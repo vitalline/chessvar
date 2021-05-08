@@ -58,6 +58,7 @@ class Board(ColorLayer):
 
         # super boring initialization stuff (bluh bluh)
         self.board_width, self.board_height = board_width, board_height
+        self.clicked_piece = None
         self.selected_piece = None
         self.turn_side = Side.WHITE
         self.piece_sprites = list()
@@ -186,8 +187,9 @@ class Board(ColorLayer):
             self.move_markers.remove(child)
 
     def on_mouse_press(self, x, y, buttons, modifiers) -> None:
-        if buttons == 1:  # LMB
+        if buttons & 1:  # LMB
             pos = self.get_coordinates(x, y)
+            self.clicked_piece = pos  # we need this in order to discern what are we dragging
             if self.not_movable(pos):
                 return
             self.deselect_piece()  # just in case we had something previously selected
@@ -203,16 +205,16 @@ class Board(ColorLayer):
 
     def on_mouse_drag(self, x, y, dx, dy, buttons, modifiers) -> None:
         self.on_mouse_motion(x, y, dx, dy)  # move the highlight as well!
-        if buttons == 1 and not self.not_a_piece(self.selected_piece):
+        if buttons & 1 and self.clicked_piece == self.selected_piece:  # if we are dragging the selected piece:
             sprite = self.get_piece(self.selected_piece)
             sprite.x = x
             sprite.y = y
 
     def on_mouse_release(self, x, y, buttons, modifiers) -> None:
-        if buttons == 1:  # LMB
+        if buttons & 1:  # LMB
             if self.nothing_selected():
                 return
-
+            self.clicked_piece = None
             selected = self.selected_piece
             pos = self.get_coordinates(x, y)
             if self.not_on_board(pos):
