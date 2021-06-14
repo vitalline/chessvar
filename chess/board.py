@@ -1,4 +1,3 @@
-from itertools import product
 from random import sample
 
 from cocos import scene
@@ -6,6 +5,8 @@ from cocos.batch import BatchNode
 from cocos.director import director
 from cocos.layer import ColorLayer
 from cocos.sprite import Sprite
+
+from pyglet.window import key, mouse
 
 from chess.movement import *
 from chess.movement.base import *
@@ -80,7 +81,8 @@ class Board(ColorLayer):
         global movements
         movements = get_movements(self)
         # self.movements = [None] + movements[-1:-6:-1]
-        self.movements = [None] + sample(movements[1:], 5)
+        self.movements = [None] + sample(movements, 5)
+        self.movements[1].directions = balance_pawn(self.movements[1].directions)
         self.types = [Type.NONE] + sample(list(Type.__members__.values())[1:], 5)
 
         for row in range(self.board_height):
@@ -104,6 +106,33 @@ class Board(ColorLayer):
             self.pieces.add(self.piece_sprites[row][col])
 
         director.run(scene.Scene(self))
+
+    def reset_movements(self):
+        self.movements = [None] + sample(movements, 5)
+        self.movements[1].directions = balance_pawn(self.movements[1].directions)
+        self.types = [Type.NONE] + sample(list(Type.__members__.values())[1:], 5)
+
+    def reset_board(self):
+        self.deselect_piece()  # you know, just in case
+        self.turn_side = Side.WHITE
+
+        for sprite in self.pieces.get_children():
+            self.pieces.remove(sprite)
+
+        self.piece_sprites = list()
+
+        for row in range(self.board_height):
+            self.piece_sprites += [[]]
+
+        for row, col in product(range(self.board_height), range(self.board_width)):
+            self.piece_sprites[row] += [Piece(self,
+                                              sides[row][col],
+                                              self.types[types[row][col]],
+                                              movement=self.movements[types[row][col]])]
+            self.piece_sprites[row][col].position = self.get_position((row, col))
+            self.piece_sprites[row][col].color = get_royal_color(sides[row][col]) \
+                if types[row][col] == 5 else (255, 255, 255)
+            self.pieces.add(self.piece_sprites[row][col])
 
     def get_coordinates(self, x: float, y: float) -> Tuple[int, int]:
         window_width, window_height = director.get_window_size()
@@ -187,7 +216,7 @@ class Board(ColorLayer):
             self.move_markers.remove(child)
 
     def on_mouse_press(self, x, y, buttons, modifiers) -> None:
-        if buttons & 1:  # LMB
+        if buttons & mouse.LEFT:
             pos = self.get_coordinates(x, y)
             self.clicked_piece = pos  # we need this in order to discern what are we dragging
             if self.not_movable(pos):
@@ -205,13 +234,13 @@ class Board(ColorLayer):
 
     def on_mouse_drag(self, x, y, dx, dy, buttons, modifiers) -> None:
         self.on_mouse_motion(x, y, dx, dy)  # move the highlight as well!
-        if buttons & 1 and self.clicked_piece == self.selected_piece:  # if we are dragging the selected piece:
+        if buttons & mouse.LEFT and self.clicked_piece == self.selected_piece:  # if we are dragging the selected piece:
             sprite = self.get_piece(self.selected_piece)
             sprite.x = x
             sprite.y = y
 
     def on_mouse_release(self, x, y, buttons, modifiers) -> None:
-        if buttons & 1:  # LMB
+        if buttons & mouse.LEFT:
             if self.nothing_selected():
                 return
             self.clicked_piece = None
@@ -235,6 +264,12 @@ class Board(ColorLayer):
             self.pieces.add(self.piece_sprites[selected[0]][selected[1]])  # and attach it to the piece rendering node
 
             self.turn_side = self.turn_side.opponent()
+
+    def on_key_press(self, symbol, modifiers):
+        if symbol == key.R:
+            if modifiers & key.MOD_ACCEL:  # CMD on OSX, CTRL otherwise
+                self.reset_movements()
+            self.reset_board()
 
     def run(self):
         pass
