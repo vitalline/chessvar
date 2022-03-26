@@ -55,7 +55,7 @@ class Board(ColorLayer):
 
     def __init__(self):
         self.is_event_handler = True
-        director.init(width=500, height=500, autoscale=False)
+        director.init(width=500, height=500, caption='Not Chess', autoscale=False)
         super().__init__(192, 168, 142, 1000)
 
         # super boring initialization stuff (bluh bluh)

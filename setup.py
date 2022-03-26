@@ -14,6 +14,9 @@ def gen_data_files(source_dirs):
 setup(
     name='chess',
     version='0.0.1',
-    options={"build_exe": {'include_files': gen_data_files([join('assets', 'pieces'), join('assets', 'util')])}},
-    executables=[Executable("main.py", base="Win32GUI")]
+    options={'build_exe': {
+        'build_exe': join('build', 'Not Chess'),
+        'include_files': gen_data_files([join('assets', 'pieces'), join('assets', 'util')])
+    }},
+    executables=[Executable('main.py', target_name='Not Chess.exe', base='Win32GUI')]
 )
