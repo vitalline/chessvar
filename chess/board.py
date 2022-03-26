@@ -5,6 +5,7 @@ from cocos.batch import BatchNode
 from cocos.director import director
 from cocos.layer import ColorLayer
 from cocos.sprite import Sprite
+from cocos.text import Label
 
 from pyglet.window import key, mouse
 
@@ -54,16 +55,19 @@ class Board(ColorLayer):
 
     def __init__(self):
         self.is_event_handler = True
-        director.init(autoscale=False)
+        director.init(width=500, height=500, autoscale=False)
         super().__init__(192, 168, 142, 1000)
 
         # super boring initialization stuff (bluh bluh)
         self.board_width, self.board_height = board_width, board_height
         self.clicked_piece = None
         self.selected_piece = None
+        self.piece_was_clicked = False  # used to discern two-click moving from dragging
         self.turn_side = Side.WHITE
         self.piece_sprites = list()
         self.board_sprites = list()
+        self.row_labels = list()
+        self.col_labels = list()
         self.moves = list()
         self.board = BatchNode()
         self.highlight = Sprite("assets/util/highlight.png", color=highlight_color, opacity=0)
@@ -85,9 +89,30 @@ class Board(ColorLayer):
         self.movements[1].directions = balance_pawn(self.movements[1].directions)
         self.types = [Type.NONE] + sample(list(Type.__members__.values())[1:], 5)
 
+        label_kwargs = {
+            'font_name': 'Courier New',
+            'font_size': 20,
+            'bold': True,
+            'color': (0, 0, 0, 1000)
+        }
+
         for row in range(self.board_height):
             self.board_sprites += [[]]
             self.piece_sprites += [[]]
+            self.row_labels += [
+                Label(str(row + 1), self.get_position((row, -0.9)),
+                      anchor_x='center', anchor_y='center', **label_kwargs),
+                Label(str(row + 1), self.get_position((row, 7.9)),
+                      anchor_x='center', anchor_y='center', **label_kwargs),
+            ]
+
+        for col in range(self.board_width):
+            self.row_labels += [
+                Label(chr(col + ord('a')), self.get_position((-0.9, col)),
+                      anchor_x='center', anchor_y='center', **label_kwargs),
+                Label(chr(col + ord('a')), self.get_position((7.9, col)),
+                      anchor_x='center', anchor_y='center', **label_kwargs),
+            ]
 
         for row, col in product(range(self.board_height), range(self.board_width)):
 
@@ -104,6 +129,9 @@ class Board(ColorLayer):
             self.piece_sprites[row][col].color = get_royal_color(sides[row][col]) \
                 if types[row][col] == 5 else (255, 255, 255)
             self.pieces.add(self.piece_sprites[row][col])
+
+        for label in self.row_labels + self.col_labels:
+            self.add(label, z=1)
 
         director.run(scene.Scene(self))
 
@@ -201,6 +229,7 @@ class Board(ColorLayer):
 
     def deselect_piece(self) -> None:
         self.selection.opacity = 0
+        self.piece_was_clicked = False
 
         if self.nothing_selected():
             return
@@ -243,14 +272,21 @@ class Board(ColorLayer):
         if buttons & mouse.LEFT:
             if self.nothing_selected():
                 return
-            self.clicked_piece = None
             selected = self.selected_piece
             pos = self.get_coordinates(x, y)
             if self.not_on_board(pos):
+                if self.piece_was_clicked:
+                    self.deselect_piece()
+                    return
                 pos = selected  # to avoid dragging a piece off the board, place them back on their cell
             move = self.find_move(pos)
             if move is None:
+                if self.piece_was_clicked:
+                    self.deselect_piece()
+                    return
                 pos = selected  # is an invalid move has been attempted, do the same
+            self.piece_was_clicked = self.clicked_piece == pos
+            self.clicked_piece = None
             piece = self.get_piece(selected)
             piece.position = self.get_position(pos)  # place the piece on the intended position
 

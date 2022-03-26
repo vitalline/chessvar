@@ -2,8 +2,8 @@ from __future__ import annotations
 
 from enum import Enum
 from itertools import product
-from random import randint
-from typing import Type, TypeVar, TYPE_CHECKING, Optional
+from random import choice, randint
+from typing import Optional, Type, TypeVar, TYPE_CHECKING
 
 from chess.movement.move import Move
 from chess.movement.util import *
@@ -69,6 +69,16 @@ def balance_pawn(directions: DirectionsType) -> DirectionsType:
         inversion = rows, -cols, times
         result = merge(result, [direction])
         result = merge(result, [inversion])
+    has_forward_movement = False
+    for direction in result:
+        if direction[0] > 0:
+            has_forward_movement = True
+            break
+    if not has_forward_movement:
+        result = merge(result, choice([
+            Directions.PAWN.value,
+            Directions.PAWN2.value
+        ]))
     return result
 
 
