@@ -65,7 +65,10 @@ def balance_pawn(directions: DirectionsType) -> DirectionsType:
             direction = (*direction[:2], 1)
         elif len(direction) == 2 or direction[2] > 2:
             direction = (*direction[:2], max_distance)
-        result += [direction]
+        rows, cols, times = direction
+        inversion = rows, -cols, times
+        result = merge(result, [direction])
+        result = merge(result, [inversion])
     return result
 
 

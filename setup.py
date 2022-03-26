@@ -1,26 +1,19 @@
 from os import walk
 from os.path import join
-from distutils.core import setup
-import py2exe
+from cx_Freeze import setup, Executable
 
 
 def gen_data_files(source_dirs):
     data_files = []
     for source_dir in source_dirs:
         for path, dirs, files in walk(source_dir):
-            data_files.append((path, [join(path, file) for file in files]))
+            data_files += [(join(path, file), join(path, file)) for file in files]
     return data_files
 
 
 setup(
     name='chess',
     version='0.0.1',
-    windows=['main.py'],
-    packages=['chess'],
-    data_files=gen_data_files([join('assets', 'pieces'), join('assets', 'util')]),
-    url='',
-    license='',
-    author='vale.a',
-    author_email='',
-    description='',
+    options={"build_exe": {'include_files': gen_data_files([join('assets', 'pieces'), join('assets', 'util')])}},
+    executables=[Executable("main.py", base="Win32GUI")]
 )
