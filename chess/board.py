@@ -57,6 +57,7 @@ class Board(ColorLayer):
         self.is_event_handler = True
         director.init(width=500, height=500, caption='Not Chess', autoscale=False)
         super().__init__(192, 168, 142, 1000)
+        director.window.remove_handlers(director._default_event_handler)
 
         # super boring initialization stuff (bluh bluh)
         self.board_width, self.board_height = board_width, board_height
@@ -306,12 +307,15 @@ class Board(ColorLayer):
             if modifiers & key.MOD_ACCEL:  # CMD on OSX, CTRL otherwise
                 self.reset_movements()
             self.reset_board()
+            return
         if symbol == key.T and modifiers & key.MOD_ACCEL:
             self.turn_side = Side.ANY
         if symbol == key.W and modifiers & key.MOD_ACCEL:
             self.turn_side = Side.WHITE
         if symbol == key.B and modifiers & key.MOD_ACCEL:
             self.turn_side = Side.BLACK
+        if self.selected_piece is not None and self.turn_side not in (self.get_side(self.selected_piece), Side.ANY):
+            self.deselect_piece()
 
     def run(self):
         pass
