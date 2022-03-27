@@ -1,21 +1,21 @@
 from __future__ import annotations
 
 from enum import Enum
-from itertools import product
-from random import choice, randint
-from typing import Optional, Type, TypeVar, TYPE_CHECKING
+import itertools
+import random
+import typing
 
 from chess.movement.move import Move
 from chess.movement.util import *
 
-if TYPE_CHECKING:
+if typing.TYPE_CHECKING:
     from chess.board import Board
 
-DirectionType = Tuple[int, int, Optional[int]]
+DirectionType = Tuple[int, int, typing.Optional[int]]
 DirectionsType = List[DirectionType]
 
 
-class Directions(Enum):
+class Directions(DirectionsType, Enum):
     NONE = []
     PAWN = [(1, 0, 1)]
     KNIGHT = sym([(1, 2, 1), (2, 1, 1)])
@@ -60,7 +60,7 @@ def merge(a: DirectionsType, b: DirectionsType) -> DirectionsType:
 def balance_pawn(directions: DirectionsType) -> DirectionsType:
     result = []
     for direction in directions:
-        max_distance = randint(1, 2)
+        max_distance = random.randint(1, 2)
         if direction[0] > 1 or direction[1] > 1:
             direction = (*direction[:2], 1)
         elif len(direction) == 2 or direction[2] > 2:
@@ -75,40 +75,40 @@ def balance_pawn(directions: DirectionsType) -> DirectionsType:
             has_forward_movement = True
             break
     if not has_forward_movement:
-        result = merge(result, choice([
-            Directions.PAWN.value,
-            Directions.PAWN2.value
+        result = merge(result, random.choice([
+            Directions.PAWN,
+            Directions.PAWN2
         ]))
     return result
 
 
 def rng_directions() -> List[DirectionsType]:
     bases = [
-        Directions.NONE.value,
-        Directions.PAWN.value,
-        Directions.PAWN2.value,
-        Directions.KNIGHT.value,
-        Directions.BISHOP.value,
-        Directions.ROOK.value,
-        Directions.QUEEN.value,
-        Directions.WAZIR.value,
-        Directions.FERZ.value,
+        Directions.NONE,
+        Directions.PAWN,
+        Directions.PAWN2,
+        Directions.KNIGHT,
+        Directions.BISHOP,
+        Directions.ROOK,
+        Directions.QUEEN,
+        Directions.WAZIR,
+        Directions.FERZ,
         sym([(2, 0, 1)]),
         sym([(2, 2, 1)]),
-        # Directions.NIGHTRIDER.value,
-        # Directions.CAMELRIDER.value,
+        # Directions.NIGHTRIDER,
+        # Directions.CAMELRIDER,
     ]
     modifiers = [
-        Directions.NONE.value,
-        Directions.NONE.value,
-        Directions.NONE.value,
-        Directions.PAWN.value,
-        Directions.PAWN2.value,
-        Directions.KNIGHT.value,
-        Directions.WAZIR.value,
-        Directions.FERZ.value,
-        Directions.CAMEL.value,
-        Directions.LANCE_SHOGI.value,
+        Directions.NONE,
+        Directions.NONE,
+        Directions.NONE,
+        Directions.PAWN,
+        Directions.PAWN2,
+        Directions.KNIGHT,
+        Directions.WAZIR,
+        Directions.FERZ,
+        Directions.CAMEL,
+        Directions.LANCE_SHOGI,
         [(1, 0), (-1, 0)],
         [(0, 1), (0, -1)],
         [(1, 0, 1), (-1, 0, 1)],
@@ -116,7 +116,7 @@ def rng_directions() -> List[DirectionsType]:
         [(1, 1, 1), (1, -1, 1)],
         [(-1, 1, 1), (-1, -1, 1)],
     ]
-    return [merge(pair[0], pair[1]) for pair in product(bases, modifiers) if pair != ([], [])]
+    return [merge(pair[0], pair[1]) for pair in itertools.product(bases, modifiers) if pair != ([], [])]
 
 
 class BaseMovement(object):
@@ -179,12 +179,12 @@ class RiderMovement(BaseDirectionalMovement):
                or self.board.get_side(move.pos_from) == self.board.get_side(move.pos_to).opponent()
 
 
-M = TypeVar('M', bound=BaseMovement)
+M = typing.TypeVar('M', bound=BaseMovement)
 
 
-def gen_movement(board: Board, base_type: Type[M], params: DirectionsType):
+def gen_movement(board: Board, base_type: typing.Type[M], params: DirectionsType):
     return type('', (base_type, object), {})(board, params)
 
 
-def gen_movements(board: Board, settings: List[Tuple[Type[M], DirectionsType]]):
+def gen_movements(board: Board, settings: List[Tuple[typing.Type[M], DirectionsType]]):
     return [gen_movement(board, setting[0], setting[1]) for setting in settings]

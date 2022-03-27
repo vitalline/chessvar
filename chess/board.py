@@ -1,3 +1,4 @@
+from itertools import product
 from random import sample
 
 from cocos import scene
@@ -70,6 +71,7 @@ class Board(ColorLayer):
         self.row_labels = list()
         self.col_labels = list()
         self.moves = list()
+        self.no_moves = gen_movement(self, RiderMovement, Directions.NONE)
         self.board = BatchNode()
         self.highlight = Sprite("assets/util/highlight.png", color=highlight_color, opacity=0)
         self.selection = Sprite("assets/util/selection.png", opacity=0)
@@ -86,7 +88,7 @@ class Board(ColorLayer):
         global movements
         movements = get_movements(self)
         # self.movements = [None] + movements[-1:-6:-1]
-        self.movements = [None] + sample(movements, 5)
+        self.movements = [self.no_moves] + sample(movements, 5)
         self.movements[1].directions = balance_pawn(self.movements[1].directions)
         self.types = [Type.NONE] + sample(list(Type.__members__.values())[1:], 5)
 
@@ -137,7 +139,7 @@ class Board(ColorLayer):
         director.run(scene.Scene(self))
 
     def reset_movements(self):
-        self.movements = [None] + sample(movements, 5)
+        self.movements = [self.no_moves] + sample(movements, 5)
         self.movements[1].directions = balance_pawn(self.movements[1].directions)
         self.types = [Type.NONE] + sample(list(Type.__members__.values())[1:], 5)
 
@@ -170,7 +172,7 @@ class Board(ColorLayer):
         row = round((y - window_height / 2) / cell_size + (self.board_height - 1) / 2)
         return row, col
 
-    def get_position(self, pos: Tuple[int, int]) -> Tuple[float, float]:
+    def get_position(self, pos: Tuple[float, float]) -> Tuple[float, float]:
         window_width, window_height = director.get_window_size()
         row, col = pos
         x = (col - (self.board_width - 1) / 2) * cell_size + window_width / 2

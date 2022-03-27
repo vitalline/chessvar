@@ -1,11 +1,11 @@
 from __future__ import annotations
 
 from enum import Enum
-from typing import Tuple, TYPE_CHECKING, Optional, Union
+import typing
 
 from cocos.sprite import Sprite
 
-if TYPE_CHECKING:
+if typing.TYPE_CHECKING:
     from chess.board import Board
 
 from chess.movement.base import BaseMovement
@@ -25,7 +25,7 @@ class Side(Enum):
         else:
             return self
 
-    def direction(self, dpos: Union[Tuple[int, int], Tuple[int, int, int]]):
+    def direction(self, dpos: typing.Union[typing.Tuple[int, int], typing.Tuple[int, int, int]]):
         if self == Side.WHITE:
             return dpos
         elif self == Side.BLACK:
@@ -66,7 +66,7 @@ class Piece(Sprite):
     def __init__(self, board: Board,
                  side: Side = Side.NONE,
                  piece_type: Type = Type.NONE,
-                 movement: Optional[BaseMovement] = None):
+                 movement: typing.Optional[BaseMovement] = None):
         if side == Side.NONE or piece_type == Type.NONE:
             super().__init__("assets/util/none.png")
         else:
@@ -79,5 +79,5 @@ class Piece(Sprite):
     def is_empty(self):
         return self.side == Side.NONE or self.type == Type.NONE
 
-    def moves(self, pos: Tuple[int, int]):  # convenience method
+    def moves(self, pos: typing.Tuple[int, int]):  # convenience method
         return self.movement.moves(pos)
