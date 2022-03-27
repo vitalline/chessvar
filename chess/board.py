@@ -196,7 +196,7 @@ class Board(ColorLayer):
         return self.not_a_piece(self.selected_piece)
 
     def not_movable(self, pos: Union[None, Tuple[int, int]]) -> bool:
-        return self.not_a_piece(pos) or self.get_piece(pos).side != self.turn_side
+        return self.not_a_piece(pos) or self.turn_side not in (self.get_piece(pos).side, Side.ANY)
 
     def find_move(self, pos: Tuple[int, int]) -> Union[None, Move]:
         for move in self.moves:
@@ -306,6 +306,12 @@ class Board(ColorLayer):
             if modifiers & key.MOD_ACCEL:  # CMD on OSX, CTRL otherwise
                 self.reset_movements()
             self.reset_board()
+        if symbol == key.T and modifiers & key.MOD_ACCEL:
+            self.turn_side = Side.ANY
+        if symbol == key.W and modifiers & key.MOD_ACCEL:
+            self.turn_side = Side.WHITE
+        if symbol == key.B and modifiers & key.MOD_ACCEL:
+            self.turn_side = Side.BLACK
 
     def run(self):
         pass

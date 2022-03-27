@@ -15,6 +15,7 @@ class Side(Enum):
     NONE = 0
     WHITE = 1
     BLACK = 2
+    ANY = -1
 
     def opponent(self):
         if self == Side.WHITE:
