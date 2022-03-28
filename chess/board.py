@@ -14,21 +14,23 @@ from chess.movement import *
 from chess.movement.base import *
 from chess.piece import Piece, Side, Type
 
-piece_row = [2, 3, 4, 5, 5, 4, 3, 2]
-pawn_row = [1] * 8
-empty_row = [0] * 8
-
-white_row = [Side.WHITE] * 8
-black_row = [Side.BLACK] * 8
-neutral_row = [Side.NONE] * 8
-
-types = [piece_row, pawn_row, empty_row, empty_row, empty_row, empty_row, pawn_row, piece_row]
-sides = [white_row, white_row, neutral_row, neutral_row, neutral_row, neutral_row, black_row, black_row]
-
 board_width = 8
 board_height = 8
-cell_size = 50
 
+piece_count = board_width // 2 + board_width % 2 + 1
+side_pieces = [i + 2 for i in range(piece_count - 2)]
+piece_row = side_pieces + [-1] * ((board_width + 1) % 2 + 1) + side_pieces[::-1]
+pawn_row = [1] * board_width
+empty_row = [0] * board_width
+
+white_row = [Side.WHITE] * board_width
+black_row = [Side.BLACK] * board_width
+neutral_row = [Side.NONE] * board_width
+
+types = [piece_row, pawn_row] + [empty_row] * (board_height - 4) + [pawn_row, piece_row]
+sides = [white_row, white_row] + [neutral_row] * (board_height - 4) + [black_row, black_row]
+
+cell_size = 50
 highlight_color = 255, 255, 204
 highlight_opacity = 25
 selection_opacity = 50
@@ -56,7 +58,9 @@ class Board(ColorLayer):
 
     def __init__(self):
         self.is_event_handler = True
-        director.init(width=500, height=500, caption='Not Chess', autoscale=False)
+        director.init(width=(board_width+2)*cell_size,
+                      height=(board_height+2)*cell_size,
+                      caption='Not Chess', autoscale=False)
         super().__init__(192, 168, 142, 1000)
         director.window.remove_handlers(director._default_event_handler)
 
@@ -88,9 +92,9 @@ class Board(ColorLayer):
         global movements
         movements = get_movements(self)
         # self.movements = [None] + movements[-1:-6:-1]
-        self.movements = [self.no_moves] + sample(movements, 5)
+        self.movements = [self.no_moves] + sample(movements, piece_count)
         self.movements[1].directions = balance_pawn(self.movements[1].directions)
-        self.types = [Type.NONE] + sample(list(Type.__members__.values())[1:], 5)
+        self.types = [Type.NONE] + sample(list(Type.__members__.values())[1:], piece_count)
 
         label_kwargs = {
             'font_name': 'Courier New',
@@ -105,7 +109,7 @@ class Board(ColorLayer):
             self.row_labels += [
                 Label(str(row + 1), self.get_position((row, -0.9)),
                       anchor_x='center', anchor_y='center', **label_kwargs),
-                Label(str(row + 1), self.get_position((row, 7.9)),
+                Label(str(row + 1), self.get_position((row, board_width - 0.1)),
                       anchor_x='center', anchor_y='center', **label_kwargs),
             ]
 
@@ -113,7 +117,7 @@ class Board(ColorLayer):
             self.row_labels += [
                 Label(chr(col + ord('a')), self.get_position((-0.9, col)),
                       anchor_x='center', anchor_y='center', **label_kwargs),
-                Label(chr(col + ord('a')), self.get_position((7.9, col)),
+                Label(chr(col + ord('a')), self.get_position((board_height - 0.1, col)),
                       anchor_x='center', anchor_y='center', **label_kwargs),
             ]
 
@@ -130,7 +134,7 @@ class Board(ColorLayer):
                                               movement=self.movements[types[row][col]])]
             self.piece_sprites[row][col].position = self.get_position((row, col))
             self.piece_sprites[row][col].color = get_royal_color(sides[row][col]) \
-                if types[row][col] == 5 else (255, 255, 255)
+                if types[row][col] == -1 else (255, 255, 255)
             self.pieces.add(self.piece_sprites[row][col])
 
         for label in self.row_labels + self.col_labels:
@@ -139,9 +143,9 @@ class Board(ColorLayer):
         director.run(scene.Scene(self))
 
     def reset_movements(self):
-        self.movements = [self.no_moves] + sample(movements, 5)
+        self.movements = [self.no_moves] + sample(movements, piece_count)
         self.movements[1].directions = balance_pawn(self.movements[1].directions)
-        self.types = [Type.NONE] + sample(list(Type.__members__.values())[1:], 5)
+        self.types = [Type.NONE] + sample(list(Type.__members__.values())[1:], piece_count)
 
     def reset_board(self):
         self.deselect_piece()  # you know, just in case
@@ -162,7 +166,7 @@ class Board(ColorLayer):
                                               movement=self.movements[types[row][col]])]
             self.piece_sprites[row][col].position = self.get_position((row, col))
             self.piece_sprites[row][col].color = get_royal_color(sides[row][col]) \
-                if types[row][col] == 5 else (255, 255, 255)
+                if types[row][col] == -1 else (255, 255, 255)
             self.pieces.add(self.piece_sprites[row][col])
 
     def get_coordinates(self, x: float, y: float) -> Tuple[int, int]:
