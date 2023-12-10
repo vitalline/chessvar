@@ -11,11 +11,8 @@ from chess.movement.util import *
 if typing.TYPE_CHECKING:
     from chess.board import Board
 
-DirectionType = Tuple[int, int, typing.Optional[int]]
-DirectionsType = List[DirectionType]
 
-
-class Directions(DirectionsType, Enum):
+class Directions(list[AnyPosition], Enum):
     NONE = []
     PAWN = [(1, 0, 1)]
     KNIGHT = sym([(1, 2, 1), (2, 1, 1)])
@@ -43,7 +40,7 @@ class Directions(DirectionsType, Enum):
     CAMELRIDER = sym([(1, 3), (3, 1)])
 
 
-def merge(a: DirectionsType, b: DirectionsType) -> DirectionsType:
+def merge(a: list[AnyPosition], b: list[AnyPosition]) -> list[AnyPosition]:
     result = a.copy()
     for i in b:
         skip = False
@@ -57,7 +54,7 @@ def merge(a: DirectionsType, b: DirectionsType) -> DirectionsType:
     return result
 
 
-def balance_pawn(directions: DirectionsType) -> DirectionsType:
+def balance_pawn(directions: list[AnyPosition]) -> list[AnyPosition]:
     result = []
     for direction in directions:
         max_distance = random.randint(1, 2)
@@ -82,7 +79,7 @@ def balance_pawn(directions: DirectionsType) -> DirectionsType:
     return result
 
 
-def rng_directions() -> List[DirectionsType]:
+def rng_directions() -> list[list[AnyPosition]]:
     bases = [
         Directions.NONE,
         Directions.PAWN,
@@ -123,25 +120,25 @@ class BaseMovement(object):
     def __init__(self, board: Board):
         self.board = board
 
-    def moves(self, pos_from: Tuple[int, int]):
+    def moves(self, pos_from: Position):
         return
 
 
 class BaseDirectionalMovement(BaseMovement):
-    def __init__(self, board: Board, directions: DirectionsType):
+    def __init__(self, board: Board, directions: list[AnyPosition]):
         super().__init__(board)
         self.directions = directions
 
-    def skip_condition(self, move: Move, direction: DirectionType) -> bool:
+    def skip_condition(self, move: Move, direction: AnyPosition) -> bool:
         return False
 
-    def stop_condition(self, move: Move, direction: DirectionType) -> bool:
+    def stop_condition(self, move: Move, direction: AnyPosition) -> bool:
         return False
 
-    def transform(self, pos: Tuple[int, int]) -> Tuple[int, int]:
+    def transform(self, pos: Position) -> Position:
         return pos
 
-    def moves(self, pos_from: Tuple[int, int]):
+    def moves(self, pos_from: Position):
         if self.board.not_on_board(pos_from):
             return
         direction_id = 0
@@ -169,10 +166,10 @@ class BaseDirectionalMovement(BaseMovement):
 
 
 class RiderMovement(BaseDirectionalMovement):
-    def __init__(self, board: Board, directions: DirectionsType):
+    def __init__(self, board: Board, directions: list[AnyPosition]):
         super().__init__(board, directions)
 
-    def stop_condition(self, move: Move, direction: DirectionType) -> bool:
+    def stop_condition(self, move: Move, direction: list[AnyPosition]) -> bool:
         return self.board.not_on_board(add(move.pos_to, direction[:2])) \
                or len(direction) > 2 and (move.pos_to == add(move.pos_from, mul(direction[:2], direction[2]))) \
                or self.board.get_side(move.pos_from) == self.board.get_side(add(move.pos_to, direction[:2])) \
@@ -182,9 +179,9 @@ class RiderMovement(BaseDirectionalMovement):
 M = typing.TypeVar('M', bound=BaseMovement)
 
 
-def gen_movement(board: Board, base_type: typing.Type[M], params: DirectionsType):
+def gen_movement(board: Board, base_type: typing.Type[M], params: list[AnyPosition]):
     return type('', (base_type, object), {})(board, params)
 
 
-def gen_movements(board: Board, settings: List[Tuple[typing.Type[M], DirectionsType]]):
+def gen_movements(board: Board, settings: list[tuple[typing.Type[M], list[AnyPosition]]]):
     return [gen_movement(board, setting[0], setting[1]) for setting in settings]

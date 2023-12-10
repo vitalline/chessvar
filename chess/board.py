@@ -12,7 +12,7 @@ from pyglet.window import key, mouse
 
 from chess.movement import *
 from chess.movement.base import *
-from chess.piece import Piece, Side, Type
+from chess.pieces.piece import Piece, Side, Type
 
 board_width = 8
 board_height = 8
@@ -40,14 +40,14 @@ marker_opacity = 50
 movements = []
 
 
-def get_cell_color(pos: Tuple[int, int]) -> Tuple[int, int, int]:
+def get_cell_color(pos: Position) -> tuple[int, int, int]:
     if (pos[0] + pos[1]) % 2:
         return 255, 204, 153
     else:
         return 187, 119, 51
 
 
-def get_royal_color(side: Side) -> Tuple[int, int, int]:
+def get_royal_color(side: Side) -> tuple[int, int, int]:
     if side == Side.WHITE:
         return 255, 255, 204
     else:
@@ -169,14 +169,14 @@ class Board(ColorLayer):
                 if types[row][col] == -1 else (255, 255, 255)
             self.pieces.add(self.piece_sprites[row][col])
 
-    def get_coordinates(self, x: float, y: float) -> Tuple[int, int]:
+    def get_coordinates(self, x: float, y: float) -> Position:
         window_width, window_height = director.get_window_size()
         x, y = director.get_virtual_coordinates(x, y)
         col = round((x - window_width / 2) / cell_size + (self.board_width - 1) / 2)
         row = round((y - window_height / 2) / cell_size + (self.board_height - 1) / 2)
         return row, col
 
-    def get_position(self, pos: Tuple[float, float]) -> Tuple[float, float]:
+    def get_position(self, pos: tuple[float, float]) -> tuple[float, float]:
         window_width, window_height = director.get_window_size()
         row, col = pos
         x = (col - (self.board_width - 1) / 2) * cell_size + window_width / 2
@@ -184,34 +184,34 @@ class Board(ColorLayer):
         return x, y
 
     # From now on we shall unanimously assume that the first coordinate corresponds to row number (AKA vertical axis).
-    def get_cell(self, pos: Tuple[int, int]) -> Sprite:
+    def get_cell(self, pos: Position) -> Sprite:
         return self.board_sprites[pos[0]][pos[1]]
 
-    def get_piece(self, pos: Tuple[int, int]) -> Piece:
+    def get_piece(self, pos: Position) -> Piece:
         return self.piece_sprites[pos[0]][pos[1]]
 
-    def get_side(self, pos: Tuple[int, int]) -> Side:
+    def get_side(self, pos: Position) -> Side:
         return self.get_piece(pos).side
 
-    def not_on_board(self, pos: Tuple[int, int]) -> bool:
+    def not_on_board(self, pos: Position) -> bool:
         return pos[0] < 0 or pos[0] >= self.board_height or pos[1] < 0 or pos[1] >= self.board_width
 
-    def not_a_piece(self, pos: Union[None, Tuple[int, int]]) -> bool:
+    def not_a_piece(self, pos: Position | None) -> bool:
         return pos is None or self.not_on_board(pos) or self.get_piece(pos).is_empty()
 
     def nothing_selected(self) -> bool:
         return self.not_a_piece(self.selected_piece)
 
-    def not_movable(self, pos: Union[None, Tuple[int, int]]) -> bool:
+    def not_movable(self, pos: Position | None) -> bool:
         return self.not_a_piece(pos) or self.turn_side not in (self.get_piece(pos).side, Side.ANY)
 
-    def find_move(self, pos: Tuple[int, int]) -> Union[None, Move]:
+    def find_move(self, pos: Position) -> Move | None:
         for move in self.moves:
             if pos == move.pos_to:
                 return move
         return None
 
-    def select_piece(self, pos: Tuple[int, int]) -> None:
+    def select_piece(self, pos: Position) -> None:
         if self.not_on_board(pos):
             return  # there's nothing to select off the board
         if pos == self.selected_piece:
@@ -285,7 +285,7 @@ class Board(ColorLayer):
                 if self.piece_was_clicked:
                     self.deselect_piece()
                     return
-                pos = selected  # to avoid dragging a piece off the board, place them back on their cell
+                pos = selected  # to avoid dragging a piece off the board, place it back on its cell
             move = self.find_move(pos)
             if move is None:
                 if self.piece_was_clicked:
