@@ -5,6 +5,8 @@ import typing
 
 from cocos.sprite import Sprite
 
+from chess.movement.util import AnyPosition
+
 if typing.TYPE_CHECKING:
     from chess.board import Board
 
@@ -25,7 +27,7 @@ class Side(Enum):
         else:
             return self
 
-    def direction(self, dpos: typing.Union[typing.Tuple[int, int], typing.Tuple[int, int, int]]):
+    def direction(self, dpos: AnyPosition) -> AnyPosition:
         if self == Side.WHITE:
             return dpos
         elif self == Side.BLACK:
@@ -34,50 +36,23 @@ class Side(Enum):
             return 0, 0
 
 
-class Type(Enum):
-    NONE = 0
-    PAWN = 1
-    KNIGHT = 2
-    BISHOP = 3
-    ROOK = 4
-    QUEEN = 5
-    KING = 6
-    AMAZON = 7
-    ARCHBISHOP = 8
-    BOAT = 9
-    CENTAUR = 10
-    CHAMPION = 11
-    CHANCELLOR = 12
-    DRAGON = 13
-    ELEPHANT = 14
-    EMPRESS = 15
-    GIRAFFE = 16
-    GRASSHOPPER = 17
-    MANN = 18
-    NIGHTRIDER = 19
-    PRINCESS = 20
-    ROOK4 = 21
-    UNICORN = 22
-    WIZARD = 23
-    ZEBRA = 24
-
-
 class Piece(Sprite):
-    def __init__(self, board: Board,
+    def __init__(self,
+                 board: Board,
                  side: Side = Side.NONE,
-                 piece_type: Type = Type.NONE,
+                 name: str = '',
                  movement: typing.Optional[BaseMovement] = None):
-        if side == Side.NONE or piece_type == Type.NONE:
+        if side == Side.NONE or not name:
             super().__init__("assets/util/none.png")
         else:
-            super().__init__(f"assets/pieces/{side.name.lower()}_{piece_type.name.lower()}.png")
+            super().__init__(f"assets/pieces/{side.name.lower()}_{name.lower()}.png")
         self.board = board
         self.side = side
-        self.type = piece_type
+        self.name = name
         self.movement = movement if movement is not None else BaseMovement(board)
 
     def is_empty(self):
-        return self.side == Side.NONE or self.type == Type.NONE
+        return self.side == Side.NONE or not self.name
 
     def moves(self, pos: typing.Tuple[int, int]):  # convenience method
         return self.movement.moves(pos)

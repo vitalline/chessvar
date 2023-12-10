@@ -10,9 +10,9 @@ from cocos.text import Label
 
 from pyglet.window import key, mouse
 
-from chess.movement import *
+from chess.movement import demo
 from chess.movement.base import *
-from chess.pieces.piece import Piece, Side, Type
+from chess.pieces.piece import Piece, Side
 
 board_width = 8
 board_height = 8
@@ -75,7 +75,7 @@ class Board(ColorLayer):
         self.row_labels = list()
         self.col_labels = list()
         self.moves = list()
-        self.no_moves = gen_movement(self, RiderMovement, Directions.NONE)
+        self.no_moves = demo.gen_movement(self, RiderMovement, demo.Directions.NONE)
         self.board = BatchNode()
         self.highlight = Sprite("assets/util/highlight.png", color=highlight_color, opacity=0)
         self.selection = Sprite("assets/util/selection.png", opacity=0)
@@ -90,11 +90,11 @@ class Board(ColorLayer):
         self.add(self.active_pieces, z=4)
 
         global movements
-        movements = get_movements(self)
+        movements = demo.get_movements(self)
         # self.movements = [None] + movements[-1:-6:-1]
         self.movements = [self.no_moves] + sample(movements, piece_count)
-        self.movements[1].directions = balance_pawn(self.movements[1].directions)
-        self.types = [Type.NONE] + sample(list(Type.__members__.values())[1:], piece_count)
+        self.movements[1].directions = demo.balance_pawn(self.movements[1].directions)
+        self.types = [demo.PieceType.NONE] + sample(list(demo.PieceType.__members__.values())[1:], piece_count)
 
         label_kwargs = {
             'font_name': 'Courier New',
@@ -130,7 +130,7 @@ class Board(ColorLayer):
 
             self.piece_sprites[row] += [Piece(self,
                                               sides[row][col],
-                                              self.types[types[row][col]],
+                                              str(self.types[types[row][col]]),
                                               movement=self.movements[types[row][col]])]
             self.piece_sprites[row][col].position = self.get_position((row, col))
             self.piece_sprites[row][col].color = get_royal_color(sides[row][col]) \
@@ -144,8 +144,8 @@ class Board(ColorLayer):
 
     def reset_movements(self):
         self.movements = [self.no_moves] + sample(movements, piece_count)
-        self.movements[1].directions = balance_pawn(self.movements[1].directions)
-        self.types = [Type.NONE] + sample(list(Type.__members__.values())[1:], piece_count)
+        self.movements[1].directions = demo.balance_pawn(self.movements[1].directions)
+        self.types = [demo.PieceType.NONE] + sample(list(demo.PieceType.__members__.values())[1:], piece_count)
 
     def reset_board(self):
         self.deselect_piece()  # you know, just in case
@@ -162,7 +162,7 @@ class Board(ColorLayer):
         for row, col in product(range(self.board_height), range(self.board_width)):
             self.piece_sprites[row] += [Piece(self,
                                               sides[row][col],
-                                              self.types[types[row][col]],
+                                              str(self.types[types[row][col]]),
                                               movement=self.movements[types[row][col]])]
             self.piece_sprites[row][col].position = self.get_position((row, col))
             self.piece_sprites[row][col].color = get_royal_color(sides[row][col]) \
