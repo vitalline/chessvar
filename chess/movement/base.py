@@ -14,7 +14,10 @@ class BaseMovement(object):
         self.board = board
 
     def moves(self, pos_from: Position):
-        return
+        return ()
+
+    def update(self):
+        pass
 
 
 class BaseDirectionalMovement(BaseMovement):
@@ -67,3 +70,33 @@ class RiderMovement(BaseDirectionalMovement):
                or len(direction) > 2 and (move.pos_to == add(move.pos_from, mul(direction[:2], direction[2]))) \
                or self.board.get_side(move.pos_from) == self.board.get_side(add(move.pos_to, direction[:2])) \
                or self.board.get_side(move.pos_from) == self.board.get_side(move.pos_to).opponent()
+
+
+class FirstMoveRiderMovement(RiderMovement):
+    def __init__(self, board: Board, directions: list[AnyPosition], first_move_directions: list[AnyPosition]):
+        super().__init__(board, directions)
+        self.first_move = True
+        self.base_directions = directions
+        self.directions = merge(self.directions, first_move_directions)
+
+    def update(self):
+        if self.first_move:
+            self.first_move = False
+            self.directions = self.base_directions
+
+
+class MoveCaptureMovement(BaseMovement):
+    def __init__(self, move: BaseMovement, capture: BaseMovement):
+        self.move = move
+        self.capture = capture
+        if self.move.board is not self.capture.board:
+            raise ValueError("Move and capture movements must be on the same board")
+        super().__init__(self.move.board)
+
+    def moves(self, pos_from: Position):
+        for move in self.move.moves(pos_from):
+            if self.board.not_a_piece(move.pos_to):
+                yield move
+        for capture in self.capture.moves(pos_from):
+            if self.board.get_side(capture.pos_to) == self.board.get_side(pos_from).opponent():
+                yield capture

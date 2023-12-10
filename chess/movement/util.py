@@ -1,3 +1,5 @@
+from itertools import zip_longest
+
 Position = tuple[int, int]
 RepeatPosition = tuple[int, int, int]
 AnyPosition = Position | RepeatPosition
@@ -20,3 +22,36 @@ def sym(poss: list[AnyPosition]) -> list[AnyPosition]:
         (pos[0], pos[1], *pos[2:]), (pos[1], -pos[0], *pos[2:]),
         (-pos[0], -pos[1], *pos[2:]), (-pos[1], pos[0], *pos[2:])
     ] for pos in poss], [])))
+
+
+def clash_min(a: tuple, b: tuple) -> tuple:
+    result = []
+    for i, j in zip_longest(a, b, fillvalue=None):
+        if i is None and j is not None:
+            result.append(j)
+        if i is not None and j is None:
+            result.append(i)
+        if i is not None and j is not None:
+            result.append(min(i, j))
+    return tuple(result)
+
+
+def clash_max(a: tuple, b: tuple) -> tuple:
+    result = []
+    for i, j in zip_longest(a, b, fillvalue=None):
+        if i is None or j is None:
+            break
+        if i is not None and j is not None:
+            result.append(max(i, j))
+    return tuple(result)
+
+
+def merge(a: list[AnyPosition], b: list[AnyPosition], clash=clash_max) -> list[AnyPosition]:
+    data = {}
+    for i in a + b:
+        if i[:2] not in data:
+            data[i[:2]] = i[2:]
+        else:
+            data[i[:2]] = clash(i[2:], data[i[:2]])
+    result = [(k[0], k[1], *v) for k, v in data.items()]
+    return result

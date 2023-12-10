@@ -71,20 +71,6 @@ class Directions(list[AnyPosition], Enum):
     CAMELRIDER = sym([(1, 3), (3, 1)])
 
 
-def merge(a: list[AnyPosition], b: list[AnyPosition]) -> list[AnyPosition]:
-    result = a.copy()
-    for i in b:
-        skip = False
-        for j in a:
-            if i[:2] == j[:2]:
-                skip = True
-                break
-        if skip:
-            continue
-        result += [i]
-    return result
-
-
 def balance_pawn(directions: list[AnyPosition]) -> list[AnyPosition]:
     result = []
     for direction in directions:
@@ -95,8 +81,8 @@ def balance_pawn(directions: list[AnyPosition]) -> list[AnyPosition]:
             direction = (*direction[:2], max_distance)
         rows, cols, times = direction
         inversion = rows, -cols, times
-        result = merge(result, [direction])
-        result = merge(result, [inversion])
+        result = merge(result, [direction], clash_min)
+        result = merge(result, [inversion], clash_min)
     has_forward_movement = False
     for direction in result:
         if direction[0] > 0:
@@ -106,7 +92,7 @@ def balance_pawn(directions: list[AnyPosition]) -> list[AnyPosition]:
         result = merge(result, random.choice([
             Directions.PAWN,
             Directions.PAWN2
-        ]))
+        ]), clash_min)
     return result
 
 

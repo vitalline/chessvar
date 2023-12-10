@@ -5,7 +5,7 @@ import typing
 
 from cocos.sprite import Sprite
 
-from chess.movement.util import AnyPosition
+from chess.movement.util import AnyPosition, Position
 
 if typing.TYPE_CHECKING:
     from chess.board import Board
@@ -20,39 +20,93 @@ class Side(Enum):
     ANY = -1
 
     def opponent(self):
-        if self == Side.WHITE:
-            return Side.BLACK
-        elif self == Side.BLACK:
-            return Side.WHITE
-        else:
-            return self
+        match self:
+            case Side.WHITE:
+                return Side.BLACK
+            case Side.BLACK:
+                return Side.WHITE
+            case _:
+                return self
 
     def direction(self, dpos: AnyPosition) -> AnyPosition:
-        if self == Side.WHITE:
-            return dpos
-        elif self == Side.BLACK:
-            return -dpos[0], dpos[1], *dpos[2:]
-        else:
-            return 0, 0
+        match self:
+            case Side.WHITE:
+                return dpos
+            case Side.BLACK:
+                return -dpos[0], dpos[1], *dpos[2:]
+            case _:
+                return 0, 0
+
+    def name(self):
+        match self:
+            case Side.WHITE:
+                return "White "
+            case Side.BLACK:
+                return "Black "
+            case _:
+                return ""
+
+    def file_name(self):
+        match self:
+            case Side.WHITE:
+                return "white"
+            case Side.BLACK:
+                return "black"
+            case _:
+                return "none"
 
 
 class Piece(Sprite):
     def __init__(self,
                  board: Board,
+                 board_pos: Position | None = None,
                  side: Side = Side.NONE,
                  name: str = '',
-                 movement: typing.Optional[BaseMovement] = None):
-        if side == Side.NONE or not name:
-            super().__init__("assets/util/none.png")
-        else:
-            super().__init__(f"assets/pieces/{side.name.lower()}_{name.lower()}.png")
+                 file_name: str = '',
+                 asset_folder: str = 'util',
+                 movement: BaseMovement | None = None):
         self.board = board
+        self.board_pos = board_pos
         self.side = side
         self.name = name
+        self.file_name = file_name or name.lower()
+        self.asset_folder = asset_folder
         self.movement = movement if movement is not None else BaseMovement(board)
+        super().__init__(f"assets/{self.asset_folder}/{self.file_name}.png")
+        if self.board_pos is not None:
+            self.position = self.board.get_screen_position(self.board_pos)
 
     def is_empty(self):
         return self.side == Side.NONE or not self.name
 
+    def move(self, pos_to: typing.Tuple[int, int]) -> bool:
+        move_result = self.board.move(self, pos_to)
+        if move_result:
+            self.movement.update()
+        return move_result
+
     def moves(self, pos: typing.Tuple[int, int]):  # convenience method
         return self.movement.moves(pos)
+
+
+class PromotablePiece(Piece):
+    def __init__(self,
+                 board: Board,
+                 board_pos: Position | None = None,
+                 side: Side = Side.NONE,
+                 name: str = '',
+                 file_name: str = '',
+                 asset_folder: str = 'util',
+                 movement: BaseMovement | None = None,
+                 promotions: list[typing.Type[Piece]] | None = None,
+                 promotion_tiles: set[Position] | None = None):
+        super().__init__(board, board_pos, side, name, file_name, asset_folder, movement)
+        self.promotions = promotions or []
+        self.promotion_tiles = promotion_tiles or set()
+
+    def move(self, pos_to: typing.Tuple[int, int]) -> bool:
+        move_result = super().move(pos_to)
+        if move_result and self.board_pos in self.promotion_tiles:
+            self.movement.update()
+            self.board.start_promotion(self)
+        return move_result
