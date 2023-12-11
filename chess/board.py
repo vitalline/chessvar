@@ -16,7 +16,9 @@ from chess.movement import movement
 from chess.movement.move import Move
 from chess.movement.util import Position, add
 from chess.pieces import pieces as abc
-from chess.pieces.groups import classic as fide, colorbound as cb, knights as kn, rookies as rk, util
+from chess.pieces.groups import classic as fide, colorbound as cb, forward as fw
+from chess.pieces.groups import knights as kn, pizza as pz, rookies as rk, util
+from chess.pieces.groups.amazon import Amazon
 from chess.pieces.pieces import Side
 
 board_width = 8
@@ -27,6 +29,10 @@ piece_groups = [
     [cb.Bede, cb.Waffle, cb.FAD, cb.Cardinal, cb.King, cb.FAD, cb.Waffle, cb.Bede],
     [kn.ChargeRook, kn.Fibnif, kn.ChargeKnight, kn.Colonel, fide.King, kn.ChargeKnight, kn.Fibnif, kn.ChargeRook],
     [rk.ShortRook, rk.WoodyRook, rk.HalfDuck, rk.Chancellor, fide.King, rk.HalfDuck, rk.WoodyRook, rk.ShortRook],
+    [kn.ChargeRook, cb.Waffle, fide.Bishop, rk.Chancellor, fide.King, fide.Bishop, cb.Waffle, kn.ChargeRook],
+    [rk.ShortRook, fide.Knight, fide.Bishop, Amazon, fide.King, fide.Bishop, fide.Knight, rk.ShortRook],
+    [kn.ChargeRook, fw.Knishop, fw.Bishight, fw.Forequeen, fide.King, fw.Bishight, fw.Knishop, kn.ChargeRook],
+    [pz.Pepperoni, pz.Mushroom, pz.Sausage, pz.Meatball, fide.King, pz.Sausage, pz.Mushroom, pz.Pepperoni],
 ]
 
 pawn_row = [fide.Pawn] * board_width
