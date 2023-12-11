@@ -19,10 +19,35 @@ def mul(pos: Position, factor: int) -> Position:
     return pos[0] * factor, pos[1] * factor
 
 
-def sym(poss: list[AnyPosition]) -> list[AnyPosition]:
+def rot(poss: list[AnyPosition]) -> list[AnyPosition]:
     return list(set(sum([[
         (pos[0], pos[1], *pos[2:]), (pos[1], -pos[0], *pos[2:]),
         (-pos[0], -pos[1], *pos[2:]), (-pos[1], pos[0], *pos[2:])
+    ] for pos in poss], [])))
+
+
+def rot2(poss: list[AnyPosition]) -> list[AnyPosition]:
+    return list(set(sum([[
+        (pos[0], pos[1], *pos[2:]), (-pos[0], -pos[1], *pos[2:])
+    ] for pos in poss], [])))
+
+
+def sym(poss: list[AnyPosition]) -> list[AnyPosition]:
+    return list(set(sum([[
+        (pos[0], pos[1], *pos[2:]), (pos[0], -pos[1], *pos[2:]),
+        (-pos[0], -pos[1], *pos[2:]), (-pos[0], pos[1], *pos[2:])
+    ] for pos in poss], [])))
+
+
+def symh(poss: list[AnyPosition]) -> list[AnyPosition]:
+    return list(set(sum([[
+        (pos[0], pos[1], *pos[2:]), (-pos[0], pos[1], *pos[2:])
+    ] for pos in poss], [])))
+
+
+def symv(poss: list[AnyPosition]) -> list[AnyPosition]:
+    return list(set(sum([[
+        (pos[0], pos[1], *pos[2:]), (pos[0], -pos[1], *pos[2:])
     ] for pos in poss], [])))
 
 

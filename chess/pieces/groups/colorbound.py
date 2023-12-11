@@ -3,47 +3,47 @@ from chess.movement.util import rot, sym
 from chess.pieces import pieces
 
 
-class Rook(pieces.Piece):
+class Bede(pieces.Piece):
     def __init__(self, board, board_pos, side):
         super().__init__(
             board, board_pos, side,
-            name='Rook',
+            name='Bede',
             file_name=f'{side.file_name()}_rook',
             asset_folder='classic',
-            movement=movement.RiderMovement(board, rot([(1, 0)]))
+            movement=movement.RiderMovement(board, rot([(1, 1), (2, 0, 1)]))
         )
 
 
-class Knight(pieces.Piece):
+class Waffle(pieces.Piece):
     def __init__(self, board, board_pos, side):
         super().__init__(
             board, board_pos, side,
-            name='Knight',
+            name='Waffle',
             file_name=f'{side.file_name()}_knight',
             asset_folder='classic',
-            movement=movement.RiderMovement(board, sym([(1, 2, 1), (2, 1, 1)]))
+            movement=movement.RiderMovement(board, rot([(1, 0, 1), (2, 2, 1)]))
         )
 
 
-class Bishop(pieces.Piece):
+class FAD(pieces.Piece):
     def __init__(self, board, board_pos, side):
         super().__init__(
             board, board_pos, side,
-            name='Bishop',
+            name='FAD',
             file_name=f'{side.file_name()}_bishop',
             asset_folder='classic',
-            movement=movement.RiderMovement(board, sym([(1, 1)]))
+            movement=movement.RiderMovement(board, rot([(1, 1, 1), (2, 0, 1), (2, 2, 1)]))
         )
 
 
-class Queen(pieces.Piece):
+class Cardinal(pieces.Piece):
     def __init__(self, board, board_pos, side):
         super().__init__(
             board, board_pos, side,
-            name='Queen',
+            name='Cardinal',
             file_name=f'{side.file_name()}_queen',
             asset_folder='classic',
-            movement=movement.RiderMovement(board, rot([(1, 0), (1, 1)]))
+            movement=movement.RiderMovement(board, sym([(1, 1), (1, 2, 1), (2, 1, 1)]))
         )
 
 
@@ -58,24 +58,7 @@ class King(pieces.RoyalPiece):
                 board, [
                     movement.RiderMovement(board, rot([(1, 0, 1), (1, 1, 1)])),
                     movement.CastlingMovement(board, (0, 2), (0, 3), (0, -2), [(0, 1), (0, 2)]),
-                    movement.CastlingMovement(board, (0, -2), (0, -4), (0, 3), [(0, -1), (0, -2), (0, -3)]),
+                    movement.CastlingMovement(board, (0, -3), (0, -4), (0, 2), [(0, -1), (0, -2), (0, -3)]),
                 ]
             )
-        )
-
-
-class Pawn(pieces.PromotablePiece):
-    def __init__(self, board, board_pos, side, promotions, promotion_tiles):
-        super().__init__(
-            board, board_pos, side,
-            name='Pawn',
-            file_name=f'{side.file_name()}_pawn',
-            asset_folder='classic',
-            movement=movement.MultiMovement(
-                board,
-                move=[movement.EnPassantTargetMovement(board, [(1, 0, 1)], [(1, 0, 2)], [(1, 0, 1)])],
-                capture=[movement.EnPassantMovement(board, [(1, 1, 1), (1, -1, 1)])],
-            ),
-            promotions=promotions,
-            promotion_tiles=promotion_tiles
         )

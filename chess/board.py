@@ -15,17 +15,19 @@ from chess.movement import movement
 from chess.movement.move import Move
 from chess.movement.util import Position, add
 from chess.pieces import pieces as abc
-from chess.pieces.groups import classic as fide, util
+from chess.pieces.groups import classic as fide, colorbound as cb, knights as kn, rookies as rk, util
 from chess.pieces.pieces import Side
 
 board_width = 8
 board_height = 8
 
 piece_groups = [
-    [fide.Rook, fide.Knight, fide.Bishop, fide.Queen],
+    [fide.Rook, fide.Knight, fide.Bishop, fide.Queen, fide.King, fide.Bishop, fide.Knight, fide.Rook],
+    [cb.Bede, cb.Waffle, cb.FAD, cb.Cardinal, cb.King, cb.FAD, cb.Waffle, cb.Bede],
+    [kn.ChargeRook, kn.Fibnif, kn.ChargeKnight, kn.Colonel, fide.King, kn.ChargeKnight, kn.Fibnif, kn.ChargeRook],
+    [rk.ShortRook, rk.WoodyRook, rk.HalfDuck, rk.Chancellor, fide.King, rk.HalfDuck, rk.WoodyRook, rk.ShortRook],
 ]
 
-piece_row = [0, 1, 2, 3, fide.King, 2, 1, 0]
 pawn_row = [fide.Pawn] * board_width
 empty_row = [util.NoPiece] * board_width
 
@@ -33,7 +35,7 @@ white_row = [Side.WHITE] * board_width
 black_row = [Side.BLACK] * board_width
 neutral_row = [Side.NONE] * board_width
 
-types = [piece_row, pawn_row] + [empty_row] * (board_height - 4) + [pawn_row, piece_row]
+types = [white_row, pawn_row] + [empty_row] * (board_height - 4) + [pawn_row, black_row]
 sides = [white_row, white_row] + [neutral_row] * (board_height - 4) + [black_row, black_row]
 
 white_promotion_tiles = {(board_height - 1, i) for i in range(board_width)}
@@ -188,8 +190,8 @@ class Board(ColorLayer):
         for row, col in product(range(self.board_height), range(self.board_width)):
             piece_type = types[row][col]
             piece_side = sides[row][col]
-            if isinstance(piece_type, int):
-                piece_type = self.piece_sets[piece_side][piece_type]
+            if isinstance(piece_type, abc.Side):
+                piece_type = self.piece_sets[piece_side][col]
             self.pieces[row].append(
                 piece_type(
                     self, (row, col), piece_side,
@@ -292,6 +294,8 @@ class Board(ColorLayer):
 
     def on_mouse_press(self, x, y, buttons, modifiers) -> None:
         if buttons & mouse.LEFT:
+            if self.game_over:
+                return
             pos = self.get_board_position(x, y)
             if self.promotion_piece:
                 if pos in self.promotion_area:
@@ -320,7 +324,7 @@ class Board(ColorLayer):
 
     def on_mouse_drag(self, x, y, dx, dy, buttons, modifiers) -> None:
         self.on_mouse_motion(x, y, dx, dy)  # move the highlight as well!
-        if buttons & mouse.LEFT and self.clicked_piece == self.selected_piece:  # if we are dragging the selected piece:
+        if buttons & mouse.LEFT and self.selected_piece is not None and self.clicked_piece == self.selected_piece:
             sprite = self.get_piece(self.selected_piece)
             sprite.x = x
             sprite.y = y
@@ -328,6 +332,7 @@ class Board(ColorLayer):
     def on_mouse_release(self, x, y, buttons, modifiers) -> None:
         if buttons & mouse.LEFT:
             if self.game_over:
+                self.deselect_piece()
                 return
             if self.promotion_piece:
                 return
