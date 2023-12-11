@@ -1,5 +1,6 @@
+import math
 import random
-from itertools import product
+from itertools import product, zip_longest
 from typing import Type
 
 from cocos import scene
@@ -168,9 +169,14 @@ class Board(ColorLayer):
         self.piece_sets = {side: random.choice(piece_groups) for side in self.piece_sets}
         self.promotion_types = {side: [] for side in self.promotion_types}
         for side in self.promotion_types:
-            self.promotion_types[side] = self.piece_sets[side]
-            repeats = set(self.piece_sets[side]) & set(self.piece_sets[side.opponent()])
-            self.promotion_types[side] += [piece for piece in self.piece_sets[side.opponent()] if piece not in repeats]
+            used_piece_set = set()
+            for pieces in (self.piece_sets[side], self.piece_sets[side.opponent()]):
+                promotion_types = []
+                for piece in pieces:
+                    if piece not in used_piece_set and not issubclass(piece, abc.RoyalPiece):
+                        used_piece_set.add(piece)
+                        promotion_types.append(piece)
+                self.promotion_types[side].extend(promotion_types[::-1])
 
     def reset_board(self):
         self.deselect_piece()  # you know, just in case
@@ -417,27 +423,41 @@ class Board(ColorLayer):
         self.advance_turn()
 
     def start_promotion(self, piece: abc.Piece) -> None:
-        if not isinstance(piece, abc.PromotablePiece):
+        if not isinstance(piece, abc.PromotablePiece) or not piece.promotions:
             return
         self.promotion_piece = piece
         piece_pos = piece.board_pos
-        pos = piece_pos
-        for promotion in piece.promotions:
+        area = len(piece.promotions)
+        area_height = max(4, math.ceil(math.sqrt(area)))
+        area_width = math.ceil(area / area_height)
+        area_origin = piece_pos
+        while self.not_on_board((area_origin[0] + piece.side.direction(area_height - 1), area_origin[1])):
+            area_origin = add(area_origin, piece.side.direction((-1, 0)))
+        area_origin = add(area_origin, piece.side.direction((area_height - 1, 0)))
+        area_cells = []
+        col_increment = 0
+        aim_left = area_origin[1] >= board_width / 2
+        for col, row in product(range(area_width), range(area_height)):
+            current_row = area_origin[0] + piece.side.direction(-row)
+            new_col = col + col_increment
+            current_col = area_origin[1] + ((new_col + 1) // 2 * ((aim_left + new_col) % 2 * 2 - 1))
+            while self.not_on_board((current_row, current_col)):
+                col_increment += 1
+                new_col = col + col_increment
+                current_col = area_origin[1] + ((new_col + 1) // 2 * ((aim_left + new_col) % 2 * 2 - 1))
+            area_cells.append((current_row, current_col))
+        for promotion, pos in zip_longest(piece.promotions, area_cells):
             background_sprite = Sprite(
                 "assets/util/cell.png", position=self.get_screen_position(pos), color=background_color
             )
             background_sprite.scale = cell_size / background_sprite.width
             self.promotion_area_node.add(background_sprite)
+            if promotion is None:
+                continue
             promotion_piece = promotion(self, pos, piece.side)
             promotion_piece.scale = cell_size / promotion_piece.width
             self.promotion_piece_node.add(promotion_piece)
             self.promotion_area[pos] = promotion
-            pos = add(pos, piece.side.direction((-1, 0)))
-            if self.not_on_board(pos):
-                pos = add(pos, piece.side.direction((-board_height, 0)))
-                pos = add(pos, piece.side.direction((-1, 0))[::-1])
-                if self.not_on_board(pos):
-                    pos = add(pos, piece.side.direction((-board_width, 0))[::-1])
 
     def replace(self, piece: abc.Piece, new_type: Type[abc.Piece], new_side: Side | None = None) -> None:
         if new_side is None:

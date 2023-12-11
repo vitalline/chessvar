@@ -29,14 +29,14 @@ class Side(Enum):
             case _:
                 return self
 
-    def direction(self, dpos: AnyPosition) -> AnyPosition:
+    def direction(self, dpos: AnyPosition | int | None = None) -> AnyPosition | int:
         match self:
             case Side.WHITE:
-                return dpos
+                return 1 if dpos is None else dpos if type(dpos) is int else dpos
             case Side.BLACK:
-                return -dpos[0], dpos[1], *dpos[2:]
+                return -1 if dpos is None else -dpos if type(dpos) is int else (-dpos[0], *dpos[1:])
             case _:
-                return 0, 0
+                return 0 if dpos is None else 0 if type(dpos) is int else (0, 0)
 
     def name(self):
         match self:
@@ -109,6 +109,11 @@ class PromotablePiece(Piece):
     def move(self, move: Move):
         super().move(move)
         if self.board_pos in self.promotion_tiles:
+            if not self.promotions:
+                return
+            if len(self.promotions) == 1:
+                move.set(promotion=self.promotions[0])
+                self.board.replace(self, self.promotions[0])
             self.board.start_promotion(self)
 
 
