@@ -8,8 +8,8 @@ class ChargeRook(pieces.Piece):
         super().__init__(
             board, board_pos, side,
             name='Charging Rook',
-            file_name=f'{side.file_name()}_rook',
-            asset_folder='classic',
+            file_name=f'{side.file_name()}_overlord',
+            asset_folder='medieval',
             movement=movement.RiderMovement(board, symv([(1, 0), (0, 1), (-1, 0, 1), (-1, 1, 1)]))
         )
 
@@ -19,8 +19,8 @@ class Fibnif(pieces.Piece):
         super().__init__(
             board, board_pos, side,
             name='Fibnif',
-            file_name=f'{side.file_name()}_knight',
-            asset_folder='classic',
+            file_name=f'{side.file_name()}_two_headed_knight',
+            asset_folder='fantasy',
             movement=movement.RiderMovement(board, sym([(1, 1, 1), (2, 1, 1)]))
         )
 
@@ -30,8 +30,8 @@ class ChargeKnight(pieces.Piece):
         super().__init__(
             board, board_pos, side,
             name='Charging Knight',
-            file_name=f'{side.file_name()}_bishop',
-            asset_folder='classic',
+            file_name=f'{side.file_name()}_mare',
+            asset_folder='nature',
             movement=movement.RiderMovement(board, symv([(2, 1, 1), (1, 2, 1), (0, 1, 1), (-1, 0, 1), (-1, 1, 1)]))
         )
 
@@ -41,8 +41,8 @@ class Colonel(pieces.Piece):
         super().__init__(
             board, board_pos, side,
             name='Colonel',
-            file_name=f'{side.file_name()}_queen',
-            asset_folder='classic',
+            file_name=f'{side.file_name()}_centaur_rook',
+            asset_folder='centaur',
             movement=movement.RiderMovement(
                 board, sym([(1, 1, 1)]) + symv([(2, 1, 1), (1, 2, 1), (1, 0), (0, 1), (-1, 0, 1), (-1, 1, 1)])
             )

@@ -8,8 +8,8 @@ class Bede(pieces.Piece):
         super().__init__(
             board, board_pos, side,
             name='Bede',
-            file_name=f'{side.file_name()}_rook',
-            asset_folder='classic',
+            file_name=f'{side.file_name()}_zora_bishop',
+            asset_folder='zora',
             movement=movement.RiderMovement(board, rot([(1, 1), (2, 0, 1)]))
         )
 
@@ -19,8 +19,8 @@ class Waffle(pieces.Piece):
         super().__init__(
             board, board_pos, side,
             name='Waffle',
-            file_name=f'{side.file_name()}_knight',
-            asset_folder='classic',
+            file_name=f'{side.file_name()}_sorcerer',
+            asset_folder='fantasy',
             movement=movement.RiderMovement(board, rot([(1, 0, 1), (2, 2, 1)]))
         )
 
@@ -30,8 +30,8 @@ class FAD(pieces.Piece):
         super().__init__(
             board, board_pos, side,
             name='FAD',
-            file_name=f'{side.file_name()}_bishop',
-            asset_folder='classic',
+            file_name=f'{side.file_name()}_beholder',
+            asset_folder='fantasy',
             movement=movement.RiderMovement(board, rot([(1, 1, 1), (2, 0, 1), (2, 2, 1)]))
         )
 
@@ -41,8 +41,8 @@ class Cardinal(pieces.Piece):
         super().__init__(
             board, board_pos, side,
             name='Cardinal',
-            file_name=f'{side.file_name()}_queen',
-            asset_folder='classic',
+            file_name=f'{side.file_name()}_archbishop',
+            asset_folder='medieval',
             movement=movement.RiderMovement(board, sym([(1, 1), (1, 2, 1), (2, 1, 1)]))
         )
 

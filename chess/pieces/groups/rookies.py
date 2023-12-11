@@ -8,8 +8,8 @@ class ShortRook(pieces.Piece):
         super().__init__(
             board, board_pos, side,
             name='Short Rook',
-            file_name=f'{side.file_name()}_rook',
-            asset_folder='classic',
+            file_name=f'{side.file_name()}_warden',
+            asset_folder='restrictors',
             movement=movement.RiderMovement(board, rot([(1, 0, 4)]))
         )
 
@@ -19,8 +19,8 @@ class WoodyRook(pieces.Piece):
         super().__init__(
             board, board_pos, side,
             name='Woody Rook',
-            file_name=f'{side.file_name()}_knight',
-            asset_folder='classic',
+            file_name=f'{side.file_name()}_woodland_rook',
+            asset_folder='woodland',
             movement=movement.RiderMovement(board, rot([(1, 0, 1), (2, 0, 1)]))
         )
 
@@ -30,8 +30,8 @@ class HalfDuck(pieces.Piece):
         super().__init__(
             board, board_pos, side,
             name='Half Duck',
-            file_name=f'{side.file_name()}_bishop',
-            asset_folder='classic',
+            file_name=f'{side.file_name()}_zora_knight',
+            asset_folder='zora',
             movement=movement.RiderMovement(board, rot([(1, 1, 1), (2, 0, 1), (3, 0, 1)]))
         )
 
@@ -41,7 +41,7 @@ class Chancellor(pieces.Piece):
         super().__init__(
             board, board_pos, side,
             name='Chancellor',
-            file_name=f'{side.file_name()}_queen',
-            asset_folder='classic',
+            file_name=f'{side.file_name()}_chancellor',
+            asset_folder='medieval',
             movement=movement.RiderMovement(board, rot([(1, 0), (1, 2, 1), (2, 1, 1)]))
         )
