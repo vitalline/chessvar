@@ -3,7 +3,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 from chess.movement.move import Move
-from chess.movement.util import AnyPosition, Position, add, mul, merge, clash_max
+from chess.movement.util import AnyPosition, Position, add, mul, merge, clash_max, sub
 
 if TYPE_CHECKING:
     from chess.board import Board
@@ -12,12 +12,13 @@ if TYPE_CHECKING:
 class BaseMovement(object):
     def __init__(self, board: Board):
         self.board = board
+        self.total_moves = 0
 
     def moves(self, pos_from: Position):
         return ()
 
-    def update(self):
-        pass
+    def update(self, move: Move):
+        self.board.update(move)
 
 
 class BaseDirectionalMovement(BaseMovement):
@@ -37,12 +38,13 @@ class BaseDirectionalMovement(BaseMovement):
     def moves(self, pos_from: Position):
         if self.board.not_on_board(pos_from):
             return
+        piece = self.board.get_piece(pos_from)
         direction_id = 0
         while direction_id < len(self.directions):
-            direction = self.board.get_side(pos_from).direction(self.directions[direction_id])
+            direction = piece.side.direction(self.directions[direction_id])
             current_pos = pos_from
             distance = 0
-            move = Move(pos_from, current_pos)
+            move = Move(piece, pos_from, current_pos, self)
             while not self.board.not_on_board(self.transform(current_pos)):
                 if self.stop_condition(move, direction):
                     direction_id += 1
@@ -52,13 +54,17 @@ class BaseDirectionalMovement(BaseMovement):
                 if self.board.not_on_board(self.transform(current_pos)):
                     direction_id += 1
                     break
-                move = Move(pos_from, current_pos)
+                move = Move(piece, pos_from, current_pos, self)
                 if self.skip_condition(move, direction):
                     continue
                 move.pos_to = self.transform(move.pos_to)
                 yield move
             else:
                 direction_id += 1
+
+    def update(self, move: Move):
+        self.total_moves += 1
+        super().update(move)
 
 
 class RiderMovement(BaseDirectionalMovement):
@@ -70,21 +76,77 @@ class RiderMovement(BaseDirectionalMovement):
                 self.board.not_on_board(add(move.pos_to, direction[:2]))
                 or len(direction) > 2 and (move.pos_to == add(move.pos_from, mul(direction[:2], direction[2])))
                 or self.board.get_side(move.pos_from) == self.board.get_side(add(move.pos_to, direction[:2]))
-                or self.board.get_side(move.pos_from) == self.board.get_side(move.pos_to).opponent()
+                or (
+                        self.board.get_side(move.pos_from) == self.board.get_side(move.pos_to).opponent()
+                        and not self.board.not_a_piece(move.pos_to)
+                )
         )
 
 
 class FirstMoveRiderMovement(RiderMovement):
     def __init__(self, board: Board, directions: list[AnyPosition], first_move_directions: list[AnyPosition]):
         super().__init__(board, directions)
-        self.first_move = True
         self.base_directions = directions
         self.directions = merge(self.directions, first_move_directions, clash_max)
 
-    def update(self):
-        if self.first_move:
-            self.first_move = False
+    def update(self, move: Move):
+        super().update(move)
+        if self.total_moves:
             self.directions = self.base_directions
+
+
+class CastlingMovement(BaseMovement):
+    def __init__(self, board: Board, direction: Position, other_piece: Position, other_direction: Position):
+        super().__init__(board)
+        self.direction = direction
+        self.other_piece = other_piece
+        self.other_direction = other_direction
+
+    def moves(self, pos_from: Position):
+        if self.total_moves:
+            return ()
+        other_piece_pos = add(pos_from, self.other_piece)
+        if self.board.not_on_board(other_piece_pos):
+            return ()
+        other_piece = self.board.get_piece(other_piece_pos)
+        if other_piece.is_empty():
+            return ()
+        if other_piece.movement.total_moves:
+            return ()
+        return (Move(self.board.get_piece(pos_from), pos_from, add(pos_from, self.direction), self), )
+
+    def update(self, move: Move):
+        if sub(move.pos_to, move.pos_from) == self.direction:
+            other_piece_pos = add(move.pos_from, self.other_piece)
+            other_piece_pos_to = add(other_piece_pos, self.other_direction)
+            self.board.move(Move(self.board.get_piece(other_piece_pos), other_piece_pos, other_piece_pos_to, self))
+        super().update(move)
+
+
+class EnPassantTargetMovement(FirstMoveRiderMovement):
+    def __init__(
+            self,
+            board: Board,
+            directions: list[AnyPosition],
+            first_move_directions: list[AnyPosition],
+            en_passant_directions: list[AnyPosition]
+    ):
+        super().__init__(board, directions, first_move_directions)
+        self.en_passant_directions = en_passant_directions
+
+    def update(self, move: Move):
+        super().update(move)
+        if self.total_moves:
+            return
+        for direction in self.en_passant_directions:
+            en_passant_tile = add(move.pos_from, move.piece.side.direction(direction))
+            if self.board.not_a_piece(en_passant_tile):
+                self.board.mark_en_passant(move.pos_to, en_passant_tile)
+
+
+class EnPassantMovement(RiderMovement):
+    def __init__(self, board: Board, directions: list[AnyPosition]):
+        super().__init__(board, directions)
 
 
 class MultiMovement(BaseMovement):
@@ -112,6 +174,6 @@ class MultiMovement(BaseMovement):
                 if self.board.get_side(move.pos_to) == self.board.get_side(pos_from).opponent():
                     yield move
 
-    def update(self):
+    def update(self, move: Move):
         for movement in self.move_or_capture + self.move + self.capture:
-            movement.update()
+            movement.update(move)

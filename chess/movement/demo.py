@@ -5,7 +5,7 @@ import random
 from enum import Enum
 from typing import Type, TYPE_CHECKING
 
-from chess.movement.base import BaseMovement, RiderMovement
+from chess.movement.movement import BaseMovement, RiderMovement
 from chess.movement.util import AnyPosition, sym, merge, clash_min
 
 if TYPE_CHECKING:

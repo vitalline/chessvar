@@ -1,4 +1,5 @@
-from chess.movement.base import RiderMovement, MultiMovement, FirstMoveRiderMovement
+from chess.movement.movement import RiderMovement, MultiMovement, FirstMoveRiderMovement, EnPassantMovement, \
+    EnPassantTargetMovement, CastlingMovement
 from chess.movement.util import sym
 from chess.pieces.piece import Piece, PromotablePiece
 
@@ -54,7 +55,13 @@ class King(Piece):
             name='King',
             file_name=f'{side.file_name()}_king',
             asset_folder='pieces',
-            movement=RiderMovement(board, sym([(1, 0, 1), (1, 1, 1)]))
+            movement=MultiMovement(
+                board, [
+                    RiderMovement(board, sym([(1, 0, 1), (1, 1, 1)])),
+                    CastlingMovement(board, (0, 2), (0, 3), (0, -2)),
+                    CastlingMovement(board, (0, -2), (0, -4), (0, 3)),
+                ]
+            )
         )
 
 
@@ -67,8 +74,8 @@ class Pawn(PromotablePiece):
             asset_folder='pieces',
             movement=MultiMovement(
                 board,
-                move=[FirstMoveRiderMovement(board, [(1, 0, 1)], [(1, 0, 2)])],
-                capture=[RiderMovement(board, [(1, 1, 1), (1, -1, 1)])],
+                move=[EnPassantTargetMovement(board, [(1, 0, 1)], [(1, 0, 2)], [(1, 0, 1)])],
+                capture=[EnPassantMovement(board, [(1, 1, 1), (1, -1, 1)])],
             ),
             promotions=promotions,
             promotion_tiles=promotion_tiles

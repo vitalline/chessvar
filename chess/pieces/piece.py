@@ -5,12 +5,13 @@ import typing
 
 from cocos.sprite import Sprite
 
+from chess.movement.move import Move
 from chess.movement.util import AnyPosition, Position
 
 if typing.TYPE_CHECKING:
     from chess.board import Board
 
-from chess.movement.base import BaseMovement
+from chess.movement.movement import BaseMovement
 
 
 class Side(Enum):
@@ -79,11 +80,9 @@ class Piece(Sprite):
     def is_empty(self):
         return self.side == Side.NONE or not self.name
 
-    def move(self, pos_to: typing.Tuple[int, int]) -> bool:
-        move_result = self.board.move(self, pos_to)
-        if move_result:
-            self.movement.update()
-        return move_result
+    def move(self, move: Move):
+        self.board.move(move)
+        self.movement.update(move)
 
     def moves(self, pos: typing.Tuple[int, int]):  # convenience method
         return self.movement.moves(pos)
@@ -104,9 +103,7 @@ class PromotablePiece(Piece):
         self.promotions = promotions or []
         self.promotion_tiles = promotion_tiles or set()
 
-    def move(self, pos_to: typing.Tuple[int, int]) -> bool:
-        move_result = super().move(pos_to)
-        if move_result and self.board_pos in self.promotion_tiles:
-            self.movement.update()
+    def move(self, move: Move):
+        super().move(move)
+        if self.board_pos in self.promotion_tiles:
             self.board.start_promotion(self)
-        return move_result
