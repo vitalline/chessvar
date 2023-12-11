@@ -1,4 +1,4 @@
-from chess.movement.base import RiderMovement, MoveCaptureMovement, FirstMoveRiderMovement
+from chess.movement.base import RiderMovement, MultiMovement, FirstMoveRiderMovement
 from chess.movement.util import sym
 from chess.pieces.piece import Piece, PromotablePiece
 
@@ -65,9 +65,10 @@ class Pawn(PromotablePiece):
             name='Pawn',
             file_name=f'{side.file_name()}_pawn',
             asset_folder='pieces',
-            movement=MoveCaptureMovement(
-                FirstMoveRiderMovement(board, [(1, 0, 1)], [(1, 0, 2)]),
-                RiderMovement(board, [(1, 1, 1), (1, -1, 1)]),
+            movement=MultiMovement(
+                board,
+                move=[FirstMoveRiderMovement(board, [(1, 0, 1)], [(1, 0, 2)])],
+                capture=[RiderMovement(board, [(1, 1, 1), (1, -1, 1)])],
             ),
             promotions=promotions,
             promotion_tiles=promotion_tiles
