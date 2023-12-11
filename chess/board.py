@@ -185,14 +185,14 @@ class Board(ColorLayer):
     def reset_board(self, shuffle: bool = False, update: bool = False) -> None:
         self.deselect_piece()  # you know, just in case
         self.turn_side = Side.WHITE
+        self.move_history = []
+        self.game_over = False
 
         for sprite in self.piece_node.get_children():
             self.piece_node.remove(sprite)
 
         if shuffle:
             self.piece_sets = {side: random.choice(list(piece_groups.keys())) for side in self.piece_sets}
-
-        self.move_history = []
 
         print(
             f"[{len(self.move_history)}] Starting new game: "
