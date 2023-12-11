@@ -1,11 +1,11 @@
 from __future__ import annotations
 
-import typing
+from typing import TYPE_CHECKING
 
 from chess.movement.move import Move
-from chess.movement.util import *
+from chess.movement.util import AnyPosition, Position, add, mul, merge, clash_max
 
-if typing.TYPE_CHECKING:
+if TYPE_CHECKING:
     from chess.board import Board
 
 
@@ -77,7 +77,7 @@ class FirstMoveRiderMovement(RiderMovement):
         super().__init__(board, directions)
         self.first_move = True
         self.base_directions = directions
-        self.directions = merge(self.directions, first_move_directions)
+        self.directions = merge(self.directions, first_move_directions, clash_max)
 
     def update(self):
         if self.first_move:

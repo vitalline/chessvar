@@ -2,13 +2,13 @@ from __future__ import annotations
 
 import itertools
 import random
-import typing
 from enum import Enum
+from typing import Type, TYPE_CHECKING
 
 from chess.movement.base import BaseMovement, RiderMovement
-from chess.movement.util import *
+from chess.movement.util import AnyPosition, sym, merge, clash_min
 
-if typing.TYPE_CHECKING:
+if TYPE_CHECKING:
     from chess.board import Board
 
 
@@ -133,14 +133,11 @@ def rng_directions() -> list[list[AnyPosition]]:
     return [merge(pair[0], pair[1]) for pair in itertools.product(bases, modifiers) if pair != ([], [])]
 
 
-M = typing.TypeVar('M', bound=BaseMovement)
-
-
-def gen_movement(board: Board, base_type: typing.Type[M], params: list[AnyPosition]):
+def gen_movement[M: BaseMovement](board: Board, base_type: Type[M], params: list[AnyPosition]):
     return type('', (base_type, object), {})(board, params)
 
 
-def gen_movements(board: Board, settings: list[tuple[typing.Type[M], list[AnyPosition]]]):
+def gen_movements[M: BaseMovement](board: Board, settings: list[tuple[Type[M], list[AnyPosition]]]):
     return [gen_movement(board, setting[0], setting[1]) for setting in settings]
 
 

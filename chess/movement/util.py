@@ -1,4 +1,6 @@
+from collections.abc import Callable
 from itertools import zip_longest
+
 
 Position = tuple[int, int]
 RepeatPosition = tuple[int, int, int]
@@ -46,7 +48,7 @@ def clash_max(a: tuple, b: tuple) -> tuple:
     return tuple(result)
 
 
-def merge(a: list[AnyPosition], b: list[AnyPosition], clash=clash_max) -> list[AnyPosition]:
+def merge(a: list[AnyPosition], b: list[AnyPosition], clash: Callable[[tuple, tuple], tuple]) -> list[AnyPosition]:
     data = {}
     for i in a + b:
         if i[:2] not in data:

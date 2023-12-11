@@ -1,4 +1,5 @@
 from itertools import product
+from typing import Type
 
 from cocos import scene
 from cocos.batch import BatchNode
@@ -9,14 +10,11 @@ from cocos.text import Label
 
 from pyglet.window import key, mouse
 
-from chess.movement.base import *
+from chess.movement.base import RiderMovement
+from chess.movement.move import Move
+from chess.movement.util import Position, add
 from chess.pieces.piece import Piece, Side, PromotablePiece
-from chess.pieces.regular.bishop import Bishop
-from chess.pieces.regular.king import King
-from chess.pieces.regular.knight import Knight
-from chess.pieces.regular.pawn import Pawn
-from chess.pieces.regular.queen import Queen
-from chess.pieces.regular.rook import Rook
+from chess.pieces.groups.classic import Bishop, King, Knight, Pawn, Queen, Rook
 from chess.pieces.util.none import NoPiece
 
 board_width = 8
@@ -335,7 +333,7 @@ class Board(ColorLayer):
                 if self.not_on_board(pos):
                     pos = add(pos, piece.side.direction((-board_width, 0))[::-1])
 
-    def promote_to(self, promotion: typing.Type[Piece]) -> None:
+    def promote_to(self, promotion: Type[Piece]) -> None:
         if self.promotion_piece is None:
             return
         pos = self.promotion_piece.board_pos
