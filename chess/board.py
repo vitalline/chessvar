@@ -381,7 +381,7 @@ class Board(ColorLayer):
         (move.piece or move).movement.update(move)
 
     def update(self, move: Move) -> None:
-        if self.en_passant_target is not None and self.turn_side == self.en_passant_target.side.opponent():
+        if self.en_passant_target is not None and move.piece.side == self.en_passant_target.side.opponent():
             if move.pos_to in self.en_passant_markers and isinstance(move.movement, movement.EnPassantMovement):
                 self.capture_en_passant()
             else:
@@ -445,6 +445,7 @@ class Board(ColorLayer):
         pos = piece.board_pos
         self.piece_node.remove(piece)
         self.pieces[pos[0]][pos[1]] = new_type(self, pos, new_side)
+        self.pieces[pos[0]][pos[1]].scale = cell_size / self.pieces[pos[0]][pos[1]].width
         self.piece_node.add(self.pieces[pos[0]][pos[1]])
         self.pieces[pos[0]][pos[1]].board_pos = pos
 
@@ -474,6 +475,8 @@ class Board(ColorLayer):
         royal_pieces = {side: self.royal_pieces[side].copy() for side in self.royal_pieces}
         quasi_royal_pieces = {side: self.quasi_royal_pieces[side].copy() for side in self.quasi_royal_pieces}
         check_side = self.check_side
+        en_passant_target = self.en_passant_target
+        en_passant_markers = self.en_passant_markers.copy()
         self.moves = {}
         for piece in movable_pieces[self.turn_side]:
             for move in piece.moves(piece.board_pos):
@@ -483,6 +486,11 @@ class Board(ColorLayer):
                 if self.check_side != self.turn_side:
                     self.moves.setdefault(move.pos_from, []).append(move)
                 self.undo(move)
+                if en_passant_target is not None:
+                    self.en_passant_target = en_passant_target
+                    self.en_passant_markers = en_passant_markers.copy()
+                    for marker in self.en_passant_markers:
+                        self.mark_en_passant(self.en_passant_target.board_pos, marker)
         self.movable_pieces = movable_pieces
         self.royal_pieces = royal_pieces
         self.quasi_royal_pieces = quasi_royal_pieces
@@ -519,7 +527,7 @@ class Board(ColorLayer):
                 break
 
     def mark_en_passant(self, piece_pos: Position, marker_pos: Position) -> None:
-        if self.en_passant_target is not None:
+        if self.en_passant_target is not None and self.en_passant_target.board_pos != piece_pos:
             return
         self.en_passant_target = self.get_piece(piece_pos)
         self.replace(self.get_piece(marker_pos), util.NoPiece, self.en_passant_target.side)
