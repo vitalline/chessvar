@@ -114,7 +114,7 @@ class Board(ColorLayer):
         self.check_side = Side.NONE
         self.game_over = False
         self.pieces = []
-        self.piece_sets = {Side.WHITE: 0, Side.BLACK: 0}
+        self.piece_sets = {Side.WHITE: 1, Side.BLACK: 1}
         self.promotion_types = {Side.WHITE: [], Side.BLACK: []}
         self.movable_pieces = {Side.WHITE: [], Side.BLACK: []}
         self.royal_pieces = {Side.WHITE: [], Side.BLACK: []}
@@ -178,20 +178,18 @@ class Board(ColorLayer):
         for label in self.row_labels + self.col_labels:
             self.add(label, z=1)
 
-        self.reset_board(shuffle=True)
+        self.reset_board(update=True)
 
         director.run(scene.Scene(self))
 
-    def reset_board(self, new_piece_sets: dict[Side, int] | None = None, shuffle: bool = False):
+    def reset_board(self, shuffle: bool = False, update: bool = False) -> None:
         self.deselect_piece()  # you know, just in case
         self.turn_side = Side.WHITE
 
         for sprite in self.piece_node.get_children():
             self.piece_node.remove(sprite)
 
-        if new_piece_sets is not None:
-            self.piece_sets = new_piece_sets
-        elif shuffle:
+        if shuffle:
             self.piece_sets = {side: random.choice(list(piece_groups.keys())) for side in self.piece_sets}
 
         self.move_history = []
@@ -204,7 +202,7 @@ class Board(ColorLayer):
 
         piece_sets = {side: piece_groups[self.piece_sets[side]] for side in self.piece_sets}
 
-        if new_piece_sets is not None or shuffle:
+        if update or shuffle:
             self.promotion_types = {side: [] for side in self.promotion_types}
             for side in self.promotion_types:
                 used_piece_set = set()
@@ -608,7 +606,8 @@ class Board(ColorLayer):
     def on_key_press(self, symbol, modifiers):
         if symbol == key.R:
             if modifiers & key.MOD_ACCEL and modifiers & key.MOD_SHIFT:
-                self.reset_board(new_piece_sets={Side.WHITE: 1, Side.BLACK: 1})
+                self.piece_sets = {Side.WHITE: 1, Side.BLACK: 1}
+                self.reset_board(update=True)
             elif modifiers & key.MOD_ACCEL:
                 self.reset_board(shuffle=True)
             else:
@@ -625,7 +624,7 @@ class Board(ColorLayer):
             else:
                 direction = -1 if modifiers & key.MOD_ACCEL else 1
                 self.piece_sets[Side.WHITE] = (self.piece_sets[Side.WHITE] + direction - 1) % len(piece_groups) + 1
-                self.reset_board(new_piece_sets=self.piece_sets)
+                self.reset_board(update=True)
                 return
         if symbol == key.B:
             if modifiers & key.MOD_ACCEL and not modifiers & key.MOD_SHIFT:
@@ -636,7 +635,7 @@ class Board(ColorLayer):
             else:
                 direction = -1 if modifiers & key.MOD_ACCEL else 1
                 self.piece_sets[Side.BLACK] = (self.piece_sets[Side.BLACK] + direction - 1) % len(piece_groups) + 1
-                self.reset_board(new_piece_sets=self.piece_sets)
+                self.reset_board(update=True)
                 return
         if symbol == key.Z and modifiers & key.MOD_ACCEL:
             self.undo_last_move()
