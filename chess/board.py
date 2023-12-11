@@ -69,7 +69,8 @@ class Board(ColorLayer):
             width=(board_width+2)*cell_size,
             height=(board_height+2)*cell_size,
             caption='Chess',
-            autoscale=False
+            autoscale=False,
+
         )
         super().__init__(192, 168, 142, 1000)
         director.window.remove_handlers(director._default_event_handler)
@@ -98,7 +99,9 @@ class Board(ColorLayer):
         self.no_moves = movement.RiderMovement(self, [])
         self.board = BatchNode()
         self.highlight = Sprite("assets/util/highlight.png", color=highlight_color, opacity=0)
+        self.highlight.scale = cell_size / self.highlight.width
         self.selection = Sprite("assets/util/selection.png", opacity=0)
+        self.selection.scale = cell_size / self.selection.width
         self.piece_node = BatchNode()
         self.move_node = BatchNode()
         self.active_piece_node = BatchNode()
@@ -115,7 +118,7 @@ class Board(ColorLayer):
 
         label_kwargs = {
             'font_name': 'Courier New',
-            'font_size': 20,
+            'font_size': cell_size * 0.4,
             'bold': True,
             'color': (0, 0, 0, 1000)
         }
@@ -142,6 +145,7 @@ class Board(ColorLayer):
             self.board_sprites[row].append(Sprite("assets/util/cell.png"))
             self.board_sprites[row][col].position = self.get_screen_position((row, col))
             self.board_sprites[row][col].color = get_cell_color((row, col))
+            self.board_sprites[row][col].scale = cell_size / self.board_sprites[row][col].width
             self.board.add(self.board_sprites[row][col])
 
         for label in self.row_labels + self.col_labels:
@@ -172,10 +176,16 @@ class Board(ColorLayer):
 
         for row, col in product(range(self.board_height), range(self.board_width)):
             self.pieces[row].append(
-                types[row][col](self, (row, col), sides[row][col], promotions, promotion_tiles[sides[row][col]])
-                if issubclass(types[row][col], abc.PromotablePiece) else types[row][col](self, (row, col), sides[row][col])
+                types[row][col](
+                    self, (row, col), sides[row][col], promotions, promotion_tiles[sides[row][col]],
+                )
+                if issubclass(types[row][col], abc.PromotablePiece) else
+                types[row][col](
+                    self, (row, col), sides[row][col]
+                )
             )
             self.pieces[row][col].color = (255, 255, 255)
+            self.pieces[row][col].scale = cell_size / self.pieces[row][col].width
             self.piece_node.add(self.pieces[row][col])
 
         self.load_all_moves()
@@ -239,11 +249,13 @@ class Board(ColorLayer):
         self.active_piece_node.add(piece)
 
         for move in self.moves.get(pos, ()):
-            self.move_node.add(Sprite(
+            move_sprite = Sprite(
                 f"assets/util/{'move' if self.not_a_piece(move.pos_to) else 'capture'}.png",
                 position=self.get_screen_position(move.pos_to),
-                opacity=marker_opacity)
+                opacity=marker_opacity
             )
+            move_sprite.scale = cell_size / move_sprite.width
+            self.move_node.add(move_sprite)
 
     def deselect_piece(self) -> None:
         self.selection.opacity = 0
@@ -388,10 +400,14 @@ class Board(ColorLayer):
         piece_pos = piece.board_pos
         pos = piece_pos
         for promotion in piece.promotions:
-            self.promotion_area_node.add(
-                Sprite("assets/util/cell.png", position=self.get_screen_position(pos), color=background_color)
+            background_sprite = Sprite(
+                "assets/util/cell.png", position=self.get_screen_position(pos), color=background_color
             )
-            self.promotion_piece_node.add(promotion(self, pos, piece.side))
+            background_sprite.scale = cell_size / background_sprite.width
+            self.promotion_area_node.add(background_sprite)
+            promotion_piece = promotion(self, pos, piece.side)
+            promotion_piece.scale = cell_size / promotion_piece.width
+            self.promotion_piece_node.add(promotion_piece)
             self.promotion_area[pos] = promotion
             pos = add(pos, piece.side.direction((-1, 0)))
             if self.not_on_board(pos):
