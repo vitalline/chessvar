@@ -625,7 +625,7 @@ class Board(ColorLayer):
             else:
                 direction = -1 if modifiers & key.MOD_ACCEL else 1
                 self.piece_sets[Side.WHITE] = (self.piece_sets[Side.WHITE] + direction - 1) % len(piece_groups) + 1
-                self.reset_board()
+                self.reset_board(new_piece_sets=self.piece_sets)
                 return
         if symbol == key.B:
             if modifiers & key.MOD_ACCEL and not modifiers & key.MOD_SHIFT:
@@ -636,7 +636,7 @@ class Board(ColorLayer):
             else:
                 direction = -1 if modifiers & key.MOD_ACCEL else 1
                 self.piece_sets[Side.BLACK] = (self.piece_sets[Side.BLACK] + direction - 1) % len(piece_groups) + 1
-                self.reset_board()
+                self.reset_board(new_piece_sets=self.piece_sets)
                 return
         if symbol == key.Z and modifiers & key.MOD_ACCEL:
             self.undo_last_move()
