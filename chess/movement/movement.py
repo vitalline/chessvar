@@ -18,7 +18,15 @@ class BaseMovement(object):
         return ()
 
     def update(self, move: Move):
+        self.total_moves += 1
         self.board.update(move)
+
+    def undo(self, move: Move):
+        self.total_moves -= 1
+
+    def reload(self, move: Move):
+        self.undo(move)
+        self.update(move)
 
 
 class BaseDirectionalMovement(BaseMovement):
@@ -44,7 +52,7 @@ class BaseDirectionalMovement(BaseMovement):
             direction = piece.side.direction(self.directions[direction_id])
             current_pos = pos_from
             distance = 0
-            move = Move(piece, pos_from, current_pos, self)
+            move = Move(pos_from, current_pos, self)
             while not self.board.not_on_board(self.transform(current_pos)):
                 if self.stop_condition(move, direction):
                     direction_id += 1
@@ -54,17 +62,13 @@ class BaseDirectionalMovement(BaseMovement):
                 if self.board.not_on_board(self.transform(current_pos)):
                     direction_id += 1
                     break
-                move = Move(piece, pos_from, current_pos, self)
+                move = Move(pos_from, current_pos, self)
                 if self.skip_condition(move, direction):
                     continue
                 move.pos_to = self.transform(move.pos_to)
                 yield move
             else:
                 direction_id += 1
-
-    def update(self, move: Move):
-        self.total_moves += 1
-        super().update(move)
 
 
 class RiderMovement(BaseDirectionalMovement):
@@ -87,12 +91,18 @@ class FirstMoveRiderMovement(RiderMovement):
     def __init__(self, board: Board, directions: list[AnyPosition], first_move_directions: list[AnyPosition]):
         super().__init__(board, directions)
         self.base_directions = directions
-        self.directions = merge(self.directions, first_move_directions, clash_max)
+        self.first_move_directions = first_move_directions
+        self.directions = merge(self.directions, self.first_move_directions, clash_max)
 
     def update(self, move: Move):
-        super().update(move)
-        if self.total_moves:
+        if not self.total_moves:
             self.directions = self.base_directions
+        super().update(move)
+
+    def undo(self, move: Move):
+        super().undo(move)
+        if not self.total_moves:
+            self.directions = merge(self.directions, self.first_move_directions, clash_max)
 
 
 class CastlingMovement(BaseMovement):
@@ -113,14 +123,21 @@ class CastlingMovement(BaseMovement):
             return ()
         if other_piece.movement.total_moves:
             return ()
-        return (Move(self.board.get_piece(pos_from), pos_from, add(pos_from, self.direction), self), )
+        return (Move(pos_from, add(pos_from, self.direction), self),)
 
     def update(self, move: Move):
         if sub(move.pos_to, move.pos_from) == self.direction:
             other_piece_pos = add(move.pos_from, self.other_piece)
             other_piece_pos_to = add(other_piece_pos, self.other_direction)
-            self.board.move(Move(self.board.get_piece(other_piece_pos), other_piece_pos, other_piece_pos_to, self))
+            self.board.move(Move(other_piece_pos, other_piece_pos_to, self, self.board.get_piece(other_piece_pos)))
         super().update(move)
+
+    def undo(self, move: Move):
+        super().undo(move)
+        if sub(move.pos_to, move.pos_from) == self.direction:
+            other_piece_pos = add(move.pos_from, self.other_piece)
+            other_piece_pos_to = add(other_piece_pos, self.other_direction)
+            self.board.undo(Move(other_piece_pos, other_piece_pos_to, self, self.board.get_piece(other_piece_pos_to)))
 
 
 class EnPassantTargetMovement(FirstMoveRiderMovement):
@@ -135,13 +152,16 @@ class EnPassantTargetMovement(FirstMoveRiderMovement):
         self.en_passant_directions = en_passant_directions
 
     def update(self, move: Move):
+        if not self.total_moves:
+            for direction in self.en_passant_directions:
+                en_passant_tile = add(move.pos_from, move.piece.side.direction(direction))
+                if self.board.not_a_piece(en_passant_tile):
+                    self.board.mark_en_passant(move.pos_to, en_passant_tile)
         super().update(move)
-        if self.total_moves:
-            return
-        for direction in self.en_passant_directions:
-            en_passant_tile = add(move.pos_from, move.piece.side.direction(direction))
-            if self.board.not_a_piece(en_passant_tile):
-                self.board.mark_en_passant(move.pos_to, en_passant_tile)
+
+    def undo(self, move: Move):
+        super().undo(move)
+        self.board.clear_en_passant()
 
 
 class EnPassantMovement(RiderMovement):
@@ -177,3 +197,15 @@ class MultiMovement(BaseMovement):
     def update(self, move: Move):
         for movement in self.move_or_capture + self.move + self.capture:
             movement.update(move)
+        super().update(move)
+
+    def undo(self, move: Move):
+        super().undo(move)
+        for movement in self.move_or_capture + self.move + self.capture:
+            movement.undo(move)
+
+    def reload(self, move: Move):
+        super().undo(move)
+        for movement in self.move_or_capture + self.move + self.capture:
+            movement.reload(move)
+        super().update(move)

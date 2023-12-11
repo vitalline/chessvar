@@ -82,7 +82,6 @@ class Piece(Sprite):
 
     def move(self, move: Move):
         self.board.move(move)
-        self.movement.update(move)
 
     def moves(self, pos: typing.Tuple[int, int]):  # convenience method
         return self.movement.moves(pos)

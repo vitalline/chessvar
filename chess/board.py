@@ -80,6 +80,7 @@ class Board(ColorLayer):
         self.en_passant_markers = set()
         self.promotion_piece = None
         self.promotion_area = {}
+        self.move_history = []
         self.turn_side = Side.WHITE
         self.pieces = []
         self.board_sprites = []
@@ -258,6 +259,7 @@ class Board(ColorLayer):
             pos = self.get_board_position(x, y)
             if self.promotion_piece:
                 if pos in self.promotion_area:
+                    self.move_history[-1].set(promotion=self.promotion_area[pos])
                     self.replace(self.promotion_piece, self.promotion_area[pos])
                     self.promotion_piece = None
                     self.promotion_area = {}
@@ -309,7 +311,12 @@ class Board(ColorLayer):
             if move is None:
                 self.set_position(self.get_piece(selected), pos)
                 return
+            move.set(piece=self.get_piece(selected))
+            captured_piece = self.get_piece(pos)
+            if captured_piece.side != Side.NONE:
+                move.set(captured_piece=(self.en_passant_target if captured_piece.is_empty() else captured_piece))
             self.get_piece(selected).move(move)
+            self.move_history.append(move)
             self.advance_turn()
 
     def set_position(self, piece: Piece, pos: Position) -> None:
@@ -323,6 +330,7 @@ class Board(ColorLayer):
         self.pieces[move.pos_to[0]][move.pos_to[1]] = move.piece
         self.pieces[move.pos_from[0]][move.pos_from[1]] = NoPiece(self, move.pos_from)
         self.piece_node.add(self.pieces[move.pos_from[0]][move.pos_from[1]])
+        (move.piece or move).movement.update(move)
 
     def update(self, move: Move) -> None:
         if self.en_passant_target is not None and self.turn_side == self.en_passant_target.side.opponent():
@@ -330,6 +338,33 @@ class Board(ColorLayer):
                 self.capture_en_passant()
             else:
                 self.clear_en_passant()
+
+    def undo(self, move: Move) -> None:
+        self.set_position(move.piece, move.pos_from)
+        self.piece_node.remove(self.pieces[move.pos_from[0]][move.pos_from[1]])
+        self.piece_node.remove(self.pieces[move.pos_to[0]][move.pos_to[1]])
+        self.pieces[move.pos_from[0]][move.pos_from[1]] = move.piece
+        self.piece_node.add(move.piece)
+        if move.captured_piece is not None:
+            if move.captured_piece.board_pos != move.pos_to:
+                self.piece_node.remove(self.pieces[move.captured_piece.board_pos[0]][move.captured_piece.board_pos[1]])
+            self.set_position(move.captured_piece, move.captured_piece.board_pos)
+            self.pieces[move.captured_piece.board_pos[0]][move.captured_piece.board_pos[1]] = move.captured_piece
+            self.piece_node.add(move.captured_piece)
+        if move.captured_piece is None or move.captured_piece.board_pos != move.pos_to:
+            self.pieces[move.pos_to[0]][move.pos_to[1]] = NoPiece(self, move.pos_to)
+            self.piece_node.add(self.pieces[move.pos_to[0]][move.pos_to[1]])
+        (move.piece or move).movement.undo(move)
+
+    def undo_last_move(self) -> None:
+        if not self.move_history:
+            return
+        self.undo(self.move_history.pop())
+        if self.move_history:
+            move = self.move_history[-1]
+            (move.piece or move).movement.undo(move)
+            (move.piece or move).movement.update(move)
+        self.advance_turn()
 
     def start_promotion(self, piece: Piece) -> None:
         if not isinstance(piece, PromotablePiece):
@@ -394,6 +429,8 @@ class Board(ColorLayer):
             self.turn_side = Side.WHITE
         if symbol == key.B and modifiers & key.MOD_ACCEL:
             self.turn_side = Side.BLACK
+        if symbol == key.Z and modifiers & key.MOD_ACCEL:
+            self.undo_last_move()
         if self.selected_piece is not None and self.turn_side not in (self.get_side(self.selected_piece), Side.ANY):
             self.deselect_piece()
 
