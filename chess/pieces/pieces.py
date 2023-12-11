@@ -58,14 +58,16 @@ class Side(Enum):
 
 
 class Piece(Sprite):
-    def __init__(self,
-                 board: Board,
-                 board_pos: Position | None = None,
-                 side: Side = Side.NONE,
-                 name: str = '',
-                 file_name: str = '',
-                 asset_folder: str = 'util',
-                 movement: BaseMovement | None = None):
+    def __init__(
+            self,
+            board: Board,
+            board_pos: Position | None = None,
+            side: Side = Side.NONE,
+            name: str = '',
+            file_name: str = '',
+            asset_folder: str = 'util',
+            movement: BaseMovement | None = None
+    ):
         self.board = board
         self.board_pos = board_pos
         self.side = side
@@ -88,16 +90,18 @@ class Piece(Sprite):
 
 
 class PromotablePiece(Piece):
-    def __init__(self,
-                 board: Board,
-                 board_pos: Position | None = None,
-                 side: Side = Side.NONE,
-                 name: str = '',
-                 file_name: str = '',
-                 asset_folder: str = 'util',
-                 movement: BaseMovement | None = None,
-                 promotions: list[typing.Type[Piece]] | None = None,
-                 promotion_tiles: set[Position] | None = None):
+    def __init__(
+            self,
+            board: Board,
+            board_pos: Position | None = None,
+            side: Side = Side.NONE,
+            name: str = '',
+            file_name: str = '',
+            asset_folder: str = 'util',
+            movement: BaseMovement | None = None,
+            promotions: list[typing.Type[Piece]] | None = None,
+            promotion_tiles: set[Position] | None = None
+    ):
         super().__init__(board, board_pos, side, name, file_name, asset_folder, movement)
         self.promotions = promotions or []
         self.promotion_tiles = promotion_tiles or set()
@@ -106,3 +110,31 @@ class PromotablePiece(Piece):
         super().move(move)
         if self.board_pos in self.promotion_tiles:
             self.board.start_promotion(self)
+
+
+class QuasiRoyalPiece(Piece):
+    def __init__(
+            self,
+            board: Board,
+            board_pos: Position | None = None,
+            side: Side = Side.NONE,
+            name: str = '',
+            file_name: str = '',
+            asset_folder: str = 'util',
+            movement: BaseMovement | None = None
+    ):
+        super().__init__(board, board_pos, side, name, file_name, asset_folder, movement)
+
+
+class RoyalPiece(QuasiRoyalPiece):
+    def __init__(
+            self,
+            board: Board,
+            board_pos: Position | None = None,
+            side: Side = Side.NONE,
+            name: str = '',
+            file_name: str = '',
+            asset_folder: str = 'util',
+            movement: BaseMovement | None = None
+    ):
+        super().__init__(board, board_pos, side, name, file_name, asset_folder, movement)

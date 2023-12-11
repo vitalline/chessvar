@@ -6,7 +6,7 @@ from chess.movement.util import Position
 
 if TYPE_CHECKING:
     from chess.movement.movement import BaseMovement
-    from chess.pieces.piece import Piece
+    from chess.pieces.pieces import Piece
 
 
 class Move(object):

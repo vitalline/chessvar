@@ -1,4 +1,4 @@
-from chess.pieces.piece import Piece, Side
+from chess.pieces.pieces import Piece, Side
 
 
 class NoPiece(Piece):
