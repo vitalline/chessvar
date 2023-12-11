@@ -106,11 +106,19 @@ class FirstMoveRiderMovement(RiderMovement):
 
 
 class CastlingMovement(BaseMovement):
-    def __init__(self, board: Board, direction: Position, other_piece: Position, other_direction: Position):
+    def __init__(
+            self,
+            board: Board,
+            direction: Position,
+            other_piece: Position,
+            other_direction: Position,
+            gap: list[Position] | None = None
+    ):
         super().__init__(board)
         self.direction = direction
         self.other_piece = other_piece
         self.other_direction = other_direction
+        self.gap = gap or []
 
     def moves(self, pos_from: Position):
         if self.total_moves:
@@ -123,6 +131,10 @@ class CastlingMovement(BaseMovement):
             return ()
         if other_piece.movement.total_moves:
             return ()
+        for cell in self.gap:
+            cell_pos = add(pos_from, cell)
+            if not self.board.not_a_piece(cell_pos):
+                return ()
         return (Move(pos_from, add(pos_from, self.direction), self),)
 
     def update(self, move: Move):
