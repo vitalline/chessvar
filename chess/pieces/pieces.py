@@ -41,41 +41,39 @@ class Side(Enum):
     def name(self):
         match self:
             case Side.WHITE:
-                return "White "
+                return "White"
             case Side.BLACK:
-                return "Black "
+                return "Black"
             case _:
                 return ""
 
     def file_name(self):
         match self:
             case Side.WHITE:
-                return "white"
+                return "white_"
             case Side.BLACK:
-                return "black"
+                return "black_"
             case _:
-                return "none"
+                return ""
 
 
 class Piece(Sprite):
+    name = ''
+    file_name = ''
+    asset_folder = 'util'
+
     def __init__(
             self,
             board: Board,
             board_pos: Position | None = None,
             side: Side = Side.NONE,
-            name: str = '',
-            file_name: str = '',
-            asset_folder: str = 'util',
             movement: BaseMovement | None = None
     ):
         self.board = board
         self.board_pos = board_pos
         self.side = side
-        self.name = name
-        self.file_name = file_name or name.lower()
-        self.asset_folder = asset_folder
         self.movement = movement if movement is not None else BaseMovement(board)
-        super().__init__(f"assets/{self.asset_folder}/{self.file_name}.png")
+        super().__init__(f"assets/{self.asset_folder}/{self.side.file_name()}{self.file_name}.png")
         if self.board_pos is not None:
             self.position = self.board.get_screen_position(self.board_pos)
 
@@ -95,14 +93,11 @@ class PromotablePiece(Piece):
             board: Board,
             board_pos: Position | None = None,
             side: Side = Side.NONE,
-            name: str = '',
-            file_name: str = '',
-            asset_folder: str = 'util',
             movement: BaseMovement | None = None,
             promotions: list[typing.Type[Piece]] | None = None,
             promotion_tiles: set[Position] | None = None
     ):
-        super().__init__(board, board_pos, side, name, file_name, asset_folder, movement)
+        super().__init__(board, board_pos, side, movement)
         self.promotions = promotions or []
         self.promotion_tiles = promotion_tiles or set()
 
@@ -123,12 +118,9 @@ class QuasiRoyalPiece(Piece):
             board: Board,
             board_pos: Position | None = None,
             side: Side = Side.NONE,
-            name: str = '',
-            file_name: str = '',
-            asset_folder: str = 'util',
             movement: BaseMovement | None = None
     ):
-        super().__init__(board, board_pos, side, name, file_name, asset_folder, movement)
+        super().__init__(board, board_pos, side, movement)
 
 
 class RoyalPiece(QuasiRoyalPiece):
@@ -137,9 +129,6 @@ class RoyalPiece(QuasiRoyalPiece):
             board: Board,
             board_pos: Position | None = None,
             side: Side = Side.NONE,
-            name: str = '',
-            file_name: str = '',
-            asset_folder: str = 'util',
             movement: BaseMovement | None = None
     ):
-        super().__init__(board, board_pos, side, name, file_name, asset_folder, movement)
+        super().__init__(board, board_pos, side, movement)

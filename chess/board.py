@@ -24,16 +24,28 @@ from chess.pieces.pieces import Side
 board_width = 8
 board_height = 8
 
-piece_groups = [
-    [fide.Rook, fide.Knight, fide.Bishop, fide.Queen, fide.King, fide.Bishop, fide.Knight, fide.Rook],
-    [cb.Bede, cb.Waffle, cb.FAD, cb.Cardinal, cb.King, cb.FAD, cb.Waffle, cb.Bede],
-    [kn.ChargeRook, kn.Fibnif, kn.ChargeKnight, kn.Colonel, fide.King, kn.ChargeKnight, kn.Fibnif, kn.ChargeRook],
-    [rk.ShortRook, rk.WoodyRook, rk.HalfDuck, rk.Chancellor, fide.King, rk.HalfDuck, rk.WoodyRook, rk.ShortRook],
-    [kn.ChargeRook, cb.Waffle, fide.Bishop, rk.Chancellor, fide.King, fide.Bishop, cb.Waffle, kn.ChargeRook],
-    [rk.ShortRook, fide.Knight, fide.Bishop, Amazon, fide.King, fide.Bishop, fide.Knight, rk.ShortRook],
-    [kn.ChargeRook, fw.Knishop, fw.Bishight, fw.Forequeen, fide.King, fw.Bishight, fw.Knishop, kn.ChargeRook],
-    [pz.Pepperoni, pz.Mushroom, pz.Sausage, pz.Meatball, fide.King, pz.Sausage, pz.Mushroom, pz.Pepperoni],
-]
+piece_groups = {
+    1: [fide.Rook, fide.Knight, fide.Bishop, fide.Queen, fide.King, fide.Bishop, fide.Knight, fide.Rook],
+    2: [cb.Bede, cb.Waffle, cb.FAD, cb.Cardinal, cb.King, cb.FAD, cb.Waffle, cb.Bede],
+    3: [rk.ShortRook, rk.WoodyRook, rk.HalfDuck, rk.Chancellor, fide.King, rk.HalfDuck, rk.WoodyRook, rk.ShortRook],
+    4: [kn.ChargeRook, kn.Fibnif, kn.ChargeKnight, kn.Colonel, fide.King, kn.ChargeKnight, kn.Fibnif, kn.ChargeRook],
+    5: [kn.ChargeRook, fw.Knishop, fw.Bishight, fw.Forequeen, fide.King, fw.Bishight, fw.Knishop, kn.ChargeRook],
+    6: [kn.ChargeRook, cb.Waffle, fide.Bishop, rk.Chancellor, fide.King, fide.Bishop, cb.Waffle, kn.ChargeRook],
+    7: [rk.ShortRook, fide.Knight, fide.Bishop, Amazon, fide.King, fide.Bishop, fide.Knight, rk.ShortRook],
+    8: [pz.Pepperoni, pz.Mushroom, pz.Sausage, pz.Meatball, fide.King, pz.Sausage, pz.Mushroom, pz.Pepperoni],
+}
+
+piece_group_names = {
+    1: "Fabulous FIDEs",
+    2: "Colorbound Clobberers",
+    3: "Remarkable Rookies",
+    4: "Nutty Knights",
+    5: "Forward FIDEs",
+    6: "All-Around Allstars",
+    7: "Amazon Army",
+    8: "Pizza Kings",
+}
+
 
 pawn_row = [fide.Pawn] * board_width
 empty_row = [util.NoPiece] * board_width
@@ -102,7 +114,7 @@ class Board(ColorLayer):
         self.check_side = Side.NONE
         self.game_over = False
         self.pieces = []
-        self.piece_sets = {Side.WHITE: [], Side.BLACK: []}
+        self.piece_sets = {Side.WHITE: 0, Side.BLACK: 0}
         self.promotion_types = {Side.WHITE: [], Side.BLACK: []}
         self.movable_pieces = {Side.WHITE: [], Side.BLACK: []}
         self.royal_pieces = {Side.WHITE: [], Side.BLACK: []}
@@ -166,34 +178,44 @@ class Board(ColorLayer):
         for label in self.row_labels + self.col_labels:
             self.add(label, z=1)
 
-        self.shuffle()
-        self.set_board()
+        self.reset_board(shuffle=True)
 
         director.run(scene.Scene(self))
 
-    def shuffle(self):
-        self.piece_sets = {side: random.choice(piece_groups) for side in self.piece_sets}
-        self.promotion_types = {side: [] for side in self.promotion_types}
-        for side in self.promotion_types:
-            used_piece_set = set()
-            for pieces in (self.piece_sets[side], self.piece_sets[side.opponent()]):
-                promotion_types = []
-                for piece in pieces:
-                    if piece not in used_piece_set and not issubclass(piece, abc.RoyalPiece):
-                        used_piece_set.add(piece)
-                        promotion_types.append(piece)
-                self.promotion_types[side].extend(promotion_types[::-1])
-
-    def reset_board(self):
+    def reset_board(self, new_piece_sets: dict[Side, int] | None = None, shuffle: bool = False):
         self.deselect_piece()  # you know, just in case
         self.turn_side = Side.WHITE
 
         for sprite in self.piece_node.get_children():
             self.piece_node.remove(sprite)
 
-        self.set_board()
+        if new_piece_sets is not None:
+            self.piece_sets = new_piece_sets
+        elif shuffle:
+            self.piece_sets = {side: random.choice(list(piece_groups.keys())) for side in self.piece_sets}
 
-    def set_board(self):
+        self.move_history = []
+
+        print(
+            f"[{len(self.move_history)}] Starting new game: "
+            f"{piece_group_names[self.piece_sets[Side.WHITE]]} vs "
+            f"{piece_group_names[self.piece_sets[Side.BLACK]]}"
+        )
+
+        piece_sets = {side: piece_groups[self.piece_sets[side]] for side in self.piece_sets}
+
+        if new_piece_sets is not None or shuffle:
+            self.promotion_types = {side: [] for side in self.promotion_types}
+            for side in self.promotion_types:
+                used_piece_set = set()
+                for pieces in (piece_sets[side], piece_sets[side.opponent()]):
+                    promotion_types = []
+                    for piece in pieces:
+                        if piece not in used_piece_set and not issubclass(piece, abc.RoyalPiece):
+                            used_piece_set.add(piece)
+                            promotion_types.append(piece)
+                    self.promotion_types[side].extend(promotion_types[::-1])
+
         self.pieces = []
 
         for row in range(self.board_height):
@@ -203,7 +225,7 @@ class Board(ColorLayer):
             piece_type = types[row][col]
             piece_side = sides[row][col]
             if isinstance(piece_type, abc.Side):
-                piece_type = self.piece_sets[piece_side][col]
+                piece_type = piece_sets[piece_side][col]
             self.pieces[row].append(
                 piece_type(
                     self, (row, col), piece_side,
@@ -318,7 +340,10 @@ class Board(ColorLayer):
                     for node in (self.promotion_area_node, self.promotion_piece_node):
                         for sprite in node.get_children():
                             node.remove(sprite)
+                    if self.move_history:
+                        print(f"[{len(self.move_history)}] {self.move_history[-1]}")
                     self.advance_turn()
+                    return
                 return
             self.clicked_piece = pos  # we need this in order to discern what are we dragging
             if self.not_movable(pos):
@@ -371,6 +396,8 @@ class Board(ColorLayer):
             self.update_move(move)
             self.get_piece(selected).move(move)
             self.move_history.append(move)
+            if not self.promotion_piece and self.move_history:
+                print(f"[{len(self.move_history)}] {self.move_history[-1]}")
             self.advance_turn()
 
     def update_move(self, move: Move) -> None:
@@ -421,7 +448,9 @@ class Board(ColorLayer):
             return  # can't undo a move while promoting because the move is not yet complete. please try again later /hj
         if not self.move_history:
             return
-        self.undo(self.move_history.pop())
+        print(f"[{len(self.move_history)}] Undoing last move.")
+        last_move = self.move_history.pop()
+        self.undo(last_move)
         if self.move_history:
             move = self.move_history[-1]
             (move.piece or move).movement.undo(move)
@@ -487,12 +516,16 @@ class Board(ColorLayer):
         if sum(self.moves.values(), []):
             self.color_pieces(shade=255)
             self.game_over = False
+            if self.check_side != Side.NONE:
+                print(f"{self.check_side.name()} is in check!")
         else:
             if self.check_side != Side.NONE:
                 self.color_pieces(self.check_side, shade=125)
                 self.color_pieces(self.check_side.opponent(), shade=225)
+                print(f"Checkmate! {self.check_side.opponent().name()} wins.")
             else:
                 self.color_pieces(shade=175)
+                print("Stalemate! It's a draw.")
             self.game_over = True
 
     def load_all_moves(self) -> None:
@@ -574,21 +607,40 @@ class Board(ColorLayer):
 
     def on_key_press(self, symbol, modifiers):
         if symbol == key.R:
-            if modifiers & key.MOD_ACCEL:  # CMD on OSX, CTRL otherwise
-                self.shuffle()
-            self.reset_board()
+            if modifiers & key.MOD_ACCEL and modifiers & key.MOD_SHIFT:
+                self.reset_board(new_piece_sets={Side.WHITE: 1, Side.BLACK: 1})
+            elif modifiers & key.MOD_ACCEL:
+                self.reset_board(shuffle=True)
+            else:
+                self.reset_board()
             return
         if symbol == key.T and modifiers & key.MOD_ACCEL:
             self.turn_side = Side.ANY
-        if symbol == key.W and modifiers & key.MOD_ACCEL:
-            self.turn_side = Side.WHITE
-        if symbol == key.B and modifiers & key.MOD_ACCEL:
-            self.turn_side = Side.BLACK
+        if symbol == key.W:
+            if modifiers & key.MOD_ACCEL and not modifiers & key.MOD_SHIFT:
+                if self.turn_side != Side.WHITE:
+                    self.turn_side = Side.WHITE
+                    print(f"[{len(self.move_history) + 1}] Passed turn to {self.turn_side.name()}.")
+                    self.load_all_moves()
+            else:
+                direction = -1 if modifiers & key.MOD_ACCEL else 1
+                self.piece_sets[Side.WHITE] = (self.piece_sets[Side.WHITE] + direction - 1) % len(piece_groups) + 1
+                self.reset_board()
+                return
+        if symbol == key.B:
+            if modifiers & key.MOD_ACCEL and not modifiers & key.MOD_SHIFT:
+                if self.turn_side != Side.BLACK:
+                    self.turn_side = Side.BLACK
+                    print(f"[{len(self.move_history) + 1}] Passed turn to {self.turn_side.name()}.")
+                    self.load_all_moves()
+            else:
+                direction = -1 if modifiers & key.MOD_ACCEL else 1
+                self.piece_sets[Side.BLACK] = (self.piece_sets[Side.BLACK] + direction - 1) % len(piece_groups) + 1
+                self.reset_board()
+                return
         if symbol == key.Z and modifiers & key.MOD_ACCEL:
             self.undo_last_move()
-        if self.selected_piece is not None and self.turn_side not in (
-                self.get_side(self.selected_piece), Side.ANY
-        ):
+        if self.selected_piece is not None and self.turn_side not in (self.get_side(self.selected_piece), Side.ANY):
             self.deselect_piece()
 
     def run(self):

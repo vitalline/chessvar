@@ -82,3 +82,11 @@ def merge(a: list[AnyPosition], b: list[AnyPosition], clash: Callable[[tuple, tu
             data[i[:2]] = clash(i[2:], data[i[:2]])
     result = [(k[0], k[1], *v) for k, v in data.items()]
     return result
+
+
+def to_alpha(pos: Position) -> str:
+    return chr(pos[1] + 97) + str(pos[0] + 1)
+
+
+def from_alpha(pos: str) -> Position:
+    return int(pos[1:]) - 1, ord(pos[0]) - 97
