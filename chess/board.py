@@ -515,15 +515,15 @@ class Board(ColorLayer):
             self.color_pieces(shade=255)
             self.game_over = False
             if self.check_side != Side.NONE:
-                print(f"{self.check_side.name()} is in check!")
+                print(f"[{len(self.move_history)}] {self.check_side.name()} is in check!")
         else:
             if self.check_side != Side.NONE:
                 self.color_pieces(self.check_side, shade=125)
                 self.color_pieces(self.check_side.opponent(), shade=225)
-                print(f"Checkmate! {self.check_side.opponent().name()} wins.")
+                print(f"[{len(self.move_history)}] Checkmate! {self.check_side.opponent().name()} wins.")
             else:
                 self.color_pieces(shade=175)
-                print("Stalemate! It's a draw.")
+                print(f"[{len(self.move_history)}] Stalemate! It's a draw.")
             self.game_over = True
 
     def load_all_moves(self) -> None:
