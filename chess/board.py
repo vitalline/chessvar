@@ -1,3 +1,4 @@
+import random
 from itertools import product
 from typing import Type
 
@@ -20,7 +21,11 @@ from chess.pieces.pieces import Side
 board_width = 8
 board_height = 8
 
-piece_row = [fide.Rook, fide.Knight, fide.Bishop, fide.Queen, fide.King, fide.Bishop, fide.Knight, fide.Rook]
+piece_groups = [
+    [fide.Rook, fide.Knight, fide.Bishop, fide.Queen],
+]
+
+piece_row = [0, 1, 2, 3, fide.King, 2, 1, 0]
 pawn_row = [fide.Pawn] * board_width
 empty_row = [util.NoPiece] * board_width
 
@@ -31,9 +36,8 @@ neutral_row = [Side.NONE] * board_width
 types = [piece_row, pawn_row] + [empty_row] * (board_height - 4) + [pawn_row, piece_row]
 sides = [white_row, white_row] + [neutral_row] * (board_height - 4) + [black_row, black_row]
 
-promotions = [fide.Rook, fide.Knight, fide.Bishop, fide.Queen]
-white_promotion_tiles = [(board_height - 1, i) for i in range(board_width)]
-black_promotion_tiles = [(0, i) for i in range(board_width)]
+white_promotion_tiles = {(board_height - 1, i) for i in range(board_width)}
+black_promotion_tiles = {(0, i) for i in range(board_width)}
 promotion_tiles = {Side.WHITE: white_promotion_tiles, Side.BLACK: black_promotion_tiles}
 
 cell_size = 50
@@ -89,6 +93,8 @@ class Board(ColorLayer):
         self.check_side = Side.NONE
         self.game_over = False
         self.pieces = []
+        self.piece_sets = {Side.WHITE: [], Side.BLACK: []}
+        self.promotion_types = {Side.WHITE: [], Side.BLACK: []}
         self.movable_pieces = {Side.WHITE: [], Side.BLACK: []}
         self.royal_pieces = {Side.WHITE: [], Side.BLACK: []}
         self.quasi_royal_pieces = {Side.WHITE: [], Side.BLACK: []}
@@ -157,7 +163,12 @@ class Board(ColorLayer):
         director.run(scene.Scene(self))
 
     def shuffle(self):
-        pass
+        self.piece_sets = {side: random.choice(piece_groups) for side in self.piece_sets}
+        self.promotion_types = {side: [] for side in self.promotion_types}
+        for side in self.promotion_types:
+            self.promotion_types[side] = self.piece_sets[side]
+            repeats = set(self.piece_sets[side]) & set(self.piece_sets[side.opponent()])
+            self.promotion_types[side] += [piece for piece in self.piece_sets[side.opponent()] if piece not in repeats]
 
     def reset_board(self):
         self.deselect_piece()  # you know, just in case
@@ -169,19 +180,25 @@ class Board(ColorLayer):
         self.set_board()
 
     def set_board(self):
-        self.pieces = list()
+        self.pieces = []
 
         for row in range(self.board_height):
             self.pieces += [[]]
 
         for row, col in product(range(self.board_height), range(self.board_width)):
+            piece_type = types[row][col]
+            piece_side = sides[row][col]
+            if isinstance(piece_type, int):
+                piece_type = self.piece_sets[piece_side][piece_type]
             self.pieces[row].append(
-                types[row][col](
-                    self, (row, col), sides[row][col], promotions, promotion_tiles[sides[row][col]],
+                piece_type(
+                    self, (row, col), piece_side,
+                    promotions=self.promotion_types[piece_side],
+                    promotion_tiles=promotion_tiles[piece_side],
                 )
-                if issubclass(types[row][col], abc.PromotablePiece) else
-                types[row][col](
-                    self, (row, col), sides[row][col]
+                if issubclass(piece_type, abc.PromotablePiece) else
+                piece_type(
+                    self, (row, col), piece_side
                 )
             )
             self.pieces[row][col].color = (255, 255, 255)
@@ -286,6 +303,7 @@ class Board(ColorLayer):
                         for sprite in node.get_children():
                             node.remove(sprite)
                     self.advance_turn()
+                return
             self.clicked_piece = pos  # we need this in order to discern what are we dragging
             if self.not_movable(pos):
                 return
@@ -414,7 +432,7 @@ class Board(ColorLayer):
                 pos = add(pos, piece.side.direction((-board_height, 0)))
                 pos = add(pos, piece.side.direction((-1, 0))[::-1])
                 if self.not_on_board(pos):
-                    pos = add(pos, piece.Side.direction((-board_width, 0))[::-1])
+                    pos = add(pos, piece.side.direction((-board_width, 0))[::-1])
 
     def replace(self, piece: abc.Piece, new_type: Type[abc.Piece], new_side: Side | None = None) -> None:
         if new_side is None:
