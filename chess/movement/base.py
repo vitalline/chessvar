@@ -65,11 +65,13 @@ class RiderMovement(BaseDirectionalMovement):
     def __init__(self, board: Board, directions: list[AnyPosition]):
         super().__init__(board, directions)
 
-    def stop_condition(self, move: Move, direction: list[AnyPosition]) -> bool:
-        return self.board.not_on_board(add(move.pos_to, direction[:2])) \
-               or len(direction) > 2 and (move.pos_to == add(move.pos_from, mul(direction[:2], direction[2]))) \
-               or self.board.get_side(move.pos_from) == self.board.get_side(add(move.pos_to, direction[:2])) \
-               or self.board.get_side(move.pos_from) == self.board.get_side(move.pos_to).opponent()
+    def stop_condition(self, move: Move, direction: AnyPosition) -> bool:
+        return (
+                self.board.not_on_board(add(move.pos_to, direction[:2]))
+                or len(direction) > 2 and (move.pos_to == add(move.pos_from, mul(direction[:2], direction[2])))
+                or self.board.get_side(move.pos_from) == self.board.get_side(add(move.pos_to, direction[:2]))
+                or self.board.get_side(move.pos_from) == self.board.get_side(move.pos_to).opponent()
+        )
 
 
 class FirstMoveRiderMovement(RiderMovement):
