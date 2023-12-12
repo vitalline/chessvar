@@ -16,7 +16,7 @@ setup(
     version='0.0.2',
     options={'build_exe': {
         'build_exe': join('build', 'Chess'),
-        'include_files': gen_data_files([join('assets', 'pieces'), join('assets', 'util')])
+        'include_files': gen_data_files(['assets'])
     }},
     executables=[Executable('main.py', target_name='Chess.exe', base='Win32GUI')]
 )
