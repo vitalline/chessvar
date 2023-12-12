@@ -16,8 +16,8 @@ from chess.movement import movement
 from chess.movement.move import Move
 from chess.movement.util import Position, add
 from chess.pieces import pieces as abc
-from chess.pieces.groups import classic as fide, colorbound as cb, forward as fw
-from chess.pieces.groups import knights as kn, pizza as pz, rookies as rk, util
+from chess.pieces.groups import avian as av, classic as fide, colorbound as cb, cylindrical as cy
+from chess.pieces.groups import forward as fw, knights as kn, mash as ms, pizza as pz, rookies as rk, util
 from chess.pieces.groups.amazon import Amazon
 from chess.pieces.pieces import Side
 
@@ -31,8 +31,12 @@ piece_groups = {
     4: [kn.ChargeRook, kn.Fibnif, kn.ChargeKnight, kn.Colonel, fide.King, kn.ChargeKnight, kn.Fibnif, kn.ChargeRook],
     5: [kn.ChargeRook, fw.Knishop, fw.Bishight, fw.Forequeen, fide.King, fw.Bishight, fw.Knishop, kn.ChargeRook],
     6: [kn.ChargeRook, cb.Waffle, fide.Bishop, rk.Chancellor, fide.King, fide.Bishop, cb.Waffle, kn.ChargeRook],
-    7: [rk.ShortRook, fide.Knight, fide.Bishop, Amazon, fide.King, fide.Bishop, fide.Knight, rk.ShortRook],
-    8: [pz.Pepperoni, pz.Mushroom, pz.Sausage, pz.Meatball, fide.King, pz.Sausage, pz.Mushroom, pz.Pepperoni],
+    7: [kn.ChargeRook, kn.Fibnif, fw.Bishight, rk.Chancellor, fide.King, fw.Bishight, kn.Fibnif, kn.ChargeRook],
+    8: [rk.ShortRook, fide.Knight, fide.Bishop, Amazon, fide.King, fide.Bishop, fide.Knight, rk.ShortRook],
+    9: [cy.CyWaffle, cy.CyKnight, cy.CyBishop, cy.CyChancellor, fide.King, cy.CyBishop, cy.CyKnight, cy.CyWaffle],
+    10: [av.Wader, av.Darter, av.Faalcon, av.Kingfisher, fide.King, av.Faalcon, av.Darter, av.Wader],
+    11: [pz.Pepperoni, pz.Mushroom, pz.Sausage, pz.Meatball, fide.King, pz.Sausage, pz.Mushroom, pz.Pepperoni],
+    12: [ms.Forfer, kn.Fibnif, ms.B4nD, ms.N2R4, fide.King, ms.B4nD, kn.Fibnif, ms.Forfer],
 }
 
 piece_group_names = {
@@ -42,8 +46,12 @@ piece_group_names = {
     4: "Nutty Knights",
     5: "Forward FIDEs",
     6: "All-Around Allstars",
-    7: "Amazon Army",
-    8: "Pizza Kings",
+    7: "All-Around Allstars 2",
+    8: "Amazon Army",
+    9: "Cylindrical Cinders",
+    10: "Avian Airforce",
+    11: "Pizza Kings",
+    12: "Meticulous Mashers",
 }
 
 
@@ -61,7 +69,7 @@ white_promotion_tiles = {(board_height - 1, i) for i in range(board_width)}
 black_promotion_tiles = {(0, i) for i in range(board_width)}
 promotion_tiles = {Side.WHITE: white_promotion_tiles, Side.BLACK: black_promotion_tiles}
 
-cell_size = 50
+cell_size = 100
 background_color = 192, 192, 192
 highlight_color = 255, 255, 204
 highlight_opacity = 25
@@ -299,7 +307,11 @@ class Board(ColorLayer):
         self.piece_node.remove(piece)
         self.active_piece_node.add(piece)
 
+        move_positions = set()
         for move in self.moves.get(pos, ()):
+            if move.pos_to in move_positions:
+                continue
+            move_positions.add(move.pos_to)
             move_sprite = Sprite(
                 f"assets/util/{'move' if self.not_a_piece(move.pos_to) else 'capture'}.png",
                 position=self.get_screen_position(move.pos_to),

@@ -11,7 +11,7 @@ class Rook(pieces.Piece):
     def __init__(self, board, board_pos, side):
         super().__init__(
             board, board_pos, side,
-            movement=movement.RiderMovement(board, rot([(1, 0)]))
+            movement.RiderMovement(board, rot([(1, 0)]))
         )
 
 
@@ -23,7 +23,7 @@ class Knight(pieces.Piece):
     def __init__(self, board, board_pos, side):
         super().__init__(
             board, board_pos, side,
-            movement=movement.RiderMovement(board, sym([(1, 2, 1), (2, 1, 1)]))
+            movement.RiderMovement(board, sym([(1, 2, 1), (2, 1, 1)]))
         )
 
 
@@ -35,7 +35,7 @@ class Bishop(pieces.Piece):
     def __init__(self, board, board_pos, side):
         super().__init__(
             board, board_pos, side,
-            movement=movement.RiderMovement(board, sym([(1, 1)]))
+            movement.RiderMovement(board, sym([(1, 1)]))
         )
 
 
@@ -47,7 +47,7 @@ class Queen(pieces.Piece):
     def __init__(self, board, board_pos, side):
         super().__init__(
             board, board_pos, side,
-            movement=movement.RiderMovement(board, rot([(1, 0), (1, 1)]))
+            movement.RiderMovement(board, rot([(1, 0), (1, 1)]))
         )
 
 
@@ -59,7 +59,7 @@ class King(pieces.RoyalPiece):
     def __init__(self, board, board_pos, side):
         super().__init__(
             board, board_pos, side,
-            movement=movement.MultiMovement(
+            movement.MultiMovement(
                 board, [
                     movement.RiderMovement(board, rot([(1, 0, 1), (1, 1, 1)])),
                     movement.CastlingMovement(board, (0, 2), (0, 3), (0, -2), [(0, 1), (0, 2)]),
@@ -77,11 +77,11 @@ class Pawn(pieces.PromotablePiece):
     def __init__(self, board, board_pos, side, promotions, promotion_tiles):
         super().__init__(
             board, board_pos, side,
-            movement=movement.MultiMovement(
+            movement.MultiMovement(
                 board,
                 move=[movement.EnPassantTargetMovement(board, [(1, 0, 1)], [(1, 0, 2)], [(1, 0, 1)])],
                 capture=[movement.EnPassantMovement(board, [(1, 1, 1), (1, -1, 1)])],
             ),
-            promotions=promotions,
-            promotion_tiles=promotion_tiles
+            promotions,
+            promotion_tiles
         )

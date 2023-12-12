@@ -11,7 +11,7 @@ class ShortRook(pieces.Piece):
     def __init__(self, board, board_pos, side):
         super().__init__(
             board, board_pos, side,
-            movement=movement.RiderMovement(board, rot([(1, 0, 4)]))
+            movement.RiderMovement(board, rot([(1, 0, 4)]))
         )
 
 
@@ -23,7 +23,7 @@ class WoodyRook(pieces.Piece):
     def __init__(self, board, board_pos, side):
         super().__init__(
             board, board_pos, side,
-            movement=movement.RiderMovement(board, rot([(1, 0, 1), (2, 0, 1)]))
+            movement.RiderMovement(board, rot([(1, 0, 1), (2, 0, 1)]))
         )
 
 
@@ -35,7 +35,7 @@ class HalfDuck(pieces.Piece):
     def __init__(self, board, board_pos, side):
         super().__init__(
             board, board_pos, side,
-            movement=movement.RiderMovement(board, rot([(1, 1, 1), (2, 0, 1), (3, 0, 1)]))
+            movement.RiderMovement(board, rot([(1, 1, 1), (2, 0, 1), (3, 0, 1)]))
         )
 
 
@@ -47,5 +47,5 @@ class Chancellor(pieces.Piece):
     def __init__(self, board, board_pos, side):
         super().__init__(
             board, board_pos, side,
-            movement=movement.RiderMovement(board, rot([(1, 0), (1, 2, 1), (2, 1, 1)]))
+            movement.RiderMovement(board, rot([(1, 0), (1, 2, 1), (2, 1, 1)]))
         )

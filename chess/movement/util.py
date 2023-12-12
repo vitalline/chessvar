@@ -4,7 +4,8 @@ from itertools import zip_longest
 
 Position = tuple[int, int]
 RepeatPosition = tuple[int, int, int]
-AnyPosition = Position | RepeatPosition
+RepeatFromPosition = tuple[int, int, int, int]
+AnyPosition = Position | RepeatPosition | RepeatFromPosition
 
 
 def add(pos: Position, dpos: Position) -> Position:

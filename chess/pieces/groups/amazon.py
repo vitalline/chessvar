@@ -11,5 +11,5 @@ class Amazon(pieces.Piece):
     def __init__(self, board, board_pos, side):
         super().__init__(
             board, board_pos, side,
-            movement=movement.RiderMovement(board, rot([(1, 0), (1, 1), (1, 2, 1), (2, 1, 1)]))
+            movement.RiderMovement(board, rot([(1, 0), (1, 1), (1, 2, 1), (2, 1, 1)]))
         )

@@ -11,7 +11,7 @@ class ChargeRook(pieces.Piece):
     def __init__(self, board, board_pos, side):
         super().__init__(
             board, board_pos, side,
-            movement=movement.RiderMovement(board, symv([(1, 0), (0, 1), (-1, 0, 1), (-1, 1, 1)]))
+            movement.RiderMovement(board, symv([(1, 0), (0, 1), (-1, 0, 1), (-1, 1, 1)]))
         )
 
 
@@ -23,7 +23,7 @@ class Fibnif(pieces.Piece):
     def __init__(self, board, board_pos, side):
         super().__init__(
             board, board_pos, side,
-            movement=movement.RiderMovement(board, sym([(1, 1, 1), (2, 1, 1)]))
+            movement.RiderMovement(board, sym([(1, 1, 1), (2, 1, 1)]))
         )
 
 
@@ -35,7 +35,7 @@ class ChargeKnight(pieces.Piece):
     def __init__(self, board, board_pos, side):
         super().__init__(
             board, board_pos, side,
-            movement=movement.RiderMovement(board, symv([(2, 1, 1), (1, 2, 1), (0, 1, 1), (-1, 0, 1), (-1, 1, 1)]))
+            movement.RiderMovement(board, symv([(2, 1, 1), (1, 2, 1), (0, 1, 1), (-1, 0, 1), (-1, 1, 1)]))
         )
 
 
@@ -47,7 +47,7 @@ class Colonel(pieces.Piece):
     def __init__(self, board, board_pos, side):
         super().__init__(
             board, board_pos, side,
-            movement=movement.RiderMovement(
+            movement.RiderMovement(
                 board, sym([(1, 1, 1)]) + symv([(2, 1, 1), (1, 2, 1), (1, 0), (0, 1), (-1, 0, 1), (-1, 1, 1)])
             )
         )
