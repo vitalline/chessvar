@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from copy import copy
 from typing import TYPE_CHECKING
 
 from chess.movement.move import Move
@@ -220,15 +221,14 @@ class ChainMovement(BaseMovement):
             move = None
             for move in self.movements[index].moves(pos_from, side):
                 if self.start_index <= index:
-                    yield move
+                    yield copy(move)
             if (
                     move is not None and len(direction) > 2 and direction[2] and
                     move.pos_to == add(pos_from, side.direction(mul(direction[:2], direction[2])))
                     and self.board.get_piece(move.pos_to).is_empty()
             ):
                 for move in self.moves(move.pos_to, side, index + 1):
-                    move.pos_from = pos_from
-                    yield move
+                    yield copy(move).set(pos_from=pos_from)
         self.movements[index].directions = directions
 
     def update(self, move: Move, side: Side):
@@ -268,11 +268,11 @@ class MultiMovement(BaseMovement):
         for movement in self.move_or_capture + self.move:
             for move in movement.moves(pos_from, side):
                 if self.board.not_a_piece(move.pos_to):
-                    yield move
+                    yield copy(move)
         for movement in self.move_or_capture + self.capture:
             for move in movement.moves(pos_from, side):
                 if self.board.get_side(move.pos_to) == side.opponent():
-                    yield move
+                    yield copy(move)
 
     def update(self, move: Move, side: Side):
         for movement in self.move_or_capture + self.move + self.capture:

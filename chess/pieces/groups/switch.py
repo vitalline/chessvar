@@ -64,4 +64,3 @@ class SlipQueen(pieces.Piece):
                 ]) for i, j in rot([(1, 0), (1, 1)])
             ])
         )
-

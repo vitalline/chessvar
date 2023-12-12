@@ -28,16 +28,30 @@ class Move(object):
 
     def set(
             self,
+            pos_from: Position | None = None,
+            pos_to: Position | None = None,
             movement: BaseMovement | None = None,
             piece: Piece | None = None,
             captured_piece: Piece | None = None,
             promotion: Type[Piece] | None = None,
     ) -> Move:
+        self.pos_from = pos_from or self.pos_from
+        self.pos_to = pos_to or self.pos_to
         self.piece = piece or self.piece
         self.movement = movement or self.movement
         self.captured_piece = captured_piece or self.captured_piece
         self.promotion = promotion or self.promotion
         return self
+
+    def __copy__(self):
+        return Move(
+            self.pos_from,
+            self.pos_to,
+            self.movement,
+            self.piece,
+            self.captured_piece,
+            self.promotion,
+        )
 
     def __str__(self) -> str:
         string = f"{to_alpha(self.pos_from)} {'->'} {to_alpha(self.pos_to)}"

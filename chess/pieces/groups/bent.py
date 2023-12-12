@@ -128,4 +128,3 @@ class Griffon(pieces.Piece):
                 ]) for i, j in rot([(1, 1)]) for k, l in ((i, 0), (0, j))
             ])
         )
-

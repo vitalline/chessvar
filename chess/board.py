@@ -16,8 +16,9 @@ from chess.movement import movement
 from chess.movement.move import Move
 from chess.movement.util import Position, add
 from chess.pieces import pieces as abc
-from chess.pieces.groups import avian as av, bent as bt, classic as fide
-from chess.pieces.groups import colorbound as cb, cylindrical as cy, dragon as dr
+from chess.pieces.groups import classic as fide
+from chess.pieces.groups import avian as av, bent as bt, colorbound as cb
+from chess.pieces.groups import cylindrical as cy, dragon as dr, fizzies as fi
 from chess.pieces.groups import forward as fw, knights as kn, mash as ms
 from chess.pieces.groups import pizza as pz, rookies as rk, switch as sw
 from chess.pieces.groups.amazon import Amazon
@@ -37,12 +38,13 @@ piece_groups = {
     7: [kn.ChargeRook, kn.Fibnif, fw.Bishight, rk.Chancellor, fide.King, fw.Bishight, kn.Fibnif, kn.ChargeRook],
     8: [rk.ShortRook, fide.Knight, fide.Bishop, Amazon, fide.King, fide.Bishop, fide.Knight, rk.ShortRook],
     9: [cy.CyWaffle, cy.CyKnight, cy.CyBishop, cy.CyChancellor, fide.King, cy.CyBishop, cy.CyKnight, cy.CyWaffle],
-    10: [av.Wader, av.Darter, av.Faalcon, av.Kingfisher, fide.King, av.Faalcon, av.Darter, av.Wader],
-    11: [pz.Pepperoni, pz.Mushroom, pz.Sausage, pz.Meatball, fide.King, pz.Sausage, pz.Mushroom, pz.Pepperoni],
-    12: [ms.Forfer, kn.Fibnif, ms.B4nD, ms.N2R4, fide.King, ms.B4nD, kn.Fibnif, ms.Forfer],
-    13: [dr.DragonHorse, dr.Dragonfly, dr.Dragoon, dr.Wyvern, fide.King, dr.Dragoon, dr.Dragonfly, dr.DragonHorse],
-    14: [sw.SlipRook, sw.Marquis, sw.Unicorn, sw.SlipQueen, fide.King, sw.Unicorn, sw.Marquis, sw.SlipRook],
-    15: [bt.LGriffon, bt.LAanca, bt.LSastik, bt.Griffon, fide.King, bt.RSastik, bt.RAanca, bt.RGriffon],
+    10: [fi.LRhino, fi.Gnohmon, fi.Crabinal, fi.EagleScout, fide.King, fi.Crabinal, fi.Gnohmon, fi.RRhino],
+    11: [av.Wader, av.Darter, av.Faalcon, av.Kingfisher, fide.King, av.Faalcon, av.Darter, av.Wader],
+    12: [pz.Pepperoni, pz.Mushroom, pz.Sausage, pz.Meatball, fide.King, pz.Sausage, pz.Mushroom, pz.Pepperoni],
+    13: [ms.Forfer, kn.Fibnif, ms.B4nD, ms.N2R4, fide.King, ms.B4nD, kn.Fibnif, ms.Forfer],
+    14: [dr.DragonHorse, dr.Dragonfly, dr.Dragoon, dr.Wyvern, fide.King, dr.Dragoon, dr.Dragonfly, dr.DragonHorse],
+    15: [sw.SlipRook, sw.Marquis, sw.Unicorn, sw.SlipQueen, fide.King, sw.Unicorn, sw.Marquis, sw.SlipRook],
+    16: [bt.LGriffon, bt.LAanca, bt.LSastik, bt.Griffon, fide.King, bt.RSastik, bt.RAanca, bt.RGriffon],
 }
 
 piece_group_names = {
@@ -55,12 +57,13 @@ piece_group_names = {
     7: "All-Around Allstars 2",
     8: "Amazon Army",
     9: "Cylindrical Cinders",
-    10: "Avian Airforce",
-    11: "Pizza Kings",
-    12: "Meticulous Mashers",
-    13: "Daring Dragons",
-    14: "Seeping Switchers",
-    15: "Bent Bozos",
+    10: "Fighting Fizzies",
+    11: "Avian Airforce",
+    12: "Pizza Kings",
+    13: "Meticulous Mashers",
+    14: "Daring Dragons",
+    15: "Seeping Switchers",
+    16: "Bent Bozos",
 }
 
 

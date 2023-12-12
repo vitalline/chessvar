@@ -83,8 +83,8 @@ class Piece(Sprite):
     def move(self, move: Move):
         self.board.move(move)
 
-    def moves(self, pos: typing.Tuple[int, int]):  # convenience method
-        return self.movement.moves(pos, self.side)
+    def moves(self, pos: Position):  # convenience method
+        yield from self.movement.moves(pos, self.side)
 
 
 class PromotablePiece(Piece):
