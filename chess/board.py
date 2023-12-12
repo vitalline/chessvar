@@ -17,8 +17,9 @@ from chess.movement.move import Move
 from chess.movement.util import Position, add
 from chess.pieces import pieces as abc
 from chess.pieces.groups import avian as av, classic as fide, colorbound as cb, cylindrical as cy, dragon as dr
-from chess.pieces.groups import forward as fw, knights as kn, mash as ms, pizza as pz, rookies as rk, util
+from chess.pieces.groups import forward as fw, knights as kn, mash as ms, pizza as pz, rookies as rk, switch as sw
 from chess.pieces.groups.amazon import Amazon
+from chess.pieces.groups.util import NoPiece
 from chess.pieces.pieces import Side
 
 board_width = 8
@@ -38,6 +39,7 @@ piece_groups = {
     11: [pz.Pepperoni, pz.Mushroom, pz.Sausage, pz.Meatball, fide.King, pz.Sausage, pz.Mushroom, pz.Pepperoni],
     12: [ms.Forfer, kn.Fibnif, ms.B4nD, ms.N2R4, fide.King, ms.B4nD, kn.Fibnif, ms.Forfer],
     13: [dr.DragonHorse, dr.Dragonfly, dr.Dragoon, dr.Wyvern, fide.King, dr.Dragoon, dr.Dragonfly, dr.DragonHorse],
+    14: [sw.SlipRook, sw.Marquis, sw.Unicorn, sw.SlipQueen, fide.King, sw.Unicorn, sw.Marquis, sw.SlipRook],
 }
 
 piece_group_names = {
@@ -54,11 +56,12 @@ piece_group_names = {
     11: "Pizza Kings",
     12: "Meticulous Mashers",
     13: "Daring Dragons",
+    14: "Seeping Switchers",
 }
 
 
 pawn_row = [fide.Pawn] * board_width
-empty_row = [util.NoPiece] * board_width
+empty_row = [NoPiece] * board_width
 
 white_row = [Side.WHITE] * board_width
 black_row = [Side.BLACK] * board_width
@@ -428,9 +431,9 @@ class Board(ColorLayer):
         self.deselect_piece()
         self.piece_node.remove(self.pieces[move.pos_to[0]][move.pos_to[1]])
         self.pieces[move.pos_to[0]][move.pos_to[1]] = move.piece
-        self.pieces[move.pos_from[0]][move.pos_from[1]] = util.NoPiece(self, move.pos_from)
+        self.pieces[move.pos_from[0]][move.pos_from[1]] = NoPiece(self, move.pos_from)
         self.piece_node.add(self.pieces[move.pos_from[0]][move.pos_from[1]])
-        (move.piece or move).movement.update(move)
+        (move.piece or move).movement.update(move, self.turn_side)
 
     def update(self, move: Move) -> None:
         if self.en_passant_target is not None and move.piece.side == self.en_passant_target.side.opponent():
@@ -452,9 +455,9 @@ class Board(ColorLayer):
             self.pieces[move.captured_piece.board_pos[0]][move.captured_piece.board_pos[1]] = move.captured_piece
             self.piece_node.add(move.captured_piece)
         if move.captured_piece is None or move.captured_piece.board_pos != move.pos_to:
-            self.pieces[move.pos_to[0]][move.pos_to[1]] = util.NoPiece(self, move.pos_to)
+            self.pieces[move.pos_to[0]][move.pos_to[1]] = NoPiece(self, move.pos_to)
             self.piece_node.add(self.pieces[move.pos_to[0]][move.pos_to[1]])
-        (move.piece or move).movement.undo(move)
+        (move.piece or move).movement.undo(move, self.turn_side)
 
     def undo_last_move(self) -> None:
         if self.promotion_piece:
@@ -466,8 +469,8 @@ class Board(ColorLayer):
         self.undo(last_move)
         if self.move_history:
             move = self.move_history[-1]
-            (move.piece or move).movement.undo(move)
-            (move.piece or move).movement.update(move)
+            (move.piece or move).movement.undo(move, self.turn_side.opponent())
+            (move.piece or move).movement.update(move, self.turn_side.opponent())
         self.advance_turn()
 
     def start_promotion(self, piece: abc.Piece) -> None:
@@ -617,20 +620,20 @@ class Board(ColorLayer):
         if self.en_passant_target is not None and self.en_passant_target.board_pos != piece_pos:
             return
         self.en_passant_target = self.get_piece(piece_pos)
-        self.replace(self.get_piece(marker_pos), util.NoPiece, self.en_passant_target.side)
+        self.replace(self.get_piece(marker_pos), NoPiece, self.en_passant_target.side)
         self.en_passant_markers.add(marker_pos)
 
     def capture_en_passant(self) -> None:
         if self.en_passant_target is None:
             return
-        self.replace(self.en_passant_target, util.NoPiece, Side.NONE)
+        self.replace(self.en_passant_target, NoPiece, Side.NONE)
         self.clear_en_passant()
 
     def clear_en_passant(self) -> None:
         self.en_passant_target = None
         for marker in self.en_passant_markers:
             if self.not_a_piece(marker):
-                self.replace(self.get_piece(marker), util.NoPiece, Side.NONE)
+                self.replace(self.get_piece(marker), NoPiece, Side.NONE)
         self.en_passant_markers = set()
 
     def on_key_press(self, symbol, modifiers):
