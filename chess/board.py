@@ -81,7 +81,7 @@ white_promotion_tiles = {(board_height - 1, i) for i in range(board_width)}
 black_promotion_tiles = {(0, i) for i in range(board_width)}
 promotion_tiles = {Side.WHITE: white_promotion_tiles, Side.BLACK: black_promotion_tiles}
 
-cell_size = 100
+cell_size = 50
 background_color = 192, 192, 192
 highlight_color = 255, 255, 204
 highlight_opacity = 25
