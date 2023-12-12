@@ -82,12 +82,17 @@ black_promotion_tiles = {(0, i) for i in range(board_width)}
 promotion_tiles = {Side.WHITE: white_promotion_tiles, Side.BLACK: black_promotion_tiles}
 
 cell_size = 50
+min_cell_size = 25
+max_cell_size = 100
+cell_size_step = 5
 background_color = 192, 192, 192
 highlight_color = 255, 255, 204
 highlight_opacity = 25
 selection_opacity = 50
 marker_opacity = 50
-
+win_shade = 225
+loss_shade = 125
+draw_shade = 175
 
 movements = []
 
@@ -109,19 +114,20 @@ def get_royal_color(side: Side) -> tuple[int, int, int]:
 class Board(ColorLayer):
 
     def __init__(self):
+        self.board_width, self.board_height = board_width, board_height
+        self.cell_size = cell_size
+
         self.is_event_handler = True
         director.init(
-            width=(board_width+2)*cell_size,
-            height=(board_height+2)*cell_size,
+            width=(self.board_width + 2) * self.cell_size,
+            height=(self.board_height + 2) * self.cell_size,
             caption='Chess',
             autoscale=False,
-
         )
         super().__init__(192, 168, 142, 1000)
         director.window.remove_handlers(director._default_event_handler)
 
         # super boring initialization stuff (bluh bluh)
-        self.board_width, self.board_height = board_width, board_height
         self.clicked_piece = None
         self.selected_piece = None
         self.piece_was_clicked = False  # used to discern two-click moving from dragging
@@ -145,28 +151,29 @@ class Board(ColorLayer):
         self.col_labels = []
         self.moves = {}
         self.no_moves = movement.RiderMovement(self, [])
+        self.anchor = 0, 0
         self.board = BatchNode()
-        self.highlight = Sprite("assets/util/highlight.png", color=highlight_color, opacity=0)
-        self.highlight.scale = cell_size / self.highlight.width
         self.selection = Sprite("assets/util/selection.png", opacity=0)
-        self.selection.scale = cell_size / self.selection.width
+        self.selection.scale = self.cell_size / self.selection.width
         self.piece_node = BatchNode()
         self.move_node = BatchNode()
         self.active_piece_node = BatchNode()
         self.promotion_area_node = BatchNode()
         self.promotion_piece_node = BatchNode()
+        self.highlight = Sprite("assets/util/highlight.png", color=highlight_color, opacity=0)
+        self.highlight.scale = self.cell_size / self.highlight.width
         self.add(self.board, z=1)
-        self.add(self.highlight, z=2)
         self.add(self.selection, z=2)
         self.add(self.piece_node, z=3)
         self.add(self.move_node, z=3)
         self.add(self.active_piece_node, z=4)
         self.add(self.promotion_area_node, z=5)
         self.add(self.promotion_piece_node, z=6)
+        self.add(self.highlight, z=7)
 
         label_kwargs = {
             'font_name': 'Courier New',
-            'font_size': cell_size * 0.4,
+            'font_size': cell_size * 0.5,
             'bold': True,
             'color': (0, 0, 0, 1000)
         }
@@ -181,7 +188,7 @@ class Board(ColorLayer):
             ]
 
         for col in range(self.board_width):
-            self.row_labels += [
+            self.col_labels += [
                 Label(chr(col + ord('a')), self.get_screen_position((-0.9, col)),
                       anchor_x='center', anchor_y='center', **label_kwargs),
                 Label(chr(col + ord('a')), self.get_screen_position((board_height - 0.1, col)),
@@ -197,11 +204,18 @@ class Board(ColorLayer):
             self.board.add(self.board_sprites[row][col])
 
         for label in self.row_labels + self.col_labels:
+            label.scale = 0.8
             self.add(label, z=1)
 
         self.reset_board(update=True)
 
         director.run(scene.Scene(self))
+
+    def resize(self, new_cell_size: int) -> None:
+        self.cell_size = new_cell_size
+        dimensions = (self.board_width + 2) * self.cell_size, (self.board_height + 2) * self.cell_size
+        director.window.set_size(*dimensions)
+        self.scale = self.cell_size / self.board_sprites[0][0].width
 
     def reset_board(self, shuffle: bool = False, update: bool = False) -> None:
         self.deselect_piece()  # you know, just in case
@@ -265,12 +279,13 @@ class Board(ColorLayer):
     def get_board_position(self, x: float, y: float) -> Position:
         window_width, window_height = director.get_window_size()
         x, y = director.get_virtual_coordinates(x, y)
-        col = round((x - window_width / 2) / cell_size + (self.board_width - 1) / 2)
-        row = round((y - window_height / 2) / cell_size + (self.board_height - 1) / 2)
+        col = round((x - window_width / 2) / self.cell_size + (self.board_width - 1) / 2)
+        row = round((y - window_height / 2) / self.cell_size + (self.board_height - 1) / 2)
         return row, col
 
     def get_screen_position(self, pos: tuple[float, float]) -> tuple[float, float]:
-        window_width, window_height = director.get_window_size()
+        window_width = (self.board_width + 2) * cell_size
+        window_height = (self.board_height + 2) * cell_size
         row, col = pos
         x = (col - (self.board_width - 1) / 2) * cell_size + window_width / 2
         y = (row - (self.board_height - 1) / 2) * cell_size + window_height / 2
@@ -543,11 +558,11 @@ class Board(ColorLayer):
                 print(f"[{len(self.move_history)}] {self.check_side.name()} is in check!")
         else:
             if self.check_side != Side.NONE:
-                self.color_pieces(self.check_side, shade=125)
-                self.color_pieces(self.check_side.opponent(), shade=225)
+                self.color_pieces(self.check_side, shade=loss_shade)
+                self.color_pieces(self.check_side.opponent(), shade=win_shade)
                 print(f"[{len(self.move_history)}] Checkmate! {self.check_side.opponent().name()} wins.")
             else:
-                self.color_pieces(shade=175)
+                self.color_pieces(shade=draw_shade)
                 print(f"[{len(self.move_history)}] Stalemate! It's a draw.")
             self.game_over = True
 
@@ -652,6 +667,25 @@ class Board(ColorLayer):
                 self.reset_board(shuffle=True)
             else:
                 self.reset_board()
+            return
+        if symbol == key.MINUS and modifiers & key.MOD_ACCEL:
+            if self.cell_size == min_cell_size:
+                return
+            self.resize(
+                min_cell_size if modifiers & key.MOD_SHIFT else max(min_cell_size, self.cell_size - cell_size_step)
+            )
+            return
+        if symbol == key.EQUAL and modifiers & key.MOD_ACCEL:
+            if self.cell_size == max_cell_size:
+                return
+            self.resize(
+                max_cell_size if modifiers & key.MOD_SHIFT else min(max_cell_size, self.cell_size + cell_size_step)
+            )
+            return
+        if symbol == key._0 and modifiers & key.MOD_ACCEL:
+            if self.cell_size == cell_size:
+                return
+            self.resize(cell_size)
             return
         if symbol == key.T and modifiers & key.MOD_ACCEL:
             self.turn_side = Side.ANY
