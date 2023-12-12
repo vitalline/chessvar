@@ -16,7 +16,7 @@ from chess.movement import movement
 from chess.movement.move import Move
 from chess.movement.util import Position, add
 from chess.pieces import pieces as abc
-from chess.pieces.groups import avian as av, classic as fide, colorbound as cb, cylindrical as cy
+from chess.pieces.groups import avian as av, classic as fide, colorbound as cb, cylindrical as cy, dragon as dr
 from chess.pieces.groups import forward as fw, knights as kn, mash as ms, pizza as pz, rookies as rk, util
 from chess.pieces.groups.amazon import Amazon
 from chess.pieces.pieces import Side
@@ -37,6 +37,7 @@ piece_groups = {
     10: [av.Wader, av.Darter, av.Faalcon, av.Kingfisher, fide.King, av.Faalcon, av.Darter, av.Wader],
     11: [pz.Pepperoni, pz.Mushroom, pz.Sausage, pz.Meatball, fide.King, pz.Sausage, pz.Mushroom, pz.Pepperoni],
     12: [ms.Forfer, kn.Fibnif, ms.B4nD, ms.N2R4, fide.King, ms.B4nD, kn.Fibnif, ms.Forfer],
+    13: [dr.DragonHorse, dr.Dragonfly, dr.Dragoon, dr.Wyvern, fide.King, dr.Dragoon, dr.Dragonfly, dr.DragonHorse],
 }
 
 piece_group_names = {
@@ -52,6 +53,7 @@ piece_group_names = {
     10: "Avian Airforce",
     11: "Pizza Kings",
     12: "Meticulous Mashers",
+    13: "Daring Dragons",
 }
 
 
@@ -120,6 +122,7 @@ class Board(ColorLayer):
         self.move_history = []
         self.turn_side = Side.WHITE
         self.check_side = Side.NONE
+        self.castling_threats = set()
         self.game_over = False
         self.pieces = []
         self.piece_sets = {Side.WHITE: 1, Side.BLACK: 1}
@@ -544,6 +547,7 @@ class Board(ColorLayer):
         royal_pieces = {side: self.royal_pieces[side].copy() for side in self.royal_pieces}
         quasi_royal_pieces = {side: self.quasi_royal_pieces[side].copy() for side in self.quasi_royal_pieces}
         check_side = self.check_side
+        castling_threats = self.castling_threats.copy()
         en_passant_target = self.en_passant_target
         en_passant_markers = self.en_passant_markers.copy()
         self.moves = {}
@@ -555,6 +559,8 @@ class Board(ColorLayer):
                 if self.check_side != self.turn_side:
                     self.moves.setdefault(move.pos_from, []).append(move)
                 self.undo(move)
+                self.check_side = check_side
+                self.castling_threats = castling_threats.copy()
                 if en_passant_target is not None:
                     self.en_passant_target = en_passant_target
                     self.en_passant_markers = en_passant_markers.copy()
@@ -564,6 +570,7 @@ class Board(ColorLayer):
         self.royal_pieces = royal_pieces
         self.quasi_royal_pieces = quasi_royal_pieces
         self.check_side = check_side
+        self.castling_threats = castling_threats
 
     def load_pieces(self):
         self.movable_pieces = {Side.WHITE: [], Side.BLACK: []}
@@ -584,12 +591,23 @@ class Board(ColorLayer):
     def load_check(self):
         self.load_pieces()
         self.check_side = Side.NONE
+        self.castling_threats = set()
         for royal in self.royal_pieces[self.turn_side]:
+            castle_moves = [
+                move for move in royal.moves(royal.board_pos) if isinstance(move.movement, movement.CastlingMovement)
+            ]
+            castle_movements = set(move.movement for move in castle_moves)
+            castle_cells = set(
+                add(royal.board_pos, offset) for mov in castle_movements for offset in mov.gap + [mov.direction]
+            )
             for piece in self.movable_pieces[self.turn_side.opponent()]:
                 for move in piece.moves(piece.board_pos):
                     if move.pos_to == royal.board_pos:
                         self.check_side = self.turn_side
+                        self.castling_threats = castle_cells
                         break
+                    if move.pos_to in castle_cells:
+                        self.castling_threats.add(move.pos_to)
                 if self.check_side != Side.NONE:
                     break
             if self.check_side != Side.NONE:
