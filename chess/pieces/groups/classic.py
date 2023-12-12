@@ -74,7 +74,7 @@ class Pawn(pieces.PromotablePiece):
     file_name = 'pawn'
     asset_folder = 'classic'
 
-    def __init__(self, board, board_pos, side, promotions, promotion_tiles):
+    def __init__(self, board, board_pos, side, promotions, promotion_squares):
         super().__init__(
             board, board_pos, side,
             movement.MultiMovement(
@@ -83,5 +83,5 @@ class Pawn(pieces.PromotablePiece):
                 capture=[movement.EnPassantMovement(board, [(1, 1, 1), (1, -1, 1)])],
             ),
             promotions,
-            promotion_tiles
+            promotion_squares
         )

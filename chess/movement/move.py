@@ -53,6 +53,13 @@ class Move(object):
             self.promotion,
         )
 
+    def __eq__(self, other: Move) -> bool:
+        return (
+            self.pos_from == other.pos_from
+            and self.pos_to == other.pos_to
+            and self.promotion == other.promotion
+        )
+
     def __str__(self) -> str:
         string = f"{to_alpha(self.pos_from)} {'->'} {to_alpha(self.pos_to)}"
         if self.piece:

@@ -95,15 +95,15 @@ class PromotablePiece(Piece):
             side: Side = Side.NONE,
             movement: BaseMovement | None = None,
             promotions: list[typing.Type[Piece]] | None = None,
-            promotion_tiles: set[Position] | None = None
+            promotion_squares: set[Position] | None = None
     ):
         super().__init__(board, board_pos, side, movement)
         self.promotions = promotions or []
-        self.promotion_tiles = promotion_tiles or set()
+        self.promotion_squares = promotion_squares or set()
 
     def move(self, move: Move):
         super().move(move)
-        if self.board_pos in self.promotion_tiles:
+        if self.board_pos in self.promotion_squares:
             if not self.promotions:
                 return
             if len(self.promotions) == 1:

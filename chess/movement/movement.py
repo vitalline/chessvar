@@ -152,11 +152,11 @@ class CastlingMovement(BaseMovement):
             return ()
         if other_piece.movement.total_moves:
             return ()
-        for cell in self.gap:
-            cell_pos = add(pos_from, cell)
-            if not self.board.not_a_piece(cell_pos):
+        for offset in self.gap:
+            pos = add(pos_from, offset)
+            if not self.board.not_a_piece(pos):
                 return ()
-            if cell_pos in self.board.castling_threats:
+            if pos in self.board.castling_threats:
                 return ()
         return (Move(pos_from, add(pos_from, side.direction(self.direction)), self),)
 
@@ -189,9 +189,9 @@ class EnPassantTargetMovement(FirstMoveRiderMovement):
     def update(self, move: Move, side: Side):
         if not self.total_moves:
             for direction in self.en_passant_directions:
-                en_passant_tile = add(move.pos_from, move.piece.side.direction(direction))
-                if self.board.not_a_piece(en_passant_tile):
-                    self.board.mark_en_passant(move.pos_to, en_passant_tile)
+                en_passant_square = add(move.pos_from, move.piece.side.direction(direction))
+                if self.board.not_a_piece(en_passant_square):
+                    self.board.mark_en_passant(move.pos_to, en_passant_square)
         super().update(move, side)
 
     def undo(self, move: Move, side: Side):

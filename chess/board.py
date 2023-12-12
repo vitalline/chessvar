@@ -1,5 +1,6 @@
 import math
 import random
+from copy import copy
 from itertools import product, zip_longest
 from typing import Type
 
@@ -77,14 +78,14 @@ neutral_row = [Side.NONE] * board_width
 types = [white_row, pawn_row] + [empty_row] * (board_height - 4) + [pawn_row, black_row]
 sides = [white_row, white_row] + [neutral_row] * (board_height - 4) + [black_row, black_row]
 
-white_promotion_tiles = {(board_height - 1, i) for i in range(board_width)}
-black_promotion_tiles = {(0, i) for i in range(board_width)}
-promotion_tiles = {Side.WHITE: white_promotion_tiles, Side.BLACK: black_promotion_tiles}
+white_promotion_squares = {(board_height - 1, i) for i in range(board_width)}
+black_promotion_squares = {(0, i) for i in range(board_width)}
+promotion_squares = {Side.WHITE: white_promotion_squares, Side.BLACK: black_promotion_squares}
 
-cell_size = 50
-min_cell_size = 25
-max_cell_size = 100
-cell_size_step = 5
+default_size = 50
+min_size = 25
+max_size = 100
+size_step = 5
 background_color = 192, 192, 192
 highlight_color = 255, 255, 204
 highlight_opacity = 25
@@ -115,71 +116,74 @@ class Board(ColorLayer):
 
     def __init__(self):
         self.board_width, self.board_height = board_width, board_height
-        self.cell_size = cell_size
+        self.size = default_size
 
         self.is_event_handler = True
         director.init(
-            width=(self.board_width + 2) * self.cell_size,
-            height=(self.board_height + 2) * self.cell_size,
+            width=(self.board_width + 2) * self.size,
+            height=(self.board_height + 2) * self.size,
             caption='Chess',
             autoscale=False,
         )
         super().__init__(192, 168, 142, 1000)
+        # remove default key combinations to not clash with our custom ones
         director.window.remove_handlers(director._default_event_handler)
 
         # super boring initialization stuff (bluh bluh)
-        self.clicked_piece = None
-        self.selected_piece = None
+        self.clicked_piece = None  # piece we clicked on
+        self.selected_piece = None  # piece selected for moving
         self.piece_was_clicked = False  # used to discern two-click moving from dragging
-        self.en_passant_target = None
-        self.en_passant_markers = set()
-        self.promotion_piece = None
-        self.promotion_area = {}
-        self.move_history = []
-        self.turn_side = Side.WHITE
-        self.check_side = Side.NONE
-        self.castling_threats = set()
-        self.game_over = False
-        self.pieces = []
-        self.piece_sets = {Side.WHITE: 1, Side.BLACK: 1}
-        self.promotion_types = {Side.WHITE: [], Side.BLACK: []}
-        self.movable_pieces = {Side.WHITE: [], Side.BLACK: []}
-        self.royal_pieces = {Side.WHITE: [], Side.BLACK: []}
-        self.quasi_royal_pieces = {Side.WHITE: [], Side.BLACK: []}
-        self.board_sprites = []
-        self.row_labels = []
-        self.col_labels = []
-        self.moves = {}
-        self.no_moves = movement.RiderMovement(self, [])
-        self.anchor = 0, 0
-        self.board = BatchNode()
-        self.selection = Sprite("assets/util/selection.png", opacity=0)
-        self.selection.scale = self.cell_size / self.selection.width
-        self.piece_node = BatchNode()
-        self.move_node = BatchNode()
-        self.active_piece_node = BatchNode()
-        self.promotion_area_node = BatchNode()
-        self.promotion_piece_node = BatchNode()
-        self.highlight = Sprite("assets/util/highlight.png", color=highlight_color, opacity=0)
-        self.highlight.scale = self.cell_size / self.highlight.width
+        self.en_passant_target = None  # piece that can be captured en passant
+        self.en_passant_markers = set()  # spaces where it can be captured
+        self.promotion_piece = None  # piece that is currently being promoted
+        self.promotion_area = {}  # spaces to draw possible promotions on
+        self.move_history = []  # list of moves made so far
+        self.future_move_history = []  # list of moves that were undone, in reverse order
+        self.turn_side = Side.WHITE  # side whose turn it is
+        self.check_side = Side.NONE  # side that is currently in check
+        self.castling_threats = set()  # spaces that are attacked in a way that prevents castling
+        self.game_over = False  # act 6 act 6 intermission 3 (game over)
+        self.pieces = []  # list of pieces on the board
+        self.piece_sets = {Side.WHITE: 1, Side.BLACK: 1}  # piece sets to use for each side
+        self.promotion_types = {Side.WHITE: [], Side.BLACK: []}  # types of pieces each side promote to
+        self.movable_pieces = {Side.WHITE: [], Side.BLACK: []}  # pieces that can be moved by each side
+        self.royal_pieces = {Side.WHITE: [], Side.BLACK: []}  # these have to stay on the board and should be protected
+        self.quasi_royal_pieces = {Side.WHITE: [], Side.BLACK: []}  # at least one of these has to stay on the board
+        self.board_sprites = []  # sprites for the board squares
+        self.row_labels = []  # labels for the rows
+        self.col_labels = []  # labels for the columns
+        self.moves = {}  # dictionary of valid moves from any square that has a movable piece on it
+        self.anchor = 0, 0  # used to have the board scale from the origin instead of the center
+        self.board = BatchNode()  # node for the board sprites
+        self.selection = Sprite("assets/util/selection.png", opacity=0)  # sprite for the selection marker
+        self.selection.scale = self.size / self.selection.width  # scale it to the size of a square
+        self.move_node = BatchNode()  # node for the move markers
+        self.piece_node = BatchNode()  # node for the piece sprites
+        self.active_piece_node = BatchNode()  # node for the selected piece
+        self.promotion_area_node = BatchNode()  # node for the promotion area background tiles
+        self.promotion_piece_node = BatchNode()  # node for the possible promotion pieces
+        self.highlight = Sprite("assets/util/highlight.png", color=highlight_color, opacity=0)  # highlight sprite
+        self.highlight.scale = self.size / self.highlight.width  # scale it to the size of a square
+
+        # let's add it all together shall we
         self.add(self.board, z=1)
         self.add(self.selection, z=2)
-        self.add(self.piece_node, z=3)
         self.add(self.move_node, z=3)
-        self.add(self.active_piece_node, z=4)
-        self.add(self.promotion_area_node, z=5)
-        self.add(self.promotion_piece_node, z=6)
-        self.add(self.highlight, z=7)
+        self.add(self.piece_node, z=4)
+        self.add(self.active_piece_node, z=5)
+        self.add(self.promotion_area_node, z=6)
+        self.add(self.promotion_piece_node, z=7)
+        self.add(self.highlight, z=8)
 
+        # initialize row/column labels
         label_kwargs = {
             'font_name': 'Courier New',
-            'font_size': cell_size * 0.5,
+            'font_size': default_size * 0.5,
             'bold': True,
             'color': (0, 0, 0, 1000)
         }
 
         for row in range(self.board_height):
-            self.board_sprites += [[]]
             self.row_labels += [
                 Label(str(row + 1), self.get_screen_position((row, -0.9)),
                       anchor_x='center', anchor_y='center', **label_kwargs),
@@ -195,32 +199,36 @@ class Board(ColorLayer):
                       anchor_x='center', anchor_y='center', **label_kwargs),
             ]
 
+        for label in self.row_labels + self.col_labels:
+            label.scale = 0.8
+            self.add(label, z=1)
+
+        # initialize board sprites
+        self.board_sprites = [[] for _ in range(self.board_height)]
+
         for row, col in product(range(self.board_height), range(self.board_width)):
 
             self.board_sprites[row].append(Sprite("assets/util/cell.png"))
             self.board_sprites[row][col].position = self.get_screen_position((row, col))
             self.board_sprites[row][col].color = get_cell_color((row, col))
-            self.board_sprites[row][col].scale = cell_size / self.board_sprites[row][col].width
+            self.board_sprites[row][col].scale = default_size / self.board_sprites[row][col].width
             self.board.add(self.board_sprites[row][col])
 
-        for label in self.row_labels + self.col_labels:
-            label.scale = 0.8
-            self.add(label, z=1)
-
+        # set up pieces on the board
         self.reset_board(update=True)
 
+        # it's showtime
         director.run(scene.Scene(self))
 
     def resize(self, new_cell_size: int) -> None:
-        self.cell_size = new_cell_size
-        dimensions = (self.board_width + 2) * self.cell_size, (self.board_height + 2) * self.cell_size
+        self.size = new_cell_size
+        dimensions = (self.board_width + 2) * self.size, (self.board_height + 2) * self.size
         director.window.set_size(*dimensions)
-        self.scale = self.cell_size / self.board_sprites[0][0].width
+        self.scale = self.size / self.board_sprites[0][0].width
 
     def reset_board(self, shuffle: bool = False, update: bool = False) -> None:
         self.deselect_piece()  # you know, just in case
         self.turn_side = Side.WHITE
-        self.move_history = []
         self.game_over = False
 
         for sprite in self.piece_node.get_children():
@@ -230,7 +238,7 @@ class Board(ColorLayer):
             self.piece_sets = {side: random.choice(list(piece_groups.keys())) for side in self.piece_sets}
 
         print(
-            f"[{len(self.move_history)}] Starting new game: "
+            f"[0] Starting new game: "
             f"{piece_group_names[self.piece_sets[Side.WHITE]]} vs "
             f"{piece_group_names[self.piece_sets[Side.BLACK]]}"
         )
@@ -238,6 +246,7 @@ class Board(ColorLayer):
         piece_sets = {side: piece_groups[self.piece_sets[side]] for side in self.piece_sets}
 
         if update or shuffle:
+            self.future_move_history = []
             self.promotion_types = {side: [] for side in self.promotion_types}
             for side in self.promotion_types:
                 used_piece_set = set()
@@ -248,6 +257,10 @@ class Board(ColorLayer):
                             used_piece_set.add(piece)
                             promotion_types.append(piece)
                     self.promotion_types[side].extend(promotion_types[::-1])
+        else:
+            self.future_move_history += self.move_history[::-1]
+
+        self.move_history = []
 
         self.pieces = []
 
@@ -263,7 +276,7 @@ class Board(ColorLayer):
                 piece_type(
                     self, (row, col), piece_side,
                     promotions=self.promotion_types[piece_side],
-                    promotion_tiles=promotion_tiles[piece_side],
+                    promotion_squares=promotion_squares[piece_side],
                 )
                 if issubclass(piece_type, abc.PromotablePiece) else
                 piece_type(
@@ -271,7 +284,7 @@ class Board(ColorLayer):
                 )
             )
             self.pieces[row][col].color = (255, 255, 255)
-            self.pieces[row][col].scale = cell_size / self.pieces[row][col].width
+            self.pieces[row][col].scale = default_size / self.pieces[row][col].width
             self.piece_node.add(self.pieces[row][col])
 
         self.load_all_moves()
@@ -279,16 +292,16 @@ class Board(ColorLayer):
     def get_board_position(self, x: float, y: float) -> Position:
         window_width, window_height = director.get_window_size()
         x, y = director.get_virtual_coordinates(x, y)
-        col = round((x - window_width / 2) / self.cell_size + (self.board_width - 1) / 2)
-        row = round((y - window_height / 2) / self.cell_size + (self.board_height - 1) / 2)
+        col = round((x - window_width / 2) / self.size + (self.board_width - 1) / 2)
+        row = round((y - window_height / 2) / self.size + (self.board_height - 1) / 2)
         return row, col
 
     def get_screen_position(self, pos: tuple[float, float]) -> tuple[float, float]:
-        window_width = (self.board_width + 2) * cell_size
-        window_height = (self.board_height + 2) * cell_size
+        window_width = (self.board_width + 2) * default_size
+        window_height = (self.board_height + 2) * default_size
         row, col = pos
-        x = (col - (self.board_width - 1) / 2) * cell_size + window_width / 2
-        y = (row - (self.board_height - 1) / 2) * cell_size + window_height / 2
+        x = (col - (self.board_width - 1) / 2) * default_size + window_width / 2
+        y = (row - (self.board_height - 1) / 2) * default_size + window_height / 2
         return x, y
 
     # From now on we shall unanimously assume that the first coordinate corresponds to row number (AKA vertical axis).
@@ -325,7 +338,7 @@ class Board(ColorLayer):
         if pos == self.selected_piece:
             return  # piece already selected, nothing else to do
 
-        # set selection properties for the selected cell
+        # set selection properties for the selected square
         self.selected_piece = pos
         self.selection.opacity = selection_opacity
         self.selection.position = self.get_screen_position(pos)
@@ -345,7 +358,7 @@ class Board(ColorLayer):
                 position=self.get_screen_position(move.pos_to),
                 opacity=marker_opacity
             )
-            move_sprite.scale = cell_size / move_sprite.width
+            move_sprite.scale = default_size / move_sprite.width
             self.move_node.add(move_sprite)
 
     def deselect_piece(self) -> None:
@@ -373,15 +386,10 @@ class Board(ColorLayer):
                 if pos in self.promotion_area:
                     self.move_history[-1].set(promotion=self.promotion_area[pos])
                     self.replace(self.promotion_piece, self.promotion_area[pos])
-                    self.promotion_piece = None
-                    self.promotion_area = {}
-                    for node in (self.promotion_area_node, self.promotion_piece_node):
-                        for sprite in node.get_children():
-                            node.remove(sprite)
+                    self.end_promotion()
                     if self.move_history:
                         print(f"[{len(self.move_history)}] {self.move_history[-1]}")
                     self.advance_turn()
-                    return
                 return
             self.clicked_piece = pos  # we need this in order to discern what are we dragging
             if self.not_movable(pos):
@@ -419,7 +427,7 @@ class Board(ColorLayer):
                 if self.piece_was_clicked:
                     self.deselect_piece()
                     return
-                pos = selected  # to avoid dragging a piece off the board, place it back on its cell
+                pos = selected  # to avoid dragging a piece off the board, place it back on its square
             move = self.find_move(selected, pos)
             if move is None:
                 if self.piece_was_clicked:
@@ -486,13 +494,30 @@ class Board(ColorLayer):
             return  # can't undo a move while promoting because the move is not yet complete. please try again later /hj
         if not self.move_history:
             return
-        print(f"[{len(self.move_history)}] Undoing last move.")
         last_move = self.move_history.pop()
+        print(f"[{len(self.move_history) + 1}] Undo: {last_move}")
         self.undo(last_move)
         if self.move_history:
             move = self.move_history[-1]
             (move.piece or move).movement.undo(move, self.turn_side.opponent())
             (move.piece or move).movement.update(move, self.turn_side.opponent())
+        future_move_history = self.future_move_history.copy()
+        self.advance_turn()
+        self.future_move_history = future_move_history
+        self.future_move_history.append(last_move)
+
+    def redo_last_move(self) -> None:
+        if not self.future_move_history:
+            return
+        last_move = copy(self.future_move_history[-1])
+        self.update_move(last_move)
+        last_move.piece.move(last_move)
+        self.move_history.append(last_move)
+        # do not pop move from future history because advance_turn() will do it for us
+        if self.promotion_piece:
+            self.replace(self.promotion_piece, last_move.promotion)
+            self.end_promotion()
+        print(f"[{len(self.move_history)}] Redo: {self.move_history[-1]}")
         self.advance_turn()
 
     def start_promotion(self, piece: abc.Piece) -> None:
@@ -507,7 +532,7 @@ class Board(ColorLayer):
         while self.not_on_board((area_origin[0] + piece.side.direction(area_height - 1), area_origin[1])):
             area_origin = add(area_origin, piece.side.direction((-1, 0)))
         area_origin = add(area_origin, piece.side.direction((area_height - 1, 0)))
-        area_cells = []
+        area_squares = []
         col_increment = 0
         aim_left = area_origin[1] >= board_width / 2
         for col, row in product(range(area_width), range(area_height)):
@@ -518,19 +543,26 @@ class Board(ColorLayer):
                 col_increment += 1
                 new_col = col + col_increment
                 current_col = area_origin[1] + ((new_col + 1) // 2 * ((aim_left + new_col) % 2 * 2 - 1))
-            area_cells.append((current_row, current_col))
-        for promotion, pos in zip_longest(piece.promotions, area_cells):
+            area_squares.append((current_row, current_col))
+        for promotion, pos in zip_longest(piece.promotions, area_squares):
             background_sprite = Sprite(
                 "assets/util/cell.png", position=self.get_screen_position(pos), color=background_color
             )
-            background_sprite.scale = cell_size / background_sprite.width
+            background_sprite.scale = default_size / background_sprite.width
             self.promotion_area_node.add(background_sprite)
             if promotion is None:
                 continue
             promotion_piece = promotion(self, pos, piece.side)
-            promotion_piece.scale = cell_size / promotion_piece.width
+            promotion_piece.scale = default_size / promotion_piece.width
             self.promotion_piece_node.add(promotion_piece)
             self.promotion_area[pos] = promotion
+
+    def end_promotion(self) -> None:
+        self.promotion_piece = None
+        self.promotion_area = {}
+        for node in (self.promotion_area_node, self.promotion_piece_node):
+            for sprite in node.get_children():
+                node.remove(sprite)
 
     def replace(self, piece: abc.Piece, new_type: Type[abc.Piece], new_side: Side | None = None) -> None:
         if new_side is None:
@@ -538,7 +570,7 @@ class Board(ColorLayer):
         pos = piece.board_pos
         self.piece_node.remove(piece)
         self.pieces[pos[0]][pos[1]] = new_type(self, pos, new_side)
-        self.pieces[pos[0]][pos[1]].scale = cell_size / self.pieces[pos[0]][pos[1]].width
+        self.pieces[pos[0]][pos[1]].scale = default_size / self.pieces[pos[0]][pos[1]].width
         self.piece_node.add(self.pieces[pos[0]][pos[1]])
         self.pieces[pos[0]][pos[1]].board_pos = pos
 
@@ -547,16 +579,24 @@ class Board(ColorLayer):
             piece.color = color or (shade, ) * 3
 
     def advance_turn(self) -> None:
+        # if we're promoting, we can't advance the turn yet
         if self.promotion_piece:
             return
+        # let's also check if the last move matches the first future move
+        if self.future_move_history and self.move_history:  # if there are any moves to compare that is
+            if self.future_move_history[-1] == self.move_history[-1]:
+                self.future_move_history.pop()  # if it does, the other future moves are still makeable, so we keep them
+            else:
+                self.future_move_history = []  # otherwise, we can't redo the future moves anymore, so we clear them
         self.turn_side = self.turn_side.opponent()
-        self.load_all_moves()
-        if sum(self.moves.values(), []):
+        self.load_all_moves()  # this updates the check status as well
+        if sum(self.moves.values(), []):  # if there are any moves available, the game continues
             self.color_pieces(shade=255)
             self.game_over = False
             if self.check_side != Side.NONE:
                 print(f"[{len(self.move_history)}] {self.check_side.name()} is in check!")
         else:
+            # the game has ended, so let's figure out who won and show it by changing piece colors
             if self.check_side != Side.NONE:
                 self.color_pieces(self.check_side, shade=loss_shade)
                 self.color_pieces(self.check_side.opponent(), shade=win_shade)
@@ -622,16 +662,16 @@ class Board(ColorLayer):
                 move for move in royal.moves(royal.board_pos) if isinstance(move.movement, movement.CastlingMovement)
             ]
             castle_movements = set(move.movement for move in castle_moves)
-            castle_cells = set(
+            castle_squares = set(
                 add(royal.board_pos, offset) for mov in castle_movements for offset in mov.gap + [mov.direction]
             )
             for piece in self.movable_pieces[self.turn_side.opponent()]:
                 for move in piece.moves(piece.board_pos):
                     if move.pos_to == royal.board_pos:
                         self.check_side = self.turn_side
-                        self.castling_threats = castle_cells
+                        self.castling_threats = castle_squares
                         break
-                    if move.pos_to in castle_cells:
+                    if move.pos_to in castle_squares:
                         self.castling_threats.add(move.pos_to)
                 if self.check_side != Side.NONE:
                     break
@@ -669,23 +709,23 @@ class Board(ColorLayer):
                 self.reset_board()
             return
         if symbol == key.MINUS and modifiers & key.MOD_ACCEL:
-            if self.cell_size == min_cell_size:
+            if self.size == min_size:
                 return
             self.resize(
-                min_cell_size if modifiers & key.MOD_SHIFT else max(min_cell_size, self.cell_size - cell_size_step)
+                min_size if modifiers & key.MOD_SHIFT else max(min_size, self.size - size_step)
             )
             return
         if symbol == key.EQUAL and modifiers & key.MOD_ACCEL:
-            if self.cell_size == max_cell_size:
+            if self.size == max_size:
                 return
             self.resize(
-                max_cell_size if modifiers & key.MOD_SHIFT else min(max_cell_size, self.cell_size + cell_size_step)
+                max_size if modifiers & key.MOD_SHIFT else min(max_size, self.size + size_step)
             )
             return
         if symbol == key._0 and modifiers & key.MOD_ACCEL:
-            if self.cell_size == cell_size:
+            if self.size == default_size:
                 return
-            self.resize(cell_size)
+            self.resize(default_size)
             return
         if symbol == key.T and modifiers & key.MOD_ACCEL:
             self.turn_side = Side.ANY
@@ -712,7 +752,12 @@ class Board(ColorLayer):
                 self.reset_board(update=True)
                 return
         if symbol == key.Z and modifiers & key.MOD_ACCEL:
-            self.undo_last_move()
+            if modifiers & key.MOD_SHIFT:
+                self.redo_last_move()
+            else:
+                self.undo_last_move()
+        if symbol == key.Y and modifiers & key.MOD_ACCEL:
+            self.redo_last_move()
         if self.selected_piece is not None and self.turn_side not in (self.get_side(self.selected_piece), Side.ANY):
             self.deselect_piece()
 
