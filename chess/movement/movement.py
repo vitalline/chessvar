@@ -4,7 +4,7 @@ from copy import copy
 from typing import TYPE_CHECKING
 
 from chess.movement.move import Move
-from chess.movement.util import AnyDirection, Direction, Position, add, mul, merge, clash_max, sub
+from chess.movement.util import AnyDirection, ClashResolution, Direction, Position, add, merge, mul, sub
 
 if TYPE_CHECKING:
     from chess.board import Board
@@ -114,7 +114,7 @@ class FirstMoveRiderMovement(RiderMovement):
         super().__init__(board, directions)
         self.base_directions = directions
         self.first_move_directions = first_move_directions
-        self.directions = merge(self.directions, self.first_move_directions, clash_max)
+        self.directions = merge(self.directions, self.first_move_directions, ClashResolution.EXPAND)
 
     def update(self, move: Move, side: Side):
         if not self.total_moves:
@@ -124,7 +124,7 @@ class FirstMoveRiderMovement(RiderMovement):
     def undo(self, move: Move, side: Side):
         super().undo(move, side)
         if not self.total_moves:
-            self.directions = merge(self.directions, self.first_move_directions, clash_max)
+            self.directions = merge(self.directions, self.first_move_directions, ClashResolution.EXPAND)
 
 
 class CastlingMovement(BaseMovement):
@@ -266,7 +266,7 @@ class MultiMovement(BaseMovement):
         self.capture = capture or []
         super().__init__(board)
         for movement in self.move_or_capture + self.move + self.capture:
-            movement.board = board  # just in case.
+            movement.board = board  # again, just in case.
 
     def moves(self, pos_from: Position, side: Side, theoretical: bool = False):
         side = side if side is not None else self.board.get_side(pos_from)

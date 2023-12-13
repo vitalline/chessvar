@@ -1,4 +1,4 @@
-from collections.abc import Callable
+from enum import Enum
 from itertools import zip_longest
 
 
@@ -7,6 +7,14 @@ RepeatDirection = tuple[int, int, int]
 RepeatFromDirection = tuple[int, int, int, int]
 AnyDirection = Direction | RepeatDirection | RepeatFromDirection
 Position = Direction
+
+
+class ClashResolution(Enum):
+    NONE = 0
+    EXPAND = 1
+    SHRINK = -1
+    FORMER = 2
+    LATTER = -2
 
 
 def add(pos: Position, dpos: Direction) -> Position:
@@ -55,35 +63,44 @@ def symv(poss: list[AnyDirection]) -> list[AnyDirection]:
 
 def clash_min(a: tuple, b: tuple) -> tuple:
     result = []
-    for i, j in zip_longest(a, b, fillvalue=None):
-        if i is None and j is not None:
-            result.append(j)
-        if i is not None and j is None:
-            result.append(i)
-        if i is not None and j is not None:
+    for i, j in zip_longest(a, b, fillvalue=0):
+        if i and j:
             result.append(min(i, j))
+        else:
+            result.append(i or j)
     return tuple(result)
 
 
 def clash_max(a: tuple, b: tuple) -> tuple:
     result = []
-    for i, j in zip_longest(a, b, fillvalue=None):
-        if i is None or j is None:
-            break
-        if i is not None and j is not None:
+    for i, j in zip_longest(a, b, fillvalue=0):
+        if i and j:
             result.append(max(i, j))
+        else:
+            result.append(i and j)
     return tuple(result)
 
 
-def merge(a: list[AnyDirection], b: list[AnyDirection], clash: Callable[[tuple, tuple], tuple]) -> list[AnyDirection]:
+def equal(a: AnyDirection, b: AnyDirection) -> bool:
+    return a + (0, ) * (4 - len(a)) == b + (0, ) * (4 - len(b))
+
+
+def merge(a: list[AnyDirection], b: list[AnyDirection], resolve_clash: ClashResolution) -> list[AnyDirection]:
     data = {}
     for i in a + b:
         if i[:2] not in data:
-            data[i[:2]] = i[2:]
-        else:
-            data[i[:2]] = clash(i[2:], data[i[:2]])
-    result = [(k[0], k[1], *v) for k, v in data.items()]
-    return result
+            data[i[:2]] = i
+        elif resolve_clash == ClashResolution.FORMER:
+            continue
+        elif resolve_clash == ClashResolution.LATTER:
+            data[i[:2]] = i
+        elif resolve_clash == ClashResolution.SHRINK:
+            data[i[:2]] = i[:2] + clash_min(i[2:3], data[i[:2]][2:3]) + clash_max(i[3:4], data[i[:2]][3:4])
+        elif resolve_clash == ClashResolution.EXPAND:
+            data[i[:2]] = i[:2] + clash_max(i[2:3], data[i[:2]][2:3]) + clash_min(i[3:4], data[i[:2]][3:4])
+        elif not equal(data[i[:2]], i):
+            raise ValueError(f"Clash between directions {data[i[:2]]} and {i} not resolved")
+    return list(data.values())
 
 
 def to_alpha(pos: Position) -> str:

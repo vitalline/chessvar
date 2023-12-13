@@ -1,12 +1,12 @@
 from __future__ import annotations
 
-import itertools
-import random
 from enum import Enum
+from itertools import product
+from random import choice, randint
 from typing import Type, TYPE_CHECKING
 
 from chess.movement.movement import BaseMovement, RiderMovement
-from chess.movement.util import AnyDirection, sym, merge, clash_min
+from chess.movement.util import AnyDirection, ClashResolution, merge, sym
 
 if TYPE_CHECKING:
     from chess.board import Board
@@ -46,6 +46,7 @@ class PieceType(Enum):
 class Directions(list[AnyDirection], Enum):
     NONE = []
     PAWN = [(1, 0, 1)]
+    PAWN2 = [(1, 0, 2)]
     KNIGHT = sym([(1, 2, 1), (2, 1, 1)])
     BISHOP = sym([(1, 1)])
     ROOK = sym([(1, 0)])
@@ -54,13 +55,15 @@ class Directions(list[AnyDirection], Enum):
     CHANCELLOR = ROOK + KNIGHT
     AMAZON = QUEEN + KNIGHT
     CAMEL = sym([(1, 3, 1), (3, 1, 1)])
-    ODDIN = sym([(1, 0, 1), (1, 2, 1), (2, 1, 1)])
-    EVANS = sym([(1, 1, 1), (2, 0, 1), (2, 2, 1)])
-    SQUIRE = ODDIN + EVANS
-    RHOMB = sym([(1, 0, 2), (1, 1, 1)])
-    PAWN2 = [(1, 0, 2)]
+    ZEBRA = sym([(2, 3, 1), (3, 2, 1)])
     WAZIR = sym([(1, 0, 1)])
     FERZ = sym([(1, 1, 1)])
+    DABBABA = sym([(2, 0, 1)])
+    ALFIL = sym([(2, 2, 1)])
+    ODDIN = WAZIR + KNIGHT
+    EVANS = FERZ + DABBABA + ALFIL
+    SQUIRE = ODDIN + EVANS
+    RHOMB = sym([(1, 0, 2), (1, 1, 1)])
     GOLD_SHOGI = sym([(1, 0, 1)]) + [(1, 1, 1), (1, -1, 1)]
     SILVER_SHOGI = sym([(1, 1, 1)]) + [(1, 0, 1)]
     KNIGHT_SHOGI = [(2, 1, 1), (2, -1, 1)]
@@ -74,25 +77,25 @@ class Directions(list[AnyDirection], Enum):
 def balance_pawn(directions: list[AnyDirection]) -> list[AnyDirection]:
     result = []
     for direction in directions:
-        max_distance = random.randint(1, 2)
+        max_distance = randint(1, 2)
         if direction[0] > 1 or direction[1] > 1:
             direction = (*direction[:2], 1)
         elif len(direction) == 2 or direction[2] > 2:
             direction = (*direction[:2], max_distance)
         rows, cols, times = direction
         inversion = rows, -cols, times
-        result = merge(result, [direction], clash_min)
-        result = merge(result, [inversion], clash_min)
+        result = merge(result, [direction], ClashResolution.SHRINK)
+        result = merge(result, [inversion], ClashResolution.SHRINK)
     has_forward_movement = False
     for direction in result:
         if direction[0] > 0:
             has_forward_movement = True
             break
     if not has_forward_movement:
-        result = merge(result, random.choice([
+        result = merge(result, choice([
             Directions.PAWN,
             Directions.PAWN2
-        ]), clash_min)
+        ]), ClashResolution.SHRINK)
     return result
 
 
@@ -107,8 +110,8 @@ def rng_directions() -> list[list[AnyDirection]]:
         Directions.QUEEN,
         Directions.WAZIR,
         Directions.FERZ,
-        sym([(2, 0, 1)]),
-        sym([(2, 2, 1)]),
+        Directions.DABBABA,
+        Directions.ALFIL,
         # Directions.NIGHTRIDER,
         # Directions.CAMELRIDER,
     ]
@@ -122,6 +125,7 @@ def rng_directions() -> list[list[AnyDirection]]:
         Directions.WAZIR,
         Directions.FERZ,
         Directions.CAMEL,
+        Directions.ZEBRA,
         Directions.LANCE_SHOGI,
         [(1, 0), (-1, 0)],
         [(0, 1), (0, -1)],
@@ -130,7 +134,7 @@ def rng_directions() -> list[list[AnyDirection]]:
         [(1, 1, 1), (1, -1, 1)],
         [(-1, 1, 1), (-1, -1, 1)],
     ]
-    return [merge(pair[0], pair[1]) for pair in itertools.product(bases, modifiers) if pair != ([], [])]
+    return [merge(pair[0], pair[1], ClashResolution.FORMER) for pair in product(bases, modifiers) if pair != ([], [])]
 
 
 def gen_movement[M: BaseMovement](board: Board, base_type: Type[M], params: list[AnyDirection]):
