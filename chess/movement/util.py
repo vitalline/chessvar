@@ -62,42 +62,30 @@ def symv(poss: list[AnyDirection]) -> list[AnyDirection]:
 
 
 def clash_min(a: tuple, b: tuple) -> tuple:
-    result = []
-    for i, j in zip_longest(a, b, fillvalue=0):
-        if i and j:
-            result.append(min(i, j))
-        else:
-            result.append(i or j)
-    return tuple(result)
+    return tuple(min(i, j) if i and j else i or j for i, j in zip_longest(a, b, fillvalue=0))
 
 
 def clash_max(a: tuple, b: tuple) -> tuple:
-    result = []
-    for i, j in zip_longest(a, b, fillvalue=0):
-        if i and j:
-            result.append(max(i, j))
-        else:
-            result.append(i and j)
-    return tuple(result)
+    return tuple(max(i, j) if i and j else 0 for i, j in zip_longest(a, b, fillvalue=0))
 
 
 def equal(a: AnyDirection, b: AnyDirection) -> bool:
     return a + (0, ) * (4 - len(a)) == b + (0, ) * (4 - len(b))
 
 
-def merge(a: list[AnyDirection], b: list[AnyDirection], resolve_clash: ClashResolution) -> list[AnyDirection]:
+def merge(a: list[AnyDirection], b: list[AnyDirection], clash_resolution: ClashResolution) -> list[AnyDirection]:
     data = {}
     for i in a + b:
         if i[:2] not in data:
             data[i[:2]] = i
-        elif resolve_clash == ClashResolution.FORMER:
+        elif clash_resolution == ClashResolution.FORMER:
             continue
-        elif resolve_clash == ClashResolution.LATTER:
+        elif clash_resolution == ClashResolution.LATTER:
             data[i[:2]] = i
-        elif resolve_clash == ClashResolution.SHRINK:
-            data[i[:2]] = i[:2] + clash_min(i[2:3], data[i[:2]][2:3]) + clash_max(i[3:4], data[i[:2]][3:4])
-        elif resolve_clash == ClashResolution.EXPAND:
-            data[i[:2]] = i[:2] + clash_max(i[2:3], data[i[:2]][2:3]) + clash_min(i[3:4], data[i[:2]][3:4])
+        elif clash_resolution == ClashResolution.SHRINK:
+            data[i[:2]] = i[:2] + clash_min(i[2:3], data[i[:2]][2:3]) + max(i[3:4], data[i[:2]][3:4])
+        elif clash_resolution == ClashResolution.EXPAND:
+            data[i[:2]] = i[:2] + clash_max(i[2:3], data[i[:2]][2:3]) + min(i[3:4], data[i[:2]][3:4])
         elif not equal(data[i[:2]], i):
             raise ValueError(f"Clash between directions {data[i[:2]]} and {i} not resolved")
     return list(data.values())
