@@ -503,8 +503,7 @@ class Board(ColorLayer):
         if self.move_history:
             move = self.move_history[-1]
             if move is not None:
-                (move.piece or move).movement.undo(move, self.turn_side.opponent())
-                (move.piece or move).movement.update(move, self.turn_side.opponent())
+                (move.piece or move).movement.reload(move, self.turn_side.opponent())
         future_move_history = self.future_move_history.copy()
         self.advance_turn()
         self.future_move_history = future_move_history
@@ -516,7 +515,9 @@ class Board(ColorLayer):
         if not self.future_move_history:
             return
         last_move = copy(self.future_move_history[-1])
-        if last_move is not None:
+        if last_move is None:
+            self.clear_en_passant()
+        else:
             self.update_move(last_move)
             last_move.piece.move(last_move)
         self.move_history.append(last_move)
@@ -754,10 +755,10 @@ class Board(ColorLayer):
         if symbol == key.W:
             if modifiers & key.MOD_ACCEL and not modifiers & key.MOD_SHIFT:
                 if self.turn_side != Side.WHITE:
-                    self.turn_side = Side.WHITE
                     self.move_history.append(None)
-                    print(f"[{len(self.move_history)}] Passed turn to {self.turn_side.name()}")
-                    self.load_all_moves()
+                    print(f"[{len(self.move_history)}] Move: Pass turn to {Side.WHITE.name()}")
+                    self.clear_en_passant()
+                    self.advance_turn()
             else:
                 direction = -1 if modifiers & key.MOD_ACCEL else 1
                 self.piece_sets[Side.WHITE] = (self.piece_sets[Side.WHITE] + direction - 1) % len(piece_groups) + 1
@@ -766,10 +767,10 @@ class Board(ColorLayer):
         if symbol == key.B:
             if modifiers & key.MOD_ACCEL and not modifiers & key.MOD_SHIFT:
                 if self.turn_side != Side.BLACK:
-                    self.turn_side = Side.BLACK
                     self.move_history.append(None)
-                    print(f"[{len(self.move_history)}] Passed turn to {self.turn_side.name()}")
-                    self.load_all_moves()
+                    print(f"[{len(self.move_history)}] Move: Pass turn to {Side.BLACK.name()}")
+                    self.clear_en_passant()
+                    self.advance_turn()
             else:
                 direction = -1 if modifiers & key.MOD_ACCEL else 1
                 self.piece_sets[Side.BLACK] = (self.piece_sets[Side.BLACK] + direction - 1) % len(piece_groups) + 1
