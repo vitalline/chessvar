@@ -388,7 +388,7 @@ class Board(ColorLayer):
                     self.replace(self.promotion_piece, self.promotion_area[pos])
                     self.end_promotion()
                     if self.move_history:
-                        print(f"[{len(self.move_history)}] {self.move_history[-1]}")
+                        print(f"[{len(self.move_history)}] Move: {self.move_history[-1]}")
                     self.advance_turn()
                 return
             self.clicked_piece = pos  # we need this in order to discern what are we dragging
@@ -440,10 +440,11 @@ class Board(ColorLayer):
                 self.set_position(self.get_piece(selected), pos)
                 return
             self.update_move(move)
-            self.get_piece(selected).move(move)
+            move.promotion = None  # do not auto-promote because we are selecting promotion type manually
+            move.piece.move(move)
             self.move_history.append(move)
             if not self.promotion_piece and self.move_history:
-                print(f"[{len(self.move_history)}] {self.move_history[-1]}")
+                print(f"[{len(self.move_history)}] Move: {self.move_history[-1]}")
             self.advance_turn()
 
     def update_move(self, move: Move) -> None:
@@ -491,34 +492,55 @@ class Board(ColorLayer):
 
     def undo_last_move(self) -> None:
         if self.promotion_piece:
-            return  # can't undo a move while promoting because the move is not yet complete. please try again later /hj
+            return
         if not self.move_history:
             return
+        print(f"[{len(self.move_history)}] Undo: {
+            self.move_history[-1] if self.move_history[-1] is not None else f'Pass turn to {self.turn_side.name()}'
+        }")
         last_move = self.move_history.pop()
-        print(f"[{len(self.move_history) + 1}] Undo: {last_move}")
-        self.undo(last_move)
+        if last_move is not None:
+            self.undo(last_move)
         if self.move_history:
             move = self.move_history[-1]
-            (move.piece or move).movement.undo(move, self.turn_side.opponent())
-            (move.piece or move).movement.update(move, self.turn_side.opponent())
+            if move is not None:
+                (move.piece or move).movement.undo(move, self.turn_side.opponent())
+                (move.piece or move).movement.update(move, self.turn_side.opponent())
         future_move_history = self.future_move_history.copy()
         self.advance_turn()
         self.future_move_history = future_move_history
         self.future_move_history.append(last_move)
 
     def redo_last_move(self) -> None:
+        if self.promotion_piece:
+            return
         if not self.future_move_history:
             return
         last_move = copy(self.future_move_history[-1])
-        self.update_move(last_move)
-        last_move.piece.move(last_move)
+        if last_move is not None:
+            self.update_move(last_move)
+            last_move.piece.move(last_move)
         self.move_history.append(last_move)
         # do not pop move from future history because advance_turn() will do it for us
-        if self.promotion_piece:
-            self.replace(self.promotion_piece, last_move.promotion)
-            self.end_promotion()
-        print(f"[{len(self.move_history)}] Redo: {self.move_history[-1]}")
+        print(f"[{len(self.move_history)}] Redo: {
+            self.move_history[-1] if self.move_history[-1] is not None
+            else f'Pass turn to {self.turn_side.opponent().name()}'
+        }")
         self.advance_turn()
+
+    def undo_last_finished_move(self) -> None:
+        if self.promotion_piece:
+            return
+        self.undo_last_move()
+        while self.move_history and self.move_history[-1] is None:
+            self.undo_last_move()
+
+    def redo_last_finished_move(self) -> None:
+        if self.promotion_piece:
+            return
+        while self.future_move_history and self.future_move_history[-1] is None:
+            self.redo_last_move()
+        self.redo_last_move()
 
     def start_promotion(self, piece: abc.Piece) -> None:
         if not isinstance(piece, abc.PromotablePiece) or not piece.promotions:
@@ -584,7 +606,10 @@ class Board(ColorLayer):
             return
         # let's also check if the last move matches the first future move
         if self.future_move_history and self.move_history:  # if there are any moves to compare that is
-            if self.future_move_history[-1] == self.move_history[-1]:
+            if (
+                    (self.move_history[-1] is None) == (self.future_move_history[-1] is None)
+                    and self.future_move_history[-1] == self.move_history[-1]
+            ):
                 self.future_move_history.pop()  # if it does, the other future moves are still makeable, so we keep them
             else:
                 self.future_move_history = []  # otherwise, we can't redo the future moves anymore, so we clear them
@@ -705,7 +730,7 @@ class Board(ColorLayer):
                 self.reset_board(update=True)
             elif modifiers & key.MOD_ACCEL:
                 self.reset_board(shuffle=True)
-            else:
+            elif modifiers & key.MOD_SHIFT:
                 self.reset_board()
             return
         if symbol == key.MINUS and modifiers & key.MOD_ACCEL:
@@ -727,13 +752,12 @@ class Board(ColorLayer):
                 return
             self.resize(default_size)
             return
-        if symbol == key.T and modifiers & key.MOD_ACCEL:
-            self.turn_side = Side.ANY
         if symbol == key.W:
             if modifiers & key.MOD_ACCEL and not modifiers & key.MOD_SHIFT:
                 if self.turn_side != Side.WHITE:
                     self.turn_side = Side.WHITE
-                    print(f"[{len(self.move_history) + 1}] Passed turn to {self.turn_side.name()}.")
+                    self.move_history.append(None)
+                    print(f"[{len(self.move_history)}] Passed turn to {self.turn_side.name()}")
                     self.load_all_moves()
             else:
                 direction = -1 if modifiers & key.MOD_ACCEL else 1
@@ -744,7 +768,8 @@ class Board(ColorLayer):
             if modifiers & key.MOD_ACCEL and not modifiers & key.MOD_SHIFT:
                 if self.turn_side != Side.BLACK:
                     self.turn_side = Side.BLACK
-                    print(f"[{len(self.move_history) + 1}] Passed turn to {self.turn_side.name()}.")
+                    self.move_history.append(None)
+                    print(f"[{len(self.move_history)}] Passed turn to {self.turn_side.name()}")
                     self.load_all_moves()
             else:
                 direction = -1 if modifiers & key.MOD_ACCEL else 1
@@ -753,11 +778,11 @@ class Board(ColorLayer):
                 return
         if symbol == key.Z and modifiers & key.MOD_ACCEL:
             if modifiers & key.MOD_SHIFT:
-                self.redo_last_move()
+                self.redo_last_finished_move()
             else:
-                self.undo_last_move()
+                self.undo_last_finished_move()
         if symbol == key.Y and modifiers & key.MOD_ACCEL:
-            self.redo_last_move()
+            self.redo_last_finished_move()
         if self.selected_piece is not None and self.turn_side not in (self.get_side(self.selected_piece), Side.ANY):
             self.deselect_piece()
 

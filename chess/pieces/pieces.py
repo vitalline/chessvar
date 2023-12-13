@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from copy import copy
 from enum import Enum
 import typing
 
@@ -83,7 +84,7 @@ class Piece(Sprite):
     def move(self, move: Move):
         self.board.move(move)
 
-    def moves(self, pos: Position):  # convenience method
+    def moves(self, pos: Position):
         yield from self.movement.moves(pos, self.side)
 
 
@@ -106,10 +107,22 @@ class PromotablePiece(Piece):
         if self.board_pos in self.promotion_squares:
             if not self.promotions:
                 return
+            if move.promotion is not None:
+                self.board.replace(self, move.promotion)
+                return
             if len(self.promotions) == 1:
                 move.set(promotion=self.promotions[0])
                 self.board.replace(self, self.promotions[0])
+                return
             self.board.start_promotion(self)
+
+    def moves(self, pos: Position):
+        for move in self.movement.moves(pos, self.side):
+            if self.promotions and move.pos_to in self.promotion_squares:
+                for promotion in self.promotions:
+                    yield copy(move).set(promotion=promotion)
+            else:
+                yield move
 
 
 class QuasiRoyalPiece(Piece):
