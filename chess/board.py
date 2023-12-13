@@ -641,7 +641,7 @@ class Board(ColorLayer):
         en_passant_markers = self.en_passant_markers.copy()
         self.moves = {}
         for piece in movable_pieces[self.turn_side]:
-            for move in piece.moves(piece.board_pos):
+            for move in piece.moves():
                 self.update_move(move)
                 self.move(move)
                 self.load_check()
@@ -683,14 +683,14 @@ class Board(ColorLayer):
         self.castling_threats = set()
         for royal in self.royal_pieces[self.turn_side]:
             castle_moves = [
-                move for move in royal.moves(royal.board_pos) if isinstance(move.movement, movement.CastlingMovement)
+                move for move in royal.moves() if isinstance(move.movement, movement.CastlingMovement)
             ]
             castle_movements = set(move.movement for move in castle_moves)
             castle_squares = set(
                 add(royal.board_pos, offset) for mov in castle_movements for offset in mov.gap + [mov.direction]
             )
             for piece in self.movable_pieces[self.turn_side.opponent()]:
-                for move in piece.moves(piece.board_pos):
+                for move in piece.moves():
                     if move.pos_to == royal.board_pos:
                         self.check_side = self.turn_side
                         self.castling_threats = castle_squares
