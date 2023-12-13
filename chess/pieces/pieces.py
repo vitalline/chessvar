@@ -84,8 +84,8 @@ class Piece(Sprite):
     def move(self, move: Move):
         self.board.move(move)
 
-    def moves(self):
-        yield from self.movement.moves(self.board_pos, self.side)
+    def moves(self, theoretical: bool = False):
+        yield from self.movement.moves(self.board_pos, self.side, theoretical)
 
 
 class PromotablePiece(Piece):
@@ -116,8 +116,8 @@ class PromotablePiece(Piece):
                 return
             self.board.start_promotion(self)
 
-    def moves(self):
-        for move in super().moves():
+    def moves(self, theoretical: bool = False):
+        for move in super().moves(theoretical):
             if self.promotions and move.pos_to in self.promotion_squares:
                 for promotion in self.promotions:
                     yield copy(move).set(promotion=promotion)

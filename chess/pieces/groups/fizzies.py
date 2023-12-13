@@ -74,20 +74,28 @@ class Crabinal(pieces.Piece):
         )
         self.update_movement()
 
-    def moves(self):
+    def moves(self, theoretical: bool = False):
         self.update_movement()
-        yield from super().moves()
+        yield from super().moves(theoretical)
 
     def update_movement(self):
         self.movement = movement.MultiMovement(self.board, [
             movement.RiderMovement(self.board, symv([(2, 1, 1), (-1, 2, 1)]))
         ] + [
-            movement.RiderMovement(self.board, symv([
-                (i, j, min(
-                    math.ceil(((self.board.board_height - self.board_pos[0] - 1) if i > 0 else self.board_pos[0]) / 2),
-                    math.ceil(((self.board.board_width - self.board_pos[1] - 1) if j > 0 else self.board_pos[1]) / 2)
-                ))
-            ])) for i, j in rot([(1, 1)])
+            movement.RiderMovement(self.board, [
+                (i, j, max(1, min(
+                    math.ceil(
+                        ((self.board.board_height - self.board_pos[0] - 1)
+                         if i == self.side.direction()
+                         else self.board_pos[0]) / 2
+                    ),
+                    math.ceil(
+                        ((self.board.board_width - self.board_pos[1] - 1)
+                         if j > 0
+                         else self.board_pos[1]) / 2
+                    )
+                )))
+            ]) for i, j in rot([(1, 1)])
         ])
 
 

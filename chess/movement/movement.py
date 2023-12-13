@@ -16,7 +16,7 @@ class BaseMovement(object):
         self.board = board
         self.total_moves = 0
 
-    def moves(self, pos_from: Position, side: Side):
+    def moves(self, pos_from: Position, side: Side, theoretical: bool = False):
         return ()
 
     def update(self, move: Move, side: Side):
@@ -39,13 +39,13 @@ class BaseDirectionalMovement(BaseMovement):
     def skip_condition(self, move: Move, direction: AnyDirection, side: Side) -> bool:
         return False
 
-    def stop_condition(self, move: Move, direction: AnyDirection, side: Side) -> bool:
+    def stop_condition(self, move: Move, direction: AnyDirection, side: Side, theoretical: bool = False) -> bool:
         return False
 
     def transform(self, pos: Position) -> Position:
         return pos
 
-    def moves(self, pos_from: Position, side: Side):
+    def moves(self, pos_from: Position, side: Side, theoretical: bool = False):
         if self.board.not_on_board(pos_from):
             return
         side = side if side is not None else self.board.get_side(pos_from)
@@ -56,7 +56,7 @@ class BaseDirectionalMovement(BaseMovement):
             distance = 0
             move = Move(pos_from, self.transform(current_pos), self)
             while not self.board.not_on_board(self.transform(current_pos)):
-                if self.stop_condition(move, direction, side):
+                if self.stop_condition(move, direction, side, theoretical):
                     direction_id += 1
                     break
                 current_pos = add(current_pos, direction)
@@ -86,14 +86,18 @@ class RiderMovement(BaseDirectionalMovement):
                 return True
         return False
 
-    def stop_condition(self, move: Move, direction: AnyDirection, side: Side) -> bool:
+    def stop_condition(self, move: Move, direction: AnyDirection, side: Side, theoretical: bool = False) -> bool:
+        next_pos_to = self.transform(add(move.pos_to, direction[:2]))
         return (
-                self.board.not_on_board(self.transform(add(move.pos_to, direction[:2])))
+                self.board.not_on_board(next_pos_to)
+                or move.pos_from == next_pos_to
                 or len(direction) > 2 and direction[2] and (
                         move.pos_to == self.transform(add(move.pos_from, mul(direction[:2], direction[2])))
                 )
-                or side == self.board.get_side(self.transform(add(move.pos_to, direction[:2])))
-                or side == self.board.get_side(move.pos_to).opponent() and not self.board.not_a_piece(move.pos_to)
+                or not theoretical and (
+                    side == self.board.get_side(next_pos_to)
+                    or side == self.board.get_side(move.pos_to).opponent() and not self.board.not_a_piece(move.pos_to)
+                )
         )
 
 
@@ -138,7 +142,7 @@ class CastlingMovement(BaseMovement):
         self.other_direction = other_direction
         self.gap = gap or []
 
-    def moves(self, pos_from: Position, side: Side):
+    def moves(self, pos_from: Position, side: Side, theoretical: bool = False):
         if self.total_moves:
             return ()
         side = side if side is not None else self.board.get_side(pos_from)
@@ -152,12 +156,13 @@ class CastlingMovement(BaseMovement):
             return ()
         if other_piece.movement.total_moves:
             return ()
-        for offset in self.gap:
-            pos = add(pos_from, offset)
-            if not self.board.not_a_piece(pos):
-                return ()
-            if pos in self.board.castling_threats:
-                return ()
+        if not theoretical:
+            for offset in self.gap:
+                pos = add(pos_from, offset)
+                if not self.board.not_a_piece(pos):
+                    return ()
+                if pos in self.board.castling_threats:
+                    return ()
         return (Move(pos_from, add(pos_from, side.direction(self.direction)), self),)
 
     def update(self, move: Move, side: Side):
@@ -212,22 +217,22 @@ class ChainMovement(BaseMovement):
         for movement in self.movements:
             movement.board = board  # just in case.
 
-    def moves(self, pos_from: Position, side: Side, index: int = 0):
+    def moves(self, pos_from: Position, side: Side, theoretical: bool = False, index: int = 0):
         if index >= len(self.movements):
             return
         directions = self.movements[index].directions
         for direction in directions:
             self.movements[index].directions = [direction]
             move = None
-            for move in self.movements[index].moves(pos_from, side):
+            for move in self.movements[index].moves(pos_from, side, theoretical):
                 if self.start_index <= index:
                     yield copy(move)
             if (
                     move is not None and len(direction) > 2 and direction[2] and
                     move.pos_to == add(pos_from, side.direction(mul(direction[:2], direction[2])))
-                    and self.board.get_piece(move.pos_to).is_empty()
+                    and (theoretical or self.board.get_piece(move.pos_to).is_empty())
             ):
-                for move in self.moves(move.pos_to, side, index + 1):
+                for move in self.moves(move.pos_to, side, theoretical, index + 1):
                     yield copy(move).set(pos_from=pos_from)
         self.movements[index].directions = directions
 
@@ -263,15 +268,15 @@ class MultiMovement(BaseMovement):
         for movement in self.move_or_capture + self.move + self.capture:
             movement.board = board  # just in case.
 
-    def moves(self, pos_from: Position, side: Side):
+    def moves(self, pos_from: Position, side: Side, theoretical: bool = False):
         side = side if side is not None else self.board.get_side(pos_from)
         for movement in self.move_or_capture + self.move:
-            for move in movement.moves(pos_from, side):
-                if self.board.not_a_piece(move.pos_to):
+            for move in movement.moves(pos_from, side, theoretical):
+                if theoretical or self.board.not_a_piece(move.pos_to):
                     yield copy(move)
         for movement in self.move_or_capture + self.capture:
-            for move in movement.moves(pos_from, side):
-                if self.board.get_side(move.pos_to) == side.opponent():
+            for move in movement.moves(pos_from, side, theoretical):
+                if theoretical or self.board.get_side(move.pos_to) == side.opponent():
                     yield copy(move)
 
     def update(self, move: Move, side: Side):

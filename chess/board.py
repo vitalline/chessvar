@@ -130,8 +130,9 @@ class Board(ColorLayer):
         director.window.remove_handlers(director._default_event_handler)
 
         # super boring initialization stuff (bluh bluh)
-        self.clicked_square = None  # squares we clicked on
-        self.selected_square = None  # squares selected for moving
+        self.hovered_square = None  # square we are currently hovering over
+        self.clicked_square = None  # square we clicked on
+        self.selected_square = None  # square selected for moving
         self.square_was_clicked = False  # used to discern two-click moving from dragging
         self.en_passant_target = None  # piece that can be captured en passant
         self.en_passant_markers = set()  # squares where it can be captured
@@ -153,6 +154,7 @@ class Board(ColorLayer):
         self.row_labels = []  # labels for the rows
         self.col_labels = []  # labels for the columns
         self.moves = {}  # dictionary of valid moves from any square that has a movable piece on it
+        self.theoretical_moves = {}  # dictionary of theoretical moves from any square that has an opposing piece on it
         self.anchor = 0, 0  # used to have the board scale from the origin instead of the center
         self.board = BatchNode()  # node for the board sprites
         self.selection = Sprite("assets/util/selection.png", opacity=0)  # sprite for the selection marker
@@ -162,7 +164,7 @@ class Board(ColorLayer):
         self.active_piece_node = BatchNode()  # node for the selected piece
         self.promotion_area_node = BatchNode()  # node for the promotion area background tiles
         self.promotion_piece_node = BatchNode()  # node for the possible promotion pieces
-        self.highlight = Sprite("assets/util/highlight.png", color=highlight_color, opacity=0)  # highlight sprite
+        self.highlight = Sprite("assets/util/selection.png", color=highlight_color, opacity=0)  # highlight sprite
         self.highlight.scale = self.size / self.highlight.width  # scale it to the size of a square
 
         # let's add it all together shall we
@@ -288,6 +290,7 @@ class Board(ColorLayer):
             self.piece_node.add(self.pieces[row][col])
 
         self.load_all_moves()
+        self.show_moves(self.hovered_square, highlight_opacity)
 
     def get_board_position(self, x: float, y: float) -> Position:
         window_width, window_height = director.get_window_size()
@@ -348,15 +351,23 @@ class Board(ColorLayer):
         self.piece_node.remove(piece)
         self.active_piece_node.add(piece)
 
+        self.show_moves(pos, marker_opacity)
+
+    def show_moves(self, pos: Position, opacity: int) -> None:
+        self.hide_moves()
+        if self.not_a_piece(pos):
+            return
+        theoretical = self.get_side(self.hovered_square) == self.turn_side.opponent()
+        move_dict = self.theoretical_moves if theoretical else self.moves
         move_positions = set()
-        for move in self.moves.get(pos, ()):
+        for move in move_dict.get(pos, ()):
             if move.pos_to in move_positions:
                 continue
             move_positions.add(move.pos_to)
             move_sprite = Sprite(
                 f"assets/util/{'move' if self.not_a_piece(move.pos_to) else 'capture'}.png",
                 position=self.get_screen_position(move.pos_to),
-                opacity=marker_opacity
+                opacity=opacity
             )
             move_sprite.scale = default_size / move_sprite.width
             self.move_node.add(move_sprite)
@@ -374,6 +385,9 @@ class Board(ColorLayer):
         self.piece_node.add(piece)
 
         self.selected_square = None
+        self.show_moves(self.hovered_square, highlight_opacity)
+
+    def hide_moves(self) -> None:
         for child in list(self.move_node.get_children()):
             self.move_node.remove(child)
 
@@ -400,9 +414,16 @@ class Board(ColorLayer):
         pos = self.get_board_position(x + dx, y + dy)
         if self.not_on_board(pos):
             self.highlight.opacity = 0
+            self.hovered_square = None
+            if self.selected_square is None:
+                self.hide_moves()
         else:
             self.highlight.opacity = highlight_opacity
             self.highlight.position = self.get_screen_position(pos)
+            if self.hovered_square != pos:
+                self.hovered_square = pos
+                if self.selected_square is None:
+                    self.show_moves(pos, highlight_opacity)
 
     def on_mouse_drag(self, x, y, dx, dy, buttons, modifiers) -> None:
         self.on_mouse_motion(x, y, dx, dy)  # move the highlight as well!
@@ -412,6 +433,9 @@ class Board(ColorLayer):
             sprite.y = y
 
     def on_mouse_release(self, x, y, buttons, modifiers) -> None:
+        if buttons & mouse.RIGHT:
+            self.deselect_piece()
+            return
         if buttons & mouse.LEFT:
             if self.game_over:
                 self.deselect_piece()
@@ -615,6 +639,7 @@ class Board(ColorLayer):
                 self.future_move_history = []  # otherwise, we can't redo the future moves anymore, so we clear them
         self.turn_side = self.turn_side.opponent()
         self.load_all_moves()  # this updates the check status as well
+        self.show_moves(self.hovered_square, highlight_opacity)
         if sum(self.moves.values(), []):  # if there are any moves available, the game continues
             self.color_pieces(shade=255)
             self.game_over = False
@@ -656,6 +681,10 @@ class Board(ColorLayer):
                     self.en_passant_markers = en_passant_markers.copy()
                     for marker in self.en_passant_markers:
                         self.mark_en_passant(self.en_passant_target.board_pos, marker)
+        self.theoretical_moves = {}
+        for piece in movable_pieces[self.turn_side.opponent()]:
+            for move in piece.moves(theoretical=True):
+                self.theoretical_moves.setdefault(move.pos_from, []).append(move)
         self.movable_pieces = movable_pieces
         self.royal_pieces = royal_pieces
         self.quasi_royal_pieces = quasi_royal_pieces
