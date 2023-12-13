@@ -1,7 +1,7 @@
 import math
 
 from chess.movement import movement
-from chess.movement.util import rot, sym, Position, symv
+from chess.movement.util import Position, rot, sym, symv
 from chess.pieces import pieces
 
 

@@ -6,7 +6,7 @@ from enum import Enum
 from typing import Type, TYPE_CHECKING
 
 from chess.movement.movement import BaseMovement, RiderMovement
-from chess.movement.util import AnyPosition, sym, merge, clash_min
+from chess.movement.util import AnyDirection, sym, merge, clash_min
 
 if TYPE_CHECKING:
     from chess.board import Board
@@ -43,7 +43,7 @@ class PieceType(Enum):
         return self.name.lower()
 
 
-class Directions(list[AnyPosition], Enum):
+class Directions(list[AnyDirection], Enum):
     NONE = []
     PAWN = [(1, 0, 1)]
     KNIGHT = sym([(1, 2, 1), (2, 1, 1)])
@@ -71,7 +71,7 @@ class Directions(list[AnyPosition], Enum):
     CAMELRIDER = sym([(1, 3), (3, 1)])
 
 
-def balance_pawn(directions: list[AnyPosition]) -> list[AnyPosition]:
+def balance_pawn(directions: list[AnyDirection]) -> list[AnyDirection]:
     result = []
     for direction in directions:
         max_distance = random.randint(1, 2)
@@ -96,7 +96,7 @@ def balance_pawn(directions: list[AnyPosition]) -> list[AnyPosition]:
     return result
 
 
-def rng_directions() -> list[list[AnyPosition]]:
+def rng_directions() -> list[list[AnyDirection]]:
     bases = [
         Directions.NONE,
         Directions.PAWN,
@@ -133,11 +133,11 @@ def rng_directions() -> list[list[AnyPosition]]:
     return [merge(pair[0], pair[1]) for pair in itertools.product(bases, modifiers) if pair != ([], [])]
 
 
-def gen_movement[M: BaseMovement](board: Board, base_type: Type[M], params: list[AnyPosition]):
+def gen_movement[M: BaseMovement](board: Board, base_type: Type[M], params: list[AnyDirection]):
     return type('', (base_type, object), {})(board, params)
 
 
-def gen_movements[M: BaseMovement](board: Board, settings: list[tuple[Type[M], list[AnyPosition]]]):
+def gen_movements[M: BaseMovement](board: Board, settings: list[tuple[Type[M], list[AnyDirection]]]):
     return [gen_movement(board, setting[0], setting[1]) for setting in settings]
 
 

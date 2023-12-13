@@ -4,7 +4,7 @@ from copy import copy
 from typing import TYPE_CHECKING
 
 from chess.movement.move import Move
-from chess.movement.util import AnyPosition, Position, add, mul, merge, clash_max, sub
+from chess.movement.util import AnyDirection, Direction, Position, add, mul, merge, clash_max, sub
 
 if TYPE_CHECKING:
     from chess.board import Board
@@ -32,14 +32,14 @@ class BaseMovement(object):
 
 
 class BaseDirectionalMovement(BaseMovement):
-    def __init__(self, board: Board, directions: list[AnyPosition]):
+    def __init__(self, board: Board, directions: list[AnyDirection]):
         super().__init__(board)
         self.directions = directions
 
-    def skip_condition(self, move: Move, direction: AnyPosition, side: Side) -> bool:
+    def skip_condition(self, move: Move, direction: AnyDirection, side: Side) -> bool:
         return False
 
-    def stop_condition(self, move: Move, direction: AnyPosition, side: Side) -> bool:
+    def stop_condition(self, move: Move, direction: AnyDirection, side: Side) -> bool:
         return False
 
     def transform(self, pos: Position) -> Position:
@@ -73,10 +73,10 @@ class BaseDirectionalMovement(BaseMovement):
 
 
 class RiderMovement(BaseDirectionalMovement):
-    def __init__(self, board: Board, directions: list[AnyPosition]):
+    def __init__(self, board: Board, directions: list[AnyDirection]):
         super().__init__(board, directions)
 
-    def skip_condition(self, move: Move, direction: AnyPosition, side: Side) -> bool:
+    def skip_condition(self, move: Move, direction: AnyDirection, side: Side) -> bool:
         if len(direction) < 4:
             return False
         if not direction[3]:
@@ -86,7 +86,7 @@ class RiderMovement(BaseDirectionalMovement):
                 return True
         return False
 
-    def stop_condition(self, move: Move, direction: AnyPosition, side: Side) -> bool:
+    def stop_condition(self, move: Move, direction: AnyDirection, side: Side) -> bool:
         return (
                 self.board.not_on_board(self.transform(add(move.pos_to, direction[:2])))
                 or len(direction) > 2 and direction[2] and (
@@ -98,7 +98,7 @@ class RiderMovement(BaseDirectionalMovement):
 
 
 class CylindricalRiderMovement(RiderMovement):
-    def __init__(self, board: Board, directions: list[AnyPosition]):
+    def __init__(self, board: Board, directions: list[AnyDirection]):
         super().__init__(board, directions)
 
     def transform(self, pos: Position) -> Position:
@@ -106,7 +106,7 @@ class CylindricalRiderMovement(RiderMovement):
 
 
 class FirstMoveRiderMovement(RiderMovement):
-    def __init__(self, board: Board, directions: list[AnyPosition], first_move_directions: list[AnyPosition]):
+    def __init__(self, board: Board, directions: list[AnyDirection], first_move_directions: list[AnyDirection]):
         super().__init__(board, directions)
         self.base_directions = directions
         self.first_move_directions = first_move_directions
@@ -127,10 +127,10 @@ class CastlingMovement(BaseMovement):
     def __init__(
             self,
             board: Board,
-            direction: Position,
-            other_piece: Position,
-            other_direction: Position,
-            gap: list[Position] | None = None
+            direction: Direction,
+            other_piece: Direction,
+            other_direction: Direction,
+            gap: list[Direction] | None = None
     ):
         super().__init__(board)
         self.direction = direction
@@ -179,9 +179,9 @@ class EnPassantTargetMovement(FirstMoveRiderMovement):
     def __init__(
             self,
             board: Board,
-            directions: list[AnyPosition],
-            first_move_directions: list[AnyPosition],
-            en_passant_directions: list[AnyPosition]
+            directions: list[AnyDirection],
+            first_move_directions: list[AnyDirection],
+            en_passant_directions: list[AnyDirection]
     ):
         super().__init__(board, directions, first_move_directions)
         self.en_passant_directions = en_passant_directions
@@ -200,7 +200,7 @@ class EnPassantTargetMovement(FirstMoveRiderMovement):
 
 
 class EnPassantMovement(RiderMovement):
-    def __init__(self, board: Board, directions: list[AnyPosition]):
+    def __init__(self, board: Board, directions: list[AnyDirection]):
         super().__init__(board, directions)
 
 

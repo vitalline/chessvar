@@ -7,7 +7,7 @@ import typing
 from cocos.sprite import Sprite
 
 from chess.movement.move import Move
-from chess.movement.util import AnyPosition, Position
+from chess.movement.util import AnyDirection, Position
 
 if typing.TYPE_CHECKING:
     from chess.board import Board
@@ -30,7 +30,7 @@ class Side(Enum):
             case _:
                 return self
 
-    def direction(self, dpos: AnyPosition | int | None = None) -> AnyPosition | int:
+    def direction(self, dpos: AnyDirection | int | None = None) -> AnyDirection | int:
         match self:
             case Side.WHITE:
                 return 1 if dpos is None else dpos if type(dpos) is int else dpos
