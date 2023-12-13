@@ -21,6 +21,9 @@ class LGriffon(pieces.Piece):
                 )
             ])
         )
+        if side == pieces.Side.BLACK:
+            self.scale_x = -1
+            self.rotation = 180
 
 
 class RGriffon(pieces.Piece):
@@ -41,8 +44,9 @@ class RGriffon(pieces.Piece):
                 )
             ])
         )
-        self.scale_x = -1
-        self.rotation = 180
+        if side == pieces.Side.WHITE:
+            self.scale_x = -1
+            self.rotation = 180
 
 
 class LAanca(pieces.Piece):
@@ -63,8 +67,9 @@ class LAanca(pieces.Piece):
                 )
             ])
         )
-        self.scale_x = -1
-        self.rotation = 180
+        if side == pieces.Side.WHITE:
+            self.scale_x = -1
+            self.rotation = 180
 
 
 class RAanca(pieces.Piece):
@@ -85,6 +90,9 @@ class RAanca(pieces.Piece):
                 )
             ])
         )
+        if side == pieces.Side.BLACK:
+            self.scale_x = -1
+            self.rotation = 180
 
 
 class LSastik(pieces.Piece):
@@ -97,8 +105,9 @@ class LSastik(pieces.Piece):
             board, board_pos, side,
             movement.RiderMovement(board, rot([(2, 0, 1), (2, -1, 1)]))
         )
-        self.scale_x = -1
-        self.rotation = 180
+        if side == pieces.Side.WHITE:
+            self.scale_x = -1
+            self.rotation = 180
 
 
 class RSastik(pieces.Piece):
@@ -111,6 +120,9 @@ class RSastik(pieces.Piece):
             board, board_pos, side,
             movement.RiderMovement(board, rot([(2, 0, 1), (2, 1, 1)]))
         )
+        if side == pieces.Side.BLACK:
+            self.scale_x = -1
+            self.rotation = 180
 
 
 class Griffon(pieces.Piece):

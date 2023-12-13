@@ -1,14 +1,14 @@
 import math
 
 from chess.movement import movement
-from chess.movement.util import Position, rot, sym, symv
+from chess.movement.util import rot, sym, symv
 from chess.pieces import pieces
 
 
 class LRhino(pieces.Piece):
     name = 'Left Single-Step Rhino'
-    file_name = 'king2'
-    asset_folder = 'classic2'
+    file_name = 'commoner2'
+    asset_folder = 'other'
 
     def __init__(self, board, board_pos, side):
         super().__init__(
@@ -23,14 +23,15 @@ class LRhino(pieces.Piece):
                 )
             ])
         )
-        self.scale_x = -1
-        self.rotation = 180
+        if side == pieces.Side.WHITE:
+            self.scale_x = -1
+            self.rotation = 180
 
 
 class RRhino(pieces.Piece):
     name = 'Right Single-Step Rhino'
-    file_name = 'king2'
-    asset_folder = 'classic2'
+    file_name = 'commoner2'
+    asset_folder = 'other'
 
     def __init__(self, board, board_pos, side):
         super().__init__(
@@ -45,6 +46,9 @@ class RRhino(pieces.Piece):
                 )
             ])
         )
+        if side == pieces.Side.BLACK:
+            self.scale_x = -1
+            self.rotation = 180
 
 
 class Gnohmon(pieces.Piece):
