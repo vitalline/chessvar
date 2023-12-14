@@ -3,8 +3,8 @@ from chess.movement.util import rot, sym
 from chess.pieces import pieces
 
 
-class SlipRook(pieces.Piece):
-    name = 'Slip Rook'
+class Panda(pieces.Piece):
+    name = 'Panda'
     file_name = 'paladin'
     asset_folder = 'medieval'
 
@@ -49,8 +49,8 @@ class Unicorn(pieces.Piece):
         )
 
 
-class SlipQueen(pieces.Piece):
-    name = 'Slip Queen'
+class ErlQueen(pieces.Piece):
+    name = 'Erl Queen'
     file_name = 'minister'
     asset_folder = 'medieval'
 
