@@ -637,24 +637,38 @@ class Board(ColorLayer):
                 self.future_move_history.pop()  # if it does, the other future moves are still makeable, so we keep them
             else:
                 self.future_move_history = []  # otherwise, we can't redo the future moves anymore, so we clear them
+        self.game_over = False
+        self.load_check()
+        pass_check_side = Side.NONE
+        if self.check_side == self.turn_side:  # if the player is in check and passes the turn, the game ends
+            self.game_over = True
+            pass_check_side = self.check_side
         self.turn_side = self.turn_side.opponent()
         self.load_all_moves()  # this updates the check status as well
         self.show_moves(self.hovered_square, highlight_opacity)
-        if sum(self.moves.values(), []):  # if there are any moves available, the game continues
-            self.color_pieces(shade=255)
-            self.game_over = False
-            if self.check_side != Side.NONE:
-                print(f"[{len(self.move_history)}] {self.check_side.name()} is in check!")
-        else:
+        if not sum(self.moves.values(), []):
+            self.game_over = True
+        if self.game_over:
             # the game has ended, so let's figure out who won and show it by changing piece colors
-            if self.check_side != Side.NONE:
+            if pass_check_side != Side.NONE:
+                # the last player was in check and passed the turn, the game ends and the current player wins
+                self.color_pieces(pass_check_side, shade=loss_shade)
+                self.color_pieces(pass_check_side.opponent(), shade=win_shade)
+                print(f"[{len(self.move_history)}] Game over! {pass_check_side.opponent().name()} wins.")
+            elif self.check_side != Side.NONE:
+                # the current player was checkmated, the game ends and the opponent wins
                 self.color_pieces(self.check_side, shade=loss_shade)
                 self.color_pieces(self.check_side.opponent(), shade=win_shade)
                 print(f"[{len(self.move_history)}] Checkmate! {self.check_side.opponent().name()} wins.")
             else:
+                # the current player was stalemated, the game ends in a draw
                 self.color_pieces(shade=draw_shade)
                 print(f"[{len(self.move_history)}] Stalemate! It's a draw.")
-            self.game_over = True
+        else:
+            # the game is still going, so let's revert the piece colors to normal in case they were changed
+            self.color_pieces(shade=255)
+            if self.check_side != Side.NONE:
+                print(f"[{len(self.move_history)}] {self.check_side.name()} is in check!")
 
     def load_all_moves(self) -> None:
         self.load_check()
