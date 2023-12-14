@@ -1,4 +1,6 @@
-hotkeys:
+controls:
+LMB: select piece, move selected piece (click or drag)
+RMB: deselect piece
 Ctrl + R: start game with random armies
 Shift + R: start game with current armies
 Ctrl + Shift + R: start game with default armies
@@ -18,6 +20,15 @@ Ctrl + Shift + Z: redo last move (if any)
 Ctrl + Y: redo last move (if any)
 Shift + [/]: select random piece (that can move)
 Ctrl + [/]: play random move (with selected piece if one exists)
+Ctrl + E: enter board edit mode
+
+controls (edit mode):
+LMB: select piece, move selected piece (click or drag)
+Shift + LMB: swap piece with selected piece
+Ctrl + LMB: copy selected piece
+RMB: remove piece
+Shift + RMB: promote piece
+Ctrl + RMB: revoke first move of a piece
 
 armies in order:
 1. Fabulous FIDEs

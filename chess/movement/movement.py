@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from copy import copy
+from copy import copy, deepcopy
 from typing import TYPE_CHECKING
 
 from chess.movement.move import Move
@@ -29,6 +29,19 @@ class BaseMovement(object):
     def reload(self, move: Move, side: Side):
         self.undo(move, side)
         self.update(move, side)
+
+    def __copy_args__(self):
+        return self.board,
+
+    def __copy__(self):
+        clone = self.__class__(*self.__copy_args__())
+        clone.total_moves = self.total_moves
+        return clone
+
+    def __deepcopy__(self, memo):
+        clone = self.__class__(*self.__copy_args__())
+        clone.total_moves = self.total_moves
+        return clone
 
 
 class BaseDirectionalMovement(BaseMovement):
@@ -70,6 +83,9 @@ class BaseDirectionalMovement(BaseMovement):
                 yield move
             else:
                 direction_id += 1
+
+    def __copy_args__(self):
+        return self.board, copy(self.directions)
 
 
 class RiderMovement(BaseDirectionalMovement):
@@ -126,6 +142,9 @@ class FirstMoveRiderMovement(RiderMovement):
         if not self.total_moves:
             self.directions = merge(self.directions, self.first_move_directions, ClashResolution.EXPAND)
 
+    def __copy_args__(self):
+        return self.board, copy(self.base_directions), copy(self.first_move_directions)
+
 
 class CastlingMovement(BaseMovement):
     def __init__(
@@ -179,6 +198,9 @@ class CastlingMovement(BaseMovement):
             other_piece_pos_to = add(other_piece_pos, side.direction(self.other_direction))
             self.board.undo(Move(other_piece_pos, other_piece_pos_to, self, self.board.get_piece(other_piece_pos_to)))
 
+    def __copy_args__(self):
+        return self.board, self.direction, self.other_piece, self.other_direction, copy(self.gap)
+
 
 class EnPassantTargetMovement(FirstMoveRiderMovement):
     def __init__(
@@ -193,15 +215,27 @@ class EnPassantTargetMovement(FirstMoveRiderMovement):
 
     def update(self, move: Move, side: Side):
         if not self.total_moves:
-            for direction in self.en_passant_directions:
-                en_passant_square = add(move.pos_from, move.piece.side.direction(direction))
-                if self.board.not_a_piece(en_passant_square):
-                    self.board.mark_en_passant(move.pos_to, en_passant_square)
+            current_directions = self.directions
+            self.directions = self.base_directions
+            result_set = {base_move.pos_to for base_move in self.moves(move.pos_from, side, True)}
+            if move.pos_to not in result_set:  # if this is not a move that could be made whenever:
+                self.directions = self.first_move_directions
+                for first_move in self.moves(move.pos_from, side, True):
+                    if move.pos_to == first_move.pos_to:  # and if it is a move that can only be made as the first move:
+                        for direction in self.en_passant_directions:
+                            en_passant_square = add(move.pos_from, move.piece.side.direction(direction))
+                            if self.board.not_a_piece(en_passant_square):
+                                self.board.mark_en_passant(move.pos_to, en_passant_square)  # mark ALL the squares!
+                        break  # and yes this is totally inefficient but like who even cares at this point really
+            self.directions = current_directions
         super().update(move, side)
 
     def undo(self, move: Move, side: Side):
         super().undo(move, side)
         self.board.clear_en_passant()
+
+    def __copy_args__(self):
+        return self.board, copy(self.directions), copy(self.first_move_directions), copy(self.en_passant_directions)
 
 
 class EnPassantMovement(RiderMovement):
@@ -252,6 +286,9 @@ class ChainMovement(BaseMovement):
             movement.reload(move, side)
         super().update(move, side)
 
+    def __copy_args__(self):
+        return self.board, deepcopy(self.movements), self.start_index
+
 
 class MultiMovement(BaseMovement):
     def __init__(
@@ -294,3 +331,6 @@ class MultiMovement(BaseMovement):
         for movement in self.move_or_capture + self.move + self.capture:
             movement.reload(move, side)
         super().update(move, side)
+
+    def __copy_args__(self):
+        return self.board, deepcopy(self.move_or_capture), deepcopy(self.move), deepcopy(self.capture)

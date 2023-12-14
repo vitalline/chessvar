@@ -28,5 +28,8 @@ setup(
         'build_exe': join('build', 'Chess'),
         'include_files': gen_data_files(['assets']) + [('readme.txt',) * 2]
     }},
-    executables=[Executable('main.py', target_name='Chess.exe', base='Win32GUI')]
+    executables=[
+        Executable('main.py', target_name='Chess.exe', base='Win32GUI'),
+        Executable('main.py', target_name='Chess_debug.exe')
+    ]
 )

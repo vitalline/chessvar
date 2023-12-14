@@ -74,7 +74,7 @@ class Pawn(pieces.PromotablePiece):
     file_name = 'pawn'
     asset_folder = 'classic'
 
-    def __init__(self, board, board_pos, side, promotions, promotion_squares):
+    def __init__(self, board, board_pos, side, promotions=None, promotion_squares=None):
         super().__init__(
             board, board_pos, side,
             movement.MultiMovement(

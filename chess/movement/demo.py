@@ -3,7 +3,7 @@ from __future__ import annotations
 from enum import Enum
 from itertools import product
 from random import choice, randint
-from typing import Type, TYPE_CHECKING
+from typing import TYPE_CHECKING, Type
 
 from chess.movement.movement import BaseMovement, RiderMovement
 from chess.movement.util import AnyDirection, ClashResolution, merge, sym

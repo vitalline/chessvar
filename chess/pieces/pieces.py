@@ -2,14 +2,14 @@ from __future__ import annotations
 
 from copy import copy
 from enum import Enum
-import typing
+from typing import TYPE_CHECKING, Type
 
 from cocos.sprite import Sprite
 
 from chess.movement.move import Move
 from chess.movement.util import AnyDirection, Position
 
-if typing.TYPE_CHECKING:
+if TYPE_CHECKING:
     from chess.board import Board
 
 from chess.movement.movement import BaseMovement
@@ -87,6 +87,14 @@ class Piece(Sprite):
     def moves(self, theoretical: bool = False):
         yield from self.movement.moves(self.board_pos, self.side, theoretical)
 
+    def __copy__(self):
+        clone = type(self)(self.board, self.board_pos, self.side)
+        clone.movement = copy(self.movement)
+        clone.scale = self.scale
+        clone.scale_x = self.scale_x
+        clone.rotation = self.rotation
+        return clone
+
 
 class PromotablePiece(Piece):
     def __init__(
@@ -95,7 +103,7 @@ class PromotablePiece(Piece):
             board_pos: Position | None = None,
             side: Side = Side.NONE,
             movement: BaseMovement | None = None,
-            promotions: list[typing.Type[Piece]] | None = None,
+            promotions: list[Type[Piece]] | None = None,
             promotion_squares: set[Position] | None = None
     ):
         super().__init__(board, board_pos, side, movement)
@@ -114,7 +122,7 @@ class PromotablePiece(Piece):
                 move.set(promotion=self.promotions[0])
                 self.board.replace(self, self.promotions[0])
                 return
-            self.board.start_promotion(self)
+            self.board.start_promotion(self, self.promotions)
 
     def moves(self, theoretical: bool = False):
         for move in super().moves(theoretical):
@@ -123,6 +131,12 @@ class PromotablePiece(Piece):
                     yield copy(move).set(promotion=promotion)
             else:
                 yield move
+
+    def __copy__(self):
+        clone = super().__copy__()
+        clone.promotions = copy(self.promotions)
+        clone.promotion_squares = copy(self.promotion_squares)
+        return clone
 
 
 class QuasiRoyalPiece(Piece):

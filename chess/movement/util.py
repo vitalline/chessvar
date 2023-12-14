@@ -91,9 +91,12 @@ def merge(a: list[AnyDirection], b: list[AnyDirection], clash_resolution: ClashR
     return list(data.values())
 
 
-def to_alpha(pos: Position) -> str:
-    return chr(pos[1] + 97) + str(pos[0] + 1)
+UNKNOWN_COORDINATE_STRING = '\u2588' * 2
 
 
-def from_alpha(pos: str) -> Position:
-    return int(pos[1:]) - 1, ord(pos[0]) - 97
+def to_alpha(pos: Position | None) -> str:
+    return UNKNOWN_COORDINATE_STRING if pos is None else chr(pos[1] + 97) + str(pos[0] + 1)
+
+
+def from_alpha(pos: str) -> Position | None:
+    return None if str == UNKNOWN_COORDINATE_STRING else int(pos[1:]) - 1, ord(pos[0]) - 97
