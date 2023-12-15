@@ -257,7 +257,10 @@ class Board(ColorLayer):
             self.promotions = {side: [] for side in self.promotions}
             for side in self.promotions:
                 used_piece_set = set()
-                for pieces in (piece_sets[side], piece_sets[side.opponent()]):
+                for pieces in (
+                        piece_sets[side][3::-1], piece_sets[side.opponent()][3::-1],
+                        piece_sets[side][5:], piece_sets[side.opponent()][5:],
+                ):
                     promotion_types = []
                     for piece in pieces:
                         if piece not in used_piece_set and not issubclass(piece, abc.RoyalPiece):
@@ -267,11 +270,15 @@ class Board(ColorLayer):
             self.edit_promotions = {side: [] for side in self.edit_promotions}
             for side in self.edit_promotions:
                 used_piece_set = set()
-                for pieces in (self.promotions[side], self.promotions[side.opponent()], [
-                    piece_groups[self.piece_sets[side.opponent()]][4],
-                    fide.Pawn,
-                    piece_groups[self.piece_sets[side]][4],
-                ]):
+                for pieces in (
+                    piece_sets[side][3::-1], piece_sets[side.opponent()][3::-1],
+                    piece_sets[side][5:], piece_sets[side.opponent()][5:],
+                    [
+                        piece_groups[self.piece_sets[side.opponent()]][4],
+                        fide.Pawn,
+                        piece_groups[self.piece_sets[side]][4],
+                    ]
+                ):
                     promotion_types = []
                     for piece in pieces:
                         if piece not in used_piece_set:
@@ -553,6 +560,7 @@ class Board(ColorLayer):
                     move.set(pos_from=pos, pos_to=None, piece=self.get_piece(pos))
             else:
                 return
+            selection = self.selected_square
             self.square_was_clicked = self.clicked_square == pos
             self.clicked_square = None
             move.piece.move(move)
@@ -560,6 +568,8 @@ class Board(ColorLayer):
             if not self.promotion_piece:
                 print(f"[{len(self.move_history)}] Edit: {self.move_history[-1]}")
             self.advance_turn()
+            if buttons & self.mouse_button & mouse.LEFT and modifiers & self.modifiers & key.MOD_ACCEL:
+                self.select_piece(selection)
             return
         if buttons & self.mouse_button & mouse.RIGHT:
             self.deselect_piece()
@@ -664,20 +674,23 @@ class Board(ColorLayer):
             (move.piece or move).movement.undo(move, self.turn_side)
 
     def undo_last_move(self) -> None:
+        if not self.move_history:
+            return
         if self.promotion_piece is not None:
-            if (
-                    self.move_history and self.future_move_history
-                    and self.move_history[-1].pos_from == self.future_move_history[-1].pos_from
-                    and self.move_history[-1].pos_to == self.future_move_history[-1].pos_to
-                    and self.future_move_history[-1].promotion is not None
-            ):
-                self.move_history[-1].promotion = self.future_move_history[-1].promotion
+            if self.move_history and self.future_move_history:
+                past, future = self.move_history[-1], self.future_move_history[-1]
+                if (
+                    past.pos_from == future.pos_from and past.pos_to == future.pos_to
+                    and ((past.captured_piece is not None) != (future.swapped_piece is not None))
+                    and ((past.swapped_piece is not None) != (future.captured_piece is not None))
+                    and future.promotion is not None
+                ):
+                    past.promotion = future.promotion
             self.end_promotion()
-            if not self.move_history[-1].is_edit:
+            past = self.move_history[-1]
+            if not (past.is_edit or past.pos_from == past.pos_to):
                 self.turn_side = self.turn_side.opponent()
         else:
-            if not self.move_history:
-                return
             print(f'[{len(self.move_history)}] Undo: {
                 f"{'Edit' if self.move_history[-1].is_edit else 'Move'}: " + str(self.move_history[-1])
                 if self.move_history[-1] is not None else f"Pass: {self.turn_side.name()}'s turn"
@@ -685,6 +698,8 @@ class Board(ColorLayer):
         last_move = self.move_history.pop()
         if last_move is not None:
             self.undo(last_move)
+            if last_move.is_edit or last_move.pos_from == last_move.pos_to:
+                self.turn_side = self.turn_side.opponent()
         if self.move_history:
             move = self.move_history[-1]
             if move is not None:
@@ -731,6 +746,8 @@ class Board(ColorLayer):
                 self.replace(last_move.piece, last_move.promotion)
         self.move_history.append(last_move)
         # do not pop move from future history because advance_turn() will do it for us
+        if last_move.is_edit or last_move.pos_from == last_move.pos_to:
+            self.turn_side = self.turn_side.opponent()
         if self.promotion_piece is None:
             print(f'[{len(self.move_history)}] Redo: {
                 f"{'Edit' if self.move_history[-1].is_edit else 'Move'}: " + str(self.move_history[-1])
