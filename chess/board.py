@@ -4,10 +4,10 @@ from math import ceil, sqrt
 from random import choice
 from typing import Type
 
-from cocos import scene
 from cocos.batch import BatchNode
 from cocos.director import director
 from cocos.layer import ColorLayer
+from cocos.scene import Scene
 from cocos.sprite import Sprite
 from cocos.text import Label
 
@@ -26,9 +26,6 @@ from chess.pieces.groups import switch as sw
 from chess.pieces.groups.amazon import Amazon
 from chess.pieces.groups.util import NoPiece
 from chess.pieces.pieces import Side
-
-board_width = 8
-board_height = 8
 
 piece_groups = {
     1: [fide.Rook, fide.Knight, fide.Bishop, fide.Queen, fide.King, fide.Bishop, fide.Knight, fide.Rook],
@@ -72,6 +69,8 @@ piece_group_names = {
     18: "Silly Sliders",
 }
 
+board_width = 8
+board_height = 8
 
 pawn_row = [fide.Pawn] * board_width
 empty_row = [NoPiece] * board_width
@@ -95,7 +94,6 @@ background_color = 192, 192, 192
 highlight_color = 255, 255, 204
 highlight_opacity = 25
 selection_opacity = 50
-marker_opacity = 50
 win_shade = 225
 loss_shade = 125
 draw_shade = 175
@@ -228,7 +226,7 @@ class Board(ColorLayer):
         self.reset_board(update=True)
 
         # it's showtime
-        director.run(scene.Scene(self))
+        director.run(Scene(self))
 
     def resize(self, new_cell_size: int) -> None:
         self.size = new_cell_size
@@ -320,7 +318,7 @@ class Board(ColorLayer):
             self.piece_node.add(self.pieces[row][col])
 
         self.load_all_moves()
-        self.show_moves(self.hovered_square, highlight_opacity)
+        self.show_moves()
 
     def get_board_position(self, x: float, y: float) -> Position:
         window_width, window_height = director.get_window_size()
@@ -376,30 +374,50 @@ class Board(ColorLayer):
         self.piece_node.remove(piece)
         self.active_piece_node.add(piece)
 
-        self.show_moves(pos, marker_opacity)
+        self.show_moves()
 
-    def show_moves(self, pos: Position, opacity: int) -> None:
+    def show_moves(self) -> None:
         self.hide_moves()
-        if self.not_a_piece(pos):
-            return
-        if not self.hovered_square:
-            return
-        if self.not_on_board(self.hovered_square):
-            return
-        theoretical = self.get_side(self.hovered_square) == self.turn_side.opponent()
-        move_dict = self.theoretical_moves if theoretical else self.moves
-        move_positions = set()
-        for move in move_dict.get(pos, ()):
-            if move.pos_to in move_positions:
-                continue
-            move_positions.add(move.pos_to)
-            move_sprite = Sprite(
-                f"assets/util/{'move' if self.not_a_piece(move.pos_to) else 'capture'}.png",
-                position=self.get_screen_position(move.pos_to),
-                opacity=opacity
-            )
-            move_sprite.scale = default_size / move_sprite.width
-            self.move_node.add(move_sprite)
+        if self.selected_square is None and self.not_on_board(self.hovered_square):
+            if not self.move_history:
+                return
+            move = self.move_history[-1]
+            if move is None or move.is_edit:
+                return
+            if move.pos_from is not None:
+                move_sprite = Sprite(
+                    f"assets/util/{'move' if self.not_a_piece(move.pos_from) else 'capture'}.png",
+                    position=self.get_screen_position(move.pos_from),
+                    opacity=selection_opacity
+                )
+                move_sprite.scale = default_size / move_sprite.width
+                self.move_node.add(move_sprite)
+            if move.pos_to is not None and move.pos_from != move.pos_to:
+                move_sprite = Sprite(
+                    f"assets/util/{'move' if self.not_a_piece(move.pos_to) else 'capture'}.png",
+                    position=self.get_screen_position(move.pos_to),
+                    opacity=selection_opacity
+                )
+                move_sprite.scale = default_size / move_sprite.width
+                self.move_node.add(move_sprite)
+        else:
+            pos = self.selected_square or self.hovered_square
+            if self.not_on_board(pos):
+                return
+            theoretical = self.get_side(pos) == self.turn_side.opponent()
+            move_dict = self.theoretical_moves if theoretical else self.moves
+            move_positions = set()
+            for move in move_dict.get(pos, ()):
+                if move.pos_to in move_positions:
+                    continue
+                move_positions.add(move.pos_to)
+                move_sprite = Sprite(
+                    f"assets/util/{'move' if self.not_a_piece(move.pos_to) else 'capture'}.png",
+                    position=self.get_screen_position(move.pos_to),
+                    opacity=selection_opacity if self.selected_square else highlight_opacity
+                )
+                move_sprite.scale = default_size / move_sprite.width
+                self.move_node.add(move_sprite)
 
     def deselect_piece(self) -> None:
         self.selection.opacity = 0
@@ -415,7 +433,7 @@ class Board(ColorLayer):
         self.piece_node.add(piece)
 
         self.selected_square = None
-        self.show_moves(self.hovered_square, highlight_opacity)
+        self.show_moves()
 
     def hide_moves(self) -> None:
         for child in list(self.move_node.get_children()):
@@ -472,15 +490,17 @@ class Board(ColorLayer):
         if self.not_on_board(pos):
             self.highlight.opacity = 0
             self.hovered_square = None
-            if self.selected_square is None or self.promotion_piece:
+            if (self.selected_square is None and not self.move_history) or self.promotion_piece:
                 self.hide_moves()
+            else:
+                self.show_moves()
         else:
             self.highlight.opacity = highlight_opacity
             self.highlight.position = self.get_screen_position(pos)
             if self.hovered_square != pos:
                 self.hovered_square = pos
                 if self.selected_square is None and not self.promotion_piece:
-                    self.show_moves(pos, highlight_opacity)
+                    self.show_moves()
                 elif self.promotion_piece:
                     self.hide_moves()
 
@@ -881,7 +901,7 @@ class Board(ColorLayer):
             pass_check_side = self.check_side
         self.turn_side = self.turn_side.opponent()
         self.load_all_moves()  # this updates the check status as well
-        self.show_moves(self.hovered_square, highlight_opacity)
+        self.show_moves()
         if not sum(self.moves.values(), []):
             self.game_over = True
         if self.game_over:
@@ -1045,7 +1065,7 @@ class Board(ColorLayer):
             else:
                 self.turn_side = self.turn_side.opponent()
                 self.advance_turn()
-                self.show_moves(self.hovered_square, highlight_opacity)
+                self.show_moves()
         if symbol == key.W:
             if modifiers & key.MOD_ACCEL and not modifiers & key.MOD_SHIFT:
                 if self.turn_side != Side.WHITE:
@@ -1093,6 +1113,14 @@ class Board(ColorLayer):
                     self.move_history.append(random_move)
                     print(f"[{len(self.move_history)}] Move: {self.move_history[-1]}")
                     self.advance_turn()
+
+    def on_deactivate(self):
+        self.hovered_square = None
+        self.clicked_square = None
+        self.held_buttons = 0
+        self.highlight.opacity = 0
+        self.deselect_piece()
+        self.show_moves()
 
     def run(self):
         pass
