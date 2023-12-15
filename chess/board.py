@@ -21,7 +21,8 @@ from chess.pieces.groups import classic as fide
 from chess.pieces.groups import avian as av, bent as bt, colorbound as cb
 from chess.pieces.groups import cylindrical as cy, dragon as dr, fizzies as fi
 from chess.pieces.groups import forward as fw, knights as kn, mash as ms
-from chess.pieces.groups import pizza as pz, rookies as rk, switch as sw
+from chess.pieces.groups import pizza as pz, rookies as rk, slide as sl
+from chess.pieces.groups import switch as sw
 from chess.pieces.groups.amazon import Amazon
 from chess.pieces.groups.util import NoPiece
 from chess.pieces.pieces import Side
@@ -37,15 +38,17 @@ piece_groups = {
     5: [kn.ChargeRook, fw.Knishop, fw.Bishight, fw.Forequeen, fide.King, fw.Bishight, fw.Knishop, kn.ChargeRook],
     6: [kn.ChargeRook, cb.Waffle, fide.Bishop, rk.Chancellor, fide.King, fide.Bishop, cb.Waffle, kn.ChargeRook],
     7: [kn.ChargeRook, kn.Fibnif, fw.Bishight, rk.Chancellor, fide.King, fw.Bishight, kn.Fibnif, kn.ChargeRook],
-    8: [rk.ShortRook, fide.Knight, fide.Bishop, Amazon, fide.King, fide.Bishop, fide.Knight, rk.ShortRook],
-    9: [cy.CyWaffle, cy.CyKnight, cy.CyBishop, cy.CyChancellor, fide.King, cy.CyBishop, cy.CyKnight, cy.CyWaffle],
-    10: [fi.LRhino, fi.Gnohmon, fi.Crabinal, fi.EagleScout, fide.King, fi.Crabinal, fi.Gnohmon, fi.RRhino],
-    11: [av.Wader, av.Darter, av.Faalcon, av.Kingfisher, fide.King, av.Faalcon, av.Darter, av.Wader],
-    12: [pz.Pepperoni, pz.Mushroom, pz.Sausage, pz.Meatball, fide.King, pz.Sausage, pz.Mushroom, pz.Pepperoni],
-    13: [ms.Forfer, kn.Fibnif, ms.B4nD, ms.N2R4, fide.King, ms.B4nD, kn.Fibnif, ms.Forfer],
-    14: [dr.DragonHorse, dr.Dragonfly, dr.Dragoon, dr.Wyvern, fide.King, dr.Dragoon, dr.Dragonfly, dr.DragonHorse],
-    15: [sw.Panda, sw.Marquis, sw.Unicorn, sw.ErlQueen, fide.King, sw.Unicorn, sw.Marquis, sw.Panda],
-    16: [bt.LGriffon, bt.LAanca, bt.LSastik, bt.Griffon, fide.King, bt.RSastik, bt.RAanca, bt.RGriffon],
+    8: [cb.Bede, cb.FAD, cb.Waffle, cb.Cardinal, cb.King, cb.Waffle, cb.FAD, cb.Bede],
+    9: [rk.ShortRook, fide.Knight, fide.Bishop, Amazon, fide.King, fide.Bishop, fide.Knight, rk.ShortRook],
+    10: [cy.CyWaffle, cy.CyKnight, cy.CyBishop, cy.CyChancellor, fide.King, cy.CyBishop, cy.CyKnight, cy.CyWaffle],
+    11: [fi.LRhino, fi.Gnohmon, fi.Crabinal, fi.EagleScout, fide.King, fi.Crabinal, fi.Gnohmon, fi.RRhino],
+    12: [av.Wader, av.Darter, av.Faalcon, av.Kingfisher, fide.King, av.Faalcon, av.Darter, av.Wader],
+    13: [pz.Pepperoni, pz.Mushroom, pz.Sausage, pz.Meatball, fide.King, pz.Sausage, pz.Mushroom, pz.Pepperoni],
+    14: [ms.Forfer, kn.Fibnif, ms.B4nD, ms.N2R4, fide.King, ms.B4nD, kn.Fibnif, ms.Forfer],
+    15: [dr.DragonHorse, dr.Dragonfly, dr.Dragoon, dr.Wyvern, fide.King, dr.Dragoon, dr.Dragonfly, dr.DragonHorse],
+    16: [sw.Panda, sw.Marquis, sw.Unicorn, sw.ErlQueen, fide.King, sw.Unicorn, sw.Marquis, sw.Panda],
+    17: [bt.LGriffon, bt.LAanca, bt.LSastik, bt.Griffon, fide.King, bt.RSastik, bt.RAanca, bt.RGriffon],
+    18: [sl.LameDuck, sl.Diamond, sl.Onyx, sl.Squire, fide.King, sl.Onyx, sl.Diamond, sl.LameDuck],
 }
 
 piece_group_names = {
@@ -56,15 +59,17 @@ piece_group_names = {
     5: "Forward FIDEs",
     6: "All-Around Allstars",
     7: "All-Around Allstars 2",
-    8: "Amazon Army",
-    9: "Cylindrical Cinders",
-    10: "Fighting Fizzies",
-    11: "Avian Airforce",
-    12: "Pizza Kings",
-    13: "Meticulous Mashers",
-    14: "Daring Dragons",
-    15: "Seeping Switchers",
-    16: "Bent Bozos",
+    8: "Colorbound Clobberers 2",
+    9: "Amazon Army",
+    10: "Cylindrical Cinders",
+    11: "Fighting Fizzies",
+    12: "Avian Airforce",
+    13: "Pizza Kings",
+    14: "Meticulous Mashers",
+    15: "Daring Dragons",
+    16: "Seeping Switchers",
+    17: "Bent Bozos",
+    18: "Silly Sliders",
 }
 
 

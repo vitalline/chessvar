@@ -38,15 +38,18 @@ armies in order:
 5. Forward FIDEs
 6. All-Around Allstars
 7. All-Around Allstars 2
-8. Amazon Army
-9. Cylindrical Cinders
-10. Fighting Fizzies
-11. Avian Airforce
-12. Pizza Kings
-13. Meticulous Mashers
-14. Daring Dragons
-15. Seeping Switchers
-16. Bent Bozos
+8. Colorbound Clobberers 2
+9. Amazon Army
+10. Cylindrical Cinders
+11. Fighting Fizzies
+12. Avian Airforce
+13. Pizza Kings
+14. Meticulous Mashers
+15. Daring Dragons
+16. Seeping Switchers
+17. Bent Bozos
+18. Silly Sliders
 
 source:
 https://en.wikipedia.org/wiki/Chess_with_different_armies
+https://www.chessvariants.org/unequal.dir/cwda.html
