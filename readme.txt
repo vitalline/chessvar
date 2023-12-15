@@ -1,8 +1,8 @@
 controls:
 LMB: select piece, move selected piece (click or drag)
 RMB: deselect piece
-Ctrl + R: start game with random armies
-Shift + R: start game with current armies
+Ctrl + R: start game with current armies
+Shift + R: start game with random armies
 Ctrl + Shift + R: start game with default armies
 Ctrl + [-]: make window smaller (-5px/square)
 Ctrl + Shift + [-]: make window smallest (25px/square)
