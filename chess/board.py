@@ -11,6 +11,7 @@ from cocos.scene import Scene
 from cocos.sprite import Sprite
 from cocos.text import Label
 
+from pyglet.gl import glClearColor
 from pyglet.window import key, mouse
 
 from chess.movement import movement
@@ -90,49 +91,61 @@ default_size = 50
 min_size = 25
 max_size = 100
 size_step = 5
-background_color = 192, 192, 192
-highlight_color = 255, 255, 204
+background_color = 192, 168, 144
+light_square_color = 255, 204, 153
+dark_square_color = 187, 119, 51
+promotion_background_color = 216, 192, 168
+piece_color = 255, 255, 255
+white_piece_color = piece_color
+black_piece_color = piece_color
+check_color = 200, 200, 200
+win_color = 225, 225, 225
+draw_color = 175, 175, 175
+loss_color = 125, 125, 125
 highlight_opacity = 25
 selection_opacity = 50
-win_shade = 225
-loss_shade = 125
-draw_shade = 175
 
 movements = []
-
-
-def get_cell_color(pos: Position) -> tuple[int, int, int]:
-    if (pos[0] + pos[1]) % 2:
-        return 255, 204, 153
-    else:
-        return 187, 119, 51
-
-
-def get_royal_color(side: Side) -> tuple[int, int, int]:
-    if side == Side.WHITE:
-        return 255, 255, 204
-    else:
-        return 255, 153, 153
 
 
 class Board(ColorLayer):
 
     def __init__(self):
+        # super boring initialization stuff (bluh bluh)
         self.board_width, self.board_height = board_width, board_height
         self.size = default_size
 
-        self.is_event_handler = True
+        self.background_color = background_color
+        self.light_square_color = light_square_color
+        self.dark_square_color = dark_square_color
+        self.promotion_background_color = promotion_background_color
+        self.piece_color = piece_color
+        self.white_piece_color = white_piece_color
+        self.black_piece_color = black_piece_color
+        self.check_color = check_color
+        self.win_color = win_color
+        self.draw_color = draw_color
+        self.loss_color = loss_color
+
+        self.is_event_handler = True  # allow the layer to receive events
+        # remove fixed aspect ratio because there's no point in having it
+        # the strips of void on both sides will have the background color
+        # and the board will be centered and scaled to fit the window too
+        director.post_resize_adjust = lambda _: None
         director.init(
             width=(self.board_width + 2) * self.size,
             height=(self.board_height + 2) * self.size,
             caption='Chess',
             autoscale=True,
+            resizable=True,
         )
-        super().__init__(192, 168, 142, 1000)
+        super().__init__(*self.background_color, 1000)  # set background color of the layer
+        glClearColor(*(c / 255 for c in self.background_color), 1)  # set background color of the window
         # remove default key combinations to not clash with our custom ones
         director.window.remove_handlers(director._default_event_handler)
+        # set a minimum window size so that you can't just make a zero pixels tall window and crash the program
+        director.window.set_minimum_size((self.board_width + 2) * min_size, (self.board_height + 2) * min_size)
 
-        # super boring initialization stuff (bluh bluh)
         self.hovered_square = None  # square we are currently hovering over
         self.clicked_square = None  # square we clicked on
         self.selected_square = None  # square selected for moving
@@ -163,7 +176,7 @@ class Board(ColorLayer):
         self.theoretical_moves = {}  # dictionary of theoretical moves from any square that has an opposing piece on it
         self.anchor = 0, 0  # used to have the board scale from the origin instead of the center
         self.board = BatchNode()  # node for the board sprites
-        self.highlight = Sprite("assets/util/selection.png", color=highlight_color, opacity=0)  # highlight sprite
+        self.highlight = Sprite("assets/util/selection.png", opacity=0)  # sprite for the highlight marker
         self.highlight.scale = self.size / self.highlight.width  # scale it to the size of a square
         self.selection = Sprite("assets/util/selection.png", opacity=0)  # sprite for the selection marker
         self.selection.scale = self.size / self.selection.width  # scale it to the size of a square
@@ -212,13 +225,14 @@ class Board(ColorLayer):
             self.add(label, z=1)
 
         # initialize board sprites
-        self.board_sprites = [[] for _ in range(self.board_height)]
+        for row in range(self.board_height):
+            self.board_sprites += [[]]
 
         for row, col in product(range(self.board_height), range(self.board_width)):
 
             self.board_sprites[row].append(Sprite("assets/util/cell.png"))
             self.board_sprites[row][col].position = self.get_screen_position((row, col))
-            self.board_sprites[row][col].color = get_cell_color((row, col))
+            self.board_sprites[row][col].color = self.light_square_color if (row + col) % 2 else self.dark_square_color
             self.board_sprites[row][col].scale = default_size / self.board_sprites[row][col].width
             self.board.add(self.board_sprites[row][col])
 
@@ -227,12 +241,6 @@ class Board(ColorLayer):
 
         # it's showtime
         director.run(Scene(self))
-
-    def resize(self, new_cell_size: int) -> None:
-        self.size = new_cell_size
-        dimensions = (self.board_width + 2) * self.size, (self.board_height + 2) * self.size
-        director.window.set_size(*dimensions)
-        # self.scale = self.size / self.board_sprites[0][0].width
 
     def reset_board(self, shuffle: bool = False, update: bool = False) -> None:
         self.deselect_piece()  # you know, just in case
@@ -313,7 +321,11 @@ class Board(ColorLayer):
                     self, (row, col), piece_side
                 )
             )
-            self.pieces[row][col].color = (255, 255, 255)
+            self.pieces[row][col].color = (
+                self.white_piece_color if piece_side == Side.WHITE else
+                self.black_piece_color if piece_side == Side.BLACK else
+                self.piece_color
+            )
             self.pieces[row][col].scale = default_size / self.pieces[row][col].width
             self.piece_node.add(self.pieces[row][col])
 
@@ -490,7 +502,6 @@ class Board(ColorLayer):
                     return
                 if pos not in {move.pos_to for move in self.moves.get(self.selected_square, ())}:
                     self.deselect_piece()
-                    return
             if not self.not_a_piece(pos) and (self.turn_side == self.get_side(pos) or self.edit_mode):
                 self.deselect_piece()  # just in case we had something previously selected
                 self.select_piece(pos)
@@ -787,7 +798,7 @@ class Board(ColorLayer):
                 self.replace(last_move.piece, last_move.promotion)
         self.move_history.append(last_move)
         # do not pop move from future history because advance_turn() will do it for us
-        if last_move.is_edit and not self.edit_mode:
+        if last_move is not None and last_move.is_edit and not self.edit_mode:
             self.turn_side = self.turn_side.opponent()
         if self.promotion_piece is None:
             print(f'[{len(self.move_history)}] Redo: {
@@ -833,7 +844,9 @@ class Board(ColorLayer):
             area_squares.append((current_row, current_col))
         for promotion, pos in zip_longest(promotions, area_squares):
             background_sprite = Sprite(
-                "assets/util/cell.png", position=self.get_screen_position(pos), color=background_color
+                "assets/util/cell.png",
+                position=self.get_screen_position(pos),
+                color=self.promotion_background_color
             )
             background_sprite.scale = default_size / background_sprite.width
             self.promotion_area_node.add(background_sprite)
@@ -851,7 +864,9 @@ class Board(ColorLayer):
             for sprite in node.get_children():
                 node.remove(sprite)
 
-    def replace(self, piece: abc.Piece, new_type: Type[abc.Piece], new_side: Side | None = None) -> None:
+    def replace(
+            self, piece: abc.Piece, new_type: Type[abc.Piece | abc.PromotablePiece], new_side: Side | None = None
+    ) -> None:
         if new_side is None:
             new_side = piece.side
         pos = piece.board_pos
@@ -861,15 +876,24 @@ class Board(ColorLayer):
             promotions=self.promotions[new_side],
             promotion_squares=promotion_squares[new_side],
         ) if issubclass(new_type, abc.PromotablePiece) else new_type(self, pos, new_side)
+        self.pieces[pos[0]][pos[1]].color = (
+            self.white_piece_color if new_side == Side.WHITE else
+            self.black_piece_color if new_side == Side.BLACK else
+            self.piece_color
+        )
         self.pieces[pos[0]][pos[1]].scale = default_size / self.pieces[pos[0]][pos[1]].width
         self.piece_node.add(self.pieces[pos[0]][pos[1]])
         self.pieces[pos[0]][pos[1]].board_pos = pos
         if pos in self.en_passant_markers and not self.not_a_piece(pos):
             self.en_passant_markers.remove(pos)
 
-    def color_pieces(self, side: Side = Side.ANY, color: tuple[int, int, int] | None = None, shade: int = 255) -> None:
+    def color_pieces(self, side: Side = Side.ANY, color: tuple[int, int, int] | None = None) -> None:
         for piece in self.movable_pieces.get(side, sum(self.movable_pieces.values(), [])):
-            piece.color = color or (shade, ) * 3
+            piece.color = color or (
+                self.white_piece_color if piece.side == Side.WHITE else
+                self.black_piece_color if piece.side == Side.BLACK else
+                self.piece_color
+            )
 
     def advance_turn(self) -> None:
         self.deselect_piece()
@@ -887,7 +911,7 @@ class Board(ColorLayer):
                 self.future_move_history = []  # otherwise, we can't redo the future moves anymore, so we clear them
         self.game_over = False
         if self.edit_mode:
-            self.color_pieces(shade=255)  # reverting the piece colors to normal in case they were previously changed
+            self.color_pieces()  # reverting the piece colors to normal in case they were changed
             return  # let's not advance the turn while editing the board to hopefully make things easier for everyone
         self.load_check()
         pass_check_side = Side.NONE
@@ -899,27 +923,59 @@ class Board(ColorLayer):
         self.show_moves()
         if not sum(self.moves.values(), []):
             self.game_over = True
+        if pass_check_side != Side.NONE:
+            self.check_side = pass_check_side
         if self.game_over:
             # the game has ended. let's find out who won and show it by changing piece colors... unless edit mode is on!
             if pass_check_side != Side.NONE:
                 # the last player was in check and passed the turn, the game ends and the current player wins
-                self.color_pieces(pass_check_side, shade=loss_shade)
-                self.color_pieces(pass_check_side.opponent(), shade=win_shade)
+                self.color_pieces(pass_check_side, self.loss_color)
+                self.color_pieces(pass_check_side.opponent(), self.win_color)
                 print(f"[{len(self.move_history)}] Game over! {pass_check_side.opponent().name()} wins.")
             elif self.check_side != Side.NONE:
                 # the current player was checkmated, the game ends and the opponent wins
-                self.color_pieces(self.check_side, shade=loss_shade)
-                self.color_pieces(self.check_side.opponent(), shade=win_shade)
+                self.color_pieces(self.check_side, self.loss_color)
+                self.color_pieces(self.check_side.opponent(), self.win_color)
                 print(f"[{len(self.move_history)}] Checkmate! {self.check_side.opponent().name()} wins.")
             else:
                 # the current player was stalemated, the game ends in a draw
-                self.color_pieces(shade=draw_shade)
+                self.color_pieces(color=self.draw_color)
                 print(f"[{len(self.move_history)}] Stalemate! It's a draw.")
         else:
-            # the game is still going, so let's revert the piece colors to normal in case they were changed
-            self.color_pieces(shade=255)
             if self.check_side != Side.NONE:
+                # the game is still going, but the current player is in check
+                self.color_pieces(self.check_side, self.check_color)
+                self.color_pieces(self.check_side.opponent())
                 print(f"[{len(self.move_history)}] {self.check_side.name()} is in check!")
+            else:
+                # the game is still going and there is no check
+                self.color_pieces()
+
+    def update_colors(self) -> None:
+        self.color = self.background_color
+        for row, col in product(range(self.board_height), range(self.board_width)):
+            self.board_sprites[row][col].color = self.light_square_color if (row + col) % 2 else self.dark_square_color
+        for sprite in self.promotion_area_node.get_children():
+            sprite.color = self.promotion_background_color
+        for sprite in self.promotion_piece_node.get_children():
+            if isinstance(sprite, abc.Piece):
+                sprite.color = (
+                    self.white_piece_color if sprite.side == Side.WHITE else
+                    self.black_piece_color if sprite.side == Side.BLACK else
+                    self.piece_color
+                )
+        if self.game_over:
+            if self.check_side != Side.NONE:
+                self.color_pieces(self.check_side, self.loss_color)
+                self.color_pieces(self.check_side.opponent(), self.win_color)
+            else:
+                self.color_pieces(color=self.draw_color)
+        else:
+            if self.check_side != Side.NONE:
+                self.color_pieces(self.check_side, self.check_color)
+                self.color_pieces(self.check_side.opponent())
+            else:
+                self.color_pieces()
 
     def load_all_moves(self) -> None:
         self.load_check()
@@ -982,7 +1038,9 @@ class Board(ColorLayer):
             ]
             castle_movements = set(move.movement for move in castle_moves)
             castle_squares = set(
-                add(royal.board_pos, offset) for mov in castle_movements for offset in mov.gap + [mov.direction]
+                add(royal.board_pos, offset)
+                for castling in castle_movements
+                for offset in castling.gap + [castling.direction]
             )
             for piece in self.movable_pieces[self.turn_side.opponent()]:
                 for move in piece.moves():
@@ -1024,7 +1082,7 @@ class Board(ColorLayer):
                 self.reset_position(self.get_piece(self.selected_square))
         if self.held_buttons:
             return
-        if symbol == key.R:
+        if symbol == key.R:  # Restart
             if modifiers & key.MOD_ACCEL and modifiers & key.MOD_SHIFT:
                 self.piece_sets = {Side.WHITE: 1, Side.BLACK: 1}
                 self.reset_board(update=True)
@@ -1032,23 +1090,37 @@ class Board(ColorLayer):
                 self.reset_board(shuffle=True)
             elif modifiers & key.MOD_ACCEL:
                 self.reset_board()
-        if symbol == key.MINUS and modifiers & key.MOD_ACCEL:
-            if self.size == min_size:
-                return
-            self.resize(
-                min_size if modifiers & key.MOD_SHIFT else max(min_size, self.size - size_step)
-            )
-        if symbol == key.EQUAL and modifiers & key.MOD_ACCEL:
-            if self.size == max_size:
-                return
-            self.resize(
-                max_size if modifiers & key.MOD_SHIFT else min(max_size, self.size + size_step)
-            )
-        if symbol == key._0 and modifiers & key.MOD_ACCEL:
-            if self.size == default_size:
-                return
-            self.resize(default_size)
-        if symbol == key.E and modifiers & key.MOD_ACCEL:
+        if symbol == key.F11:  # Full screen (toggle)
+            director.window.set_fullscreen(not director.window.fullscreen)
+        if symbol == key.MINUS:  # (-) Decrease window size
+            if modifiers & key.MOD_ACCEL and modifiers & key.MOD_SHIFT:
+                director.window.set_size((self.board_width + 2) * min_size, (self.board_height + 2) * min_size)
+            elif modifiers & key.MOD_ACCEL:
+                width, height = director.window.get_size()
+                director.window.set_size(
+                    width - (self.board_width + 2) * size_step,
+                    height - (self.board_height + 2) * size_step
+                )
+            elif modifiers & key.MOD_SHIFT:
+                width, height = director.window.get_size()
+                size = min(round(width / (self.board_width + 2)), round(height / (self.board_height + 2)))
+                director.window.set_size((self.board_width + 2) * size, (self.board_height + 2) * size)
+        if symbol == key.EQUAL:  # (+) Increase window size
+            if modifiers & key.MOD_ACCEL and modifiers & key.MOD_SHIFT:
+                director.window.set_size((self.board_width + 2) * max_size, (self.board_height + 2) * max_size)
+            elif modifiers & key.MOD_ACCEL:
+                width, height = director.window.get_size()
+                director.window.set_size(
+                    width + (self.board_width + 2) * size_step,
+                    height + (self.board_height + 2) * size_step
+                )
+            elif modifiers & key.MOD_SHIFT:
+                width, height = director.window.get_size()
+                size = max(round(width / (self.board_width + 2)), round(height / (self.board_height + 2)))
+                director.window.set_size((self.board_width + 2) * size, (self.board_height + 2) * size)
+        if symbol == key._0 and modifiers & key.MOD_ACCEL:  # Reset window size
+            director.window.set_size((self.board_width + 2) * default_size, (self.board_height + 2) * default_size)
+        if symbol == key.E and modifiers & key.MOD_ACCEL:  # Edit mode (toggle)
             self.edit_mode = not self.edit_mode
             print(f"[{len(self.move_history)}] Mode: {'EDIT' if self.edit_mode else 'PLAY'}")
             self.deselect_piece()
@@ -1062,45 +1134,97 @@ class Board(ColorLayer):
                 self.turn_side = self.turn_side.opponent()
                 self.advance_turn()
                 self.show_moves()
-        if symbol == key.W:
-            if modifiers & key.MOD_ACCEL and not modifiers & key.MOD_SHIFT:
+        if symbol == key.W:  # White
+            if modifiers & key.MOD_ACCEL and not modifiers & key.MOD_SHIFT:  # White is in control
                 if self.turn_side != Side.WHITE:
                     self.move_history.append(None)
                     print(f"[{len(self.move_history)}] Pass: {Side.WHITE.name()}'s turn")
                     self.clear_en_passant()
                     self.advance_turn()
-            else:
-                direction = -1 if modifiers & key.MOD_ACCEL else 1
-                self.piece_sets[Side.WHITE] = (self.piece_sets[Side.WHITE] + direction - 1) % len(piece_groups) + 1
+            elif modifiers & key.MOD_SHIFT:  # Shift white piece set
+                d = -1 if modifiers & key.MOD_ACCEL else 1
+                self.piece_sets[Side.WHITE] = (self.piece_sets[Side.WHITE] + d - 1) % len(piece_groups) + 1
                 self.reset_board(update=True)
-        if symbol == key.B:
-            if modifiers & key.MOD_ACCEL and not modifiers & key.MOD_SHIFT:
+        if symbol == key.B:  # Black
+            if modifiers & key.MOD_ACCEL and not modifiers & key.MOD_SHIFT:  # Black is in control
                 if self.turn_side != Side.BLACK:
                     self.move_history.append(None)
                     print(f"[{len(self.move_history)}] Pass: {Side.BLACK.name()}'s turn")
                     self.clear_en_passant()
                     self.advance_turn()
-            else:
-                direction = -1 if modifiers & key.MOD_ACCEL else 1
-                self.piece_sets[Side.BLACK] = (self.piece_sets[Side.BLACK] + direction - 1) % len(piece_groups) + 1
+            elif modifiers & key.MOD_SHIFT:  # Shift black piece set
+                d = -1 if modifiers & key.MOD_ACCEL else 1
+                self.piece_sets[Side.BLACK] = (self.piece_sets[Side.BLACK] + d - 1) % len(piece_groups) + 1
                 self.reset_board(update=True)
-        if symbol == key.Z and modifiers & key.MOD_ACCEL:
-            if modifiers & key.MOD_SHIFT:
+        if symbol == key.N:  # Next
+            if modifiers & key.MOD_ACCEL and not modifiers & key.MOD_SHIFT:  # Next player is in control
+                self.move_history.append(None)
+                print(f"[{len(self.move_history)}] Pass: {self.turn_side.opponent().name()}'s turn")
+                self.clear_en_passant()
+                self.advance_turn()
+            elif modifiers & key.MOD_SHIFT:
+                if self.piece_sets[Side.WHITE] == self.piece_sets[Side.BLACK]:  # Next piece set
+                    d = -1 if modifiers & key.MOD_ACCEL else 1
+                    self.piece_sets[Side.WHITE] = (self.piece_sets[Side.WHITE] + d - 1) % len(piece_groups) + 1
+                    self.piece_sets[Side.BLACK] = (self.piece_sets[Side.BLACK] + d - 1) % len(piece_groups) + 1
+                else:  # Next player goes first
+                    piece_sets = self.piece_sets[Side.WHITE], self.piece_sets[Side.BLACK]
+                    self.piece_sets[Side.BLACK], self.piece_sets[Side.WHITE] = piece_sets
+                self.reset_board(update=True)
+        if symbol == key.G:  # Graphics
+            if modifiers & key.MOD_ACCEL and not modifiers & key.MOD_SHIFT:  # Graphics reset
+                # Oh god, it's the initialization part all over again
+                self.background_color = background_color
+                self.light_square_color = light_square_color
+                self.dark_square_color = dark_square_color
+                self.promotion_background_color = promotion_background_color
+                self.piece_color = piece_color
+                self.white_piece_color = white_piece_color
+                self.black_piece_color = black_piece_color
+                self.check_color = check_color
+                self.win_color = win_color
+                self.loss_color = loss_color
+                self.draw_color = draw_color
+                self.update_colors()
+                # So thank god that's over! Haha... it's over, right? There's not... there's not more, right? I mean-
+            elif modifiers & key.MOD_SHIFT:  # Graphics shift
+                # OH GOD, IT'S THE INITIALIZATION PART ALL OVER AGAIN
+                d = -1 if modifiers & key.MOD_ACCEL else 1
+                glClearColor(*(self.background_color[(i - d) % 3] / 255 for i in range(3)), 1)
+                self.background_color = tuple(self.background_color[(i - d) % 3] for i in range(3))
+                self.light_square_color = tuple(self.light_square_color[(i - d) % 3] for i in range(3))
+                self.dark_square_color = tuple(self.dark_square_color[(i - d) % 3] for i in range(3))
+                self.promotion_background_color = tuple(self.promotion_background_color[(i - d) % 3] for i in range(3))
+                self.piece_color = tuple(self.piece_color[(i - d) % 3] for i in range(3))
+                self.white_piece_color = tuple(self.white_piece_color[(i - d) % 3] for i in range(3))
+                self.black_piece_color = tuple(self.black_piece_color[(i - d) % 3] for i in range(3))
+                self.check_color = tuple(self.check_color[(i - d) % 3] for i in range(3))
+                self.win_color = tuple(self.win_color[(i - d) % 3] for i in range(3))
+                self.loss_color = tuple(self.loss_color[(i - d) % 3] for i in range(3))
+                self.draw_color = tuple(self.draw_color[(i - d) % 3] for i in range(3))
+                self.update_colors()
+                # Ok, jokes aside, I wish I could just do this with a for loop, or any other concise and readable way
+                # But I thought storing the colors as like 10 separate variables would be a good idea, so here we are
+                # Maybe I'll change it later, but for now, I'll just leave it like this. But hey, at least it's funny
+        if symbol == key.Z and modifiers & key.MOD_ACCEL:  # Undo
+            if modifiers & key.MOD_SHIFT:  # Unless Ctrl+Shift+Z, then redo
                 self.redo_last_finished_move()
             else:
                 self.undo_last_finished_move()
-        if symbol == key.Y and modifiers & key.MOD_ACCEL:
+        if symbol == key.Y and modifiers & key.MOD_ACCEL:  # Redo
             self.redo_last_finished_move()
-        if symbol == key.SLASH:
-            if modifiers & key.MOD_SHIFT:
+        if symbol == key.SLASH:  # (?) Random
+            if modifiers & key.MOD_SHIFT:  # Random piece
                 self.deselect_piece()
                 if self.moves:
                     self.select_piece(choice(list(self.moves.keys())))
-            if modifiers & key.MOD_ACCEL:
+            if modifiers & key.MOD_ACCEL:  # Random move
+                if self.game_over and not self.edit_mode:
+                    return
                 choices = (
                     self.moves.get(self.selected_square, [])
-                    if self.selected_square
-                    else sum(self.moves.values(), [])
+                    if self.selected_square            # Pick from moves of selected piece
+                    else sum(self.moves.values(), [])  # Pick from all possible moves
                 )
                 if choices:
                     random_move = choice(choices)
@@ -1119,4 +1243,3 @@ class Board(ColorLayer):
 
     def run(self):
         pass
-

@@ -1,13 +1,16 @@
 controls:
 LMB: select piece, move selected piece (click or drag)
 RMB: deselect piece
+F11: toggle full screen
 Ctrl + R: start game with current armies
 Shift + R: start game with random armies
 Ctrl + Shift + R: start game with default armies
 Ctrl + [-]: make window smaller (-5px/square)
-Ctrl + Shift + [-]: make window smallest (25px/square)
-Ctrl + [=]: make window bigger (+5px/square)
-Ctrl + Shift + [=]: make window biggest (100px/square)
+Shift + [-]: make window square (use smaller dimension)
+Ctrl + Shift + [-]: make window very small (25px/square)
+Ctrl + [=]: make window larger (+5px/square)
+Shift + [=]: make window square (use larger dimension)
+Ctrl + Shift + [=]: make window very large (100px/square)
 Ctrl + 0: make window regular (50px/square)
 Ctrl + W: pass turn to white player (if it's not their turn)
 Shift + W: cycle white army forward (+1)
@@ -15,6 +18,12 @@ Ctrl + Shift + W: cycle white army backward (-1)
 Ctrl + B: pass turn to black player (if it's not their turn)
 Shift + B: cycle black army forward (+1)
 Ctrl + Shift + B: cycle black army backward (-1)
+Ctrl + N: pass turn to next player
+Shift + N: cycle both armies forward (+1) if they're the same, swap otherwise
+Ctrl + Shift + N: cycle both armies backward (-1) if they're the same, swap otherwise
+Ctrl + G: reset graphics mode (colors)
+Shift + G: cycle graphics mode forward (+1)
+Ctrl + Shift + G: cycle graphics mode backward (-1)
 Ctrl + Z: undo last move (if any)
 Ctrl + Shift + Z: redo last move (if any)
 Ctrl + Y: redo last move (if any)
