@@ -378,39 +378,14 @@ class Board(ColorLayer):
 
     def show_moves(self) -> None:
         self.hide_moves()
-        if self.selected_square is None and self.not_on_board(self.hovered_square):
-            if not self.move_history:
-                return
-            move = self.move_history[-1]
-            if move is None or move.is_edit:
-                return
-            if move.pos_from is not None:
-                move_sprite = Sprite(
-                    f"assets/util/{'move' if self.not_a_piece(move.pos_from) else 'capture'}.png",
-                    position=self.get_screen_position(move.pos_from),
-                    opacity=selection_opacity
-                )
-                move_sprite.scale = default_size / move_sprite.width
-                self.move_node.add(move_sprite)
-            if move.pos_to is not None and move.pos_from != move.pos_to:
-                move_sprite = Sprite(
-                    f"assets/util/{'move' if self.not_a_piece(move.pos_to) else 'capture'}.png",
-                    position=self.get_screen_position(move.pos_to),
-                    opacity=selection_opacity
-                )
-                move_sprite.scale = default_size / move_sprite.width
-                self.move_node.add(move_sprite)
-        else:
-            pos = self.selected_square or self.hovered_square
-            if self.not_on_board(pos):
-                return
+        move_sprites = dict()
+        pos = self.selected_square or self.hovered_square
+        if not self.not_on_board(pos):
             theoretical = self.get_side(pos) == self.turn_side.opponent()
             move_dict = self.theoretical_moves if theoretical else self.moves
-            move_positions = set()
             for move in move_dict.get(pos, ()):
-                if move.pos_to in move_positions:
+                if move.pos_to in move_sprites:
                     continue
-                move_positions.add(move.pos_to)
                 move_sprite = Sprite(
                     f"assets/util/{'move' if self.not_a_piece(move.pos_to) else 'capture'}.png",
                     position=self.get_screen_position(move.pos_to),
@@ -418,10 +393,37 @@ class Board(ColorLayer):
                 )
                 move_sprite.scale = default_size / move_sprite.width
                 self.move_node.add(move_sprite)
+                move_sprites[move.pos_to] = move_sprite
+        if not self.selected_square and self.move_history:
+            move = self.move_history[-1]
+            if move is not None and not move.is_edit:
+                if move.pos_from is not None and move.pos_from != move.pos_to:
+                    if move.pos_from in move_sprites and not self.not_a_piece(move.pos_from):
+                        move_sprites[move.pos_from].opacity = selection_opacity
+                    else:
+                        move_sprite = Sprite(
+                            f"assets/util/capture.png",
+                            position=self.get_screen_position(move.pos_from),
+                            opacity=selection_opacity
+                        )
+                        move_sprite.scale = default_size / move_sprite.width
+                        self.move_node.add(move_sprite)
+                if move.pos_to is not None and not self.not_a_piece(move.pos_to):
+                    if move.pos_to in move_sprites:
+                        move_sprites[move.pos_to].opacity = selection_opacity
+                    else:
+                        move_sprite = Sprite(
+                            f"assets/util/selection.png",
+                            position=self.get_screen_position(move.pos_to),
+                            opacity=selection_opacity
+                        )
+                        move_sprite.scale = default_size / move_sprite.width
+                        self.move_node.add(move_sprite)
 
     def deselect_piece(self) -> None:
         self.selection.opacity = 0
         self.square_was_clicked = False
+        self.clicked_square = None
 
         if self.nothing_selected():
             return
@@ -439,51 +441,7 @@ class Board(ColorLayer):
         for child in list(self.move_node.get_children()):
             self.move_node.remove(child)
 
-    def on_mouse_press(self, x, y, buttons, modifiers) -> None:
-        if buttons & mouse.LEFT:
-            self.held_buttons = mouse.LEFT
-            if self.game_over and not self.edit_mode:
-                return
-            pos = self.get_board_position(x, y)
-            if self.promotion_piece:
-                if pos in self.promotion_area:
-                    self.move_history[-1].set(promotion=self.promotion_area[pos])
-                    self.replace(self.promotion_piece, self.promotion_area[pos])
-                    self.end_promotion()
-                    print(
-                        f"[{len(self.move_history)}] "
-                        f"{'Edit' if self.move_history[-1].is_edit else 'Move'}: "
-                        f"{self.move_history[-1]}"
-                    )
-                    self.advance_turn()
-                return
-            self.clicked_square = pos  # we need this in order to discern what are we dragging
-            if self.not_a_piece(pos):
-                return
-            if self.turn_side != self.get_side(pos) and not self.edit_mode:
-                return
-            if self.selected_square is not None:
-                if self.selected_square == pos:
-                    self.deselect_piece()
-                    return
-                if self.edit_mode:
-                    return
-            self.deselect_piece()  # just in case we had something previously selected
-            self.select_piece(pos)
-        if buttons & mouse.RIGHT:
-            self.held_buttons = mouse.RIGHT
-            if self.promotion_piece:
-                self.undo_last_finished_move()
-                return
-            if self.edit_mode:
-                pos = self.get_board_position(x, y)
-                if self.not_on_board(pos):
-                    return
-                self.clicked_square = pos  # we need this in order to discern what are we dragging
-                self.deselect_piece()  # just in case we had something previously selected
-
-    def on_mouse_motion(self, x, y, dx, dy) -> None:
-        pos = self.get_board_position(x + dx, y + dy)
+    def update_highlight(self, pos: Position) -> None:
         if self.clicked_square != pos:
             self.square_was_clicked = False
             self.clicked_square = None
@@ -504,8 +462,61 @@ class Board(ColorLayer):
                 elif self.promotion_piece:
                     self.hide_moves()
 
+    def on_mouse_press(self, x, y, buttons, modifiers) -> None:
+        if buttons & mouse.LEFT:
+            self.held_buttons = mouse.LEFT
+            if self.game_over and not self.edit_mode:
+                return
+            pos = self.get_board_position(x, y)
+            if self.promotion_piece:
+                if pos in self.promotion_area:
+                    self.move_history[-1].set(promotion=self.promotion_area[pos])
+                    self.replace(self.promotion_piece, self.promotion_area[pos])
+                    self.end_promotion()
+                    print(
+                        f"[{len(self.move_history)}] "
+                        f"{'Edit' if self.move_history[-1].is_edit else 'Move'}: "
+                        f"{self.move_history[-1]}"
+                    )
+                    self.advance_turn()
+                return
+            if self.selected_square is not None:
+                if self.edit_mode:
+                    if pos == self.selected_square:
+                        self.deselect_piece()
+                    else:
+                        self.square_was_clicked = True
+                        self.clicked_square = pos
+                    return
+                if pos not in {move.pos_to for move in self.moves.get(self.selected_square, ())}:
+                    self.deselect_piece()
+                    return
+            if not self.not_a_piece(pos) and (self.turn_side == self.get_side(pos) or self.edit_mode):
+                self.deselect_piece()  # just in case we had something previously selected
+                self.select_piece(pos)
+            self.square_was_clicked = True
+            self.clicked_square = pos
+        if buttons & mouse.RIGHT:
+            self.held_buttons = mouse.RIGHT
+            self.deselect_piece()
+            if self.promotion_piece:
+                self.undo_last_finished_move()
+                return
+            if self.edit_mode:
+                pos = self.get_board_position(x, y)
+                if self.not_on_board(pos):
+                    return
+                self.square_was_clicked = True
+                self.clicked_square = pos
+
+    def on_mouse_motion(self, x, y, dx, dy) -> None:
+        if not self.held_buttons:
+            pos = self.get_board_position(x + dx, y + dy)
+            self.update_highlight(pos)
+
     def on_mouse_drag(self, x, y, dx, dy, buttons, modifiers) -> None:
-        self.on_mouse_motion(x, y, dx, dy)  # move the highlight as well!
+        pos = self.get_board_position(x + dx, y + dy)
+        self.update_highlight(pos)
         if buttons & self.held_buttons & mouse.LEFT and self.selected_square is not None:
             if self.edit_mode and modifiers & key.MOD_ACCEL:
                 self.reset_position(self.get_piece(self.selected_square))
@@ -525,15 +536,15 @@ class Board(ColorLayer):
             if self.not_on_board(pos):
                 return
             move = Move(is_edit=True)
+            print(self.selected_square, pos, self.square_was_clicked)
             if held_buttons & mouse.LEFT:
                 if self.nothing_selected():
-                    return
-                if self.not_a_piece(pos):
-                    if self.square_was_clicked:
-                        self.deselect_piece()
+                    if self.square_was_clicked and self.move_history and self.move_history[-1].pos_from is None:
+                        self.select_piece(self.move_history[-1].pos_to)
+                    else:
                         return
                 if pos == self.selected_square:
-                    if self.square_was_clicked:
+                    if not self.square_was_clicked:
                         self.deselect_piece()
                     self.reset_position(self.get_piece(pos))
                     return
@@ -560,7 +571,6 @@ class Board(ColorLayer):
                         move.set(captured_piece=self.get_piece(pos))
             elif held_buttons & mouse.RIGHT:
                 if self.clicked_square != pos:
-                    self.clicked_square = None
                     self.deselect_piece()
                     return
                 if modifiers & key.MOD_ACCEL:
@@ -589,21 +599,14 @@ class Board(ColorLayer):
                     move.set(pos_from=pos, pos_to=None, piece=self.get_piece(pos))
             else:
                 return
-            selection = self.selected_square
-            self.square_was_clicked = self.clicked_square == pos
+            print(self.selected_square, pos, self.square_was_clicked)
+            selected_square = self.selected_square
             square_was_clicked = self.square_was_clicked  # we need this because self.square_was_clicked will be reset
-            self.clicked_square = None
             move.piece.move(move)
             self.move_history.append(move)
             if not self.promotion_piece:
                 print(f"[{len(self.move_history)}] Edit: {self.move_history[-1]}")
             self.advance_turn()
-            if (
-                    held_buttons & mouse.LEFT
-                    and modifiers & key.MOD_ACCEL
-                    and square_was_clicked
-            ):
-                self.select_piece(selection)
             return
         if held_buttons & mouse.RIGHT:
             self.deselect_piece()
@@ -616,20 +619,9 @@ class Board(ColorLayer):
                 return
             if self.nothing_selected():
                 return
-            selected = self.selected_square
             pos = self.get_board_position(x, y)
-            self.square_was_clicked = self.clicked_square == pos
-            self.clicked_square = None
-            if self.not_on_board(pos):
-                if self.square_was_clicked:
-                    self.deselect_piece()
-                    return
-            if pos == self.selected_square:
-                self.reset_position(self.get_piece(pos))
-                if not self.square_was_clicked:
-                    self.deselect_piece()
-            else:
-                move = self.find_move(selected, pos)
+            if self.selected_square and pos != self.selected_square:
+                move = self.find_move(self.selected_square, pos)
                 if move is None:
                     self.deselect_piece()
                     return
@@ -640,13 +632,20 @@ class Board(ColorLayer):
                 if not self.promotion_piece:
                     print(f"[{len(self.move_history)}] Move: {self.move_history[-1]}")
                 self.advance_turn()
+            else:
+                self.reset_position(self.get_piece(self.selected_square))
+                if not self.square_was_clicked:
+                    self.deselect_piece()
 
     def update_move(self, move: Move) -> None:
         move.set(piece=self.get_piece(move.pos_from))
         if move.pos_from != move.pos_to:
-            captured_piece = self.get_piece(move.pos_to)
-            if captured_piece.side != Side.NONE:
-                move.set(captured_piece=(self.en_passant_target if captured_piece.is_empty() else captured_piece))
+            new_piece = self.get_piece(move.pos_to)
+            if new_piece.side != Side.NONE:
+                if move.swapped_piece is not None:
+                    move.set(swapped_piece=new_piece)
+                else:
+                    move.set(captured_piece=(self.en_passant_target if new_piece.is_empty() else new_piece))
 
     def set_position(self, piece: abc.Piece, pos: Position) -> None:
         piece.board_pos = pos
@@ -1119,7 +1118,6 @@ class Board(ColorLayer):
         self.clicked_square = None
         self.held_buttons = 0
         self.highlight.opacity = 0
-        self.deselect_piece()
         self.show_moves()
 
     def run(self):
