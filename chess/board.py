@@ -394,7 +394,7 @@ class Board(ColorLayer):
                 move_sprite.scale = default_size / move_sprite.width
                 self.move_node.add(move_sprite)
                 move_sprites[move.pos_to] = move_sprite
-        if not self.selected_square and self.move_history:
+        if not self.selected_square and self.move_history and not self.edit_mode:
             move = self.move_history[-1]
             if move is not None and not move.is_edit:
                 if move.pos_from is not None and move.pos_from != move.pos_to:
@@ -536,7 +536,6 @@ class Board(ColorLayer):
             if self.not_on_board(pos):
                 return
             move = Move(is_edit=True)
-            print(self.selected_square, pos, self.square_was_clicked)
             if held_buttons & mouse.LEFT:
                 if self.nothing_selected():
                     if self.square_was_clicked and self.move_history and self.move_history[-1].pos_from is None:
@@ -599,9 +598,6 @@ class Board(ColorLayer):
                     move.set(pos_from=pos, pos_to=None, piece=self.get_piece(pos))
             else:
                 return
-            print(self.selected_square, pos, self.square_was_clicked)
-            selected_square = self.selected_square
-            square_was_clicked = self.square_was_clicked  # we need this because self.square_was_clicked will be reset
             move.piece.move(move)
             self.move_history.append(move)
             if not self.promotion_piece:
@@ -1061,6 +1057,7 @@ class Board(ColorLayer):
                 self.advance_turn()
                 self.moves = {}
                 self.theoretical_moves = {}
+                self.show_moves()
             else:
                 self.turn_side = self.turn_side.opponent()
                 self.advance_turn()
