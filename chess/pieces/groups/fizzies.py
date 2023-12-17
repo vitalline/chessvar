@@ -2,7 +2,7 @@ import math
 
 from chess.movement import movement
 from chess.movement.util import rot, sym, symv
-from chess.pieces.pieces import Piece
+from chess.pieces.pieces import Piece, Side
 
 
 class LRhino(Piece):
@@ -22,7 +22,7 @@ class LRhino(Piece):
                     [(1, 0), (1, 1), (0, 1), (-1, 1), (-1, 0), (-1, -1), (0, -1), (1, -1)],
                 )
             ]),
-            side == pieces.Side.WHITE
+            side == Side.WHITE
         )
 
 
@@ -43,7 +43,7 @@ class RRhino(Piece):
                     [(0, 1), (-1, 1), (-1, 0), (-1, -1), (0, -1), (1, -1), (1, 0), (1, 1)],
                 )
             ]),
-            side == pieces.Side.BLACK
+            side == Side.BLACK
         )
 
 

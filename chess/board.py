@@ -6,8 +6,9 @@ from typing import Type
 
 from arcade import key, MOUSE_BUTTON_LEFT, MOUSE_BUTTON_RIGHT, Text
 from arcade import Sprite, SpriteList, Window
-from arcade import set_background_color, start_render
+from arcade import start_render
 
+from chess.color import colors
 from chess.movement import movement
 from chess.movement.move import Move
 from chess.movement.util import Position, add
@@ -85,20 +86,8 @@ default_size = 50
 min_size = 25
 max_size = 100
 size_step = 5
-background_color = 192, 168, 144
-light_square_color = 255, 204, 153
-dark_square_color = 187, 119, 51
-promotion_background_color = 216, 192, 168
-text_color = 0, 0, 0
-piece_color = 255, 255, 255
-white_piece_color = piece_color
-black_piece_color = piece_color
-check_color = 200, 200, 200
-win_color = 225, 225, 225
-draw_color = 175, 175, 175
-loss_color = 125, 125, 125
-highlight_opacity = 25
-selection_opacity = 50
+highlight_alpha = 64
+selection_alpha = 128
 
 movements = []
 
@@ -122,18 +111,8 @@ class Board(Window):
         self.origin = self.width / 2, self.height / 2
         self.set_minimum_size((self.board_width + 2) * min_size, (self.board_height + 2) * min_size)
 
-        self.background_color = background_color
-        self.light_square_color = light_square_color
-        self.dark_square_color = dark_square_color
-        self.promotion_background_color = promotion_background_color
-        self.text_color = text_color
-        self.piece_color = piece_color
-        self.white_piece_color = white_piece_color
-        self.black_piece_color = black_piece_color
-        self.check_color = check_color
-        self.win_color = win_color
-        self.draw_color = draw_color
-        self.loss_color = loss_color
+        self.color_index = 0
+        self.background_color = colors[self.color_index]["background_color"]
 
         self.hovered_square = None  # square we are currently hovering over
         self.clicked_square = None  # square we clicked on
@@ -184,7 +163,7 @@ class Board(Window):
             'width': self.square_size / 2,
             'bold': True,
             'align': 'center',
-            'color': self.text_color,
+            'color': colors[self.color_index]["text_color"],
         }
 
         for row in range(self.board_height):
@@ -202,7 +181,7 @@ class Board(Window):
         # initialize board sprites
         for row, col in product(range(self.board_height), range(self.board_width)):
             sprite = Sprite("assets/util/square.png")
-            sprite.color = self.light_square_color if (row + col) % 2 else self.dark_square_color
+            sprite.color = colors[self.color_index]["light_square_color" if (row + col) % 2 else "dark_square_color"]
             sprite.position = self.get_screen_position((row, col))
             sprite.scale = self.square_size / sprite.texture.width
             self.board_sprite_list.append(sprite)
@@ -215,14 +194,17 @@ class Board(Window):
         for label in self.label_list:
             label.draw()
         self.board_sprite_list.draw()
-        self.highlight.draw()
-        self.selection.draw()
+        if not self.promotion_area:
+            self.highlight.draw()
+            self.selection.draw()
         self.move_sprite_list.draw()
         self.piece_sprite_list.draw()
         if self.active_piece:
             self.active_piece.draw()
         self.promotion_area_sprite_list.draw()
         self.promotion_piece_sprite_list.draw()
+        if self.promotion_area:
+            self.highlight.draw()
 
     def reset_board(self, shuffle: bool = False, update: bool = False) -> None:
         self.deselect_piece()  # you know, just in case
@@ -305,10 +287,12 @@ class Board(Window):
                     self, (row, col), piece_side
                 )
             )
-            self.pieces[row][col].color = (
-                self.white_piece_color if piece_side == Side.WHITE else
-                self.black_piece_color if piece_side == Side.BLACK else
-                self.piece_color
+            self.pieces[row][col].set_color(
+                colors[self.color_index].get(
+                    f"{self.pieces[row][col].side.file_name()}piece_color",
+                    colors[self.color_index]["piece_color"]
+                ),
+                colors[self.color_index]["colored_pieces"]
             )
             self.pieces[row][col].scale = self.square_size / self.pieces[row][col].texture.width
             self.piece_sprite_list.append(self.pieces[row][col])
@@ -373,7 +357,7 @@ class Board(Window):
 
         # set selection properties for the selected square
         self.selected_square = pos
-        self.selection.alpha = selection_opacity
+        self.selection.alpha = selection_alpha
         self.selection.position = self.get_screen_position(pos)
 
         # make the piece displayed on top of everything else
@@ -394,7 +378,7 @@ class Board(Window):
                 if move.pos_to in move_sprites:
                     continue
                 move_sprite = Sprite(f"assets/util/{'move' if self.not_a_piece(move.pos_to) else 'capture'}.png")
-                move_sprite.alpha = selection_opacity if self.selected_square else highlight_opacity
+                move_sprite.alpha = selection_alpha if self.selected_square else highlight_alpha
                 move_sprite.position = self.get_screen_position(move.pos_to)
                 move_sprite.scale = self.square_size / move_sprite.texture.width
                 self.move_sprite_list.append(move_sprite)
@@ -404,19 +388,19 @@ class Board(Window):
             if move is not None and not move.is_edit:
                 if move.pos_from is not None and move.pos_from != move.pos_to:
                     if move.pos_from in move_sprites and not self.not_a_piece(move.pos_from):
-                        move_sprites[move.pos_from].alpha = selection_opacity
+                        move_sprites[move.pos_from].alpha = selection_alpha
                     else:
                         move_sprite = Sprite("assets/util/capture.png")
-                        move_sprite.alpha = selection_opacity
+                        move_sprite.alpha = selection_alpha
                         move_sprite.position = self.get_screen_position(move.pos_from)
                         move_sprite.scale = self.square_size / move_sprite.texture.width
                         self.move_sprite_list.append(move_sprite)
                 if move.pos_to is not None and not self.not_a_piece(move.pos_to):
                     if move.pos_to in move_sprites:
-                        move_sprites[move.pos_to].alpha = selection_opacity
+                        move_sprites[move.pos_to].alpha = selection_alpha
                     else:
                         move_sprite = Sprite("assets/util/selection.png")
-                        move_sprite.alpha = selection_opacity
+                        move_sprite.alpha = selection_alpha
                         move_sprite.position = self.get_screen_position(move.pos_to)
                         move_sprite.scale = self.square_size / move_sprite.texture.width
                         self.move_sprite_list.append(move_sprite)
@@ -452,7 +436,7 @@ class Board(Window):
             else:
                 self.show_moves()
         else:
-            self.highlight.alpha = highlight_opacity
+            self.highlight.alpha = highlight_alpha
             self.highlight.position = self.get_screen_position(pos)
             if self.hovered_square != pos:
                 self.hovered_square = pos
@@ -829,7 +813,7 @@ class Board(Window):
             area_squares.append((current_row, current_col))
         for promotion, pos in zip_longest(promotions, area_squares):
             background_sprite = Sprite("assets/util/square.png")
-            background_sprite.color = self.promotion_background_color
+            background_sprite.color = colors[self.color_index]["promotion_area_color"]
             background_sprite.position = self.get_screen_position(pos)
             background_sprite.scale = self.square_size / background_sprite.texture.width
             self.promotion_area_sprite_list.append(background_sprite)
@@ -843,9 +827,8 @@ class Board(Window):
     def end_promotion(self) -> None:
         self.promotion_piece = None
         self.promotion_area = {}
-        for node in (self.promotion_area_sprite_list, self.promotion_piece_sprite_list):
-            for sprite in node:
-                node.remove(sprite)
+        self.promotion_area_sprite_list.clear()
+        self.promotion_piece_sprite_list.clear()
 
     def replace(
             self, piece: abc.Piece, new_type: Type[abc.Piece | abc.PromotablePiece], new_side: Side | None = None
@@ -859,10 +842,12 @@ class Board(Window):
             promotions=self.promotions[new_side],
             promotion_squares=promotion_squares[new_side],
         ) if issubclass(new_type, abc.PromotablePiece) else new_type(self, pos, new_side)
-        self.pieces[pos[0]][pos[1]].color = (
-            self.white_piece_color if new_side == Side.WHITE else
-            self.black_piece_color if new_side == Side.BLACK else
-            self.piece_color
+        self.pieces[pos[0]][pos[1]].set_color(
+            colors[self.color_index].get(
+                f"{new_side.file_name()}piece_color",
+                colors[self.color_index]["piece_color"]
+            ),
+            colors[self.color_index]["colored_pieces"]
         )
         self.pieces[pos[0]][pos[1]].scale = self.square_size / self.pieces[pos[0]][pos[1]].texture.width
         self.piece_sprite_list.append(self.pieces[pos[0]][pos[1]])
@@ -872,10 +857,13 @@ class Board(Window):
 
     def color_pieces(self, side: Side = Side.ANY, color: tuple[int, int, int] | None = None) -> None:
         for piece in self.movable_pieces.get(side, sum(self.movable_pieces.values(), [])):
-            piece.color = color or (
-                self.white_piece_color if piece.side == Side.WHITE else
-                self.black_piece_color if piece.side == Side.BLACK else
-                self.piece_color
+            piece.set_color(
+                color if color is not None else
+                colors[self.color_index].get(
+                    f"{piece.side.file_name()}piece_color",
+                    colors[self.color_index]["piece_color"]
+                ),
+                colors[self.color_index]["colored_pieces"]
             )
 
     def advance_turn(self) -> None:
@@ -912,51 +900,83 @@ class Board(Window):
             # the game has ended. let's find out who won and show it by changing piece colors... unless edit mode is on!
             if pass_check_side != Side.NONE:
                 # the last player was in check and passed the turn, the game ends and the current player wins
-                self.color_pieces(pass_check_side, self.loss_color)
-                self.color_pieces(pass_check_side.opponent(), self.win_color)
                 print(f"[{len(self.move_history)}] Game over! {pass_check_side.opponent().name()} wins.")
             elif self.check_side != Side.NONE:
                 # the current player was checkmated, the game ends and the opponent wins
-                self.color_pieces(self.check_side, self.loss_color)
-                self.color_pieces(self.check_side.opponent(), self.win_color)
                 print(f"[{len(self.move_history)}] Checkmate! {self.check_side.opponent().name()} wins.")
             else:
                 # the current player was stalemated, the game ends in a draw
-                self.color_pieces(color=self.draw_color)
                 print(f"[{len(self.move_history)}] Stalemate! It's a draw.")
         else:
             if self.check_side != Side.NONE:
                 # the game is still going, but the current player is in check
-                self.color_pieces(self.check_side, self.check_color)
-                self.color_pieces(self.check_side.opponent())
                 print(f"[{len(self.move_history)}] {self.check_side.name()} is in check!")
             else:
                 # the game is still going and there is no check
-                self.color_pieces()
+                pass
+        self.color_all_pieces()
 
     def update_colors(self) -> None:
-        set_background_color(self.background_color)
+        self.background_color = colors[self.color_index]["background_color"]
+        for sprite in self.label_list:
+            sprite.color = colors[self.color_index]["text_color"]
         for sprite in self.board_sprite_list:
             color = sum(self.get_board_position(sprite.position)) % 2
-            sprite.color = self.light_square_color if color else self.dark_square_color
+            sprite.color = colors[self.color_index]["light_square_color" if color else "dark_square_color"]
         for sprite in self.promotion_area_sprite_list:
-            sprite.color = self.promotion_background_color
+            sprite.color = colors[self.color_index]["promotion_background_color"]
         for sprite in self.promotion_piece_sprite_list:
             if isinstance(sprite, abc.Piece):
-                sprite.color = (
-                    self.white_piece_color if sprite.side == Side.WHITE else
-                    self.black_piece_color if sprite.side == Side.BLACK else
-                    self.piece_color
+                sprite.set_color(
+                    colors[self.color_index].get(
+                        f"{sprite.side.file_name()}piece_color",
+                        colors[self.color_index]["piece_color"]
+                    ),
+                    colors[self.color_index]["colored_pieces"]
                 )
+        self.color_all_pieces()
+
+    def color_all_pieces(self) -> None:
         if self.game_over:
             if self.check_side != Side.NONE:
-                self.color_pieces(self.check_side, self.loss_color)
-                self.color_pieces(self.check_side.opponent(), self.win_color)
+                self.color_pieces(
+                    self.check_side,
+                    colors[self.color_index].get(
+                        f"{self.check_side.file_name()}loss_color",
+                        colors[self.color_index]["loss_color"]
+                    ),
+                )
+                self.color_pieces(
+                    self.check_side.opponent(),
+                    colors[self.color_index].get(
+                        f"{self.check_side.opponent().file_name()}win_color",
+                        colors[self.color_index]["win_color"]
+                    ),
+                )
             else:
-                self.color_pieces(color=self.draw_color)
+                self.color_pieces(
+                    Side.WHITE,
+                    colors[self.color_index].get(
+                        f"{Side.WHITE.file_name()}draw_color",
+                        colors[self.color_index]["draw_color"]
+                    ),
+                )
+                self.color_pieces(
+                    Side.BLACK,
+                    colors[self.color_index].get(
+                        f"{Side.BLACK.file_name()}draw_color",
+                        colors[self.color_index]["draw_color"]
+                    ),
+                )
         else:
             if self.check_side != Side.NONE:
-                self.color_pieces(self.check_side, self.check_color)
+                self.color_pieces(
+                    self.check_side,
+                    colors[self.color_index].get(
+                        f"{self.check_side.file_name()}check_color",
+                        colors[self.color_index]["check_color"]
+                    ),
+                )
                 self.color_pieces(self.check_side.opponent())
             else:
                 self.color_pieces()
@@ -1157,40 +1177,11 @@ class Board(Window):
                 self.reset_board(update=True)
         if symbol == key.G:  # Graphics
             if modifiers & key.MOD_ACCEL and not modifiers & key.MOD_SHIFT:  # Graphics reset
-                # Oh god, it's the initialization part all over again
-                self.background_color = background_color
-                self.light_square_color = light_square_color
-                self.dark_square_color = dark_square_color
-                self.promotion_background_color = promotion_background_color
-                self.text_color = text_color
-                self.piece_color = piece_color
-                self.white_piece_color = white_piece_color
-                self.black_piece_color = black_piece_color
-                self.check_color = check_color
-                self.win_color = win_color
-                self.loss_color = loss_color
-                self.draw_color = draw_color
+                self.color_index = 0
                 self.update_colors()
-                # So thank god that's over! Haha... it's over, right? There's not... there's not more, right? I mean-
             elif modifiers & key.MOD_SHIFT:  # Graphics shift
-                # OH GOD, IT'S THE INITIALIZATION PART ALL OVER AGAIN
-                d = -1 if modifiers & key.MOD_ACCEL else 1
-                self.background_color = tuple(self.background_color[(i - d) % 3] for i in range(3))
-                self.light_square_color = tuple(self.light_square_color[(i - d) % 3] for i in range(3))
-                self.dark_square_color = tuple(self.dark_square_color[(i - d) % 3] for i in range(3))
-                self.promotion_background_color = tuple(self.promotion_background_color[(i - d) % 3] for i in range(3))
-                self.text_color = tuple(self.text_color[(i - d) % 3] for i in range(3))
-                self.piece_color = tuple(self.piece_color[(i - d) % 3] for i in range(3))
-                self.white_piece_color = tuple(self.white_piece_color[(i - d) % 3] for i in range(3))
-                self.black_piece_color = tuple(self.black_piece_color[(i - d) % 3] for i in range(3))
-                self.check_color = tuple(self.check_color[(i - d) % 3] for i in range(3))
-                self.win_color = tuple(self.win_color[(i - d) % 3] for i in range(3))
-                self.loss_color = tuple(self.loss_color[(i - d) % 3] for i in range(3))
-                self.draw_color = tuple(self.draw_color[(i - d) % 3] for i in range(3))
+                self.color_index = (self.color_index + (-1 if modifiers & key.MOD_ACCEL else 1)) % len(colors)
                 self.update_colors()
-                # Ok, jokes aside, I wish I could just do this with a for loop, or any other concise and readable way
-                # But I thought storing the colors as like 10 separate variables would be a good idea, so here we are
-                # Maybe I'll change it later, but for now, I'll just leave it like this. But hey, at least it's funny
         if symbol == key.Z and modifiers & key.MOD_ACCEL:  # Undo
             if modifiers & key.MOD_SHIFT:  # Unless Ctrl+Shift+Z, then redo
                 self.redo_last_finished_move()

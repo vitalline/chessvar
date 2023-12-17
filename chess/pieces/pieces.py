@@ -4,7 +4,7 @@ from copy import copy
 from enum import Enum
 from typing import TYPE_CHECKING, Type
 
-from arcade import Sprite
+from arcade import Color, Sprite, load_texture
 
 from chess.movement.move import Move
 from chess.movement.util import AnyDirection, Position
@@ -101,6 +101,29 @@ class Piece(Sprite):
         clone.scale = self.scale
         clone.flipped_horizontally = self.flipped_horizontally
         return clone
+
+    def set_color(self, color: Color, force_color: bool = False):
+        if not self.name:
+            return
+        side = Side.WHITE if force_color else Side.NONE
+        if side == Side.NONE:
+            if max(color) != min(color):  # if color is not grayscale
+                if max(self.color) == min(self.color):  # but was grayscale
+                    side = Side.WHITE  # make piece white so that it can be colored
+            if max(color) == min(color):  # if color is grayscale
+                if max(self.color) != min(self.color):  # but was not grayscale
+                    side = self.side  # make piece match the side
+        new_texture = None
+        if side != Side.NONE:  # if side was defined and does not match the current texture
+            if self.texture.name != f"assets/{self.asset_folder}/{side.file_name()}{self.file_name}.png":
+                new_texture = load_texture(  # make piece match the side
+                    f"assets/{self.asset_folder}/{side.file_name()}{self.file_name}.png",
+                    flipped_horizontally=self.flipped_horizontally,
+                    flipped_vertically=self.flipped_vertically,
+                )
+        if new_texture is not None:
+            self.texture = new_texture
+        self.color = color
 
 
 class PromotablePiece(Piece):
