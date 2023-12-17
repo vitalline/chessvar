@@ -1,9 +1,9 @@
 from chess.movement import movement
 from chess.movement.util import rot
-from chess.pieces import pieces
+from chess.pieces.pieces import Piece, Side
 
 
-class LGriffon(pieces.Piece):
+class LGriffon(Piece):
     name = 'Left Griffon'
     file_name = 'griffin'
     asset_folder = 'fantasy'
@@ -19,14 +19,12 @@ class LGriffon(pieces.Piece):
                     [(1, 1), (-1, 1), (-1, -1), (1, -1)],
                     [(1, 0), (0, 1), (-1, 0), (0, -1)],
                 )
-            ])
+            ]),
+            side == Side.BLACK
         )
-        if side == pieces.Side.BLACK:
-            self.scale_x = -1
-            self.rotation = 180
 
 
-class RGriffon(pieces.Piece):
+class RGriffon(Piece):
     name = 'Right Griffon'
     file_name = 'griffin'
     asset_folder = 'fantasy'
@@ -42,14 +40,12 @@ class RGriffon(pieces.Piece):
                     [(1, 1), (-1, 1), (-1, -1), (1, -1)],
                     [(0, 1), (-1, 0), (0, -1), (1, 0)],
                 )
-            ])
+            ]),
+            side == Side.WHITE
         )
-        if side == pieces.Side.WHITE:
-            self.scale_x = -1
-            self.rotation = 180
 
 
-class LAanca(pieces.Piece):
+class LAanca(Piece):
     name = 'Left Aanca'
     file_name = 'celtic_nauthiz'
     asset_folder = 'celtic'
@@ -65,14 +61,12 @@ class LAanca(pieces.Piece):
                     [(1, 0), (0, 1), (-1, 0), (0, -1)],
                     [(1, -1), (1, 1), (-1, 1), (-1, -1)],
                 )
-            ])
+            ]),
+            side == Side.WHITE
         )
-        if side == pieces.Side.WHITE:
-            self.scale_x = -1
-            self.rotation = 180
 
 
-class RAanca(pieces.Piece):
+class RAanca(Piece):
     name = 'Right Aanca'
     file_name = 'celtic_nauthiz'
     asset_folder = 'celtic'
@@ -88,14 +82,12 @@ class RAanca(pieces.Piece):
                     [(1, 0), (0, 1), (-1, 0), (0, -1)],
                     [(1, 1), (-1, 1), (-1, -1), (1, -1)],
                 )
-            ])
+            ]),
+            side == Side.BLACK
         )
-        if side == pieces.Side.BLACK:
-            self.scale_x = -1
-            self.rotation = 180
 
 
-class LSastik(pieces.Piece):
+class LSastik(Piece):
     name = 'Left Sastik'
     file_name = 'celtic_eiwaz'
     asset_folder = 'celtic'
@@ -103,14 +95,12 @@ class LSastik(pieces.Piece):
     def __init__(self, board, board_pos, side):
         super().__init__(
             board, board_pos, side,
-            movement.RiderMovement(board, rot([(2, 0, 1), (2, -1, 1)]))
+            movement.RiderMovement(board, rot([(2, 0, 1), (2, -1, 1)])),
+            side == Side.WHITE
         )
-        if side == pieces.Side.WHITE:
-            self.scale_x = -1
-            self.rotation = 180
 
 
-class RSastik(pieces.Piece):
+class RSastik(Piece):
     name = 'Right Sastik'
     file_name = 'celtic_eiwaz'
     asset_folder = 'celtic'
@@ -118,14 +108,12 @@ class RSastik(pieces.Piece):
     def __init__(self, board, board_pos, side):
         super().__init__(
             board, board_pos, side,
-            movement.RiderMovement(board, rot([(2, 0, 1), (2, 1, 1)]))
+            movement.RiderMovement(board, rot([(2, 0, 1), (2, 1, 1)])),
+            side == Side.BLACK
         )
-        if side == pieces.Side.BLACK:
-            self.scale_x = -1
-            self.rotation = 180
 
 
-class Griffon(pieces.Piece):
+class Griffon(Piece):
     name = 'Griffon'
     file_name = 'manticore'
     asset_folder = 'fantasy'

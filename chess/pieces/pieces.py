@@ -4,7 +4,7 @@ from copy import copy
 from enum import Enum
 from typing import TYPE_CHECKING, Type
 
-from cocos.sprite import Sprite
+from arcade import Sprite
 
 from chess.movement.move import Move
 from chess.movement.util import AnyDirection, Position
@@ -68,13 +68,21 @@ class Piece(Sprite):
             board: Board,
             board_pos: Position | None = None,
             side: Side = Side.NONE,
-            movement: BaseMovement | None = None
+            movement: BaseMovement | None = None,
+            flipped_horizontally: bool = False,
+            flipped_vertically: bool = False
     ):
         self.board = board
         self.board_pos = board_pos
         self.side = side
         self.movement = movement if movement is not None else BaseMovement(board)
-        super().__init__(f"assets/{self.asset_folder}/{self.side.file_name()}{self.file_name}.png")
+        self.flipped_horizontally = flipped_horizontally
+        self.flipped_vertically = flipped_vertically
+        super().__init__(
+            f"assets/{self.asset_folder}/{self.side.file_name()}{self.file_name}.png",
+            flipped_horizontally=self.flipped_horizontally,
+            flipped_vertically=self.flipped_vertically,
+        )
         if self.board_pos is not None:
             self.position = self.board.get_screen_position(self.board_pos)
 
@@ -91,8 +99,7 @@ class Piece(Sprite):
         clone = type(self)(self.board, self.board_pos, self.side)
         clone.movement = copy(self.movement)
         clone.scale = self.scale
-        clone.scale_x = self.scale_x
-        clone.rotation = self.rotation
+        clone.flipped_horizontally = self.flipped_horizontally
         return clone
 
 

@@ -1,9 +1,9 @@
 from chess.movement import movement
 from chess.movement.util import rot
-from chess.pieces import pieces
+from chess.pieces.pieces import Piece
 
 
-class Forfer(pieces.Piece):
+class Forfer(Piece):
     name = 'Forfer'
     file_name = 'fortress'
     asset_folder = 'medieval'
@@ -15,7 +15,7 @@ class Forfer(pieces.Piece):
         )
 
 
-class B4nD(pieces.Piece):
+class B4nD(Piece):
     name = 'B4nD'
     file_name = 'pylon'
     asset_folder = 'fantasy'
@@ -27,7 +27,7 @@ class B4nD(pieces.Piece):
         )
 
 
-class N2R4(pieces.Piece):
+class N2R4(Piece):
     name = 'N2R4'
     file_name = 'sun'
     asset_folder = 'helios'

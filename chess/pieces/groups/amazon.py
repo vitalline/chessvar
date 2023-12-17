@@ -1,9 +1,9 @@
 from chess.movement import movement
 from chess.movement.util import rot
-from chess.pieces import pieces
+from chess.pieces.pieces import Piece
 
 
-class Amazon(pieces.Piece):
+class Amazon(Piece):
     name = 'Amazon'
     file_name = 'centaur_queen'
     asset_folder = 'centaur'

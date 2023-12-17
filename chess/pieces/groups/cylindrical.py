@@ -1,9 +1,9 @@
 from chess.movement import movement
 from chess.movement.util import rot, sym
-from chess.pieces import pieces
+from chess.pieces.pieces import Piece
 
 
-class CyWaffle(pieces.Piece):
+class CyWaffle(Piece):
     name = 'Cylindrical Waffle'
     file_name = 'sorcerer2'
     asset_folder = 'other'
@@ -15,7 +15,7 @@ class CyWaffle(pieces.Piece):
         )
 
 
-class CyKnight(pieces.Piece):
+class CyKnight(Piece):
     name = 'Cylindrical Knight'
     file_name = 'knight2'
     asset_folder = 'classic2'
@@ -27,7 +27,7 @@ class CyKnight(pieces.Piece):
         )
 
 
-class CyBishop(pieces.Piece):
+class CyBishop(Piece):
     name = 'Cylindrical Bishop'
     file_name = 'bishop2'
     asset_folder = 'classic2'
@@ -39,7 +39,7 @@ class CyBishop(pieces.Piece):
         )
 
 
-class CyChancellor(pieces.Piece):
+class CyChancellor(Piece):
     name = 'Cylindrical Chancellor'
     file_name = 'chancellor2'
     asset_folder = 'other'

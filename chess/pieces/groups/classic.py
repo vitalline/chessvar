@@ -1,9 +1,9 @@
 from chess.movement import movement
 from chess.movement.util import rot, sym
-from chess.pieces import pieces
+from chess.pieces.pieces import Piece, PromotablePiece, RoyalPiece
 
 
-class Rook(pieces.Piece):
+class Rook(Piece):
     name = 'Rook'
     file_name = 'rook'
     asset_folder = 'classic'
@@ -15,7 +15,7 @@ class Rook(pieces.Piece):
         )
 
 
-class Knight(pieces.Piece):
+class Knight(Piece):
     name = 'Knight'
     file_name = 'knight'
     asset_folder = 'classic'
@@ -27,7 +27,7 @@ class Knight(pieces.Piece):
         )
 
 
-class Bishop(pieces.Piece):
+class Bishop(Piece):
     name = 'Bishop'
     file_name = 'bishop'
     asset_folder = 'classic'
@@ -39,7 +39,7 @@ class Bishop(pieces.Piece):
         )
 
 
-class Queen(pieces.Piece):
+class Queen(Piece):
     name = 'Queen'
     file_name = 'queen'
     asset_folder = 'classic'
@@ -51,7 +51,7 @@ class Queen(pieces.Piece):
         )
 
 
-class King(pieces.RoyalPiece):
+class King(RoyalPiece):
     name = 'King'
     file_name = 'king'
     asset_folder = 'classic'
@@ -69,7 +69,7 @@ class King(pieces.RoyalPiece):
         )
 
 
-class Pawn(pieces.PromotablePiece):
+class Pawn(PromotablePiece):
     name = 'Pawn'
     file_name = 'pawn'
     asset_folder = 'classic'

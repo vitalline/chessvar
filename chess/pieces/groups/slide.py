@@ -1,9 +1,9 @@
 from chess.movement import movement
 from chess.movement.util import rot
-from chess.pieces import pieces
+from chess.pieces.pieces import Piece
 
 
-class LameDuck(pieces.Piece):
+class LameDuck(Piece):
     name = 'Lame Duck'
     file_name = 'zora_rook'
     asset_folder = 'zora'
@@ -15,7 +15,7 @@ class LameDuck(pieces.Piece):
         )
 
 
-class Diamond(pieces.Piece):
+class Diamond(Piece):
     name = 'Diamond'
     file_name = 'rhombus'
     asset_folder = 'geometry'
@@ -27,7 +27,7 @@ class Diamond(pieces.Piece):
         )
 
 
-class Onyx(pieces.Piece):
+class Onyx(Piece):
     name = 'Onyx'
     file_name = 'circles'
     asset_folder = 'geometry'
@@ -39,7 +39,7 @@ class Onyx(pieces.Piece):
         )
 
 
-class Squire(pieces.Piece):
+class Squire(Piece):
     name = 'Squire'
     file_name = 'woodland_queen'
     asset_folder = 'woodland'

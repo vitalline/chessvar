@@ -1,9 +1,9 @@
 from chess.movement import movement
 from chess.movement.util import rot, sym
-from chess.pieces import pieces
+from chess.pieces.pieces import Piece
 
 
-class Panda(pieces.Piece):
+class Panda(Piece):
     name = 'Panda'
     file_name = 'paladin'
     asset_folder = 'medieval'
@@ -20,7 +20,7 @@ class Panda(pieces.Piece):
         )
 
 
-class Marquis(pieces.Piece):
+class Marquis(Piece):
     name = 'Marquis'
     file_name = 'tailor'
     asset_folder = 'medieval'
@@ -32,7 +32,7 @@ class Marquis(pieces.Piece):
         )
 
 
-class Unicorn(pieces.Piece):
+class Unicorn(Piece):
     name = 'Unicorn'
     file_name = 'unicorn'
     asset_folder = 'fantasy'
@@ -49,7 +49,7 @@ class Unicorn(pieces.Piece):
         )
 
 
-class ErlQueen(pieces.Piece):
+class ErlQueen(Piece):
     name = 'Erl Queen'
     file_name = 'minister'
     asset_folder = 'medieval'

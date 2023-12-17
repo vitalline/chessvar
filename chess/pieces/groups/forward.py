@@ -1,9 +1,9 @@
 from chess.movement import movement
 from chess.movement.util import symv
-from chess.pieces import pieces
+from chess.pieces.pieces import Piece
 
 
-class Knishop(pieces.Piece):
+class Knishop(Piece):
     name = 'Knishop'
     file_name = 'jester'
     asset_folder = 'medieval'
@@ -15,7 +15,7 @@ class Knishop(pieces.Piece):
         )
 
 
-class Bishight(pieces.Piece):
+class Bishight(Piece):
     name = 'Bishight'
     file_name = 'priest'
     asset_folder = 'medieval'
@@ -27,7 +27,7 @@ class Bishight(pieces.Piece):
         )
 
 
-class Forequeen(pieces.Piece):
+class Forequeen(Piece):
     name = 'Forequeen'
     file_name = 'pasha'
     asset_folder = 'medieval'

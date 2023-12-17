@@ -1,5 +1,7 @@
-/assets/old/
 /build/
-/venv/
+/cx_dist/
 /dist/
-/tutorials/
+/main.build/
+/main.dist/
+/venv/
+*.spec

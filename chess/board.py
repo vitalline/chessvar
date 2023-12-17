@@ -4,15 +4,9 @@ from math import ceil, sqrt
 from random import choice
 from typing import Type
 
-from cocos.batch import BatchNode
-from cocos.director import director
-from cocos.layer import ColorLayer
-from cocos.scene import Scene
-from cocos.sprite import Sprite
-from cocos.text import Label
-
-from pyglet.gl import glClearColor
-from pyglet.window import key, mouse
+from arcade import key, MOUSE_BUTTON_LEFT, MOUSE_BUTTON_RIGHT, Text
+from arcade import Sprite, SpriteList, Window
+from arcade import set_background_color, start_render
 
 from chess.movement import movement
 from chess.movement.move import Move
@@ -95,6 +89,7 @@ background_color = 192, 168, 144
 light_square_color = 255, 204, 153
 dark_square_color = 187, 119, 51
 promotion_background_color = 216, 192, 168
+text_color = 0, 0, 0
 piece_color = 255, 255, 255
 white_piece_color = piece_color
 black_piece_color = piece_color
@@ -108,17 +103,30 @@ selection_opacity = 50
 movements = []
 
 
-class Board(ColorLayer):
+class Board(Window):
 
     def __init__(self):
         # super boring initialization stuff (bluh bluh)
         self.board_width, self.board_height = board_width, board_height
-        self.size = default_size
+        self.square_size = default_size
+
+        super().__init__(
+            width=(self.board_width + 2) * self.square_size,
+            height=(self.board_height + 2) * self.square_size,
+            title='Chess',
+            resizable=True,
+            vsync=True,
+            center_window=True,
+        )
+
+        self.origin = self.width / 2, self.height / 2
+        self.set_minimum_size((self.board_width + 2) * min_size, (self.board_height + 2) * min_size)
 
         self.background_color = background_color
         self.light_square_color = light_square_color
         self.dark_square_color = dark_square_color
         self.promotion_background_color = promotion_background_color
+        self.text_color = text_color
         self.piece_color = piece_color
         self.white_piece_color = white_piece_color
         self.black_piece_color = black_piece_color
@@ -126,25 +134,6 @@ class Board(ColorLayer):
         self.win_color = win_color
         self.draw_color = draw_color
         self.loss_color = loss_color
-
-        self.is_event_handler = True  # allow the layer to receive events
-        # remove fixed aspect ratio because there's no point in having it
-        # the strips of void on both sides will have the background color
-        # and the board will be centered and scaled to fit the window too
-        director.post_resize_adjust = lambda _: None
-        director.init(
-            width=(self.board_width + 2) * self.size,
-            height=(self.board_height + 2) * self.size,
-            caption='Chess',
-            autoscale=True,
-            resizable=True,
-        )
-        super().__init__(*self.background_color, 1000)  # set background color of the layer
-        glClearColor(*(c / 255 for c in self.background_color), 1)  # set background color of the window
-        # remove default key combinations to not clash with our custom ones
-        director.window.remove_handlers(director._default_event_handler)
-        # set a minimum window size so that you can't just make a zero pixels tall window and crash the program
-        director.window.set_minimum_size((self.board_width + 2) * min_size, (self.board_height + 2) * min_size)
 
         self.hovered_square = None  # square we are currently hovering over
         self.clicked_square = None  # square we clicked on
@@ -169,78 +158,71 @@ class Board(ColorLayer):
         self.movable_pieces = {Side.WHITE: [], Side.BLACK: []}  # pieces that can be moved by each side
         self.royal_pieces = {Side.WHITE: [], Side.BLACK: []}  # these have to stay on the board and should be protected
         self.quasi_royal_pieces = {Side.WHITE: [], Side.BLACK: []}  # at least one of these has to stay on the board
-        self.board_sprites = []  # sprites for the board squares
-        self.row_labels = []  # labels for the rows
-        self.col_labels = []  # labels for the columns
         self.moves = {}  # dictionary of valid moves from any square that has a movable piece on it
         self.theoretical_moves = {}  # dictionary of theoretical moves from any square that has an opposing piece on it
         self.anchor = 0, 0  # used to have the board scale from the origin instead of the center
-        self.board = BatchNode()  # node for the board sprites
-        self.highlight = Sprite("assets/util/selection.png", opacity=0)  # sprite for the highlight marker
-        self.highlight.scale = self.size / self.highlight.width  # scale it to the size of a square
-        self.selection = Sprite("assets/util/selection.png", opacity=0)  # sprite for the selection marker
-        self.selection.scale = self.size / self.selection.width  # scale it to the size of a square
-        self.move_node = BatchNode()  # node for the move markers
-        self.piece_node = BatchNode()  # node for the piece sprites
-        self.active_piece_node = BatchNode()  # node for the selected piece
-        self.promotion_area_node = BatchNode()  # node for the promotion area background tiles
-        self.promotion_piece_node = BatchNode()  # node for the possible promotion pieces
-
-        # let's add it all together shall we
-        self.add(self.board, z=1)
-        self.add(self.highlight, z=2)
-        self.add(self.selection, z=3)
-        self.add(self.move_node, z=4)
-        self.add(self.piece_node, z=5)
-        self.add(self.active_piece_node, z=6)
-        self.add(self.promotion_area_node, z=7)
-        self.add(self.promotion_piece_node, z=8)
+        self.highlight = Sprite("assets/util/selection.png")  # sprite for the highlight marker
+        self.highlight.alpha = 0
+        self.highlight.scale = self.square_size / self.highlight.texture.width  # scale it to the size of a square
+        self.selection = Sprite("assets/util/selection.png")  # sprite for the selection marker
+        self.selection.alpha = 0
+        self.selection.scale = self.square_size / self.selection.texture.width  # scale it to the size of a square
+        self.active_piece = None  # piece that is currently being moved
+        self.label_list = []  # labels for the rows and columns
+        self.board_sprite_list = SpriteList()  # sprites for the board squares
+        self.move_sprite_list = SpriteList()  # sprites for the move markers
+        self.piece_sprite_list = SpriteList()  # sprites for the piece sprites
+        self.promotion_area_sprite_list = SpriteList()  # sprites for the promotion area background tiles
+        self.promotion_piece_sprite_list = SpriteList()  # sprites for the possible promotion pieces
 
         # initialize row/column labels
         label_kwargs = {
+            'anchor_x': 'center',
+            'anchor_y': 'center',
             'font_name': 'Courier New',
-            'font_size': default_size * 0.5,
+            'font_size': self.square_size / 2,
+            'width': self.square_size / 2,
             'bold': True,
-            'color': (0, 0, 0, 1000)
+            'align': 'center',
+            'color': self.text_color,
         }
 
         for row in range(self.board_height):
-            self.row_labels += [
-                Label(str(row + 1), self.get_screen_position((row, -0.9)),
-                      anchor_x='center', anchor_y='center', **label_kwargs),
-                Label(str(row + 1), self.get_screen_position((row, board_width - 0.1)),
-                      anchor_x='center', anchor_y='center', **label_kwargs),
-            ]
+            self.label_list.extend([
+                Text(str(row + 1), *self.get_screen_position((row, -1)), **label_kwargs),
+                Text(str(row + 1), *self.get_screen_position((row, board_width)), **label_kwargs)
+            ])
 
         for col in range(self.board_width):
-            self.col_labels += [
-                Label(chr(col + ord('a')), self.get_screen_position((-0.9, col)),
-                      anchor_x='center', anchor_y='center', **label_kwargs),
-                Label(chr(col + ord('a')), self.get_screen_position((board_height - 0.1, col)),
-                      anchor_x='center', anchor_y='center', **label_kwargs),
-            ]
-
-        for label in self.row_labels + self.col_labels:
-            label.scale = 0.8
-            self.add(label, z=1)
+            self.label_list.extend([
+                Text(chr(col + ord('a')), *self.get_screen_position((-1, col)), **label_kwargs),
+                Text(chr(col + ord('a')), *self.get_screen_position((board_height, col)), **label_kwargs),
+            ])
 
         # initialize board sprites
-        for row in range(self.board_height):
-            self.board_sprites += [[]]
-
         for row, col in product(range(self.board_height), range(self.board_width)):
-
-            self.board_sprites[row].append(Sprite("assets/util/cell.png"))
-            self.board_sprites[row][col].position = self.get_screen_position((row, col))
-            self.board_sprites[row][col].color = self.light_square_color if (row + col) % 2 else self.dark_square_color
-            self.board_sprites[row][col].scale = default_size / self.board_sprites[row][col].width
-            self.board.add(self.board_sprites[row][col])
+            sprite = Sprite("assets/util/square.png")
+            sprite.color = self.light_square_color if (row + col) % 2 else self.dark_square_color
+            sprite.position = self.get_screen_position((row, col))
+            sprite.scale = self.square_size / sprite.texture.width
+            self.board_sprite_list.append(sprite)
 
         # set up pieces on the board
         self.reset_board(update=True)
 
-        # it's showtime
-        director.run(Scene(self))
+    def on_draw(self):
+        start_render()
+        for label in self.label_list:
+            label.draw()
+        self.board_sprite_list.draw()
+        self.highlight.draw()
+        self.selection.draw()
+        self.move_sprite_list.draw()
+        self.piece_sprite_list.draw()
+        if self.active_piece:
+            self.active_piece.draw()
+        self.promotion_area_sprite_list.draw()
+        self.promotion_piece_sprite_list.draw()
 
     def reset_board(self, shuffle: bool = False, update: bool = False) -> None:
         self.deselect_piece()  # you know, just in case
@@ -248,8 +230,10 @@ class Board(ColorLayer):
         self.game_over = False
         self.edit_mode = False
 
-        for sprite in self.piece_node.get_children():
-            self.piece_node.remove(sprite)
+        self.piece_sprite_list.clear()
+
+        for sprite in self.piece_sprite_list:
+            self.piece_sprite_list.remove(sprite)
 
         if shuffle:
             self.piece_sets = {side: choice(list(piece_groups.keys())) for side in self.piece_sets}
@@ -326,25 +310,36 @@ class Board(ColorLayer):
                 self.black_piece_color if piece_side == Side.BLACK else
                 self.piece_color
             )
-            self.pieces[row][col].scale = default_size / self.pieces[row][col].width
-            self.piece_node.add(self.pieces[row][col])
+            self.pieces[row][col].scale = self.square_size / self.pieces[row][col].texture.width
+            self.piece_sprite_list.append(self.pieces[row][col])
 
         self.load_all_moves()
         self.show_moves()
 
-    def get_board_position(self, x: float, y: float) -> Position:
-        window_width, window_height = director.get_window_size()
-        x, y = director.get_virtual_coordinates(x, y)
-        col = round((x - window_width / 2) / default_size + (self.board_width - 1) / 2)
-        row = round((y - window_height / 2) / default_size + (self.board_height - 1) / 2)
+    def get_board_position(
+            self,
+            pos: tuple[float, float],
+            size: float = 0,
+            origin: tuple[float, float] | None = None
+    ) -> Position:
+        x, y = pos
+        size = size or self.square_size
+        origin = origin or self.origin
+        col = round((x - origin[0]) / size + (self.board_width - 1) / 2)
+        row = round((y - origin[1]) / size + (self.board_height - 1) / 2)
         return row, col
 
-    def get_screen_position(self, pos: tuple[float, float]) -> tuple[float, float]:
-        window_width = (self.board_width + 2) * default_size
-        window_height = (self.board_height + 2) * default_size
+    def get_screen_position(
+            self,
+            pos: tuple[float, float],
+            size: float = 0,
+            origin: tuple[float, float] | None = None
+    ) -> tuple[float, float]:
         row, col = pos
-        x = (col - (self.board_width - 1) / 2) * default_size + window_width / 2
-        y = (row - (self.board_height - 1) / 2) * default_size + window_height / 2
+        size = size or self.square_size
+        origin = origin or self.origin
+        x = (col - (self.board_width - 1) / 2) * size + origin[0]
+        y = (row - (self.board_height - 1) / 2) * size + origin[1]
         return x, y
 
     # From now on we shall unanimously assume that the first coordinate corresponds to row number (AKA vertical axis).
@@ -378,13 +373,13 @@ class Board(ColorLayer):
 
         # set selection properties for the selected square
         self.selected_square = pos
-        self.selection.opacity = selection_opacity
+        self.selection.alpha = selection_opacity
         self.selection.position = self.get_screen_position(pos)
 
-        # move the piece to active piece node (to be displayed on top of everything else)
+        # make the piece displayed on top of everything else
         piece = self.get_piece(self.selected_square)
-        self.piece_node.remove(piece)
-        self.active_piece_node.add(piece)
+        self.piece_sprite_list.remove(piece)
+        self.active_piece = piece
 
         self.show_moves()
 
@@ -398,42 +393,36 @@ class Board(ColorLayer):
             for move in move_dict.get(pos, ()):
                 if move.pos_to in move_sprites:
                     continue
-                move_sprite = Sprite(
-                    f"assets/util/{'move' if self.not_a_piece(move.pos_to) else 'capture'}.png",
-                    position=self.get_screen_position(move.pos_to),
-                    opacity=selection_opacity if self.selected_square else highlight_opacity
-                )
-                move_sprite.scale = default_size / move_sprite.width
-                self.move_node.add(move_sprite)
+                move_sprite = Sprite(f"assets/util/{'move' if self.not_a_piece(move.pos_to) else 'capture'}.png")
+                move_sprite.alpha = selection_opacity if self.selected_square else highlight_opacity
+                move_sprite.position = self.get_screen_position(move.pos_to)
+                move_sprite.scale = self.square_size / move_sprite.texture.width
+                self.move_sprite_list.append(move_sprite)
                 move_sprites[move.pos_to] = move_sprite
         if not self.selected_square and self.move_history and not self.edit_mode:
             move = self.move_history[-1]
             if move is not None and not move.is_edit:
                 if move.pos_from is not None and move.pos_from != move.pos_to:
                     if move.pos_from in move_sprites and not self.not_a_piece(move.pos_from):
-                        move_sprites[move.pos_from].opacity = selection_opacity
+                        move_sprites[move.pos_from].alpha = selection_opacity
                     else:
-                        move_sprite = Sprite(
-                            f"assets/util/capture.png",
-                            position=self.get_screen_position(move.pos_from),
-                            opacity=selection_opacity
-                        )
-                        move_sprite.scale = default_size / move_sprite.width
-                        self.move_node.add(move_sprite)
+                        move_sprite = Sprite("assets/util/capture.png")
+                        move_sprite.alpha = selection_opacity
+                        move_sprite.position = self.get_screen_position(move.pos_from)
+                        move_sprite.scale = self.square_size / move_sprite.texture.width
+                        self.move_sprite_list.append(move_sprite)
                 if move.pos_to is not None and not self.not_a_piece(move.pos_to):
                     if move.pos_to in move_sprites:
-                        move_sprites[move.pos_to].opacity = selection_opacity
+                        move_sprites[move.pos_to].alpha = selection_opacity
                     else:
-                        move_sprite = Sprite(
-                            f"assets/util/selection.png",
-                            position=self.get_screen_position(move.pos_to),
-                            opacity=selection_opacity
-                        )
-                        move_sprite.scale = default_size / move_sprite.width
-                        self.move_node.add(move_sprite)
+                        move_sprite = Sprite("assets/util/selection.png")
+                        move_sprite.alpha = selection_opacity
+                        move_sprite.position = self.get_screen_position(move.pos_to)
+                        move_sprite.scale = self.square_size / move_sprite.texture.width
+                        self.move_sprite_list.append(move_sprite)
 
     def deselect_piece(self) -> None:
-        self.selection.opacity = 0
+        self.selection.alpha = 0
         self.square_was_clicked = False
         self.clicked_square = None
 
@@ -441,31 +430,29 @@ class Board(ColorLayer):
             return
 
         # move the piece to general piece node
-        piece = self.get_piece(self.selected_square)
+        piece, self.active_piece = self.active_piece, None
         self.reset_position(piece)
-        self.active_piece_node.remove(piece)
-        self.piece_node.add(piece)
+        self.piece_sprite_list.append(piece)
 
         self.selected_square = None
         self.show_moves()
 
     def hide_moves(self) -> None:
-        for child in list(self.move_node.get_children()):
-            self.move_node.remove(child)
+        self.move_sprite_list.clear()
 
     def update_highlight(self, pos: Position) -> None:
         if self.clicked_square != pos:
             self.square_was_clicked = False
             self.clicked_square = None
         if self.not_on_board(pos):
-            self.highlight.opacity = 0
+            self.highlight.alpha = 0
             self.hovered_square = None
             if (self.selected_square is None and not self.move_history) or self.promotion_piece:
                 self.hide_moves()
             else:
                 self.show_moves()
         else:
-            self.highlight.opacity = highlight_opacity
+            self.highlight.alpha = highlight_opacity
             self.highlight.position = self.get_screen_position(pos)
             if self.hovered_square != pos:
                 self.hovered_square = pos
@@ -475,11 +462,11 @@ class Board(ColorLayer):
                     self.hide_moves()
 
     def on_mouse_press(self, x, y, buttons, modifiers) -> None:
-        if buttons & mouse.LEFT:
-            self.held_buttons = mouse.LEFT
+        if buttons & MOUSE_BUTTON_LEFT:
+            self.held_buttons = MOUSE_BUTTON_LEFT
             if self.game_over and not self.edit_mode:
                 return
-            pos = self.get_board_position(x, y)
+            pos = self.get_board_position((x, y))
             if self.promotion_piece:
                 if pos in self.promotion_area:
                     self.move_history[-1].set(promotion=self.promotion_area[pos])
@@ -507,14 +494,14 @@ class Board(ColorLayer):
                 self.select_piece(pos)
             self.square_was_clicked = True
             self.clicked_square = pos
-        if buttons & mouse.RIGHT:
-            self.held_buttons = mouse.RIGHT
+        if buttons & MOUSE_BUTTON_RIGHT:
+            self.held_buttons = MOUSE_BUTTON_RIGHT
             self.deselect_piece()
             if self.promotion_piece:
                 self.undo_last_finished_move()
                 return
             if self.edit_mode:
-                pos = self.get_board_position(x, y)
+                pos = self.get_board_position((x, y))
                 if self.not_on_board(pos):
                     return
                 self.square_was_clicked = True
@@ -522,20 +509,18 @@ class Board(ColorLayer):
 
     def on_mouse_motion(self, x, y, dx, dy) -> None:
         if not self.held_buttons:
-            pos = self.get_board_position(x + dx, y + dy)
+            pos = self.get_board_position((x + dx, y + dy))
             self.update_highlight(pos)
 
     def on_mouse_drag(self, x, y, dx, dy, buttons, modifiers) -> None:
-        pos = self.get_board_position(x + dx, y + dy)
+        pos = self.get_board_position((x + dx, y + dy))
         self.update_highlight(pos)
-        if buttons & self.held_buttons & mouse.LEFT and self.selected_square is not None:
+        if buttons & self.held_buttons & MOUSE_BUTTON_LEFT and self.selected_square is not None:
             if self.edit_mode and modifiers & key.MOD_ACCEL:
                 self.reset_position(self.get_piece(self.selected_square))
             else:
                 sprite = self.get_piece(self.selected_square)
-                x, y = director.get_virtual_coordinates(x, y)
-                sprite.x = x
-                sprite.y = y
+                sprite.position = x, y
 
     def on_mouse_release(self, x, y, buttons, modifiers) -> None:
         held_buttons = buttons & self.held_buttons
@@ -543,11 +528,11 @@ class Board(ColorLayer):
         if self.edit_mode:
             if self.promotion_piece:
                 return
-            pos = self.get_board_position(x, y)
+            pos = self.get_board_position((x, y))
             if self.not_on_board(pos):
                 return
             move = Move(is_edit=True)
-            if held_buttons & mouse.LEFT:
+            if held_buttons & MOUSE_BUTTON_LEFT:
                 if self.nothing_selected():
                     if self.square_was_clicked and self.move_history and self.move_history[-1].pos_from is None:
                         self.select_piece(self.move_history[-1].pos_to)
@@ -579,7 +564,7 @@ class Board(ColorLayer):
                     )
                     if not self.not_a_piece(pos):
                         move.set(captured_piece=self.get_piece(pos))
-            elif held_buttons & mouse.RIGHT:
+            elif held_buttons & MOUSE_BUTTON_RIGHT:
                 if self.clicked_square != pos:
                     self.deselect_piece()
                     return
@@ -615,10 +600,10 @@ class Board(ColorLayer):
                 print(f"[{len(self.move_history)}] Edit: {self.move_history[-1]}")
             self.advance_turn()
             return
-        if held_buttons & mouse.RIGHT:
+        if held_buttons & MOUSE_BUTTON_RIGHT:
             self.deselect_piece()
             return
-        if held_buttons & mouse.LEFT:
+        if held_buttons & MOUSE_BUTTON_LEFT:
             if self.game_over:
                 self.deselect_piece()
                 return
@@ -626,7 +611,7 @@ class Board(ColorLayer):
                 return
             if self.nothing_selected():
                 return
-            pos = self.get_board_position(x, y)
+            pos = self.get_board_position((x, y))
             if self.selected_square and pos != self.selected_square:
                 move = self.find_move(self.selected_square, pos)
                 if move is None:
@@ -668,21 +653,21 @@ class Board(ColorLayer):
         if move.swapped_piece is not None:
             self.set_position(move.swapped_piece, move.pos_from)
         if move.piece is not None and move.pos_to is None:
-            self.piece_node.remove(move.piece)
+            self.piece_sprite_list.remove(move.piece)
         if move.pos_to is not None and move.pos_from != move.pos_to:
-            self.piece_node.remove(self.pieces[move.pos_to[0]][move.pos_to[1]])
+            self.piece_sprite_list.remove(self.pieces[move.pos_to[0]][move.pos_to[1]])
             self.pieces[move.pos_to[0]][move.pos_to[1]] = move.piece
         if move.pos_from is not None and move.pos_from != move.pos_to:
             self.pieces[move.pos_from[0]][move.pos_from[1]] = (
                 NoPiece(self, move.pos_from) if move.swapped_piece is None else move.swapped_piece
             )
-            self.piece_node.add(self.pieces[move.pos_from[0]][move.pos_from[1]])
+            self.piece_sprite_list.append(self.pieces[move.pos_from[0]][move.pos_from[1]])
         if move.piece is not None and move.pos_from is None:
-            self.piece_node.add(move.piece)
+            self.piece_sprite_list.append(move.piece)
         if not move.is_edit or (move.pos_from == move.pos_to and move.promotion is None):
             (move.piece or move).movement.update(move, move.piece.side or self.turn_side)
 
-    def update(self, move: Move) -> None:
+    def update_board(self, move: Move) -> None:
         if self.en_passant_target is not None and move.piece.side == self.en_passant_target.side.opponent():
             if move.pos_to in self.en_passant_markers and isinstance(move.movement, movement.EnPassantMovement):
                 self.capture_en_passant()
@@ -693,25 +678,25 @@ class Board(ColorLayer):
         if move.pos_from != move.pos_to or move.promotion is not None:
             if move.pos_from is not None:
                 self.set_position(move.piece, move.pos_from)
-                self.piece_node.remove(self.pieces[move.pos_from[0]][move.pos_from[1]])
+                self.piece_sprite_list.remove(self.pieces[move.pos_from[0]][move.pos_from[1]])
             if move.pos_to is not None and move.pos_from != move.pos_to:
-                self.piece_node.remove(self.pieces[move.pos_to[0]][move.pos_to[1]])
+                self.piece_sprite_list.remove(self.pieces[move.pos_to[0]][move.pos_to[1]])
             if move.pos_from is not None:
                 self.pieces[move.pos_from[0]][move.pos_from[1]] = move.piece
-                self.piece_node.add(move.piece)
+                self.piece_sprite_list.append(move.piece)
         if move.captured_piece is not None:
             if move.captured_piece.board_pos != move.pos_to:
-                self.piece_node.remove(self.pieces[move.captured_piece.board_pos[0]][move.captured_piece.board_pos[1]])
+                self.piece_sprite_list.remove(self.pieces[move.captured_piece.board_pos[0]][move.captured_piece.board_pos[1]])
             self.reset_position(move.captured_piece)
             self.pieces[move.captured_piece.board_pos[0]][move.captured_piece.board_pos[1]] = move.captured_piece
-            self.piece_node.add(move.captured_piece)
+            self.piece_sprite_list.append(move.captured_piece)
         if move.pos_to is not None and move.pos_from != move.pos_to:
             if move.captured_piece is None or move.captured_piece.board_pos != move.pos_to:
                 self.pieces[move.pos_to[0]][move.pos_to[1]] = NoPiece(self, move.pos_to)
-                self.piece_node.add(self.pieces[move.pos_to[0]][move.pos_to[1]])
+                self.piece_sprite_list.append(self.pieces[move.pos_to[0]][move.pos_to[1]])
             if move.swapped_piece is not None:
                 self.set_position(move.swapped_piece, move.pos_to)
-                self.piece_node.add(move.swapped_piece)
+                self.piece_sprite_list.append(move.swapped_piece)
                 self.pieces[move.pos_to[0]][move.pos_to[1]] = move.swapped_piece
         if not move.is_edit or (move.pos_from == move.pos_to and move.promotion is None):
             (move.piece or move).movement.undo(move, move.piece.side or self.turn_side)
@@ -736,10 +721,10 @@ class Board(ColorLayer):
             if not past.is_edit:
                 self.turn_side = self.turn_side.opponent()
         else:
-            print(f'[{len(self.move_history)}] Undo: {
+            print(f'''[{len(self.move_history)}] Undo: {
                 f"{'Edit' if self.move_history[-1].is_edit else 'Move'}: " + str(self.move_history[-1])
                 if self.move_history[-1] is not None else f"Pass: {self.turn_side.name()}'s turn"
-            }')
+            }''')
         last_move = self.move_history.pop()
         if last_move is not None:
             self.undo(last_move)
@@ -801,10 +786,10 @@ class Board(ColorLayer):
         if last_move is not None and last_move.is_edit and not self.edit_mode:
             self.turn_side = self.turn_side.opponent()
         if self.promotion_piece is None:
-            print(f'[{len(self.move_history)}] Redo: {
+            print(f'''[{len(self.move_history)}] Redo: {
                 f"{'Edit' if self.move_history[-1].is_edit else 'Move'}: " + str(self.move_history[-1])
                 if self.move_history[-1] is not None else f"Pass: {self.turn_side.opponent().name()}'s turn"
-            }')
+            }''')
         self.advance_turn()
 
     def undo_last_finished_move(self) -> None:
@@ -843,25 +828,23 @@ class Board(ColorLayer):
                 current_col = area_origin[1] + ((new_col + 1) // 2 * ((aim_left + new_col) % 2 * 2 - 1))
             area_squares.append((current_row, current_col))
         for promotion, pos in zip_longest(promotions, area_squares):
-            background_sprite = Sprite(
-                "assets/util/cell.png",
-                position=self.get_screen_position(pos),
-                color=self.promotion_background_color
-            )
-            background_sprite.scale = default_size / background_sprite.width
-            self.promotion_area_node.add(background_sprite)
+            background_sprite = Sprite("assets/util/square.png")
+            background_sprite.color = self.promotion_background_color
+            background_sprite.position = self.get_screen_position(pos)
+            background_sprite.scale = self.square_size / background_sprite.texture.width
+            self.promotion_area_sprite_list.append(background_sprite)
             if promotion is None:
                 continue
             promotion_piece = promotion(self, pos, piece.side)
-            promotion_piece.scale = default_size / promotion_piece.width
-            self.promotion_piece_node.add(promotion_piece)
+            promotion_piece.scale = self.square_size / promotion_piece.texture.width
+            self.promotion_piece_sprite_list.append(promotion_piece)
             self.promotion_area[pos] = promotion
 
     def end_promotion(self) -> None:
         self.promotion_piece = None
         self.promotion_area = {}
-        for node in (self.promotion_area_node, self.promotion_piece_node):
-            for sprite in node.get_children():
+        for node in (self.promotion_area_sprite_list, self.promotion_piece_sprite_list):
+            for sprite in node:
                 node.remove(sprite)
 
     def replace(
@@ -870,7 +853,7 @@ class Board(ColorLayer):
         if new_side is None:
             new_side = piece.side
         pos = piece.board_pos
-        self.piece_node.remove(piece)
+        self.piece_sprite_list.remove(piece)
         self.pieces[pos[0]][pos[1]] = new_type(
             self, pos, new_side,
             promotions=self.promotions[new_side],
@@ -881,8 +864,8 @@ class Board(ColorLayer):
             self.black_piece_color if new_side == Side.BLACK else
             self.piece_color
         )
-        self.pieces[pos[0]][pos[1]].scale = default_size / self.pieces[pos[0]][pos[1]].width
-        self.piece_node.add(self.pieces[pos[0]][pos[1]])
+        self.pieces[pos[0]][pos[1]].scale = self.square_size / self.pieces[pos[0]][pos[1]].texture.width
+        self.piece_sprite_list.append(self.pieces[pos[0]][pos[1]])
         self.pieces[pos[0]][pos[1]].board_pos = pos
         if pos in self.en_passant_markers and not self.not_a_piece(pos):
             self.en_passant_markers.remove(pos)
@@ -952,12 +935,13 @@ class Board(ColorLayer):
                 self.color_pieces()
 
     def update_colors(self) -> None:
-        self.color = self.background_color
-        for row, col in product(range(self.board_height), range(self.board_width)):
-            self.board_sprites[row][col].color = self.light_square_color if (row + col) % 2 else self.dark_square_color
-        for sprite in self.promotion_area_node.get_children():
+        set_background_color(self.background_color)
+        for sprite in self.board_sprite_list:
+            color = sum(self.get_board_position(sprite.position)) % 2
+            sprite.color = self.light_square_color if color else self.dark_square_color
+        for sprite in self.promotion_area_sprite_list:
             sprite.color = self.promotion_background_color
-        for sprite in self.promotion_piece_node.get_children():
+        for sprite in self.promotion_piece_sprite_list:
             if isinstance(sprite, abc.Piece):
                 sprite.color = (
                     self.white_piece_color if sprite.side == Side.WHITE else
@@ -1078,7 +1062,7 @@ class Board(ColorLayer):
 
     def on_key_press(self, symbol, modifiers):
         if self.edit_mode and modifiers & key.MOD_ACCEL:
-            if self.held_buttons & mouse.LEFT and self.selected_square is not None:
+            if self.held_buttons & MOUSE_BUTTON_LEFT and self.selected_square is not None:
                 self.reset_position(self.get_piece(self.selected_square))
         if self.held_buttons:
             return
@@ -1091,35 +1075,35 @@ class Board(ColorLayer):
             elif modifiers & key.MOD_ACCEL:
                 self.reset_board()
         if symbol == key.F11:  # Full screen (toggle)
-            director.window.set_fullscreen(not director.window.fullscreen)
+            self.set_fullscreen(not self.fullscreen)
         if symbol == key.MINUS:  # (-) Decrease window size
             if modifiers & key.MOD_ACCEL and modifiers & key.MOD_SHIFT:
-                director.window.set_size((self.board_width + 2) * min_size, (self.board_height + 2) * min_size)
+                self.set_size((self.board_width + 2) * min_size, (self.board_height + 2) * min_size)
             elif modifiers & key.MOD_ACCEL:
-                width, height = director.window.get_size()
-                director.window.set_size(
+                width, height = self.get_size()
+                self.set_size(
                     width - (self.board_width + 2) * size_step,
                     height - (self.board_height + 2) * size_step
                 )
             elif modifiers & key.MOD_SHIFT:
-                width, height = director.window.get_size()
+                width, height = self.get_size()
                 size = min(round(width / (self.board_width + 2)), round(height / (self.board_height + 2)))
-                director.window.set_size((self.board_width + 2) * size, (self.board_height + 2) * size)
+                self.set_size((self.board_width + 2) * size, (self.board_height + 2) * size)
         if symbol == key.EQUAL:  # (+) Increase window size
             if modifiers & key.MOD_ACCEL and modifiers & key.MOD_SHIFT:
-                director.window.set_size((self.board_width + 2) * max_size, (self.board_height + 2) * max_size)
+                self.set_size((self.board_width + 2) * max_size, (self.board_height + 2) * max_size)
             elif modifiers & key.MOD_ACCEL:
-                width, height = director.window.get_size()
-                director.window.set_size(
+                width, height = self.get_size()
+                self.set_size(
                     width + (self.board_width + 2) * size_step,
                     height + (self.board_height + 2) * size_step
                 )
             elif modifiers & key.MOD_SHIFT:
-                width, height = director.window.get_size()
+                width, height = self.get_size()
                 size = max(round(width / (self.board_width + 2)), round(height / (self.board_height + 2)))
-                director.window.set_size((self.board_width + 2) * size, (self.board_height + 2) * size)
-        if symbol == key._0 and modifiers & key.MOD_ACCEL:  # Reset window size
-            director.window.set_size((self.board_width + 2) * default_size, (self.board_height + 2) * default_size)
+                self.set_size((self.board_width + 2) * size, (self.board_height + 2) * size)
+        if symbol == key.KEY_0 and modifiers & key.MOD_ACCEL:  # Reset window size
+            self.set_size((self.board_width + 2) * self.square_size, (self.board_height + 2) * self.square_size)
         if symbol == key.E and modifiers & key.MOD_ACCEL:  # Edit mode (toggle)
             self.edit_mode = not self.edit_mode
             print(f"[{len(self.move_history)}] Mode: {'EDIT' if self.edit_mode else 'PLAY'}")
@@ -1178,6 +1162,7 @@ class Board(ColorLayer):
                 self.light_square_color = light_square_color
                 self.dark_square_color = dark_square_color
                 self.promotion_background_color = promotion_background_color
+                self.text_color = text_color
                 self.piece_color = piece_color
                 self.white_piece_color = white_piece_color
                 self.black_piece_color = black_piece_color
@@ -1190,11 +1175,11 @@ class Board(ColorLayer):
             elif modifiers & key.MOD_SHIFT:  # Graphics shift
                 # OH GOD, IT'S THE INITIALIZATION PART ALL OVER AGAIN
                 d = -1 if modifiers & key.MOD_ACCEL else 1
-                glClearColor(*(self.background_color[(i - d) % 3] / 255 for i in range(3)), 1)
                 self.background_color = tuple(self.background_color[(i - d) % 3] for i in range(3))
                 self.light_square_color = tuple(self.light_square_color[(i - d) % 3] for i in range(3))
                 self.dark_square_color = tuple(self.dark_square_color[(i - d) % 3] for i in range(3))
                 self.promotion_background_color = tuple(self.promotion_background_color[(i - d) % 3] for i in range(3))
+                self.text_color = tuple(self.text_color[(i - d) % 3] for i in range(3))
                 self.piece_color = tuple(self.piece_color[(i - d) % 3] for i in range(3))
                 self.white_piece_color = tuple(self.white_piece_color[(i - d) % 3] for i in range(3))
                 self.black_piece_color = tuple(self.black_piece_color[(i - d) % 3] for i in range(3))
@@ -1234,11 +1219,40 @@ class Board(ColorLayer):
                     print(f"[{len(self.move_history)}] Move: {self.move_history[-1]}")
                     self.advance_turn()
 
+    def update_sprite(self, sprite: Sprite, from_size: float, from_origin: tuple[float, float]) -> None:
+        old_position = sprite.position
+        sprite.scale = self.square_size / sprite.texture.width
+        sprite.position = self.get_screen_position(self.get_board_position(old_position, from_size, from_origin))
+
+    def on_resize(self, width: float, height: float):
+        super().on_resize(width, height)
+        old_size = self.square_size
+        self.square_size = min(self.width / (self.board_width + 2), self.height / (self.board_height + 2))
+        old_origin = self.origin
+        self.origin = self.width / 2, self.height / 2
+        self.update_sprite(self.highlight, old_size, old_origin)
+        self.update_sprite(self.selection, old_size, old_origin)
+        if self.active_piece is not None:
+            self.update_sprite(self.active_piece, old_size, old_origin)
+        for sprite_list in (
+            self.board_sprite_list,
+            self.move_sprite_list,
+            self.piece_sprite_list,
+            self.promotion_area_sprite_list,
+            self.promotion_piece_sprite_list,
+        ):
+            for sprite in sprite_list:
+                self.update_sprite(sprite, old_size, old_origin)
+        for label in self.label_list:
+            old_position = label.position
+            label.font_size = self.square_size / 2
+            label.x, label.y = self.get_screen_position(self.get_board_position(old_position, old_size, old_origin))
+
     def on_deactivate(self):
         self.hovered_square = None
         self.clicked_square = None
         self.held_buttons = 0
-        self.highlight.opacity = 0
+        self.highlight.alpha = 0
         self.show_moves()
 
     def run(self):

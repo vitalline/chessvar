@@ -1,9 +1,9 @@
 from chess.movement import movement
 from chess.movement.util import rot, sym, symv
-from chess.pieces import pieces
+from chess.pieces.pieces import Piece
 
 
-class Pepperoni(pieces.Piece):
+class Pepperoni(Piece):
     name = 'Pepperoni'
     file_name = 'circle'
     asset_folder = 'geometry'
@@ -15,7 +15,7 @@ class Pepperoni(pieces.Piece):
         )
 
 
-class Mushroom(pieces.Piece):
+class Mushroom(Piece):
     name = 'Mushroom'
     file_name = 'mushroom'
     asset_folder = 'nature'
@@ -27,7 +27,7 @@ class Mushroom(pieces.Piece):
         )
 
 
-class Sausage(pieces.Piece):
+class Sausage(Piece):
     name = 'Sausage'
     file_name = 'courier_runner'
     asset_folder = 'courier'
@@ -39,7 +39,7 @@ class Sausage(pieces.Piece):
         )
 
 
-class Meatball(pieces.Piece):
+class Meatball(Piece):
     name = 'Meatball'
     file_name = 'courier_rook'
     asset_folder = 'courier'

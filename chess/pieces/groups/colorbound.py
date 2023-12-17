@@ -1,9 +1,9 @@
 from chess.movement import movement
 from chess.movement.util import rot, sym
-from chess.pieces import pieces
+from chess.pieces.pieces import Piece, RoyalPiece
 
 
-class Bede(pieces.Piece):
+class Bede(Piece):
     name = 'Bede'
     file_name = 'zora_bishop'
     asset_folder = 'zora'
@@ -16,7 +16,7 @@ class Bede(pieces.Piece):
         )
 
 
-class Waffle(pieces.Piece):
+class Waffle(Piece):
     name = 'Waffle'
     file_name = 'sorcerer'
     asset_folder = 'fantasy'
@@ -28,7 +28,7 @@ class Waffle(pieces.Piece):
         )
 
 
-class FAD(pieces.Piece):
+class FAD(Piece):
     name = 'FAD'
     file_name = 'beholder'
     asset_folder = 'fantasy'
@@ -40,7 +40,7 @@ class FAD(pieces.Piece):
         )
 
 
-class Cardinal(pieces.Piece):
+class Cardinal(Piece):
     name = 'Cardinal'
     file_name = 'archbishop'
     asset_folder = 'medieval'
@@ -52,7 +52,7 @@ class Cardinal(pieces.Piece):
         )
 
 
-class King(pieces.RoyalPiece):
+class King(RoyalPiece):
     name = 'King'
     file_name = 'king'
     asset_folder = 'classic'

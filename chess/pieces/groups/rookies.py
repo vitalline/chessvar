@@ -1,9 +1,9 @@
 from chess.movement import movement
 from chess.movement.util import rot
-from chess.pieces import pieces
+from chess.pieces.pieces import Piece
 
 
-class ShortRook(pieces.Piece):
+class ShortRook(Piece):
     name = 'Short Rook'
     file_name = 'warden'
     asset_folder = 'restrictors'
@@ -15,7 +15,7 @@ class ShortRook(pieces.Piece):
         )
 
 
-class WoodyRook(pieces.Piece):
+class WoodyRook(Piece):
     name = 'Woody Rook'
     file_name = 'woodland_rook'
     asset_folder = 'woodland'
@@ -27,7 +27,7 @@ class WoodyRook(pieces.Piece):
         )
 
 
-class HalfDuck(pieces.Piece):
+class HalfDuck(Piece):
     name = 'Half Duck'
     file_name = 'zora_knight'
     asset_folder = 'zora'
@@ -39,7 +39,7 @@ class HalfDuck(pieces.Piece):
         )
 
 
-class Chancellor(pieces.Piece):
+class Chancellor(Piece):
     name = 'Chancellor'
     file_name = 'chancellor'
     asset_folder = 'medieval'

@@ -2,10 +2,10 @@ import math
 
 from chess.movement import movement
 from chess.movement.util import rot, sym, symv
-from chess.pieces import pieces
+from chess.pieces.pieces import Piece
 
 
-class LRhino(pieces.Piece):
+class LRhino(Piece):
     name = 'Left Single-Step Rhino'
     file_name = 'commoner2'
     asset_folder = 'other'
@@ -21,14 +21,12 @@ class LRhino(pieces.Piece):
                     [(1, 1), (0, 1), (-1, 1), (-1, 0), (-1, -1), (0, -1), (1, -1), (1, 0)],
                     [(1, 0), (1, 1), (0, 1), (-1, 1), (-1, 0), (-1, -1), (0, -1), (1, -1)],
                 )
-            ])
+            ]),
+            side == pieces.Side.WHITE
         )
-        if side == pieces.Side.WHITE:
-            self.scale_x = -1
-            self.rotation = 180
 
 
-class RRhino(pieces.Piece):
+class RRhino(Piece):
     name = 'Right Single-Step Rhino'
     file_name = 'commoner2'
     asset_folder = 'other'
@@ -44,14 +42,12 @@ class RRhino(pieces.Piece):
                     [(1, 1), (0, 1), (-1, 1), (-1, 0), (-1, -1), (0, -1), (1, -1), (1, 0)],
                     [(0, 1), (-1, 1), (-1, 0), (-1, -1), (0, -1), (1, -1), (1, 0), (1, 1)],
                 )
-            ])
+            ]),
+            side == pieces.Side.BLACK
         )
-        if side == pieces.Side.BLACK:
-            self.scale_x = -1
-            self.rotation = 180
 
 
-class Gnohmon(pieces.Piece):
+class Gnohmon(Piece):
     name = 'Gnohmon'
     file_name = 'courier_bishop'
     asset_folder = 'courier'
@@ -63,7 +59,7 @@ class Gnohmon(pieces.Piece):
         )
 
 
-class Crabinal(pieces.Piece):
+class Crabinal(Piece):
     name = 'Crabinal'
     file_name = 'swords'
     asset_folder = 'medieval'
@@ -99,7 +95,7 @@ class Crabinal(pieces.Piece):
         ])
 
 
-class EagleScout(pieces.Piece):
+class EagleScout(Piece):
     name = 'Eagle Scout'
     file_name = 'crow'
     asset_folder = 'nature'

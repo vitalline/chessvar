@@ -21,7 +21,7 @@ class BaseMovement(object):
 
     def update(self, move: Move, side: Side):
         self.total_moves += 1
-        self.board.update(move)
+        self.board.update_board(move)
 
     def undo(self, move: Move, side: Side):
         self.total_moves -= 1

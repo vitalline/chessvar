@@ -1,9 +1,9 @@
 from chess.movement import movement
 from chess.movement.util import sym, symv
-from chess.pieces import pieces
+from chess.pieces.pieces import Piece
 
 
-class ChargeRook(pieces.Piece):
+class ChargeRook(Piece):
     name = 'Charging Rook'
     file_name = 'overlord'
     asset_folder = 'medieval'
@@ -15,7 +15,7 @@ class ChargeRook(pieces.Piece):
         )
 
 
-class Fibnif(pieces.Piece):
+class Fibnif(Piece):
     name = 'Fibnif'
     file_name = 'two_headed_knight'
     asset_folder = 'fantasy'
@@ -27,7 +27,7 @@ class Fibnif(pieces.Piece):
         )
 
 
-class ChargeKnight(pieces.Piece):
+class ChargeKnight(Piece):
     name = 'Charging Knight'
     file_name = 'mare'
     asset_folder = 'nature'
@@ -39,7 +39,7 @@ class ChargeKnight(pieces.Piece):
         )
 
 
-class Colonel(pieces.Piece):
+class Colonel(Piece):
     name = 'Colonel'
     file_name = 'centaur_rook'
     asset_folder = 'centaur'

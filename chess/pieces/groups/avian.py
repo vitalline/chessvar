@@ -1,9 +1,9 @@
 from chess.movement import movement
 from chess.movement.util import rot, sym, symv
-from chess.pieces import pieces
+from chess.pieces.pieces import Piece
 
 
-class Wader(pieces.Piece):
+class Wader(Piece):
     name = 'Wader'
     file_name = 'star4'
     asset_folder = 'geometry'
@@ -15,7 +15,7 @@ class Wader(pieces.Piece):
         )
 
 
-class Darter(pieces.Piece):
+class Darter(Piece):
     name = 'Darter'
     file_name = 'star3'
     asset_folder = 'geometry'
@@ -27,7 +27,7 @@ class Darter(pieces.Piece):
         )
 
 
-class Faalcon(pieces.Piece):
+class Faalcon(Piece):
     name = 'Faalcon'
     file_name = 'triangles'
     asset_folder = 'geometry'
@@ -39,7 +39,7 @@ class Faalcon(pieces.Piece):
         )
 
 
-class Kingfisher(pieces.Piece):
+class Kingfisher(Piece):
     name = 'Flying Kingfisher'
     file_name = 'octagon'
     asset_folder = 'geometry'
