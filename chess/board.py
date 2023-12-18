@@ -1,14 +1,16 @@
 from copy import copy
 from itertools import product, zip_longest
 from math import ceil, sqrt
-from random import choice
+from random import choice, randrange
 from typing import Type
 
+from PIL.ImageColor import getrgb
 from arcade import key, MOUSE_BUTTON_LEFT, MOUSE_BUTTON_RIGHT, Text
 from arcade import Sprite, SpriteList, Window
 from arcade import start_render
 
-from chess.color import colors
+from chess.color import colors, trickster_colors
+from chess.color import average, darken, desaturate, lighten, saturate
 from chess.movement import movement
 from chess.movement.move import Move
 from chess.movement.util import Position, add
@@ -111,9 +113,9 @@ class Board(Window):
         self.origin = self.width / 2, self.height / 2
         self.set_minimum_size((self.board_width + 2) * min_size, (self.board_height + 2) * min_size)
 
-        self.color_index = 0
-        self.background_color = colors[self.color_index]["background_color"]
-
+        self.color_index = 0  # index of the current color scheme
+        self.color_scheme = colors[self.color_index]  # current color scheme
+        self.background_color = self.color_scheme["background_color"]  # background color
         self.hovered_square = None  # square we are currently hovering over
         self.clicked_square = None  # square we clicked on
         self.selected_square = None  # square selected for moving
@@ -128,8 +130,11 @@ class Board(Window):
         self.turn_side = Side.WHITE  # side whose turn it is
         self.check_side = Side.NONE  # side that is currently in check
         self.castling_threats = set()  # squares that are attacked in a way that prevents castling
-        self.game_over = False  # act 6 act 6 intermission 3 (game over)
         self.edit_mode = False  # allows to edit the board position if set to True
+        self.game_over = False  # act 6 act 6 intermission 3 (game over)
+        self.trickster_color_index = 0  # hey wouldn't it be funny if there was an easter egg here
+        self.trickster_color_delta = 0  # but it's not like that's ever going to happen right
+        self.trickster_angle_delta = 0  # this is just a normal chess game after all
         self.pieces = []  # list of pieces on the board
         self.piece_sets = {Side.WHITE: 1, Side.BLACK: 1}  # piece sets to use for each side
         self.promotions = {Side.WHITE: [], Side.BLACK: []}  # types of pieces each side promote to
@@ -163,7 +168,7 @@ class Board(Window):
             'width': self.square_size / 2,
             'bold': True,
             'align': 'center',
-            'color': colors[self.color_index]["text_color"],
+            'color': self.color_scheme["text_color"],
         }
 
         for row in range(self.board_height):
@@ -181,7 +186,7 @@ class Board(Window):
         # initialize board sprites
         for row, col in product(range(self.board_height), range(self.board_width)):
             sprite = Sprite("assets/util/square.png")
-            sprite.color = colors[self.color_index]["light_square_color" if (row + col) % 2 else "dark_square_color"]
+            sprite.color = self.color_scheme["light_square_color" if (row + col) % 2 else "dark_square_color"]
             sprite.position = self.get_screen_position((row, col))
             sprite.scale = self.square_size / sprite.texture.width
             self.board_sprite_list.append(sprite)
@@ -190,6 +195,7 @@ class Board(Window):
         self.reset_board(update=True)
 
     def on_draw(self):
+        self.update_trickster_mode()
         start_render()
         for label in self.label_list:
             label.draw()
@@ -205,6 +211,11 @@ class Board(Window):
         self.promotion_piece_sprite_list.draw()
         if self.promotion_area:
             self.highlight.draw()
+
+    def on_update(self, delta_time: float):
+        if self.trickster_color_index:
+            self.trickster_color_delta += delta_time
+            self.trickster_angle_delta += delta_time
 
     def reset_board(self, shuffle: bool = False, update: bool = False) -> None:
         self.deselect_piece()  # you know, just in case
@@ -288,11 +299,11 @@ class Board(Window):
                 )
             )
             self.pieces[row][col].set_color(
-                colors[self.color_index].get(
+                self.color_scheme.get(
                     f"{self.pieces[row][col].side.file_name()}piece_color",
-                    colors[self.color_index]["piece_color"]
+                    self.color_scheme["piece_color"]
                 ),
-                colors[self.color_index]["colored_pieces"]
+                self.color_scheme["colored_pieces"]
             )
             self.pieces[row][col].scale = self.square_size / self.pieces[row][col].texture.width
             self.piece_sprite_list.append(self.pieces[row][col])
@@ -813,7 +824,7 @@ class Board(Window):
             area_squares.append((current_row, current_col))
         for promotion, pos in zip_longest(promotions, area_squares):
             background_sprite = Sprite("assets/util/square.png")
-            background_sprite.color = colors[self.color_index]["promotion_area_color"]
+            background_sprite.color = self.color_scheme["promotion_area_color"]
             background_sprite.position = self.get_screen_position(pos)
             background_sprite.scale = self.square_size / background_sprite.texture.width
             self.promotion_area_sprite_list.append(background_sprite)
@@ -843,11 +854,11 @@ class Board(Window):
             promotion_squares=promotion_squares[new_side],
         ) if issubclass(new_type, abc.PromotablePiece) else new_type(self, pos, new_side)
         self.pieces[pos[0]][pos[1]].set_color(
-            colors[self.color_index].get(
+            self.color_scheme.get(
                 f"{new_side.file_name()}piece_color",
-                colors[self.color_index]["piece_color"]
+                self.color_scheme["piece_color"]
             ),
-            colors[self.color_index]["colored_pieces"]
+            self.color_scheme["colored_pieces"]
         )
         self.pieces[pos[0]][pos[1]].scale = self.square_size / self.pieces[pos[0]][pos[1]].texture.width
         self.piece_sprite_list.append(self.pieces[pos[0]][pos[1]])
@@ -859,11 +870,11 @@ class Board(Window):
         for piece in self.movable_pieces.get(side, sum(self.movable_pieces.values(), [])):
             piece.set_color(
                 color if color is not None else
-                colors[self.color_index].get(
+                self.color_scheme.get(
                     f"{piece.side.file_name()}piece_color",
-                    colors[self.color_index]["piece_color"]
+                    self.color_scheme["piece_color"]
                 ),
-                colors[self.color_index]["colored_pieces"]
+                self.color_scheme["colored_pieces"]
             )
 
     def advance_turn(self) -> None:
@@ -917,22 +928,46 @@ class Board(Window):
         self.color_all_pieces()
 
     def update_colors(self) -> None:
-        self.background_color = colors[self.color_index]["background_color"]
+        self.color_scheme = colors[self.color_index]
+        if self.trickster_color_index:
+            self.color_scheme = copy(self.color_scheme)
+            new_colors = (
+                trickster_colors[self.trickster_color_index - 1],
+                trickster_colors[self.trickster_color_index % len(trickster_colors)]
+            )
+            self.color_scheme["light_square_color"] = lighten(desaturate(new_colors[0], 0.11), 0.011)
+            self.color_scheme["dark_square_color"] = lighten(desaturate(new_colors[1], 0.11), 0.011)
+            self.color_scheme["background_color"] = darken(average(
+                self.color_scheme["light_square_color"],
+                self.color_scheme["dark_square_color"]
+            ), 0.11 / 2)
+            self.color_scheme["promotion_area_color"] = darken(self.color_scheme["background_color"], 0.11)
+            self.color_scheme["text_color"] = darken(self.color_scheme["background_color"], 0.11 * 3)
+            self.color_scheme["white_piece_color"] = saturate(darken(new_colors[0], 0.11), 0.11)
+            self.color_scheme["black_piece_color"] = desaturate(darken(new_colors[1], 0.11), 0.11)
+            self.color_scheme["white_check_color"] = desaturate(self.color_scheme["white_piece_color"], 0.11)
+            self.color_scheme["black_check_color"] = desaturate(self.color_scheme["black_piece_color"], 0.11)
+            self.color_scheme["white_win_color"] = darken(self.color_scheme["white_piece_color"], 0.11)
+            self.color_scheme["black_win_color"] = darken(self.color_scheme["black_piece_color"], 0.11)
+            self.color_scheme["white_draw_color"] = desaturate(self.color_scheme["white_piece_color"], 0.11 * 5)
+            self.color_scheme["black_draw_color"] = desaturate(self.color_scheme["black_piece_color"], 0.11 * 5)
+            self.color_scheme["loss_color"] = getrgb("#bbbbbb")
+        self.background_color = self.color_scheme["background_color"]
         for sprite in self.label_list:
-            sprite.color = colors[self.color_index]["text_color"]
+            sprite.color = self.color_scheme["text_color"]
         for sprite in self.board_sprite_list:
             color = sum(self.get_board_position(sprite.position)) % 2
-            sprite.color = colors[self.color_index]["light_square_color" if color else "dark_square_color"]
+            sprite.color = self.color_scheme["light_square_color" if color else "dark_square_color"]
         for sprite in self.promotion_area_sprite_list:
-            sprite.color = colors[self.color_index]["promotion_background_color"]
+            sprite.color = self.color_scheme["promotion_area_color"]
         for sprite in self.promotion_piece_sprite_list:
             if isinstance(sprite, abc.Piece):
                 sprite.set_color(
-                    colors[self.color_index].get(
+                    self.color_scheme.get(
                         f"{sprite.side.file_name()}piece_color",
-                        colors[self.color_index]["piece_color"]
+                        self.color_scheme["piece_color"]
                     ),
-                    colors[self.color_index]["colored_pieces"]
+                    self.color_scheme["colored_pieces"]
                 )
         self.color_all_pieces()
 
@@ -941,45 +976,71 @@ class Board(Window):
             if self.check_side != Side.NONE:
                 self.color_pieces(
                     self.check_side,
-                    colors[self.color_index].get(
+                    self.color_scheme.get(
                         f"{self.check_side.file_name()}loss_color",
-                        colors[self.color_index]["loss_color"]
+                        self.color_scheme["loss_color"]
                     ),
                 )
                 self.color_pieces(
                     self.check_side.opponent(),
-                    colors[self.color_index].get(
+                    self.color_scheme.get(
                         f"{self.check_side.opponent().file_name()}win_color",
-                        colors[self.color_index]["win_color"]
+                        self.color_scheme["win_color"]
                     ),
                 )
             else:
                 self.color_pieces(
                     Side.WHITE,
-                    colors[self.color_index].get(
+                    self.color_scheme.get(
                         f"{Side.WHITE.file_name()}draw_color",
-                        colors[self.color_index]["draw_color"]
+                        self.color_scheme["draw_color"]
                     ),
                 )
                 self.color_pieces(
                     Side.BLACK,
-                    colors[self.color_index].get(
+                    self.color_scheme.get(
                         f"{Side.BLACK.file_name()}draw_color",
-                        colors[self.color_index]["draw_color"]
+                        self.color_scheme["draw_color"]
                     ),
                 )
         else:
             if self.check_side != Side.NONE:
                 self.color_pieces(
                     self.check_side,
-                    colors[self.color_index].get(
+                    self.color_scheme.get(
                         f"{self.check_side.file_name()}check_color",
-                        colors[self.color_index]["check_color"]
+                        self.color_scheme["check_color"]
                     ),
                 )
                 self.color_pieces(self.check_side.opponent())
             else:
                 self.color_pieces()
+
+    def update_trickster_mode(self) -> None:
+        if not self.trickster_color_index:
+            self.trickster_color_delta = 0
+            return  # trickster mode is disabled
+        if self.trickster_color_delta > 1 / 11:
+            self.trickster_color_delta %= 1 / 11  # ah yes, modulo assignment. derpy stepbrother of the walrus operator
+            self.trickster_color_index = self.trickster_color_index % len(trickster_colors) + 1
+            self.update_colors()
+        for sprite_list in (self.piece_sprite_list, self.promotion_piece_sprite_list, [self.active_piece]):
+            for sprite in sprite_list:
+                if (
+                        isinstance(sprite, abc.Piece) and not sprite.is_empty()
+                        and not (self.game_over and not self.edit_mode and sprite.side == self.check_side)
+                ):
+                    sprite.angle += self.trickster_angle_delta / 11 * 360 * (1 if sum(sprite.board_pos) % 2 else -1)
+        self.trickster_angle_delta = 0
+
+    def reset_trickster_mode(self) -> None:
+        if self.trickster_color_index:
+            return  # trickster mode is enabled
+        self.update_colors()
+        for sprite_list in (self.piece_sprite_list, self.promotion_piece_sprite_list):
+            for sprite in sprite_list:
+                if isinstance(sprite, abc.Piece) and not sprite.is_empty():
+                    sprite.angle = 0
 
     def load_all_moves(self) -> None:
         self.load_check()
@@ -1178,10 +1239,19 @@ class Board(Window):
         if symbol == key.G:  # Graphics
             if modifiers & key.MOD_ACCEL and not modifiers & key.MOD_SHIFT:  # Graphics reset
                 self.color_index = 0
-                self.update_colors()
             elif modifiers & key.MOD_SHIFT:  # Graphics shift
                 self.color_index = (self.color_index + (-1 if modifiers & key.MOD_ACCEL else 1)) % len(colors)
+            if self.color_scheme["scheme_type"] == "cherub" and self.trickster_color_index:
+                self.trickster_color_index = 0
+                self.reset_trickster_mode()
+            else:
                 self.update_colors()
+        if symbol == key.T and modifiers & key.MOD_ACCEL:  # Trickster mode
+            if self.color_scheme["scheme_type"] == "cherub":
+                self.trickster_color_index = (
+                    randrange(len(trickster_colors)) + 1 if not self.trickster_color_index else 0
+                )
+                self.reset_trickster_mode()
         if symbol == key.Z and modifiers & key.MOD_ACCEL:  # Undo
             if modifiers & key.MOD_SHIFT:  # Unless Ctrl+Shift+Z, then redo
                 self.redo_last_finished_move()
