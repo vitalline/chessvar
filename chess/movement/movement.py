@@ -145,6 +145,20 @@ class FirstMoveRiderMovement(RiderMovement):
     def __copy_args__(self):
         return self.board, copy(self.base_directions), copy(self.first_move_directions)
 
+    def __copy__(self):
+        clone = self.__class__(*self.__copy_args__())
+        clone.total_moves = self.total_moves
+        if self.total_moves:
+            clone.directions = clone.base_directions
+        return clone
+
+    def __deepcopy__(self, memo):
+        clone = self.__class__(*self.__copy_args__())
+        clone.total_moves = self.total_moves
+        if self.total_moves:
+            clone.directions = clone.base_directions
+        return clone
+
 
 class CastlingMovement(BaseMovement):
     def __init__(
@@ -235,7 +249,9 @@ class EnPassantTargetMovement(FirstMoveRiderMovement):
         self.board.clear_en_passant()
 
     def __copy_args__(self):
-        return self.board, copy(self.directions), copy(self.first_move_directions), copy(self.en_passant_directions)
+        return (
+            self.board, copy(self.base_directions), copy(self.first_move_directions), copy(self.en_passant_directions)
+        )
 
 
 class EnPassantMovement(RiderMovement):

@@ -130,6 +130,7 @@ class Board(Window):
         self.turn_side = Side.WHITE  # side whose turn it is
         self.check_side = Side.NONE  # side that is currently in check
         self.castling_threats = set()  # squares that are attacked in a way that prevents castling
+        self.flip_mode = False  # whether the board is flipped
         self.edit_mode = False  # allows to edit the board position if set to True
         self.game_over = False  # act 6 act 6 intermission 3 (game over)
         self.trickster_color_index = 0  # hey wouldn't it be funny if there was an easter egg here
@@ -315,26 +316,38 @@ class Board(Window):
             self,
             pos: tuple[float, float],
             size: float = 0,
-            origin: tuple[float, float] | None = None
+            origin: tuple[float, float] | None = None,
+            flip: bool | None = None
     ) -> Position:
         x, y = pos
         size = size or self.square_size
         origin = origin or self.origin
-        col = round((x - origin[0]) / size + (self.board_width - 1) / 2)
-        row = round((y - origin[1]) / size + (self.board_height - 1) / 2)
+        flip = flip if flip is not None else self.flip_mode
+        if flip:
+            col = round((origin[0] - x) / size + (self.board_width - 1) / 2)
+            row = round((origin[1] - y) / size + (self.board_height - 1) / 2)
+        else:
+            col = round((x - origin[0]) / size + (self.board_width - 1) / 2)
+            row = round((y - origin[1]) / size + (self.board_height - 1) / 2)
         return row, col
 
     def get_screen_position(
             self,
             pos: tuple[float, float],
             size: float = 0,
-            origin: tuple[float, float] | None = None
+            origin: tuple[float, float] | None = None,
+            flip: bool | None = None
     ) -> tuple[float, float]:
         row, col = pos
         size = size or self.square_size
         origin = origin or self.origin
-        x = (col - (self.board_width - 1) / 2) * size + origin[0]
-        y = (row - (self.board_height - 1) / 2) * size + origin[1]
+        flip = flip if flip is not None else self.flip_mode
+        if flip:
+            x = origin[0] - (col - (self.board_width - 1) / 2) * size
+            y = origin[1] - (row - (self.board_height - 1) / 2) * size
+        else:
+            x = (col - (self.board_width - 1) / 2) * size + origin[0]
+            y = (row - (self.board_height - 1) / 2) * size + origin[1]
         return x, y
 
     # From now on we shall unanimously assume that the first coordinate corresponds to row number (AKA vertical axis).
@@ -474,13 +487,13 @@ class Board(Window):
                     )
                     self.advance_turn()
                 return
+            if pos == self.selected_square:
+                self.deselect_piece()
+                return
             if self.selected_square is not None:
                 if self.edit_mode:
-                    if pos == self.selected_square:
-                        self.deselect_piece()
-                    else:
-                        self.square_was_clicked = True
-                        self.clicked_square = pos
+                    self.square_was_clicked = True
+                    self.clicked_square = pos
                     return
                 if pos not in {move.pos_to for move in self.moves.get(self.selected_square, ())}:
                     self.deselect_piece()
@@ -526,13 +539,11 @@ class Board(Window):
             pos = self.get_board_position((x, y))
             if self.not_on_board(pos):
                 return
+            next_selected_square = None
             move = Move(is_edit=True)
             if held_buttons & MOUSE_BUTTON_LEFT:
-                if self.nothing_selected():
-                    if self.square_was_clicked and self.move_history and self.move_history[-1].pos_from is None:
-                        self.select_piece(self.move_history[-1].pos_to)
-                    else:
-                        return
+                if not self.selected_square:
+                    return
                 if pos == self.selected_square:
                     if not self.square_was_clicked:
                         self.deselect_piece()
@@ -545,6 +556,8 @@ class Board(Window):
                     move.set(pos_from=None, pos_to=pos, piece=piece)
                     if not self.not_a_piece(pos):
                         move.set(captured_piece=self.get_piece(pos))
+                    if self.square_was_clicked:
+                        next_selected_square = pos
                 elif modifiers & key.MOD_SHIFT:
                     move.set(
                         pos_from=self.selected_square, pos_to=pos,
@@ -594,6 +607,8 @@ class Board(Window):
             if not self.promotion_piece:
                 print(f"[{len(self.move_history)}] Edit: {self.move_history[-1]}")
             self.advance_turn()
+            if next_selected_square:
+                self.select_piece(next_selected_square)
             return
         if held_buttons & MOUSE_BUTTON_RIGHT:
             self.deselect_piece()
@@ -1236,6 +1251,8 @@ class Board(Window):
                     piece_sets = self.piece_sets[Side.WHITE], self.piece_sets[Side.BLACK]
                     self.piece_sets[Side.BLACK], self.piece_sets[Side.WHITE] = piece_sets
                 self.reset_board(update=True)
+        if symbol == key.F and modifiers & key.MOD_ACCEL:  # Flip
+            self.flip_board()
         if symbol == key.G:  # Graphics
             if modifiers & key.MOD_ACCEL and not modifiers & key.MOD_SHIFT:  # Graphics reset
                 self.color_index = 0
@@ -1280,21 +1297,28 @@ class Board(Window):
                     print(f"[{len(self.move_history)}] Move: {self.move_history[-1]}")
                     self.advance_turn()
 
-    def update_sprite(self, sprite: Sprite, from_size: float, from_origin: tuple[float, float]) -> None:
+    def update_sprite(
+            self, sprite: Sprite, from_size: float, from_origin: tuple[float, float], from_flip_mode: bool
+    ) -> None:
         old_position = sprite.position
         sprite.scale = self.square_size / sprite.texture.width
-        sprite.position = self.get_screen_position(self.get_board_position(old_position, from_size, from_origin))
+        sprite.position = self.get_screen_position(self.get_board_position(
+            old_position, from_size, from_origin, from_flip_mode
+        ))
 
-    def on_resize(self, width: float, height: float):
+    def update_sprites(self, width: float, height: float, flip_mode: bool) -> None:
         super().on_resize(width, height)
         old_size = self.square_size
         self.square_size = min(self.width / (self.board_width + 2), self.height / (self.board_height + 2))
         old_origin = self.origin
         self.origin = self.width / 2, self.height / 2
-        self.update_sprite(self.highlight, old_size, old_origin)
-        self.update_sprite(self.selection, old_size, old_origin)
+        old_flip_mode = self.flip_mode
+        self.flip_mode = flip_mode
+        old_selected_square = self.selected_square
+        self.update_sprite(self.highlight, old_size, old_origin, old_flip_mode)
+        self.update_sprite(self.selection, old_size, old_origin, old_flip_mode)
         if self.active_piece is not None:
-            self.update_sprite(self.active_piece, old_size, old_origin)
+            self.update_sprite(self.active_piece, old_size, old_origin, old_flip_mode)
         for sprite_list in (
             self.board_sprite_list,
             self.move_sprite_list,
@@ -1303,11 +1327,21 @@ class Board(Window):
             self.promotion_piece_sprite_list,
         ):
             for sprite in sprite_list:
-                self.update_sprite(sprite, old_size, old_origin)
+                self.update_sprite(sprite, old_size, old_origin, old_flip_mode)
         for label in self.label_list:
             old_position = label.position
             label.font_size = self.square_size / 2
-            label.x, label.y = self.get_screen_position(self.get_board_position(old_position, old_size, old_origin))
+            label.x, label.y = self.get_screen_position(
+                self.get_board_position(old_position, old_size, old_origin, old_flip_mode)
+            )
+        self.select_piece(old_selected_square)
+        self.update_highlight(self.get_board_position(self.highlight.position, old_size, old_origin, old_flip_mode))
+
+    def flip_board(self) -> None:
+        self.update_sprites(self.width, self.height, not self.flip_mode)
+
+    def on_resize(self, width: float, height: float):
+        self.update_sprites(width, height, self.flip_mode)
 
     def on_deactivate(self):
         self.hovered_square = None
