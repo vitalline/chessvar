@@ -21,6 +21,7 @@ Ctrl + Shift + B: cycle black army backward (-1)
 Ctrl + N: pass turn to next player
 Shift + N: cycle both armies forward (+1) if they're the same, swap otherwise
 Ctrl + Shift + N: cycle both armies backward (-1) if they're the same, swap otherwise
+Ctrl + F: flip board
 Ctrl + G: reset graphics mode (colors)
 Shift + G: cycle graphics mode forward (+1)
 Ctrl + Shift + G: cycle graphics mode backward (-1)
