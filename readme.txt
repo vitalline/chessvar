@@ -55,8 +55,8 @@ armies in order:
 12. Avian Airforce
 13. Pizza Kings
 14. Meticulous Mashers
-15. Daring Dragons
-16. Seeping Switchers
+15. Seeping Switchers
+16. Daring Dragons
 17. Bent Bozos
 18. Silly Sliders
 

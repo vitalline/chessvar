@@ -40,8 +40,8 @@ piece_groups = {
     12: [av.Wader, av.Darter, av.Faalcon, av.Kingfisher, fide.King, av.Faalcon, av.Darter, av.Wader],
     13: [pz.Pepperoni, pz.Mushroom, pz.Sausage, pz.Meatball, fide.King, pz.Sausage, pz.Mushroom, pz.Pepperoni],
     14: [ms.Forfer, kn.Fibnif, ms.B4nD, ms.N2R4, fide.King, ms.B4nD, kn.Fibnif, ms.Forfer],
-    15: [dr.DragonHorse, dr.Dragonfly, dr.Dragoon, dr.Wyvern, fide.King, dr.Dragoon, dr.Dragonfly, dr.DragonHorse],
-    16: [sw.Panda, sw.Marquis, sw.Unicorn, sw.ErlQueen, fide.King, sw.Unicorn, sw.Marquis, sw.Panda],
+    15: [sw.Panda, sw.Marquis, sw.Unicorn, sw.ErlQueen, fide.King, sw.Unicorn, sw.Marquis, sw.Panda],
+    16: [dr.DragonHorse, dr.Dragonfly, dr.Dragoon, dr.Wyvern, fide.King, dr.Dragoon, dr.Dragonfly, dr.DragonHorse],
     17: [bt.LGriffon, bt.LAanca, bt.LSastik, bt.Griffon, fide.King, bt.RSastik, bt.RAanca, bt.RGriffon],
     18: [sl.LameDuck, sl.Diamond, sl.Onyx, sl.Squire, fide.King, sl.Onyx, sl.Diamond, sl.LameDuck],
 }
@@ -61,8 +61,8 @@ piece_group_names = {
     12: "Avian Airforce",
     13: "Pizza Kings",
     14: "Meticulous Mashers",
-    15: "Daring Dragons",
-    16: "Seeping Switchers",
+    15: "Seeping Switchers",
+    16: "Daring Dragons",
     17: "Bent Bozos",
     18: "Silly Sliders",
 }
