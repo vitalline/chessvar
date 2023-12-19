@@ -452,6 +452,7 @@ class Board(Window):
         if self.clicked_square != pos:
             self.square_was_clicked = False
             self.clicked_square = None
+        self.highlight.position = self.get_screen_position(pos)
         if self.not_on_board(pos):
             self.highlight.alpha = 0
             self.hovered_square = None
@@ -461,7 +462,6 @@ class Board(Window):
                 self.show_moves()
         else:
             self.highlight.alpha = highlight_alpha
-            self.highlight.position = self.get_screen_position(pos)
             if self.hovered_square != pos:
                 self.hovered_square = pos
                 if self.selected_square is None and not self.promotion_piece:
