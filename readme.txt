@@ -1,7 +1,10 @@
 controls:
-LMB: select piece, move selected piece (click or drag)
-RMB: deselect piece
+Mouse, Arrow keys: move selection
+LMB, Enter: select piece, move selected piece (click or drag)
+RMB, Backspace: deselect piece
+Tab: select next piece or square
 F11: toggle full screen
+Escape: exit application
 Ctrl + R: start game with current armies
 Shift + R: start game with random armies
 Ctrl + Shift + R: start game with default armies
@@ -33,12 +36,12 @@ Ctrl + [/]: play random move (with selected piece if one exists)
 Ctrl + E: enter board edit mode
 
 controls (edit mode):
-LMB: select piece, move selected piece (click or drag)
-Shift + LMB: swap piece with selected piece
-Ctrl + LMB: copy selected piece
-RMB: remove piece
-Shift + RMB: promote piece
-Ctrl + RMB: revoke first move of a piece
+LMB, Enter: select piece, move selected piece (click or drag)
+Shift + LMB/Enter: swap piece with selected piece
+Ctrl + LMB/Enter: copy selected piece
+RMB, Backspace: remove piece
+Shift + RMB/Backspace: promote piece
+Ctrl + RMB/Backspace: revoke first move of a piece
 
 armies in order:
 1. Fabulous FIDEs

@@ -1,45 +1,48 @@
 from colorsys import hls_to_rgb, hsv_to_rgb, rgb_to_hls, rgb_to_hsv
 
 from PIL.ImageColor import getrgb
+from arcade import Color
 
 
-def average(color1: tuple[int, int, int], color2: tuple[int, int, int]) -> tuple[int, int, int]:
+def average(color1: Color, color2: Color) -> Color:
     return tuple(min(255, max(0, round((x1 + x2) / 2))) for x1, x2 in zip(color1, color2))  # type: ignore
 
 
-def lighten(color: tuple[int, int, int], amount: float) -> tuple[int, int, int]:
-    h, l, s = rgb_to_hls(*(x / 255 for x in color))
+def lighten(color: Color, amount: float) -> Color:
+    h, l, s = rgb_to_hls(*(x / 255 for x in color[:3]))
     return tuple(  # type: ignore
         min(255, max(0, round(x * 255))) for x in hls_to_rgb(h, min(1.0, max(0.0, l + amount)), s)
-    )
+    ) + color[3:]
 
 
-def darken(color: tuple[int, int, int], amount: float) -> tuple[int, int, int]:
+def darken(color: Color, amount: float) -> Color:
     return lighten(color, -amount)
 
 
-def lighten_or_darken(color: tuple[int, int, int], amount: float) -> tuple[int, int, int]:
-    h, l, s = rgb_to_hls(*(x / 255 for x in color))
+def lighten_or_darken(color: Color, amount: float) -> Color:
+    h, l, s = rgb_to_hls(*(x / 255 for x in color[:3]))
     return tuple(  # type: ignore
         min(255, max(0, round(x * 255))) for x in
         hls_to_rgb(h, min(1.0, max(0.0, l + (amount if l < 0.5 else -amount))), s)
-    )
+    ) + color[3:]
 
 
-def saturate(color: tuple[int, int, int], amount: float) -> tuple[int, int, int]:
-    h, l, s = rgb_to_hls(*(x / 255 for x in color))
+def saturate(color: Color, amount: float) -> Color:
+    h, l, s = rgb_to_hls(*(x / 255 for x in color[:3]))
     return tuple(  # type: ignore
         min(255, max(0, round(x * 255))) for x in hls_to_rgb(h, l, min(1.0, max(0.0, s + amount)))
-    )
+    ) + color[3:]
 
 
-def desaturate(color: tuple[int, int, int], amount: float) -> tuple[int, int, int]:
+def desaturate(color: Color, amount: float) -> Color:
     return saturate(color, -amount)
 
 
 default_colors = {
     "colored_pieces": False,
     "text_color": (0, 0, 0),
+    "highlight_color": (0, 0, 0, 80),
+    "selection_color": (0, 0, 0, 120),
     "piece_color": (255, 255, 255),
     "check_color": (200, 200, 200),
     "win_color": (225, 225, 225),
@@ -114,6 +117,8 @@ for i in range(len(colors)):
         colors[i]["text_color"] = tuple(  # type: ignore
             min(255, max(0, round(x * 255))) for x in hsv_to_rgb(0, 0, rgb_to_hsv(r, g, b)[2] + 0.3)
         )
+        colors[i]["highlight_color"] = (255, 255, 255, 80)
+        colors[i]["selection_color"] = (255, 255, 255, 120)
     elif colors[i]["scheme_type"] == "color":
         colors[i]["text_color"] = colors[i]["promotion_area_color"]
     else:
