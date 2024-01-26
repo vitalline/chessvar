@@ -1,6 +1,9 @@
 from copy import copy
+from datetime import datetime
 from itertools import product, zip_longest
 from math import ceil, sqrt
+from os import curdir, name as os_name, system
+from os.path import abspath, join
 from random import choice, randrange
 from typing import Type
 
@@ -91,6 +94,8 @@ size_step = 5
 
 movements = []
 
+base_dir = abspath(curdir)
+
 
 class Board(Window):
 
@@ -111,6 +116,7 @@ class Board(Window):
         self.origin = self.width / 2, self.height / 2
         self.set_minimum_size((self.board_width + 2) * min_size, (self.board_height + 2) * min_size)
 
+        self.log_data = []  # list of presently logged strings
         self.color_index = 0  # index of the current color scheme
         self.color_scheme = colors[self.color_index]  # current color scheme
         self.background_color = self.color_scheme["background_color"]  # background color
@@ -230,8 +236,8 @@ class Board(Window):
         if shuffle:
             self.piece_sets = {side: choice(list(piece_groups.keys())) for side in self.piece_sets}
 
-        print(
-            f"[0] Starting new game: "
+        self.log(
+            f"[Ply 0] Starting new game: "
             f"{piece_group_names[self.piece_sets[Side.WHITE]]} vs "
             f"{piece_group_names[self.piece_sets[Side.BLACK]]}"
         )
@@ -479,8 +485,8 @@ class Board(Window):
                     self.move_history[-1].set(promotion=self.promotion_area[pos])
                     self.replace(self.promotion_piece, self.promotion_area[pos])
                     self.end_promotion()
-                    print(
-                        f"[{len(self.move_history)}] "
+                    self.log(
+                        f"[Ply {len(self.move_history)}] "
                         f"{'Edit' if self.move_history[-1].is_edit else 'Move'}: "
                         f"{self.move_history[-1]}"
                     )
@@ -604,7 +610,7 @@ class Board(Window):
             move.piece.move(move)
             self.move_history.append(move)
             if not self.promotion_piece:
-                print(f"[{len(self.move_history)}] Edit: {self.move_history[-1]}")
+                self.log(f"[Ply {len(self.move_history)}] Edit: {self.move_history[-1]}")
             self.advance_turn()
             if next_selected_square:
                 self.select_piece(next_selected_square)
@@ -631,7 +637,7 @@ class Board(Window):
                 move.piece.move(move)
                 self.move_history.append(move)
                 if not self.promotion_piece:
-                    print(f"[{len(self.move_history)}] Move: {self.move_history[-1]}")
+                    self.log(f"[Ply {len(self.move_history)}] Move: {self.move_history[-1]}")
                 self.advance_turn()
             else:
                 self.reset_position(self.get_piece(self.selected_square))
@@ -730,7 +736,7 @@ class Board(Window):
             if not past.is_edit:
                 self.turn_side = self.turn_side.opponent()
         else:
-            print(f'''[{len(self.move_history)}] Undo: {
+            self.log(f'''[Ply {len(self.move_history)}] Undo: {
                 f"{'Edit' if self.move_history[-1].is_edit else 'Move'}: " + str(self.move_history[-1])
                 if self.move_history[-1] is not None else f"Pass: {self.turn_side.name()}'s turn"
             }''')
@@ -795,7 +801,7 @@ class Board(Window):
         if last_move is not None and last_move.is_edit and not self.edit_mode:
             self.turn_side = self.turn_side.opponent()
         if self.promotion_piece is None:
-            print(f'''[{len(self.move_history)}] Redo: {
+            self.log(f'''[Ply {len(self.move_history)}] Redo: {
                 f"{'Edit' if self.move_history[-1].is_edit else 'Move'}: " + str(self.move_history[-1])
                 if self.move_history[-1] is not None else f"Pass: {self.turn_side.opponent().name()}'s turn"
             }''')
@@ -925,17 +931,17 @@ class Board(Window):
             # the game has ended. let's find out who won and show it by changing piece colors... unless edit mode is on!
             if pass_check_side != Side.NONE:
                 # the last player was in check and passed the turn, the game ends and the current player wins
-                print(f"[{len(self.move_history)}] Game over! {pass_check_side.opponent().name()} wins.")
+                self.log(f"[Ply {len(self.move_history)}] Game over! {pass_check_side.opponent().name()} wins.")
             elif self.check_side != Side.NONE:
                 # the current player was checkmated, the game ends and the opponent wins
-                print(f"[{len(self.move_history)}] Checkmate! {self.check_side.opponent().name()} wins.")
+                self.log(f"[Ply {len(self.move_history)}] Checkmate! {self.check_side.opponent().name()} wins.")
             else:
                 # the current player was stalemated, the game ends in a draw
-                print(f"[{len(self.move_history)}] Stalemate! It's a draw.")
+                self.log(f"[Ply {len(self.move_history)}] Stalemate! It's a draw.")
         else:
             if self.check_side != Side.NONE:
                 # the game is still going, but the current player is in check
-                print(f"[{len(self.move_history)}] {self.check_side.name()} is in check!")
+                self.log(f"[Ply {len(self.move_history)}] {self.check_side.name()} is in check!")
             else:
                 # the game is still going and there is no check
                 pass
@@ -1255,7 +1261,7 @@ class Board(Window):
             self.set_size((self.board_width + 2) * self.square_size, (self.board_height + 2) * self.square_size)
         if symbol == key.E and modifiers & key.MOD_ACCEL:  # Edit mode (toggle)
             self.edit_mode = not self.edit_mode
-            print(f"[{len(self.move_history)}] Mode: {'EDIT' if self.edit_mode else 'PLAY'}")
+            self.log(f"[Ply {len(self.move_history)}] Mode: {'EDIT' if self.edit_mode else 'PLAY'}")
             self.deselect_piece()
             self.hide_moves()
             if self.edit_mode:
@@ -1271,7 +1277,7 @@ class Board(Window):
             if modifiers & key.MOD_ACCEL and not modifiers & key.MOD_SHIFT:  # White is in control
                 if self.turn_side != Side.WHITE:
                     self.move_history.append(None)
-                    print(f"[{len(self.move_history)}] Pass: {Side.WHITE.name()}'s turn")
+                    self.log(f"[Ply {len(self.move_history)}] Pass: {Side.WHITE.name()}'s turn")
                     self.clear_en_passant()
                     self.advance_turn()
             elif modifiers & key.MOD_SHIFT:  # Shift white piece set
@@ -1282,7 +1288,7 @@ class Board(Window):
             if modifiers & key.MOD_ACCEL and not modifiers & key.MOD_SHIFT:  # Black is in control
                 if self.turn_side != Side.BLACK:
                     self.move_history.append(None)
-                    print(f"[{len(self.move_history)}] Pass: {Side.BLACK.name()}'s turn")
+                    self.log(f"[Ply {len(self.move_history)}] Pass: {Side.BLACK.name()}'s turn")
                     self.clear_en_passant()
                     self.advance_turn()
             elif modifiers & key.MOD_SHIFT:  # Shift black piece set
@@ -1292,7 +1298,7 @@ class Board(Window):
         if symbol == key.N:  # Next
             if modifiers & key.MOD_ACCEL and not modifiers & key.MOD_SHIFT:  # Next player is in control
                 self.move_history.append(None)
-                print(f"[{len(self.move_history)}] Pass: {self.turn_side.opponent().name()}'s turn")
+                self.log(f"[Ply {len(self.move_history)}] Pass: {self.turn_side.opponent().name()}'s turn")
                 self.clear_en_passant()
                 self.advance_turn()
             elif modifiers & key.MOD_SHIFT:
@@ -1304,8 +1310,12 @@ class Board(Window):
                     piece_sets = self.piece_sets[Side.WHITE], self.piece_sets[Side.BLACK]
                     self.piece_sets[Side.BLACK], self.piece_sets[Side.WHITE] = piece_sets
                 self.reset_board(update=True)
-        if symbol == key.F and modifiers & key.MOD_ACCEL:  # Flip
-            self.flip_board()
+        if symbol == key.F:
+            if modifiers & key.MOD_ACCEL:  # Flip
+                self.flip_board()
+            elif modifiers & key.MOD_SHIFT:  # Fast-forward
+                while self.future_move_history:
+                    self.redo_last_move()
         if symbol == key.G:  # Graphics
             if modifiers & key.MOD_ACCEL and not modifiers & key.MOD_SHIFT:  # Graphics reset
                 self.color_index = 0
@@ -1329,6 +1339,11 @@ class Board(Window):
                 self.undo_last_finished_move()
         if symbol == key.Y and modifiers & key.MOD_ACCEL:  # Redo
             self.redo_last_finished_move()
+        if symbol == key.L:  # Log
+            if modifiers & key.MOD_ACCEL:  # Save log
+                self.save_log()
+            if modifiers & key.MOD_SHIFT:  # Clear log
+                self.clear_log()
         if symbol == key.SLASH:  # (?) Random
             if modifiers & key.MOD_SHIFT:  # Random piece
                 self.deselect_piece()
@@ -1347,7 +1362,7 @@ class Board(Window):
                     self.update_move(random_move)
                     random_move.piece.move(random_move)
                     self.move_history.append(random_move)
-                    print(f"[{len(self.move_history)}] Move: {self.move_history[-1]}")
+                    self.log(f"[Ply {len(self.move_history)}] Move: {self.move_history[-1]}")
                     self.advance_turn()
 
     def on_key_release(self, symbol: int, modifiers: int):
@@ -1407,6 +1422,19 @@ class Board(Window):
 
     def flip_board(self) -> None:
         self.update_sprites(self.width, self.height, not self.flip_mode)
+
+    def log(self, string: str) -> None:
+        self.log_data.append(string)
+        print(string)
+
+    def save_log(self) -> None:
+        if self.log_data:
+            with open(join(base_dir, f"log_{datetime.now():%Y-%m-%d_%H-%M-%S}.txt"), "w") as log_file:
+                log_file.write("\n".join(self.log_data))
+
+    def clear_log(self) -> None:
+        self.log_data.clear()
+        system("cls" if os_name == "nt" else "clear")
 
     def on_resize(self, width: float, height: float):
         self.update_sprites(width, height, self.flip_mode)

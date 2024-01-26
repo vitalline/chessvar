@@ -25,12 +25,15 @@ Ctrl + N: pass turn to next player
 Shift + N: cycle both armies forward (+1) if they're the same, swap otherwise
 Ctrl + Shift + N: cycle both armies backward (-1) if they're the same, swap otherwise
 Ctrl + F: flip board
+Shift + F: fast-forward to last move
 Ctrl + G: reset graphics mode (colors)
 Shift + G: cycle graphics mode forward (+1)
 Ctrl + Shift + G: cycle graphics mode backward (-1)
 Ctrl + Z: undo last move (if any)
 Ctrl + Shift + Z: redo last move (if any)
 Ctrl + Y: redo last move (if any)
+Ctrl + L: save game log
+Shift + L: clear game log
 Shift + [/]: select random piece (that can move)
 Ctrl + [/]: play random move (with selected piece if one exists)
 Ctrl + E: enter board edit mode
