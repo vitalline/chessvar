@@ -133,7 +133,7 @@ class Board(Window):
         self.en_passant_markers = set()  # squares where it can be captured
         self.promotion_piece = None  # piece that is currently being promoted
         self.promotion_area = {}  # squares to draw possible promotions on
-        self.ply_count = 0  # number of half-moves made so far
+        self.ply_count = 0  # current half-move number
         self.move_history = []  # list of moves made so far
         self.future_move_history = []  # list of moves that were undone, in reverse order
         self.turn_side = Side.WHITE  # side whose turn it is
@@ -247,6 +247,7 @@ class Board(Window):
             f"{piece_group_names[self.piece_sets[Side.WHITE]]} vs "
             f"{piece_group_names[self.piece_sets[Side.BLACK]]}"
         )
+        self.ply_count += 1
 
         piece_sets = {side: piece_groups[self.piece_sets[side]].copy() for side in self.piece_sets}
 
@@ -496,12 +497,12 @@ class Board(Window):
                     self.move_history[-1].set(promotion=self.promotion_area[pos])
                     self.replace(self.promotion_piece, self.promotion_area[pos])
                     self.end_promotion()
-                    self.ply_count += not self.move_history[-1].is_edit
                     self.log(
                         f"[Ply {self.ply_count}] "
                         f"{'Edit' if self.move_history[-1].is_edit else 'Move'}: "
                         f"{self.move_history[-1]}"
                     )
+                    self.ply_count += not self.move_history[-1].is_edit
                     self.advance_turn()
                 return
             if pos == self.selected_square:
@@ -649,8 +650,8 @@ class Board(Window):
                 move.piece.move(move)
                 self.move_history.append(move)
                 if not self.promotion_piece:
-                    self.ply_count += 1
                     self.log(f"[Ply {self.ply_count}] Move: {self.move_history[-1]}")
+                    self.ply_count += 1
                 self.advance_turn()
             else:
                 self.reset_position(self.get_piece(self.selected_square))
@@ -816,11 +817,11 @@ class Board(Window):
         if last_move is not None and last_move.is_edit and not self.edit_mode:
             self.turn_side = self.turn_side.opponent()
         if self.promotion_piece is None:
-            self.ply_count += 1 if last_move is None else not last_move.is_edit
             self.log(f'''[Ply {self.ply_count}] Redo: {
                 f"{'Edit' if last_move.is_edit else 'Move'}: " + str(last_move)
                 if last_move is not None else f"Pass: {self.turn_side.opponent().name()}'s turn"
             }''')
+            self.ply_count += 1 if last_move is None else not last_move.is_edit
         self.advance_turn()
 
     def undo_last_finished_move(self) -> None:
@@ -1293,8 +1294,8 @@ class Board(Window):
             if modifiers & key.MOD_ACCEL and not modifiers & key.MOD_SHIFT:  # White is in control
                 if self.turn_side != Side.WHITE:
                     self.move_history.append(None)
-                    self.ply_count += 1
                     self.log(f"[Ply {self.ply_count}] Pass: {Side.WHITE.name()}'s turn")
+                    self.ply_count += 1
                     self.clear_en_passant()
                     self.advance_turn()
             elif modifiers & key.MOD_SHIFT:  # Shift white piece set
@@ -1305,8 +1306,8 @@ class Board(Window):
             if modifiers & key.MOD_ACCEL and not modifiers & key.MOD_SHIFT:  # Black is in control
                 if self.turn_side != Side.BLACK:
                     self.move_history.append(None)
-                    self.ply_count += 1
                     self.log(f"[Ply {self.ply_count}] Pass: {Side.BLACK.name()}'s turn")
+                    self.ply_count += 1
                     self.clear_en_passant()
                     self.advance_turn()
             elif modifiers & key.MOD_SHIFT:  # Shift black piece set
@@ -1316,8 +1317,8 @@ class Board(Window):
         if symbol == key.N:  # Next
             if modifiers & key.MOD_ACCEL and not modifiers & key.MOD_SHIFT:  # Next player is in control
                 self.move_history.append(None)
-                self.ply_count += 1
                 self.log(f"[Ply {self.ply_count}] Pass: {self.turn_side.opponent().name()}'s turn")
+                self.ply_count += 1
                 self.clear_en_passant()
                 self.advance_turn()
             elif modifiers & key.MOD_SHIFT:
@@ -1383,8 +1384,8 @@ class Board(Window):
                     self.update_move(random_move)
                     random_move.piece.move(random_move)
                     self.move_history.append(random_move)
-                    self.ply_count += 1
                     self.log(f"[Ply {self.ply_count}] Move: {self.move_history[-1]}")
+                    self.ply_count += 1
                     self.advance_turn()
 
     def on_key_release(self, symbol: int, modifiers: int):
