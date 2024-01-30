@@ -49,7 +49,13 @@ class BaseDirectionalMovement(BaseMovement):
         super().__init__(board)
         self.directions = directions
 
-    def skip_condition(self, move: Move, direction: AnyDirection, side: Side) -> bool:
+    def initialize_direction(self, direction: AnyDirection, pos_from: Position, side: Side) -> None:
+        pass
+
+    def advance_direction(self, move: Move, direction: AnyDirection, pos_from: Position, side: Side) -> None:
+        pass
+
+    def skip_condition(self, move: Move, direction: AnyDirection, side: Side, theoretical: bool = False) -> bool:
         return False
 
     def stop_condition(self, move: Move, direction: AnyDirection, side: Side, theoretical: bool = False) -> bool:
@@ -65,6 +71,7 @@ class BaseDirectionalMovement(BaseMovement):
         direction_id = 0
         while direction_id < len(self.directions):
             direction = side.direction(self.directions[direction_id])
+            self.initialize_direction(direction, pos_from, side)
             current_pos = pos_from
             distance = 0
             move = Move(pos_from, self.transform(current_pos), self)
@@ -72,13 +79,11 @@ class BaseDirectionalMovement(BaseMovement):
                 if self.stop_condition(move, direction, side, theoretical):
                     direction_id += 1
                     break
-                current_pos = add(current_pos, direction)
+                current_pos = add(current_pos, direction[:2])
                 distance += 1
-                if self.board.not_on_board(self.transform(current_pos)):
-                    direction_id += 1
-                    break
                 move = Move(pos_from, self.transform(current_pos), self)
-                if self.skip_condition(move, direction, side):
+                self.advance_direction(move, direction, pos_from, side)
+                if self.skip_condition(move, direction, side, theoretical):
                     continue
                 yield move
             else:
@@ -92,7 +97,7 @@ class RiderMovement(BaseDirectionalMovement):
     def __init__(self, board: Board, directions: list[AnyDirection]):
         super().__init__(board, directions)
 
-    def skip_condition(self, move: Move, direction: AnyDirection, side: Side) -> bool:
+    def skip_condition(self, move: Move, direction: AnyDirection, side: Side, theoretical: bool = False) -> bool:
         if len(direction) < 4:
             return False
         if not direction[3]:
@@ -115,6 +120,52 @@ class RiderMovement(BaseDirectionalMovement):
                     or side == self.board.get_side(move.pos_to).opponent() and not self.board.not_a_piece(move.pos_to)
                 )
         )
+
+
+class CannonRiderMovement(RiderMovement):
+    def __init__(self, board: Board, directions: list[AnyDirection]):
+        super().__init__(board, directions)
+        self.jumped = None
+
+    def initialize_direction(self, direction: AnyDirection, pos_from: Position, side: Side) -> None:
+        self.jumped = -1
+
+    def advance_direction(self, move: Move, direction: AnyDirection, pos_from: Position, side: Side) -> None:
+        if self.jumped == -1:
+            if not self.board.not_a_piece(self.transform(move.pos_to)):
+                self.jumped = 0
+        elif self.jumped == 0:
+            self.jumped = 1
+
+    def skip_condition(self, move: Move, direction: AnyDirection, side: Side, theoretical: bool = False) -> bool:
+        return super().skip_condition(move, direction, side, theoretical) if self.jumped == 1 else not theoretical
+
+    def stop_condition(self, move: Move, direction: AnyDirection, side: Side, theoretical: bool = False) -> bool:
+        return super().stop_condition(move, direction, side, theoretical or self.jumped != 1)
+
+    def __copy__(self):
+        clone = self.__class__(*self.__copy_args__())
+        clone.jumped = None
+        return clone
+
+    def __deepcopy__(self, memo):
+        clone = self.__class__(*self.__copy_args__())
+        clone.jumped = None
+        return clone
+
+
+class SpaciousRiderMovement(RiderMovement):
+    def __init__(self, board: Board, directions: list[AnyDirection]):
+        super().__init__(board, directions)
+
+    def spacious_transform(self, pos: Position) -> Position:
+        return pos[0] % self.board.board_height, pos[1] % self.board.board_width
+
+    def skip_condition(self, move: Move, direction: AnyDirection, side: Side, theoretical: bool = False) -> bool:
+        next_pos_to = self.transform(add(move.pos_to, direction[:2]))
+        check_space = self.spacious_transform(next_pos_to)
+        check_state = check_space == self.spacious_transform(move.pos_from) or self.board.not_a_piece(check_space)
+        return not check_state or super().skip_condition(move, direction, side, theoretical)
 
 
 class CylindricalRiderMovement(RiderMovement):
@@ -237,7 +288,7 @@ class EnPassantTargetMovement(FirstMoveRiderMovement):
                 for first_move in self.moves(move.pos_from, side, True):
                     if move.pos_to == first_move.pos_to:  # and if it is a move that can only be made as the first move:
                         for direction in self.en_passant_directions:
-                            en_passant_square = add(move.pos_from, move.piece.side.direction(direction))
+                            en_passant_square = add(move.pos_from, move.piece.side.direction(direction[:2]))
                             if self.board.not_a_piece(en_passant_square):
                                 self.board.mark_en_passant(move.pos_to, en_passant_square)  # mark ALL the squares!
                         break  # and yes this is totally inefficient but like who even cares at this point really

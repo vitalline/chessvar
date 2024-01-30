@@ -19,11 +19,11 @@ from chess.movement.move import Move
 from chess.movement.util import Position, add
 from chess.pieces import pieces as abc
 from chess.pieces.groups import classic as fide
-from chess.pieces.groups import avian as av, bent as bt, colorbound as cb
-from chess.pieces.groups import cylindrical as cy, dragon as dr, fizzies as fi
-from chess.pieces.groups import forward as fw, knights as kn, mash as ms
-from chess.pieces.groups import pizza as pz, rookies as rk, slide as sl
-from chess.pieces.groups import switch as sw
+from chess.pieces.groups import avian as av, bent as bt, cannon as ca
+from chess.pieces.groups import colorbound as cb, cylindrical as cy, dragon as dr
+from chess.pieces.groups import fizzies as fi, forward as fw, knights as kn
+from chess.pieces.groups import mash as ms, pizza as pz, rookies as rk
+from chess.pieces.groups import shatranj as sh, slide as sl, switch as sw
 from chess.pieces.groups.amazon import Amazon
 from chess.pieces.groups.util import NoPiece
 from chess.pieces.pieces import Side
@@ -41,12 +41,14 @@ piece_groups = {
     10: [cy.CyWaffle, cy.CyKnight, cy.CyBishop, cy.CyChancellor, fide.King, cy.CyBishop, cy.CyKnight, cy.CyWaffle],
     11: [fi.LRhino, fi.Gnohmon, fi.Crabinal, fi.EagleScout, fide.King, fi.Crabinal, fi.Gnohmon, fi.RRhino],
     12: [av.Wader, av.Darter, av.Faalcon, av.Kingfisher, fide.King, av.Faalcon, av.Darter, av.Wader],
-    13: [pz.Pepperoni, pz.Mushroom, pz.Sausage, pz.Meatball, fide.King, pz.Sausage, pz.Mushroom, pz.Pepperoni],
-    14: [ms.Forfer, kn.Fibnif, ms.B4nD, ms.N2R4, fide.King, ms.B4nD, kn.Fibnif, ms.Forfer],
-    15: [sw.Panda, sw.Marquis, sw.Unicorn, sw.ErlQueen, fide.King, sw.Unicorn, sw.Marquis, sw.Panda],
-    16: [dr.DragonHorse, dr.Dragonfly, dr.Dragoon, dr.Wyvern, fide.King, dr.Dragoon, dr.Dragonfly, dr.DragonHorse],
-    17: [bt.LGriffon, bt.LAanca, bt.LSastik, bt.Griffon, fide.King, bt.RSastik, bt.RAanca, bt.RGriffon],
-    18: [sl.LameDuck, sl.Diamond, sl.Onyx, sl.Squire, fide.King, sl.Onyx, sl.Diamond, sl.LameDuck],
+    13: [ca.Mortar, ca.Napoleon, ca.Carronade, ca.BigBertha, fide.King, ca.Carronade, ca.Napoleon, ca.Howitzer],
+    14: [pz.Pepperoni, pz.Mushroom, pz.Sausage, pz.Meatball, fide.King, pz.Sausage, pz.Mushroom, pz.Pepperoni],
+    15: [ms.Forfer, kn.Fibnif, ms.B4nD, ms.N2R4, fide.King, ms.B4nD, kn.Fibnif, ms.Forfer],
+    16: [sw.Panda, sw.Marquis, sw.Unicorn, sw.ErlQueen, fide.King, sw.Unicorn, sw.Marquis, sw.Panda],
+    17: [dr.DragonHorse, dr.Dragonfly, dr.Dragoon, dr.Wyvern, fide.King, dr.Dragoon, dr.Dragonfly, dr.DragonHorse],
+    18: [bt.LGriffon, bt.LAanca, bt.LSastik, bt.Griffon, fide.King, bt.RSastik, bt.RAanca, bt.RGriffon],
+    19: [sh.Hero, fide.Knight, sh.Shaman, sh.WarElephant, fide.King, sh.Shaman, fide.Knight, sh.Hero],
+    20: [sl.LameDuck, sl.Diamond, sl.Onyx, sl.Squire, fide.King, sl.Onyx, sl.Diamond, sl.LameDuck],
 }
 
 piece_group_names = {
@@ -62,12 +64,14 @@ piece_group_names = {
     10: "Cylindrical Cinders",
     11: "Fighting Fizzies",
     12: "Avian Airforce",
-    13: "Pizza Kings",
-    14: "Meticulous Mashers",
-    15: "Seeping Switchers",
-    16: "Daring Dragons",
-    17: "Bent Bozos",
-    18: "Silly Sliders",
+    13: "Spacious Cannoneers",
+    14: "Pizza Kings",
+    15: "Meticulous Mashers",
+    16: "Seeping Switchers",
+    17: "Daring Dragons",
+    18: "Bent Bozos",
+    19: "Shatranjian Shooters",
+    20: "Silly Sliders",
 }
 
 board_width = 8
@@ -151,16 +155,16 @@ class Board(Window):
         self.theoretical_moves = {}  # dictionary of theoretical moves from any square that has an opposing piece on it
         self.anchor = 0, 0  # used to have the board scale from the origin instead of the center
         self.highlight = Sprite("assets/util/selection.png")  # sprite for the highlight marker
-        self.highlight.color = self.color_scheme["highlight_color"]
+        self.highlight.color = self.color_scheme["highlight_color"]  # color it according to the color scheme
         self.highlight.scale = self.square_size / self.highlight.texture.width  # scale it to the size of a square
         self.selection = Sprite("assets/util/selection.png")  # sprite for the selection marker
-        self.selection.color = self.color_scheme["selection_color"]
+        self.selection.color = self.color_scheme["selection_color"]  # color it according to the color scheme
         self.selection.scale = self.square_size / self.selection.texture.width  # scale it to the size of a square
         self.active_piece = None  # piece that is currently being moved
         self.label_list = []  # labels for the rows and columns
         self.board_sprite_list = SpriteList()  # sprites for the board squares
         self.move_sprite_list = SpriteList()  # sprites for the move markers
-        self.piece_sprite_list = SpriteList()  # sprites for the piece sprites
+        self.piece_sprite_list = SpriteList()  # sprites for the pieces
         self.promotion_area_sprite_list = SpriteList()  # sprites for the promotion area background tiles
         self.promotion_piece_sprite_list = SpriteList()  # sprites for the possible promotion pieces
 
@@ -242,7 +246,12 @@ class Board(Window):
             f"{piece_group_names[self.piece_sets[Side.BLACK]]}"
         )
 
-        piece_sets = {side: piece_groups[self.piece_sets[side]] for side in self.piece_sets}
+        piece_sets = {side: piece_groups[self.piece_sets[side]].copy() for side in self.piece_sets}
+
+        # Special condition for Spacious Cannoneers as black: Swap the positions of Mortar and Howitzer
+        black_piece_set = piece_sets[Side.BLACK]
+        if black_piece_set[0] == ca.Mortar and black_piece_set[7] == ca.Howitzer:
+            black_piece_set[0], black_piece_set[7] = black_piece_set[7], black_piece_set[0]
 
         if update or shuffle:
             self.future_move_history = []

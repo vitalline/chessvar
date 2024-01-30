@@ -59,12 +59,14 @@ armies in order:
 10. Cylindrical Cinders
 11. Fighting Fizzies
 12. Avian Airforce
-13. Pizza Kings
-14. Meticulous Mashers
-15. Seeping Switchers
-16. Daring Dragons
-17. Bent Bozos
-18. Silly Sliders
+13. Spacious Cannoneers
+14. Pizza Kings
+15. Meticulous Mashers
+16. Seeping Switchers
+17. Daring Dragons
+18. Bent Bozos
+19. Shatranjian Shooters
+20. Silly Sliders
 
 source:
 https://en.wikipedia.org/wiki/Chess_with_different_armies
