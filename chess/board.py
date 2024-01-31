@@ -223,7 +223,7 @@ class Board(Window):
             self.highlight.draw()
 
     def on_update(self, delta_time: float):
-        if self.trickster_color_index:
+        if self.is_trickster_mode():
             self.trickster_color_delta += delta_time
             self.trickster_angle_delta += delta_time
 
@@ -705,29 +705,48 @@ class Board(Window):
 
     def undo(self, move: Move) -> None:
         if move.pos_from != move.pos_to or move.promotion is not None:
+            # piece was added, moved, removed, or promoted
             if move.pos_from is not None:
+                # existing piece was moved, empty the square it moved from and restore its position
                 self.set_position(move.piece, move.pos_from)
                 self.piece_sprite_list.remove(self.pieces[move.pos_from[0]][move.pos_from[1]])
             if move.pos_to is not None and move.pos_from != move.pos_to:
+                # piece was placed on a different square, empty that square
                 self.piece_sprite_list.remove(self.pieces[move.pos_to[0]][move.pos_to[1]])
+            if move.pos_to is None or move.promotion is not None:
+                # existing piece was removed from the board (possibly promoted to a different piece type)
+                if self.is_trickster_mode(False):  # reset_trickster_mode() does not reset removed pieces
+                    move.piece.angle = 0           # so instead we have to do it manually as a workaround
             if move.pos_from is not None:
+                # existing piece was moved, restore it on the square it moved from
                 self.pieces[move.pos_from[0]][move.pos_from[1]] = move.piece
                 self.piece_sprite_list.append(move.piece)
         if move.captured_piece is not None:
-            if move.captured_piece.board_pos != move.pos_to:
-                self.piece_sprite_list.remove(self.pieces[move.captured_piece.board_pos[0]][move.captured_piece.board_pos[1]])
+            # piece was captured, restore it on the square it was captured from
+            capture_pos = move.captured_piece.board_pos
+            if capture_pos != move.pos_to:
+                # piece was captured from a different square than the one the capturing piece moved to (e.g. en passant)
+                # empty the square it was captured from (it was not emptied earlier because it was not the one moved to)
+                self.piece_sprite_list.remove(self.pieces[capture_pos[0]][capture_pos[1]])
             self.reset_position(move.captured_piece)
-            self.pieces[move.captured_piece.board_pos[0]][move.captured_piece.board_pos[1]] = move.captured_piece
+            if self.is_trickster_mode(False):  # reset_trickster_mode() does not reset removed pieces
+                move.captured_piece.angle = 0  # so instead we have to do it manually as a workaround
+            self.pieces[capture_pos[0]][capture_pos[1]] = move.captured_piece
             self.piece_sprite_list.append(move.captured_piece)
         if move.pos_to is not None and move.pos_from != move.pos_to:
+            # piece was added on or moved to a different square, restore the piece that was there before
             if move.captured_piece is None or move.captured_piece.board_pos != move.pos_to:
+                # no piece was on the square that was moved to (e.g. non-capturing move, en passant)
+                # create a blank piece on that square
                 self.pieces[move.pos_to[0]][move.pos_to[1]] = NoPiece(self, move.pos_to)
                 self.piece_sprite_list.append(self.pieces[move.pos_to[0]][move.pos_to[1]])
             if move.swapped_piece is not None:
+                # piece was swapped with another piece, move the swapped piece to the square that was moved to
                 self.set_position(move.swapped_piece, move.pos_to)
                 self.piece_sprite_list.append(move.swapped_piece)
                 self.pieces[move.pos_to[0]][move.pos_to[1]] = move.swapped_piece
         if not move.is_edit or (move.pos_from == move.pos_to and move.promotion is None):
+            # call movement.undo() to restore movement state before the move (e.g. pawn double move, castling rights)
             (move.piece or move).movement.undo(move, move.piece.side or self.turn_side)
 
     def undo_last_move(self) -> None:
@@ -869,6 +888,13 @@ class Board(Window):
                 continue
             promotion_piece = promotion(self, pos, piece.side)
             promotion_piece.scale = self.square_size / promotion_piece.texture.width
+            promotion_piece.set_color(
+                self.color_scheme.get(
+                    f"{promotion_piece.side.file_name()}piece_color",
+                    self.color_scheme["piece_color"]
+                ),
+                self.color_scheme["colored_pieces"]
+            )
             self.promotion_piece_sprite_list.append(promotion_piece)
             self.promotion_area[pos] = promotion
 
@@ -966,7 +992,7 @@ class Board(Window):
 
     def update_colors(self) -> None:
         self.color_scheme = colors[self.color_index]
-        if self.trickster_color_index:
+        if self.is_trickster_mode():
             self.color_scheme = copy(self.color_scheme)
             new_colors = (
                 trickster_colors[self.trickster_color_index - 1],
@@ -1058,8 +1084,11 @@ class Board(Window):
             else:
                 self.color_pieces()
 
+    def is_trickster_mode(self, value: bool = True) -> bool:
+        return value == (self.trickster_color_index != 0)
+
     def update_trickster_mode(self) -> None:
-        if not self.trickster_color_index:
+        if self.is_trickster_mode(False):
             self.trickster_color_delta = 0
             return  # trickster mode is disabled
         if self.trickster_color_delta > 1 / 11:
@@ -1076,7 +1105,7 @@ class Board(Window):
         self.trickster_angle_delta = 0
 
     def reset_trickster_mode(self) -> None:
-        if self.trickster_color_index:
+        if self.is_trickster_mode():
             return  # trickster mode is enabled
         self.update_colors()
         for sprite_list in (self.piece_sprite_list, self.promotion_piece_sprite_list, [self.active_piece]):
@@ -1341,7 +1370,7 @@ class Board(Window):
                 self.color_index = 0
             elif modifiers & key.MOD_SHIFT:  # Graphics shift
                 self.color_index = (self.color_index + (-1 if modifiers & key.MOD_ACCEL else 1)) % len(colors)
-            if self.color_scheme["scheme_type"] == "cherub" and self.trickster_color_index:
+            if self.color_scheme["scheme_type"] == "cherub" and self.is_trickster_mode():
                 self.trickster_color_index = 0
                 self.reset_trickster_mode()
             else:
@@ -1349,7 +1378,7 @@ class Board(Window):
         if symbol == key.T and modifiers & key.MOD_ACCEL:  # Trickster mode
             if self.color_scheme["scheme_type"] == "cherub":
                 self.trickster_color_index = (
-                    randrange(len(trickster_colors)) + 1 if not self.trickster_color_index else 0
+                    randrange(len(trickster_colors)) + 1 if self.is_trickster_mode(False) else 0
                 )
                 self.reset_trickster_mode()
         if symbol == key.Z and modifiers & key.MOD_ACCEL:  # Undo
