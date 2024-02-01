@@ -1,4 +1,4 @@
-import math
+from math import ceil
 
 from chess.movement import movement
 from chess.movement.util import rot, sym, symv
@@ -61,38 +61,17 @@ class Gnohmon(Piece):
 
 class Crabinal(Piece):
     name = 'Crabinal'
-    file_name = 'ffNbsNhhB'
+    file_name = 'ffbsNhhB'
     asset_folder = 'fizz'
 
     def __init__(self, board, board_pos, side):
         super().__init__(
-            board, board_pos, side
+            board, board_pos, side,
+            movement.MultiMovement(board, [
+                movement.RiderMovement(board, symv([(2, 1, 1), (-1, 2, 1)])),
+                movement.HalflingRiderMovement(board, rot([(1, 1)]))
+            ])
         )
-        self.update_movement()
-
-    def moves(self, theoretical: bool = False):
-        self.update_movement()
-        yield from super().moves(theoretical)
-
-    def update_movement(self):
-        self.movement = movement.MultiMovement(self.board, [
-            movement.RiderMovement(self.board, symv([(2, 1, 1), (-1, 2, 1)]))
-        ] + [
-            movement.RiderMovement(self.board, [
-                (i, j, max(1, min(
-                    math.ceil(
-                        ((self.board.board_height - self.board_pos[0] - 1)
-                         if i == self.side.direction()
-                         else self.board_pos[0]) / 2
-                    ),
-                    math.ceil(
-                        ((self.board.board_width - self.board_pos[1] - 1)
-                         if j > 0
-                         else self.board_pos[1]) / 2
-                    )
-                )))
-            ]) for i, j in rot([(1, 1)])
-        ])
 
 
 class EagleScout(Piece):
@@ -105,7 +84,7 @@ class EagleScout(Piece):
         for i, j in [(1, 1), (-1, 1), (-1, -1), (1, -1)]:
             for k, l in [(-i, j), (i, -j)]:
                 rider_movements = []
-                for m in range(int(math.ceil(max(board.board_width, board.board_height) / 2))):
+                for m in range(int(ceil(max(board.board_width, board.board_height) / 2))):
                     rider_movements.append(movement.RiderMovement(board, [(i, j, 1)]))
                     rider_movements.append(movement.RiderMovement(board, [(k, l, 1)]))
                 chain_movements.append(movement.ChainMovement(board, rider_movements))

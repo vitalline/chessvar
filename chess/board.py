@@ -19,9 +19,9 @@ from chess.movement.move import Move
 from chess.movement.util import Position, add
 from chess.pieces import pieces as abc
 from chess.pieces.groups import classic as fide
-from chess.pieces.groups import amazon as am, avian as av, beast as bs, cannon as ca
+from chess.pieces.groups import amazon as am, amontillado as ao, avian as av, beast as bs, cannon as ca
 from chess.pieces.groups import colorbound as cb, fizz as fi, forward as fw, knight as kn
-from chess.pieces.groups import mash as ms, pizza as pz, rookie as rk
+from chess.pieces.groups import mash as ms, pizza as pz, rookie as rk, splash as sp, switch as sw
 from chess.pieces.groups.util import NoPiece
 from chess.pieces.pieces import Side
 
@@ -45,6 +45,10 @@ piece_groups = [
     {
         'name': "Amazing Armada",
         'set': [am.Cannon, am.Camel, am.Knife, am.Amazon, fide.King, am.Knife, am.Camel, am.Cannon],
+    },
+    {
+        'name': "Amontillado Arbiters",
+        'set': [ao.Hasdrubal, ao.Crabster, ao.Bed, ao.Hamilcar, fide.King, ao.Bed, ao.Crabster, ao.Hasdrubal],
     },
     {
         'name': "Avian Airforce",
@@ -74,6 +78,14 @@ piece_groups = [
         'name': "Pizza Pounders",
         'set': [pz.Pepperoni, pz.Mushroom, pz.Sausage, pz.Meatball, fide.King, pz.Sausage, pz.Mushroom, pz.Pepperoni],
     },
+    {
+        'name': "Seeping Switchers",
+        'set': [sw.Panda, sw.Marquis, sw.Bear, sw.Pandabear, fide.King, sw.Bear, sw.Marquis, sw.Panda],
+    },
+    {
+        'name': "Superior Splashers",
+        'set': [sp.Mammoth, sp.Kirin, sp.Deacon, sp.Brigadier, fide.King, sp.Deacon, sp.Kirin, sp.Mammoth],
+    }
 ]
 
 board_width = 8
@@ -252,11 +264,6 @@ class Board(Window):
         self.ply_count += 1
 
         piece_sets = {side: piece_groups[self.piece_sets[side]]['set'].copy() for side in self.piece_sets}
-
-        # Special condition for Spacious Cannoneers as black: Swap the positions of Mortar and Howitzer
-        black_piece_set = piece_sets[Side.BLACK]
-        if black_piece_set[0] == ca.Mortar and black_piece_set[7] == ca.Howitzer:
-            black_piece_set[0], black_piece_set[7] = black_piece_set[7], black_piece_set[0]
 
         if update or shuffle:
             self.future_move_history = []

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from copy import copy, deepcopy
+from math import ceil
 from typing import TYPE_CHECKING
 
 from chess.movement.move import Move
@@ -39,9 +40,7 @@ class BaseMovement(object):
         return clone
 
     def __deepcopy__(self, memo):
-        clone = self.__class__(*self.__copy_args__())
-        clone.total_moves = self.total_moves
-        return clone
+        return self.__copy__()
 
 
 class BaseDirectionalMovement(BaseMovement):
@@ -122,6 +121,31 @@ class RiderMovement(BaseDirectionalMovement):
         )
 
 
+class HalflingRiderMovement(RiderMovement):
+
+    def __init__(self, board: Board, directions: list[AnyDirection]):
+        super().__init__(board, directions)
+        self.board_size = self.board.board_height, self.board.board_width
+        self.current_distance = 0
+        self.max_distance = 0
+
+    @staticmethod
+    def distance_to_edge(position: int, direction: int, size: int) -> int:
+        return (size - position - 1) if direction > 0 else position if direction < 0 else size
+
+    def initialize_direction(self, direction: AnyDirection, pos_from: Position, side: Side) -> None:
+        self.current_distance = 0
+        self.max_distance = min(ceil(
+            self.distance_to_edge(pos_from[i], direction[i], self.board_size[i]) / 2
+        ) for i in range(2))
+
+    def advance_direction(self, move: Move, direction: AnyDirection, pos_from: Position, side: Side) -> None:
+        self.current_distance += 1
+
+    def stop_condition(self, move: Move, direction: AnyDirection, side: Side, theoretical: bool = False) -> bool:
+        return self.current_distance >= self.max_distance or super().stop_condition(move, direction, side, theoretical)
+
+
 class CannonRiderMovement(RiderMovement):
     def __init__(self, board: Board, directions: list[AnyDirection]):
         super().__init__(board, directions)
@@ -142,16 +166,6 @@ class CannonRiderMovement(RiderMovement):
 
     def stop_condition(self, move: Move, direction: AnyDirection, side: Side, theoretical: bool = False) -> bool:
         return super().stop_condition(move, direction, side, theoretical or self.jumped != 1)
-
-    def __copy__(self):
-        clone = self.__class__(*self.__copy_args__())
-        clone.jumped = None
-        return clone
-
-    def __deepcopy__(self, memo):
-        clone = self.__class__(*self.__copy_args__())
-        clone.jumped = None
-        return clone
 
 
 class SpaciousRiderMovement(RiderMovement):
@@ -205,11 +219,7 @@ class FirstMoveRiderMovement(RiderMovement):
         return clone
 
     def __deepcopy__(self, memo):
-        clone = self.__class__(*self.__copy_args__())
-        clone.total_moves = self.total_moves
-        if self.total_moves:
-            clone.directions = clone.base_directions
-        return clone
+        return self.__copy__()
 
 
 class CastlingMovement(BaseMovement):
