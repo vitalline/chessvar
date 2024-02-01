@@ -14,7 +14,7 @@ class LRhino(Piece):
         super().__init__(
             board, board_pos, side,
             movement.MultiMovement(board, [
-                movement.ChainMovement(board, [
+                movement.BentMovement(board, [
                     movement.RiderMovement(board, [(*ij, 1)]),
                     movement.RiderMovement(board, [(*kl, 1)])
                 ]) for ij, kl in zip(
@@ -35,7 +35,7 @@ class RRhino(Piece):
         super().__init__(
             board, board_pos, side,
             movement.MultiMovement(board, [
-                movement.ChainMovement(board, [
+                movement.BentMovement(board, [
                     movement.RiderMovement(board, [(*ij, 1)]),
                     movement.RiderMovement(board, [(*kl, 1)])
                 ]) for ij, kl in zip(
@@ -87,7 +87,7 @@ class EagleScout(Piece):
                 for m in range(int(ceil(max(board.board_width, board.board_height) / 2))):
                     rider_movements.append(movement.RiderMovement(board, [(i, j, 1)]))
                     rider_movements.append(movement.RiderMovement(board, [(k, l, 1)]))
-                chain_movements.append(movement.ChainMovement(board, rider_movements))
+                chain_movements.append(movement.BentMovement(board, rider_movements))
         super().__init__(
             board, board_pos, side,
             movement.MultiMovement(board, [movement.RiderMovement(board, rot([(1, 0, 1)]))] + chain_movements)

@@ -14,7 +14,7 @@ class Hero(Piece):
         super().__init__(
             board, board_pos, side,
             movement.MultiMovement(board, [
-                movement.ChainMovement(board, [
+                movement.BentMovement(board, [
                     movement.RiderMovement(board, [(*mul(ij, k), 1)]),
                     movement.RiderMovement(board, [(*mul(ij, 3 - k), 1)])
                 ]) for ij in rot([(1, 0)]) for k in (1, 2)
@@ -31,7 +31,7 @@ class Shaman(Piece):
         super().__init__(
             board, board_pos, side,
             movement.MultiMovement(board, [
-                movement.ChainMovement(board, [
+                movement.BentMovement(board, [
                     movement.RiderMovement(board, [(*mul(ij, k), 1)]),
                     movement.RiderMovement(board, [(*mul(ij, 3 - k), 1)])
                 ]) for ij in rot([(1, 1)]) for k in (1, 2)
@@ -48,7 +48,7 @@ class WarElephant(Piece):
         super().__init__(
             board, board_pos, side,
             movement.MultiMovement(board, [
-                movement.ChainMovement(board, [
+                movement.BentMovement(board, [
                     movement.RiderMovement(board, [(*mul(ij, k), 1)]),
                     movement.RiderMovement(board, [(*mul(ij, 3 - k), 1)])
                 ]) for ij in rot([(1, 0), (1, 1)]) for k in (1, 2)

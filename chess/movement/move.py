@@ -19,6 +19,7 @@ class Move(object):
             captured_piece: Piece | None = None,
             swapped_piece: Piece | None = None,
             promotion: Type[Piece] | None = None,
+            chained_move: Move | None = None,
             is_edit: bool = False
     ):
         self.pos_from = pos_from
@@ -28,6 +29,7 @@ class Move(object):
         self.captured_piece = captured_piece
         self.swapped_piece = swapped_piece
         self.promotion = promotion
+        self.chained_move = chained_move
         self.is_edit = is_edit
 
     def set(
@@ -39,6 +41,7 @@ class Move(object):
             captured_piece: Piece | None = None,
             swapped_piece: Piece | None = None,
             promotion: Type[Piece] | None = None,
+            chained_move: Move | None = None,
             is_edit: bool | None = None
     ) -> Move:
         self.pos_from = pos_from or self.pos_from
@@ -48,6 +51,7 @@ class Move(object):
         self.captured_piece = captured_piece or self.captured_piece
         self.swapped_piece = swapped_piece or self.swapped_piece
         self.promotion = promotion or self.promotion
+        self.chained_move = chained_move if chained_move is not None else self.chained_move
         self.is_edit = is_edit if is_edit is not None else self.is_edit
         return self
 
@@ -60,18 +64,21 @@ class Move(object):
             self.captured_piece,
             self.swapped_piece,
             self.promotion,
+            self.chained_move.__copy__() if self.chained_move else None,
             self.is_edit
         )
 
     def __eq__(self, other: Move) -> bool:
         return (
-            self.pos_from == other.pos_from
+            other is not None
+            and self.pos_from == other.pos_from
             and self.pos_to == other.pos_to
             and self.movement == other.movement
             and self.piece == other.piece
             and self.captured_piece == other.captured_piece
             and self.swapped_piece == other.swapped_piece
             and self.promotion == other.promotion
+            and self.chained_move == other.chained_move
             and self.is_edit == other.is_edit
         )
 

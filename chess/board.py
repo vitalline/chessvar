@@ -167,6 +167,8 @@ class Board(Window):
         self.royal_pieces = {Side.WHITE: [], Side.BLACK: []}  # these have to stay on the board and should be protected
         self.quasi_royal_pieces = {Side.WHITE: [], Side.BLACK: []}  # at least one of these has to stay on the board
         self.moves = {}  # dictionary of valid moves from any square that has a movable piece on it
+        self.chain_moves = {}  # dictionary of valid moves that can be chained from a specific move (marked as from/to)
+        self.chain_start = None  # move that started the current chain (if any)
         self.theoretical_moves = {}  # dictionary of theoretical moves from any square that has an opposing piece on it
         self.anchor = 0, 0  # used to have the board scale from the origin instead of the center
         self.highlight = Sprite("assets/util/selection.png")  # sprite for the highlight marker
@@ -395,7 +397,7 @@ class Board(Window):
     def find_move(self, pos_from: Position, pos_to: Position) -> Move | None:
         for move in self.moves.get(pos_from, ()):
             if pos_to == move.pos_to:
-                return move
+                return copy(move)
         return None
 
     def select_piece(self, pos: Position | None) -> None:
@@ -656,12 +658,27 @@ class Board(Window):
                     return
                 self.update_move(move)
                 move.promotion = None  # do not auto-promote because we are selecting promotion type manually
+                move.chained_move = None  # do not chain moves because we are selecting chained move manually
                 move.piece.move(move)
-                self.move_history.append(move)
-                if not self.promotion_piece:
-                    self.log(f"[Ply {self.ply_count}] Move: {self.move_history[-1]}")
-                    self.ply_count += 1
-                self.advance_turn()
+                if self.chain_start is None:
+                    self.chain_start = move
+                    self.move_history.append(self.chain_start)
+                else:
+                    last_move = self.chain_start
+                    chained_move = last_move
+                    while chained_move.chained_move is not None:
+                        chained_move = chained_move.chained_move
+                    chained_move.chained_move = move
+                if self.promotion_piece is None:
+                    self.log(f"[Ply {self.ply_count}] Move: {move}")
+                if not self.chain_moves.get((move.pos_from, move.pos_to)):
+                    self.chain_start = None
+                    if self.promotion_piece is None:
+                        self.ply_count += 1
+                    self.advance_turn()
+                else:
+                    self.load_all_moves()
+                    self.show_moves()
             else:
                 self.reset_position(self.get_piece(self.selected_square))
                 if not self.square_was_clicked:
@@ -779,14 +796,19 @@ class Board(Window):
                 self.turn_side = self.turn_side.opponent()
         else:
             last_move = self.move_history[-1]
-            self.ply_count -= 1 if last_move is None else not last_move.is_edit
-            self.log(f'''[Ply {self.ply_count}] Undo: {
-                f"{'Edit' if last_move.is_edit else 'Move'}: " + str(last_move)
-                if last_move is not None else f"Pass: {self.turn_side.name()}'s turn"
-            }''')
+            self.ply_count -= 1 if last_move is None else not last_move.is_edit and self.chain_start is None
         last_move = self.move_history.pop()
         if last_move is not None:
-            self.undo(last_move)
+            move_chain = [last_move]
+            chained_move = last_move.chained_move
+            while chained_move is not None:
+                move_chain.append(chained_move)
+                chained_move = chained_move.chained_move
+            for chained_move in move_chain[::-1]:
+                self.log(f'''[Ply {self.ply_count}] Undo: {
+                    f"{'Edit' if chained_move.is_edit else 'Move'}: " + str(chained_move)
+                }''')
+                self.undo(chained_move)
             if last_move.is_edit:
                 if not self.edit_mode:
                     self.turn_side = self.turn_side.opponent()
@@ -796,12 +818,19 @@ class Board(Window):
                         and last_move.piece.board_pos not in self.en_passant_markers
                 ):
                     last_move.piece.side = Side.NONE
+        else:
+            self.log(f"[Ply {self.ply_count}] Undo: Pass: {self.turn_side.name()}'s turn")
         if self.move_history:
             move = self.move_history[-1]
             if move is not None and (not move.is_edit or (move.pos_from == move.pos_to and move.promotion is None)):
                 (move.piece or move).movement.reload(move, move.piece.side or self.turn_side)
         future_move_history = self.future_move_history.copy()
-        self.advance_turn()
+        if self.chain_start is None:
+            self.advance_turn()
+        else:
+            self.chain_start = None
+            self.load_all_moves()
+        self.chain_start = None
         self.future_move_history = future_move_history
         self.future_move_history.append(last_move)
 
@@ -827,7 +856,9 @@ class Board(Window):
         if not self.future_move_history:
             return
         last_move = copy(self.future_move_history[-1])
+        last_chain_move = last_move
         if last_move is None:
+            self.log(f"[Ply {self.ply_count}] Redo: Pass: {self.turn_side.opponent().name()}'s turn")
             self.clear_en_passant()
         elif not piece_was_moved:
             if last_move.pos_from is not None:
@@ -837,20 +868,34 @@ class Board(Window):
                 if side == Side.NONE:
                     side = Side.WHITE if last_move.pos_from[0] < self.board_height / 2 else Side.BLACK
                     last_move.piece.side = side
-            last_move.piece.move(last_move)
+            chained_move = last_move
+            history_move = self.move_history[-1] if self.move_history else None
+            while chained_move is not None:
+                chained_move.piece.move(chained_move)
+                self.log(f'''[Ply {self.ply_count}] Redo: {
+                f"{'Edit' if chained_move.is_edit else 'Move'}: " + str(chained_move)
+                }''')
+                last_chain_move = chained_move
+                chained_move = chained_move.chained_move
+                history_move = history_move.chained_move if history_move else None
+                if chained_move is not None:
+                    self.update_move(chained_move)
+                if history_move is not None:
+                    self.update_move(history_move)
             if not isinstance(last_move.piece, abc.PromotablePiece) and last_move.promotion is not None:
                 self.replace(last_move.piece, last_move.promotion)
         self.move_history.append(last_move)
         # do not pop move from future history because advance_turn() will do it for us
         if last_move is not None and last_move.is_edit and not self.edit_mode:
             self.turn_side = self.turn_side.opponent()
-        if self.promotion_piece is None:
-            self.log(f'''[Ply {self.ply_count}] Redo: {
-                f"{'Edit' if last_move.is_edit else 'Move'}: " + str(last_move)
-                if last_move is not None else f"Pass: {self.turn_side.opponent().name()}'s turn"
-            }''')
-            self.ply_count += 1 if last_move is None else not last_move.is_edit
-        self.advance_turn()
+        if last_chain_move is None or not self.chain_moves.get((last_chain_move.pos_from, last_chain_move.pos_to)):
+            if self.promotion_piece is None:
+                self.ply_count += 1 if last_move is None else not last_move.is_edit
+            self.advance_turn()
+        if self.chain_moves.get((last_chain_move.pos_from, last_chain_move.pos_to)):
+            self.load_all_moves()
+            self.select_piece(last_chain_move.pos_to)
+            self.show_moves()
 
     def undo_last_finished_move(self) -> None:
         self.undo_last_move()
@@ -1131,15 +1176,30 @@ class Board(Window):
         castling_threats = self.castling_threats.copy()
         en_passant_target = self.en_passant_target
         en_passant_markers = self.en_passant_markers.copy()
+        chain_moves = (
+            self.chain_moves[(self.chain_start.pos_from, self.chain_start.pos_to)]
+            if self.chain_start is not None else None
+        )
         self.moves = {}
-        for piece in movable_pieces[self.turn_side]:
-            for move in piece.moves():
+        self.chain_moves = {}
+        for piece in movable_pieces[self.turn_side] if chain_moves is None else [self.chain_start.piece]:
+            for move in piece.moves() if chain_moves is None else chain_moves:
                 self.update_move(move)
                 self.move(move)
+                move_chain = [move]
+                chained_move = move.chained_move
+                while chained_move is not None:
+                    self.update_move(chained_move)
+                    self.move(chained_move)
+                    move_chain.append(chained_move)
+                    chained_move = chained_move.chained_move
                 self.load_check()
                 if self.check_side != self.turn_side:
                     self.moves.setdefault(move.pos_from, []).append(move)
-                self.undo(move)
+                    if move.chained_move:
+                        self.chain_moves.setdefault((move.pos_from, move.pos_to), []).append(move.chained_move)
+                for chained_move in move_chain[::-1]:
+                    self.undo(chained_move)
                 self.check_side = check_side
                 self.castling_threats = castling_threats.copy()
                 if en_passant_target is not None:
@@ -1189,12 +1249,15 @@ class Board(Window):
             )
             for piece in self.movable_pieces[self.turn_side.opponent()]:
                 for move in piece.moves():
-                    if move.pos_to == royal.board_pos:
+                    last_move = move
+                    while last_move.chained_move is not None:
+                        last_move = last_move.chained_move
+                    if last_move.pos_to == royal.board_pos:
                         self.check_side = self.turn_side
                         self.castling_threats = castle_squares
                         break
-                    if move.pos_to in castle_squares:
-                        self.castling_threats.add(move.pos_to)
+                    if last_move.pos_to in castle_squares:
+                        self.castling_threats.add(last_move.pos_to)
                 if self.check_side != Side.NONE:
                     break
             if self.check_side != Side.NONE:
@@ -1322,6 +1385,7 @@ class Board(Window):
             if self.edit_mode:
                 self.advance_turn()
                 self.moves = {}
+                self.chain_moves = {}
                 self.theoretical_moves = {}
                 self.show_moves()
             else:
@@ -1419,10 +1483,13 @@ class Board(Window):
                 )
                 if choices:
                     random_move = choice(choices)
-                    self.update_move(random_move)
-                    random_move.piece.move(random_move)
+                    chained_move = random_move
+                    while chained_move is not None:
+                        self.update_move(chained_move)
+                        random_move.piece.move(random_move)
+                        self.log(f"[Ply {self.ply_count}] Move: {chained_move}")
+                        chained_move = chained_move.chained_move
                     self.move_history.append(random_move)
-                    self.log(f"[Ply {self.ply_count}] Move: {self.move_history[-1]}")
                     self.ply_count += 1
                     self.advance_turn()
 

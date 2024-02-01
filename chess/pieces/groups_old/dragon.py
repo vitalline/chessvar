@@ -53,7 +53,7 @@ class Wyvern(Piece):
             board, board_pos, side,
             movement.MultiMovement(board, [
                 movement.RiderMovement(board, sym([(1, 1), (2, 1, 1)])),
-                *(movement.ChainMovement(board, [
+                *(movement.BentMovement(board, [
                     movement.RiderMovement(board, [(0, 2 * i, 1)]),
                     movement.RiderMovement(board, [(0, 1 * i)])
                 ]) for i in (1, -1))

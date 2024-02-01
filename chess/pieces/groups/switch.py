@@ -12,7 +12,7 @@ class Panda(Piece):
         super().__init__(
             board, board_pos, side,
             movement.MultiMovement(board, [
-                movement.ChainMovement(board, [
+                movement.BentMovement(board, [
                     movement.RiderMovement(board, [(i, j, 1)]),
                     movement.RiderMovement(board, [(2 * i, 2 * j)])
                 ]) for i, j in rot([(1, 0)])
@@ -41,7 +41,7 @@ class Bear(Piece):
         super().__init__(
             board, board_pos, side,
             movement.MultiMovement(board, [
-                movement.ChainMovement(board, [
+                movement.BentMovement(board, [
                     movement.RiderMovement(board, [(i, j, 1)]),
                     movement.RiderMovement(board, [(2 * i, 2 * j)])
                 ]) for i, j in rot([(1, 1)])
@@ -58,7 +58,7 @@ class Pandabear(Piece):
         super().__init__(
             board, board_pos, side,
             movement.MultiMovement(board, [
-                movement.ChainMovement(board, [
+                movement.BentMovement(board, [
                     movement.RiderMovement(board, [(i, j, 1)]),
                     movement.RiderMovement(board, [(2 * i, 2 * j)])
                 ]) for i, j in rot([(1, 0), (1, 1)])

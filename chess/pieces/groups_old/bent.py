@@ -12,7 +12,7 @@ class LGriffon(Piece):
         super().__init__(
             board, board_pos, side,
             movement.MultiMovement(board, [
-                movement.ChainMovement(board, [
+                movement.BentMovement(board, [
                     movement.RiderMovement(board, [(*ij, 1)]),
                     movement.RiderMovement(board, [kl])
                 ]) for ij, kl in zip(
@@ -33,7 +33,7 @@ class RGriffon(Piece):
         super().__init__(
             board, board_pos, side,
             movement.MultiMovement(board, [
-                movement.ChainMovement(board, [
+                movement.BentMovement(board, [
                     movement.RiderMovement(board, [(*ij, 1)]),
                     movement.RiderMovement(board, [kl])
                 ]) for ij, kl in zip(
@@ -54,7 +54,7 @@ class LAanca(Piece):
         super().__init__(
             board, board_pos, side,
             movement.MultiMovement(board, [
-                movement.ChainMovement(board, [
+                movement.BentMovement(board, [
                     movement.RiderMovement(board, [(*ij, 1)]),
                     movement.RiderMovement(board, [kl])
                 ]) for ij, kl in zip(
@@ -75,7 +75,7 @@ class RAanca(Piece):
         super().__init__(
             board, board_pos, side,
             movement.MultiMovement(board, [
-                movement.ChainMovement(board, [
+                movement.BentMovement(board, [
                     movement.RiderMovement(board, [(*ij, 1)]),
                     movement.RiderMovement(board, [kl])
                 ]) for ij, kl in zip(
@@ -122,7 +122,7 @@ class Griffon(Piece):
         super().__init__(
             board, board_pos, side,
             movement.MultiMovement(board, [
-                movement.ChainMovement(board, [
+                movement.BentMovement(board, [
                     movement.RiderMovement(board, [(i, j, 1)]),
                     movement.RiderMovement(board, [(k, l)])
                 ]) for i, j in rot([(1, 1)]) for k, l in ((i, 0), (0, j))
