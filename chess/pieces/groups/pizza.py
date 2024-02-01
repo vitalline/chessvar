@@ -5,8 +5,8 @@ from chess.pieces.pieces import Piece
 
 class Pepperoni(Piece):
     name = 'Pepperoni'
-    file_name = 'circle'
-    asset_folder = 'geometry'
+    file_name = 'sDfAvWF'
+    asset_folder = 'pizza'
 
     def __init__(self, board, board_pos, side):
         super().__init__(
@@ -17,8 +17,8 @@ class Pepperoni(Piece):
 
 class Mushroom(Piece):
     name = 'Mushroom'
-    file_name = 'mushroom'
-    asset_folder = 'nature'
+    file_name = 'vNfsCbF'
+    asset_folder = 'pizza'
 
     def __init__(self, board, board_pos, side):
         super().__init__(
@@ -29,8 +29,8 @@ class Mushroom(Piece):
 
 class Sausage(Piece):
     name = 'Sausage'
-    file_name = 'courier_runner'
-    asset_folder = 'courier'
+    file_name = 'sWFvNvH'
+    asset_folder = 'pizza'
 
     def __init__(self, board, board_pos, side):
         super().__init__(
@@ -41,8 +41,8 @@ class Sausage(Piece):
 
 class Meatball(Piece):
     name = 'Meatball'
-    file_name = 'courier_rook'
-    asset_folder = 'courier'
+    file_name = 'FWADfN'
+    asset_folder = 'pizza'
 
     def __init__(self, board, board_pos, side):
         super().__init__(

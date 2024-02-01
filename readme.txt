@@ -46,28 +46,7 @@ RMB, Backspace: remove piece
 Shift + RMB/Backspace: promote piece
 Ctrl + RMB/Backspace: revoke first move of a piece
 
-armies in order:
-1. Fabulous FIDEs
-2. Colorbound Clobberers
-3. Remarkable Rookies
-4. Nutty Knights
-5. Forward FIDEs
-6. All-Around Allstars
-7. All-Around Allstars 2
-8. Colorbound Clobberers 2
-9. Amazon Army
-10. Cylindrical Cinders
-11. Fighting Fizzies
-12. Avian Airforce
-13. Spacious Cannoneers
-14. Pizza Kings
-15. Meticulous Mashers
-16. Seeping Switchers
-17. Daring Dragons
-18. Bent Bozos
-19. Shatranjian Shooters
-20. Silly Sliders
-
 source:
+https://www.reddit.com/r/chessvariants/comments/vmdk1s/a_new_and_improved_chess_with_different_armies/
 https://en.wikipedia.org/wiki/Chess_with_different_armies
 https://www.chessvariants.org/unequal.dir/cwda.html

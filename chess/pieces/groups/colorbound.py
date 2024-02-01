@@ -5,8 +5,8 @@ from chess.pieces.pieces import Piece, RoyalPiece
 
 class Bede(Piece):
     name = 'Bede'
-    file_name = 'zora_bishop'
-    asset_folder = 'zora'
+    file_name = 'BD'
+    asset_folder = 'colorbound'
 
     def __init__(self, board, board_pos, side):
 
@@ -18,8 +18,8 @@ class Bede(Piece):
 
 class Waffle(Piece):
     name = 'Waffle'
-    file_name = 'sorcerer'
-    asset_folder = 'fantasy'
+    file_name = 'WA'
+    asset_folder = 'colorbound'
 
     def __init__(self, board, board_pos, side):
         super().__init__(
@@ -28,10 +28,10 @@ class Waffle(Piece):
         )
 
 
-class FAD(Piece):
-    name = 'FAD'
-    file_name = 'beholder'
-    asset_folder = 'fantasy'
+class Fad(Piece):
+    name = 'Fad'
+    file_name = 'FAD'
+    asset_folder = 'colorbound'
 
     def __init__(self, board, board_pos, side):
         super().__init__(
@@ -40,10 +40,10 @@ class FAD(Piece):
         )
 
 
-class Cardinal(Piece):
-    name = 'Cardinal'
-    file_name = 'archbishop'
-    asset_folder = 'medieval'
+class Archbishop(Piece):
+    name = 'Archbishop'
+    file_name = 'BN'
+    asset_folder = 'colorbound'
 
     def __init__(self, board, board_pos, side):
         super().__init__(
@@ -54,7 +54,7 @@ class Cardinal(Piece):
 
 class King(RoyalPiece):
     name = 'King'
-    file_name = 'king'
+    file_name = 'K'
     asset_folder = 'classic'
 
     def __init__(self, board, board_pos, side):

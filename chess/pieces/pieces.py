@@ -51,9 +51,9 @@ class Side(Enum):
     def file_name(self):
         match self:
             case Side.WHITE:
-                return "white_"
+                return "0."
             case Side.BLACK:
-                return "black_"
+                return "1."
             case _:
                 return ""
 

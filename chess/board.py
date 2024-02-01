@@ -19,60 +19,62 @@ from chess.movement.move import Move
 from chess.movement.util import Position, add
 from chess.pieces import pieces as abc
 from chess.pieces.groups import classic as fide
-from chess.pieces.groups import avian as av, bent as bt, cannon as ca
-from chess.pieces.groups import colorbound as cb, cylindrical as cy, dragon as dr
-from chess.pieces.groups import fizzies as fi, forward as fw, knights as kn
-from chess.pieces.groups import mash as ms, pizza as pz, rookies as rk
-from chess.pieces.groups import shatranj as sh, slide as sl, switch as sw
-from chess.pieces.groups.amazon import Amazon
+from chess.pieces.groups import amazon as am, avian as av, beast as bs, cannon as ca
+from chess.pieces.groups import colorbound as cb, fizz as fi, forward as fw, knight as kn
+from chess.pieces.groups import mash as ms, pizza as pz, rookie as rk
 from chess.pieces.groups.util import NoPiece
 from chess.pieces.pieces import Side
 
-piece_groups = {
-    1: [fide.Rook, fide.Knight, fide.Bishop, fide.Queen, fide.King, fide.Bishop, fide.Knight, fide.Rook],
-    2: [cb.Bede, cb.Waffle, cb.FAD, cb.Cardinal, cb.King, cb.FAD, cb.Waffle, cb.Bede],
-    3: [rk.ShortRook, rk.WoodyRook, rk.HalfDuck, rk.Chancellor, fide.King, rk.HalfDuck, rk.WoodyRook, rk.ShortRook],
-    4: [kn.ChargeRook, kn.Fibnif, kn.ChargeKnight, kn.Colonel, fide.King, kn.ChargeKnight, kn.Fibnif, kn.ChargeRook],
-    5: [kn.ChargeRook, fw.Knishop, fw.Bishight, fw.Forequeen, fide.King, fw.Bishight, fw.Knishop, kn.ChargeRook],
-    6: [kn.ChargeRook, cb.Waffle, fide.Bishop, rk.Chancellor, fide.King, fide.Bishop, cb.Waffle, kn.ChargeRook],
-    7: [kn.ChargeRook, kn.Fibnif, fw.Bishight, rk.Chancellor, fide.King, fw.Bishight, kn.Fibnif, kn.ChargeRook],
-    8: [cb.Bede, cb.FAD, cb.Waffle, cb.Cardinal, cb.King, cb.Waffle, cb.FAD, cb.Bede],
-    9: [rk.ShortRook, fide.Knight, fide.Bishop, Amazon, fide.King, fide.Bishop, fide.Knight, rk.ShortRook],
-    10: [cy.CyWaffle, cy.CyKnight, cy.CyBishop, cy.CyChancellor, fide.King, cy.CyBishop, cy.CyKnight, cy.CyWaffle],
-    11: [fi.LRhino, fi.Gnohmon, fi.Crabinal, fi.EagleScout, fide.King, fi.Crabinal, fi.Gnohmon, fi.RRhino],
-    12: [av.Wader, av.Darter, av.Faalcon, av.Kingfisher, fide.King, av.Faalcon, av.Darter, av.Wader],
-    13: [ca.Mortar, ca.Napoleon, ca.Carronade, ca.BigBertha, fide.King, ca.Carronade, ca.Napoleon, ca.Howitzer],
-    14: [pz.Pepperoni, pz.Mushroom, pz.Sausage, pz.Meatball, fide.King, pz.Sausage, pz.Mushroom, pz.Pepperoni],
-    15: [ms.Forfer, kn.Fibnif, ms.B4nD, ms.N2R4, fide.King, ms.B4nD, kn.Fibnif, ms.Forfer],
-    16: [sw.Panda, sw.Marquis, sw.Unicorn, sw.ErlQueen, fide.King, sw.Unicorn, sw.Marquis, sw.Panda],
-    17: [dr.DragonHorse, dr.Dragonfly, dr.Dragoon, dr.Wyvern, fide.King, dr.Dragoon, dr.Dragonfly, dr.DragonHorse],
-    18: [bt.LGriffon, bt.LAanca, bt.LSastik, bt.Griffon, fide.King, bt.RSastik, bt.RAanca, bt.RGriffon],
-    19: [sh.Hero, fide.Knight, sh.Shaman, sh.WarElephant, fide.King, sh.Shaman, fide.Knight, sh.Hero],
-    20: [sl.LameDuck, sl.Diamond, sl.Onyx, sl.Squire, fide.King, sl.Onyx, sl.Diamond, sl.LameDuck],
-}
-
-piece_group_names = {
-    1: "Fabulous FIDEs",
-    2: "Colorbound Clobberers",
-    3: "Remarkable Rookies",
-    4: "Nutty Knights",
-    5: "Forward FIDEs",
-    6: "All-Around Allstars",
-    7: "All-Around Allstars 2",
-    8: "Colorbound Clobberers 2",
-    9: "Amazon Army",
-    10: "Cylindrical Cinders",
-    11: "Fighting Fizzies",
-    12: "Avian Airforce",
-    13: "Spacious Cannoneers",
-    14: "Pizza Kings",
-    15: "Meticulous Mashers",
-    16: "Seeping Switchers",
-    17: "Daring Dragons",
-    18: "Bent Bozos",
-    19: "Shatranjian Shooters",
-    20: "Silly Sliders",
-}
+piece_groups = [
+    {
+        'name': "Fabulous FIDEs",
+        'set': [fide.Rook, fide.Knight, fide.Bishop, fide.Queen, fide.King, fide.Bishop, fide.Knight, fide.Rook],
+    },
+    {
+        'name': "Colorbound Clobberers",
+        'set': [cb.Bede, cb.Waffle, cb.Fad, cb.Archbishop, cb.King, cb.Fad, cb.Waffle, cb.Bede],
+    },
+    {
+        'name': "Remarkable Rookies",
+        'set': [rk.Fork, rk.WarMachine, rk.Dove, rk.Chancellor, fide.King, rk.Dove, rk.WarMachine, rk.Fork],
+    },
+    {
+        'name': "Nutty Knights",
+        'set': [kn.Forerook, kn.Fibnif, kn.Foreknight, kn.Colonel, fide.King, kn.Foreknight, kn.Fibnif, kn.Forerook],
+    },
+    {
+        'name': "Amazing Armada",
+        'set': [am.Cannon, am.Camel, am.Knife, am.Amazon, fide.King, am.Knife, am.Camel, am.Cannon],
+    },
+    {
+        'name': "Avian Airforce",
+        'set': [av.Wader, av.Nightrider, av.Faalcon, av.Kingfisher, fide.King, av.Faalcon, av.Nightrider, av.Wader],
+    },
+    {
+        'name': "Beautiful Beasts",
+        'set': [bs.Ouroboros, bs.Quagga, bs.Roc, bs.Buffalo, fide.King, bs.Roc, bs.Quagga, bs.Ouroboros],
+    },
+    {
+        'name': "Claustrophobic Cannoneers",
+        'set': [ca.Howitzer, ca.Mortar, ca.Carronade, ca.Bertha, fide.King, ca.Carronade, ca.Mortar, ca.Howitzer],
+    },
+    {
+        'name': "Fighting Fizzies",
+        'set': [fi.LRhino, fi.Gnohmon, fi.Crabinal, fi.EagleScout, fide.King, fi.Crabinal, fi.Gnohmon, fi.RRhino],
+    },
+    {
+        'name': "Forward Forgers",
+        'set': [fw.Rock, fw.Knishop, fw.Bishight, fw.Forequeen, fide.King, fw.Bishight, fw.Knishop, fw.Rock],
+    },
+    {
+        'name': "Meticulous Mashers",
+        'set': [ms.Forfer, ms.Napoleon, ms.Bandage, ms.Rancor, fide.King, ms.Bandage, ms.Napoleon, ms.Forfer]
+    },
+    {
+        'name': "Pizza Pounders",
+        'set': [pz.Pepperoni, pz.Mushroom, pz.Sausage, pz.Meatball, fide.King, pz.Sausage, pz.Mushroom, pz.Pepperoni],
+    },
+]
 
 board_width = 8
 board_height = 8
@@ -146,7 +148,7 @@ class Board(Window):
         self.trickster_color_delta = 0  # but it's not like that's ever going to happen right
         self.trickster_angle_delta = 0  # this is just a normal chess game after all
         self.pieces = []  # list of pieces on the board
-        self.piece_sets = {Side.WHITE: 1, Side.BLACK: 1}  # piece sets to use for each side
+        self.piece_sets = {Side.WHITE: 0, Side.BLACK: 0}  # piece sets to use for each side
         self.promotions = {Side.WHITE: [], Side.BLACK: []}  # types of pieces each side promote to
         self.edit_promotions = {Side.WHITE: [], Side.BLACK: []}  # types of pieces each side can promote to in edit mode
         self.movable_pieces = {Side.WHITE: [], Side.BLACK: []}  # pieces that can be moved by each side
@@ -240,16 +242,16 @@ class Board(Window):
             self.piece_sprite_list.remove(sprite)
 
         if shuffle:
-            self.piece_sets = {side: choice(list(piece_groups.keys())) for side in self.piece_sets}
+            self.piece_sets = {side: randrange(len(piece_groups)) for side in self.piece_sets}
 
         self.log(
             f"[Ply {self.ply_count}] Starting new game: "
-            f"{piece_group_names[self.piece_sets[Side.WHITE]]} vs "
-            f"{piece_group_names[self.piece_sets[Side.BLACK]]}"
+            f"{piece_groups[self.piece_sets[Side.WHITE]]['name']} vs "
+            f"{piece_groups[self.piece_sets[Side.BLACK]]['name']}"
         )
         self.ply_count += 1
 
-        piece_sets = {side: piece_groups[self.piece_sets[side]].copy() for side in self.piece_sets}
+        piece_sets = {side: piece_groups[self.piece_sets[side]]['set'].copy() for side in self.piece_sets}
 
         # Special condition for Spacious Cannoneers as black: Swap the positions of Mortar and Howitzer
         black_piece_set = piece_sets[Side.BLACK]
@@ -278,9 +280,9 @@ class Board(Window):
                     piece_sets[side][3::-1], piece_sets[side.opponent()][3::-1],
                     piece_sets[side][5:], piece_sets[side.opponent()][5:],
                     [
-                        piece_groups[self.piece_sets[side.opponent()]][4],
+                        piece_groups[self.piece_sets[side.opponent()]]['set'][4],
                         fide.Pawn,
-                        piece_groups[self.piece_sets[side]][4],
+                        piece_groups[self.piece_sets[side]]['set'][4],
                     ]
                 ):
                     promotion_types = []
@@ -1269,7 +1271,7 @@ class Board(Window):
             return
         if symbol == key.R:  # Restart
             if modifiers & key.MOD_ACCEL and modifiers & key.MOD_SHIFT:
-                self.piece_sets = {Side.WHITE: 1, Side.BLACK: 1}
+                self.piece_sets = {Side.WHITE: 0, Side.BLACK: 0}
                 self.reset_board(update=True)
             elif modifiers & key.MOD_SHIFT:
                 self.reset_board(shuffle=True)
@@ -1329,7 +1331,7 @@ class Board(Window):
                     self.advance_turn()
             elif modifiers & key.MOD_SHIFT:  # Shift white piece set
                 d = -1 if modifiers & key.MOD_ACCEL else 1
-                self.piece_sets[Side.WHITE] = (self.piece_sets[Side.WHITE] + d - 1) % len(piece_groups) + 1
+                self.piece_sets[Side.WHITE] = (self.piece_sets[Side.WHITE] + d) % len(piece_groups)
                 self.reset_board(update=True)
         if symbol == key.B:  # Black
             if modifiers & key.MOD_ACCEL and not modifiers & key.MOD_SHIFT:  # Black is in control
@@ -1341,7 +1343,7 @@ class Board(Window):
                     self.advance_turn()
             elif modifiers & key.MOD_SHIFT:  # Shift black piece set
                 d = -1 if modifiers & key.MOD_ACCEL else 1
-                self.piece_sets[Side.BLACK] = (self.piece_sets[Side.BLACK] + d - 1) % len(piece_groups) + 1
+                self.piece_sets[Side.BLACK] = (self.piece_sets[Side.BLACK] + d) % len(piece_groups)
                 self.reset_board(update=True)
         if symbol == key.N:  # Next
             if modifiers & key.MOD_ACCEL and not modifiers & key.MOD_SHIFT:  # Next player is in control
@@ -1353,8 +1355,8 @@ class Board(Window):
             elif modifiers & key.MOD_SHIFT:
                 if self.piece_sets[Side.WHITE] == self.piece_sets[Side.BLACK]:  # Next piece set
                     d = -1 if modifiers & key.MOD_ACCEL else 1
-                    self.piece_sets[Side.WHITE] = (self.piece_sets[Side.WHITE] + d - 1) % len(piece_groups) + 1
-                    self.piece_sets[Side.BLACK] = (self.piece_sets[Side.BLACK] + d - 1) % len(piece_groups) + 1
+                    self.piece_sets[Side.WHITE] = (self.piece_sets[Side.WHITE] + d) % len(piece_groups)
+                    self.piece_sets[Side.BLACK] = (self.piece_sets[Side.BLACK] + d) % len(piece_groups)
                 else:  # Next player goes first
                     piece_sets = self.piece_sets[Side.WHITE], self.piece_sets[Side.BLACK]
                     self.piece_sets[Side.BLACK], self.piece_sets[Side.WHITE] = piece_sets

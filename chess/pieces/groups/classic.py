@@ -5,7 +5,7 @@ from chess.pieces.pieces import Piece, PromotablePiece, RoyalPiece
 
 class Rook(Piece):
     name = 'Rook'
-    file_name = 'rook'
+    file_name = 'R'
     asset_folder = 'classic'
 
     def __init__(self, board, board_pos, side):
@@ -17,7 +17,7 @@ class Rook(Piece):
 
 class Knight(Piece):
     name = 'Knight'
-    file_name = 'knight'
+    file_name = 'N'
     asset_folder = 'classic'
 
     def __init__(self, board, board_pos, side):
@@ -29,7 +29,7 @@ class Knight(Piece):
 
 class Bishop(Piece):
     name = 'Bishop'
-    file_name = 'bishop'
+    file_name = 'B'
     asset_folder = 'classic'
 
     def __init__(self, board, board_pos, side):
@@ -41,7 +41,7 @@ class Bishop(Piece):
 
 class Queen(Piece):
     name = 'Queen'
-    file_name = 'queen'
+    file_name = 'Q'
     asset_folder = 'classic'
 
     def __init__(self, board, board_pos, side):
@@ -53,7 +53,7 @@ class Queen(Piece):
 
 class King(RoyalPiece):
     name = 'King'
-    file_name = 'king'
+    file_name = 'K'
     asset_folder = 'classic'
 
     def __init__(self, board, board_pos, side):
@@ -71,7 +71,7 @@ class King(RoyalPiece):
 
 class Pawn(PromotablePiece):
     name = 'Pawn'
-    file_name = 'pawn'
+    file_name = 'P'
     asset_folder = 'classic'
 
     def __init__(self, board, board_pos, side, promotions=None, promotion_squares=None):

@@ -159,7 +159,8 @@ class SpaciousRiderMovement(RiderMovement):
         super().__init__(board, directions)
 
     def spacious_transform(self, pos: Position) -> Position:
-        return pos[0] % self.board.board_height, pos[1] % self.board.board_width
+        # return pos[0] % self.board.board_height, pos[1] % self.board.board_width
+        return pos  # as much as i like the idea of a toroidal movement condition, it's just not practical for this game
 
     def skip_condition(self, move: Move, direction: AnyDirection, side: Side, theoretical: bool = False) -> bool:
         next_pos_to = self.transform(add(move.pos_to, direction[:2]))

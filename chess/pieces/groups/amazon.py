@@ -1,12 +1,56 @@
 from chess.movement import movement
-from chess.movement.util import rot
+from chess.movement.util import rot, sym
 from chess.pieces.pieces import Piece
+
+
+class Cannon(Piece):
+    name = 'Cannon'
+    file_name = 'mRcpR'
+    asset_folder = 'amazon'
+
+    def __init__(self, board, board_pos, side):
+        super().__init__(
+            board, board_pos, side,
+            movement.MultiMovement(
+                board,
+                move=[
+                    movement.RiderMovement(board, rot([(1, 0)])),
+                ],
+                capture=[
+                    movement.CannonRiderMovement(board, rot([(1, 0)])),
+                ],
+            )
+        )
+
+
+class Camel(Piece):
+    name = 'Camel'
+    file_name = 'C'
+    asset_folder = 'amazon'
+
+    def __init__(self, board, board_pos, side):
+        super().__init__(
+            board, board_pos, side,
+            movement.RiderMovement(board, sym([(1, 3, 1), (3, 1, 1)]))
+        )
+
+
+class Knife(Piece):
+    name = 'Knife'
+    file_name = 'NF'
+    asset_folder = 'amazon'
+
+    def __init__(self, board, board_pos, side):
+        super().__init__(
+            board, board_pos, side,
+            movement.RiderMovement(board, sym([(1, 1, 1), (1, 2, 1), (2, 1, 1)]))
+        )
 
 
 class Amazon(Piece):
     name = 'Amazon'
-    file_name = 'centaur_queen'
-    asset_folder = 'centaur'
+    file_name = 'QN'
+    asset_folder = 'amazon'
 
     def __init__(self, board, board_pos, side):
         super().__init__(
