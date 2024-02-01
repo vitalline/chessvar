@@ -41,7 +41,7 @@ class Move(object):
             captured_piece: Piece | None = None,
             swapped_piece: Piece | None = None,
             promotion: Type[Piece] | None = None,
-            chained_move: Move | None = None,
+            chained_move: Move | bool | None = None,
             is_edit: bool | None = None
     ) -> Move:
         self.pos_from = pos_from or self.pos_from
@@ -64,13 +64,26 @@ class Move(object):
             self.captured_piece,
             self.swapped_piece,
             self.promotion,
-            self.chained_move.__copy__() if self.chained_move else None,
+            self.chained_move,
+            self.is_edit
+        )
+
+    def __deepcopy__(self, memo):
+        return Move(
+            self.pos_from,
+            self.pos_to,
+            self.movement.__copy__() if isinstance(self.movement, BaseMovement) else self.movement,
+            self.piece.__copy__() if isinstance(self.piece, Piece) else self.piece,
+            self.captured_piece.__copy__() if isinstance(self.captured_piece, Piece) else self.captured_piece,
+            self.swapped_piece.__copy__() if isinstance(self.swapped_piece, Piece) else self.swapped_piece,
+            self.promotion,
+            self.chained_move.__copy__() if isinstance(self.chained_move, Move) else self.chained_move,
             self.is_edit
         )
 
     def __eq__(self, other: Move) -> bool:
         return (
-            other is not None
+            not not other
             and self.pos_from == other.pos_from
             and self.pos_to == other.pos_to
             and self.movement == other.movement

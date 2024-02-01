@@ -76,7 +76,7 @@ class Crabinal(Piece):
 
 class EagleScout(Piece):
     name = 'Eagle Scout'
-    file_name = 'WzFF'
+    file_name = 'WzB'
     asset_folder = 'fizz'
 
     def __init__(self, board, board_pos, side):

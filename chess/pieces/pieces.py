@@ -93,7 +93,7 @@ class Piece(Sprite):
         self.board.move(move)
 
     def moves(self, theoretical: bool = False):
-        yield from self.movement.moves(self.board_pos, self.side, theoretical)
+        yield from self.movement.moves(self.board_pos, self, theoretical)
 
     def __copy__(self):
         clone = type(self)(self.board, self.board_pos, self.side)
