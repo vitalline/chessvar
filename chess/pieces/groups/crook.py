@@ -12,15 +12,13 @@ class LionCub(Piece):
 
     def __init__(self, board, board_pos, side):
         movements = []
-        for i, j in rot([(1, 0)]) + [(0, 0)]:
+        for i, j in rot([(1, 0)]):
             movements.append(
-                movement.ChainMovement(board, [
-                    movement.MultiMovement(board, move=[
-                        movement.RiderMovement(board, [(i, j, 1)])
+                movement.BentMovement(board, [
+                    movement.RiderMovement(board, [(i, j, 1)]),
+                    movement.RiderMovement(board, [
+                        (k, l, 1) for k, l in rot([(1, 0)]) if (i, j) != (-k, -l)
                     ]),
-                    movement.MultiMovement(board, capture=[
-                        movement.RiderMovement(board, [(k, l, 1) for k, l in rot([(1, 0)]) if (i, j) != (-k, -l)]),
-                    ])
                 ])
             )
             movements.append(
@@ -29,17 +27,9 @@ class LionCub(Piece):
                         movement.RiderMovement(board, [(i, j, 1)])
                     ]),
                     movement.MultiMovement(board, move=[
-                        movement.RiderMovement(board, [(k, l, 1) for k, l in rot([(1, 0)]) if (i, j) != (-k, -l)]),
-                    ])
-                ])
-            )
-            movements.append(
-                movement.ChainMovement(board, [
-                    movement.MultiMovement(board, move=[
-                        movement.RiderMovement(board, [(i, j, 1)])
-                    ]),
-                    movement.MultiMovement(board, move=[
-                        movement.RiderMovement(board, [(k, l, 1) for k, l in rot([(1, 0)]) if (i, j) != (-k, -l)]),
+                        movement.RiderMovement(board, [
+                            (k, l, 1) for k, l in rot([(1, 0)]) + [(0, 0)] if (i, j) != (-k, -l)
+                        ]),
                     ])
                 ])
             )

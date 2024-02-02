@@ -394,8 +394,13 @@ class ChainMovement(BaseMovement):
                     yield copy(move).set(pos_to=chained_move.pos_to)
         else:
             for move in self.movements[index].moves(pos_from, piece, theoretical):
-                for chained_move in self.moves(move.pos_to, piece, theoretical, index + 1):
-                    yield copy(move).set(chained_move=chained_move)
+                self.board.update_move(move)  # this is most likely SUPER inefficient but i've spent about a day on this
+                self.board.move(move)  # and i'm not about to spend another day trying to figure out how to make it FAST
+                chain_options = []  # also what this does is it makes sure the board state is updated after each chained
+                for chained_move in self.moves(move.pos_to, piece, theoretical, index + 1):  # move so that the next can
+                    chain_options.append(copy(move).set(chained_move=chained_move))  # account for change of board state
+                self.board.undo(move)  # also let's not forget to undo the move before something unexpected could happen
+                yield from chain_options  # yielding from cache might be a weird thing to do but it works and i'm tired.
 
     def update(self, move: Move, piece: Piece):
         for movement in self.movements:

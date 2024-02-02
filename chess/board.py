@@ -21,7 +21,8 @@ from chess.pieces import pieces as abc
 from chess.pieces.groups import classic as fide
 from chess.pieces.groups import amazon as am, amontillado as ao, avian as av, beast as bs, cannon as ca
 from chess.pieces.groups import colorbound as cb, crook as cr, fizz as fi, forward as fw, knight as kn
-from chess.pieces.groups import mash as ms, pizza as pz, rookie as rk, splash as sp, switch as sw
+from chess.pieces.groups import mash as ms, pizza as pz, rookie as rk, splash as sp, starbound as st
+from chess.pieces.groups import stone as so, switch as sw
 from chess.pieces.groups.util import NoPiece
 from chess.pieces.pieces import Side
 
@@ -85,6 +86,14 @@ piece_groups = [
     {
         'name': "Seeping Switchers",
         'set': [sw.Panda, sw.Marquis, sw.Bear, sw.Pandabear, fide.King, sw.Bear, sw.Marquis, sw.Panda],
+    },
+    {
+        'name': "Starbound Sliders",
+        'set': [st.Star, st.Lancer, st.Sinerider, st.Turneagle, fide.King, st.Sinerider, st.Lancer, st.Star],
+    },
+    {
+        'name': "Stoic Stones",
+        'set': [so.Champion, so.Tower, so.Stele, so.Caryatid, fide.King, so.Stele, so.Tower, so.Champion],
     },
     {
         'name': "Superior Splashers",
@@ -1210,13 +1219,17 @@ class Board(Window):
         castling_threats = self.castling_threats.copy()
         en_passant_target = self.en_passant_target
         en_passant_markers = self.en_passant_markers.copy()
+        last_chain_move = self.chain_start
+        if last_chain_move:
+            while last_chain_move.chained_move:
+                last_chain_move = last_chain_move.chained_move
         chain_moves = (
-            self.chain_moves[(self.chain_start.pos_from, self.chain_start.pos_to)]
-            if self.chain_start is not None else None
+            self.chain_moves[(last_chain_move.pos_from, last_chain_move.pos_to)]
+            if last_chain_move is not None else None
         )
         self.moves = {}
         self.chain_moves = {}
-        for piece in movable_pieces[self.turn_side] if chain_moves is None else [self.chain_start.piece]:
+        for piece in movable_pieces[self.turn_side] if chain_moves is None else [last_chain_move.piece]:
             for move in piece.moves() if chain_moves is None else chain_moves:
                 self.update_move(move)
                 self.move(move)
