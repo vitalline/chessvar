@@ -138,7 +138,7 @@ class HalflingRiderMovement(RiderMovement):
 
     @staticmethod
     def distance_to_edge(position: int, direction: int, size: int) -> int:
-        return (size - position - 1) if direction > 0 else position if direction < 0 else size
+        return ((size - position - 1) if direction > 0 else position) // abs(direction) if direction != 0 else size
 
     def initialize_direction(self, direction: AnyDirection, pos_from: Position, piece: Piece) -> None:
         self.current_distance = 0
