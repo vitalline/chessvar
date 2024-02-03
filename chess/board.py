@@ -20,9 +20,9 @@ from chess.movement.util import Position, add
 from chess.pieces import pieces as abc
 from chess.pieces.groups import classic as fide
 from chess.pieces.groups import amazon as am, amontillado as ao, avian as av, beast as bs, burn as br, cannon as ca
-from chess.pieces.groups import colorbound as cb, crook as cr, drip as dr, fizz as fi, forward as fw, iron as ir
-from chess.pieces.groups import knight as kn, mash as ms, pizza as pz, rookie as rk, splash as sp, starbound as st
-from chess.pieces.groups import stone as so, switch as sw
+from chess.pieces.groups import colorbound as cb, crook as cr, demirifle as de, drip as dr, fizz as fi, forward as fw
+from chess.pieces.groups import iron as ir, knight as kn, mash as ms, pizza as pz, rookie as rk, splash as sp
+from chess.pieces.groups import starbound as st, stone as so, switch as sw
 from chess.pieces.groups.util import NoPiece
 from chess.pieces.pieces import Side
 
@@ -70,6 +70,10 @@ piece_groups = [
     {
         'name': "Cruel Crooks",
         'set': [cr.LionCub, cr.Rhino, cr.Boyscout, cr.Griffon, fide.King, cr.Boyscout, cr.Rhino, cr.LionCub],
+    },
+    {
+        'name': "Demirifle Destroyers",
+        'set': [de.Snail, de.Crab, de.Lobster, de.Crabsnail, fide.King, de.Lobster, de.Crab, de.Snail],
     },
     {
         'name': "Dripping Droogs",
@@ -424,7 +428,10 @@ class Board(Window):
 
     def find_move(self, pos_from: Position, pos_to: Position) -> Move | None:
         for move in self.moves.get(pos_from, ()):
-            if pos_to == move.pos_to:
+            if move.pos_from == move.pos_to:
+                if move.captured_piece is None or pos_to == move.captured_piece.board_pos:
+                    return copy(move)
+            elif pos_to == move.pos_to:
                 return copy(move)
         return None
 
@@ -454,14 +461,16 @@ class Board(Window):
             theoretical = self.get_side(pos) == self.turn_side.opponent()
             move_dict = self.theoretical_moves if theoretical else self.moves
             for move in move_dict.get(pos, ()):
-                if move.pos_to in move_sprites:
+                capture = move.captured_piece
+                pos_to = capture.board_pos if move.pos_from == move.pos_to and capture is not None else move.pos_to
+                if pos_to in move_sprites:
                     continue
-                move_sprite = Sprite(f"assets/util/{'move' if self.not_a_piece(move.pos_to) else 'capture'}.png")
-                move_sprite.color = self.color_scheme["selection_color" if self.selected_square else "highlight_color"]
-                move_sprite.position = self.get_screen_position(move.pos_to)
-                move_sprite.scale = self.square_size / move_sprite.texture.width
-                self.move_sprite_list.append(move_sprite)
-                move_sprites[move.pos_to] = move_sprite
+                sprite = Sprite(f"assets/util/{'move' if self.not_a_piece(pos_to) else 'capture'}.png")
+                sprite.color = self.color_scheme["selection_color" if self.selected_square else "highlight_color"]
+                sprite.position = self.get_screen_position(pos_to)
+                sprite.scale = self.square_size / sprite.texture.width
+                self.move_sprite_list.append(sprite)
+                move_sprites[pos_to] = sprite
         if not self.selected_square and self.move_history and not self.edit_mode:
             move = self.move_history[-1]
             if move is not None and not move.is_edit:
@@ -469,25 +478,27 @@ class Board(Window):
                 chained_move = move
                 while chained_move.chained_move:
                     chained_move = chained_move.chained_move
-                pos_to = chained_move.pos_to
+                move = chained_move
+                capture = move.captured_piece
+                pos_to = capture.board_pos if move.pos_from == move.pos_to and capture is not None else move.pos_to
                 if pos_from is not None and pos_from != pos_to:
                     if pos_from in move_sprites and not self.not_a_piece(pos_from):
                         move_sprites[pos_from].color = self.color_scheme["selection_color"]
                     else:
-                        move_sprite = Sprite("assets/util/capture.png")
-                        move_sprite.color = self.color_scheme["selection_color"]
-                        move_sprite.position = self.get_screen_position(pos_from)
-                        move_sprite.scale = self.square_size / move_sprite.texture.width
-                        self.move_sprite_list.append(move_sprite)
-                if pos_to is not None and not self.not_a_piece(pos_to):
+                        sprite = Sprite(f"assets/util/{'capture' if self.not_a_piece(pos_from) else 'selection'}.png")
+                        sprite.color = self.color_scheme["selection_color"]
+                        sprite.position = self.get_screen_position(pos_from)
+                        sprite.scale = self.square_size / sprite.texture.width
+                        self.move_sprite_list.append(sprite)
+                if pos_to is not None:
                     if pos_to in move_sprites:
                         move_sprites[pos_to].color = self.color_scheme["selection_color"]
                     else:
-                        move_sprite = Sprite("assets/util/selection.png")
-                        move_sprite.color = self.color_scheme["selection_color"]
-                        move_sprite.position = self.get_screen_position(pos_to)
-                        move_sprite.scale = self.square_size / move_sprite.texture.width
-                        self.move_sprite_list.append(move_sprite)
+                        sprite = Sprite(f"assets/util/{'capture' if self.not_a_piece(pos_to) else 'selection'}.png")
+                        sprite.color = self.color_scheme["selection_color"]
+                        sprite.position = self.get_screen_position(pos_to)
+                        sprite.scale = self.square_size / sprite.texture.width
+                        self.move_sprite_list.append(sprite)
 
     def deselect_piece(self) -> None:
         self.selection.color = (0, 0, 0, 0)
@@ -737,8 +748,10 @@ class Board(Window):
             if new_piece.side != Side.NONE:
                 if move.swapped_piece is not None:
                     move.set(swapped_piece=new_piece)
+                elif isinstance(move.movement, movement.EnPassantMovement) and new_piece.is_empty():
+                    move.set(captured_piece=self.en_passant_target)
                 else:
-                    move.set(captured_piece=(self.en_passant_target if new_piece.is_empty() else new_piece))
+                    move.set(captured_piece=new_piece)
 
     def set_position(self, piece: abc.Piece, pos: Position) -> None:
         piece.board_pos = pos
@@ -758,11 +771,16 @@ class Board(Window):
         if move.pos_to is not None and move.pos_from != move.pos_to:
             self.piece_sprite_list.remove(self.pieces[move.pos_to[0]][move.pos_to[1]])
             self.pieces[move.pos_to[0]][move.pos_to[1]] = move.piece
+        if move.captured_piece is not None and move.captured_piece.board_pos != move.pos_to:
+            self.piece_sprite_list.remove(move.captured_piece)
         if move.pos_from is not None and move.pos_from != move.pos_to:
             self.pieces[move.pos_from[0]][move.pos_from[1]] = (
                 NoPiece(self, move.pos_from) if move.swapped_piece is None else move.swapped_piece
             )
             self.piece_sprite_list.append(self.pieces[move.pos_from[0]][move.pos_from[1]])
+        if move.captured_piece is not None and (capture_pos := move.captured_piece.board_pos) != move.pos_to:
+            self.pieces[capture_pos[0]][capture_pos[1]] = NoPiece(self, capture_pos)
+            self.piece_sprite_list.append(self.pieces[capture_pos[0]][capture_pos[1]])
         if move.piece is not None and move.pos_from is None:
             self.piece_sprite_list.append(move.piece)
         if not move.is_edit or (move.pos_from == move.pos_to and move.promotion is None):
@@ -770,10 +788,7 @@ class Board(Window):
 
     def update_board(self, move: Move) -> None:
         if self.en_passant_target is not None and move.piece.side == self.en_passant_target.side.opponent():
-            if move.pos_to in self.en_passant_markers and isinstance(move.movement, movement.EnPassantMovement):
-                self.capture_en_passant()
-            else:
-                self.clear_en_passant()
+            self.clear_en_passant()
 
     def undo(self, move: Move) -> None:
         if move.pos_from != move.pos_to or move.promotion is not None:
@@ -1329,12 +1344,6 @@ class Board(Window):
         if self.not_a_piece(marker_pos):
             self.replace(self.get_piece(marker_pos), NoPiece, self.en_passant_target.side)
         self.en_passant_markers.add(marker_pos)
-
-    def capture_en_passant(self) -> None:
-        if self.en_passant_target is None:
-            return
-        self.replace(self.en_passant_target, NoPiece, Side.NONE)
-        self.clear_en_passant()
 
     def clear_en_passant(self) -> None:
         self.en_passant_target = None

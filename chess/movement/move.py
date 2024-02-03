@@ -101,7 +101,7 @@ class Move(object):
                 string = f"on {to_alpha(self.pos_from)} is moved to {to_alpha(self.pos_to)}"
             else:
                 string = f"on {to_alpha(self.pos_from)} goes to {to_alpha(self.pos_to)}"
-        elif self.pos_from is None or (self.piece.is_empty() and self.pos_from == self.pos_to):
+        elif self.pos_from is None or (self.piece and self.piece.is_empty() and self.pos_from == self.pos_to):
             string = f"appears on {to_alpha(self.pos_to)}"
         elif self.pos_to is None:
             string = f"disappears from {to_alpha(self.pos_from)}"
@@ -124,6 +124,8 @@ class Move(object):
                 string += f" on {to_alpha(self.captured_piece.board_pos)}"
         if self.swapped_piece:
             string += f", swaps with {self.swapped_piece.side.name()} {self.swapped_piece.name}"
-        if self.promotion and self.pos_from is not None and (not self.piece.is_empty() or self.pos_from != self.pos_to):
+        if self.promotion and self.pos_from is not None and not (
+            self.piece and self.piece.is_empty() and self.pos_from == self.pos_to
+        ):
             string += f", promotes to {self.promotion.name}"
         return string

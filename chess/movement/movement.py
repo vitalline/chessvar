@@ -198,6 +198,38 @@ class CylindricalRiderMovement(RiderMovement):
         return pos[0], pos[1] % self.board.board_width
 
 
+class RangedCaptureRiderMovement(RiderMovement):
+    def __init__(self, board: Board, directions: list[AnyDirection]):
+        super().__init__(board, directions)
+
+    def moves(self, pos_from: Position, piece: Piece, theoretical: bool = False):
+        for move in super().moves(pos_from, piece, theoretical):
+            if not theoretical:
+                captured_piece = self.board.get_piece(move.pos_to)
+                if not captured_piece.is_empty():
+                    move.captured_piece = captured_piece
+                    move.pos_to = move.pos_from
+            yield move
+
+    def skip_condition(self, move: Move, direction: AnyDirection, piece: Piece, theoretical: bool = False) -> bool:
+        if move.captured_piece:
+            pos_to = move.captured_piece.board_pos
+            move.pos_to = pos_to
+            result = super().skip_condition(move, direction, piece, theoretical)
+            move.pos_to = move.pos_from
+            return result
+        return super().skip_condition(move, direction, piece, theoretical)
+
+    def stop_condition(self, move: Move, direction: AnyDirection, piece: Piece, theoretical: bool = False) -> bool:
+        if move.captured_piece:
+            pos_to = move.captured_piece.board_pos
+            move.pos_to = pos_to
+            result = super().stop_condition(move, direction, piece, theoretical)
+            move.pos_to = move.pos_from
+            return result
+        return super().stop_condition(move, direction, piece, theoretical)
+
+
 class FirstMoveRiderMovement(RiderMovement):
     def __init__(self, board: Board, directions: list[AnyDirection], first_move_directions: list[AnyDirection]):
         super().__init__(board, directions)
