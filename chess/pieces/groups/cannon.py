@@ -15,10 +15,10 @@ class Howitzer(Piece):
                 board,
                 move_or_capture=[
                     movement.RiderMovement(board, rot([(1, 0, 1)])),
-                    movement.SpaciousRiderMovement(board, rot([(1, 0)])),
+                    movement.SpaciousRiderMovement(board, rot([(1, 0)]))
                 ],
                 move=[
-                    movement.CannonRiderMovement(board, rot([(1, 0)])),
+                    movement.CannonRiderMovement(board, rot([(1, 0)]))
                 ],
             )
         )
@@ -36,10 +36,10 @@ class Mortar(Piece):
                 board,
                 move_or_capture=[
                     movement.RiderMovement(board, rot([(1, 0, 1)])),
-                    movement.SpaciousRiderMovement(board, rot([(1, 0)])),
+                    movement.SpaciousRiderMovement(board, rot([(1, 0)]))
                 ],
                 capture=[
-                    movement.CannonRiderMovement(board, rot([(1, 0)])),
+                    movement.CannonRiderMovement(board, rot([(1, 0)]))
                 ],
             )
         )
@@ -58,7 +58,7 @@ class Carronade(Piece):
                 move_or_capture=[
                     movement.RiderMovement(board, rot([(1, 1, 1)])),
                     movement.SpaciousRiderMovement(board, rot([(1, 1)])),
-                    movement.CannonRiderMovement(board, rot([(1, 1)])),
+                    movement.CannonRiderMovement(board, rot([(1, 1)]))
                 ],
             )
         )
@@ -80,7 +80,7 @@ class Bertha(Piece):
                     movement.SpaciousRiderMovement(board, rot([(1, 0)])),
                     movement.SpaciousRiderMovement(board, rot([(1, 1)])),
                     movement.CannonRiderMovement(board, rot([(1, 0)])),
-                    movement.CannonRiderMovement(board, rot([(1, 1)])),
+                    movement.CannonRiderMovement(board, rot([(1, 1)]))
                 ],
             )
         )

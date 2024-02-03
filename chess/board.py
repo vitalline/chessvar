@@ -19,9 +19,9 @@ from chess.movement.move import Move
 from chess.movement.util import Position, add
 from chess.pieces import pieces as abc
 from chess.pieces.groups import classic as fide
-from chess.pieces.groups import amazon as am, amontillado as ao, avian as av, beast as bs, cannon as ca
-from chess.pieces.groups import colorbound as cb, crook as cr, fizz as fi, forward as fw, knight as kn
-from chess.pieces.groups import mash as ms, pizza as pz, rookie as rk, splash as sp, starbound as st
+from chess.pieces.groups import amazon as am, amontillado as ao, avian as av, beast as bs, burn as br, cannon as ca
+from chess.pieces.groups import colorbound as cb, crook as cr, drip as dr, fizz as fi, forward as fw, iron as ir
+from chess.pieces.groups import knight as kn, mash as ms, pizza as pz, rookie as rk, splash as sp, starbound as st
 from chess.pieces.groups import stone as so, switch as sw
 from chess.pieces.groups.util import NoPiece
 from chess.pieces.pieces import Side
@@ -60,6 +60,10 @@ piece_groups = [
         'set': [bs.Ouroboros, bs.Quagga, bs.Roc, bs.Buffalo, fide.King, bs.Roc, bs.Quagga, bs.Ouroboros],
     },
     {
+        'name': "Burning Barbarians",
+        'set': [br.Caddy, br.Sorcerer, br.DragonHorse, br.DragonKing, fide.King, br.DragonHorse, br.Sorcerer, br.Caddy],
+    },
+    {
         'name': "Claustrophobic Cannoneers",
         'set': [ca.Howitzer, ca.Mortar, ca.Carronade, ca.Bertha, fide.King, ca.Carronade, ca.Mortar, ca.Howitzer],
     },
@@ -68,12 +72,20 @@ piece_groups = [
         'set': [cr.LionCub, cr.Rhino, cr.Boyscout, cr.Griffon, fide.King, cr.Boyscout, cr.Rhino, cr.LionCub],
     },
     {
+        'name': "Dripping Droogs",
+        'set': [dr.Muskrat, dr.Crabrider, dr.Wizard, dr.Eagle, fide.King, dr.Wizard, dr.Crabrider, dr.Muskrat],
+    },
+    {
         'name': "Fighting Fizzies",
-        'set': [fi.LRhino, fi.Gnohmon, fi.Crabinal, fi.EagleScout, fide.King, fi.Crabinal, fi.Gnohmon, fi.RRhino],
+        'set': [fi.LRhino, fi.Gnomon, fi.Crabinal, fi.EagleScout, fide.King, fi.Crabinal, fi.Gnomon, fi.RRhino],
     },
     {
         'name': "Forward Forgers",
         'set': [fw.Rock, fw.Knishop, fw.Bishight, fw.Forequeen, fide.King, fw.Bishight, fw.Knishop, fw.Rock],
+    },
+    {
+        'name': "Irritant Irons",
+        'set': [ir.Platypus, ir.Enforcer, ir.SRider, ir.GRider, fide.King, ir.SRider, ir.Enforcer, ir.Platypus],
     },
     {
         'name': "Meticulous Mashers",

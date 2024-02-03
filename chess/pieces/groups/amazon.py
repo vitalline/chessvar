@@ -13,12 +13,8 @@ class Cannon(Piece):
             board, board_pos, side,
             movement.MultiMovement(
                 board,
-                move=[
-                    movement.RiderMovement(board, rot([(1, 0)])),
-                ],
-                capture=[
-                    movement.CannonRiderMovement(board, rot([(1, 0)])),
-                ],
+                move=[movement.RiderMovement(board, rot([(1, 0)]))],
+                capture=[movement.CannonRiderMovement(board, rot([(1, 0)]))]
             )
         )
 

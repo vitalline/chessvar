@@ -1,6 +1,6 @@
 from chess.movement import movement
-from chess.movement.util import rot, sym
-from chess.pieces.pieces import Piece, RoyalPiece
+from chess.movement.util import rot
+from chess.pieces.pieces import Piece
 
 
 class Champion(Piece):
@@ -40,7 +40,7 @@ class Stele(Piece):
                     movement.RiderMovement(board, [(i, j, 1)]),
                     movement.RiderMovement(board, [
                         (k, l, 1) for k, l in rot([(1, 1)]) if (i, j) != (-k, -l)
-                    ]),
+                    ])
                 ])
             )
             movements.append(
@@ -51,7 +51,7 @@ class Stele(Piece):
                     movement.MultiMovement(board, move_or_capture=[
                         movement.RiderMovement(board, [
                             (k, l, 1) for k, l in rot([(1, 1)]) + [(0, 0)] if (i, j) != (-k, -l)
-                        ]),
+                        ])
                     ])
                 ])
             )
@@ -71,7 +71,7 @@ class Caryatid(Piece):
                     movement.RiderMovement(board, [(i, j, 1)]),
                     movement.RiderMovement(board, [
                         (k, l, 1) for k, l in rot([(1, 0)]) if (i, j) != (-k, -l)
-                    ]),
+                    ])
                 ])
             )
             movements.append(
@@ -82,7 +82,7 @@ class Caryatid(Piece):
                     movement.MultiMovement(board, move_or_capture=[
                         movement.RiderMovement(board, [
                             (k, l, 1) for k, l in rot([(1, 0)]) + [(0, 0)] if (i, j) != (-k, -l)
-                        ]),
+                        ])
                     ])
                 ])
             )

@@ -19,7 +19,7 @@ class LRhino(Piece):
                     movement.RiderMovement(board, [(*kl, 1)])
                 ]) for ij, kl in zip(
                     [(1, 1), (0, 1), (-1, 1), (-1, 0), (-1, -1), (0, -1), (1, -1), (1, 0)],
-                    [(1, 0), (1, 1), (0, 1), (-1, 1), (-1, 0), (-1, -1), (0, -1), (1, -1)],
+                    [(1, 0), (1, 1), (0, 1), (-1, 1), (-1, 0), (-1, -1), (0, -1), (1, -1)]
                 )
             ]),
             side == Side.WHITE
@@ -40,15 +40,15 @@ class RRhino(Piece):
                     movement.RiderMovement(board, [(*kl, 1)])
                 ]) for ij, kl in zip(
                     [(1, 1), (0, 1), (-1, 1), (-1, 0), (-1, -1), (0, -1), (1, -1), (1, 0)],
-                    [(0, 1), (-1, 1), (-1, 0), (-1, -1), (0, -1), (1, -1), (1, 0), (1, 1)],
+                    [(0, 1), (-1, 1), (-1, 0), (-1, -1), (0, -1), (1, -1), (1, 0), (1, 1)]
                 )
             ]),
             side == Side.BLACK
         )
 
 
-class Gnohmon(Piece):
-    name = 'Gnohmon'
+class Gnomon(Piece):
+    name = 'Gnomon'
     file_name = 'vNvWnH'
     asset_folder = 'fizz'
 

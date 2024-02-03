@@ -63,7 +63,7 @@ class King(RoyalPiece):
                 board, [
                     movement.RiderMovement(board, rot([(1, 0, 1), (1, 1, 1)])),
                     movement.CastlingMovement(board, (0, 2), (0, 3), (0, -2), [(0, 1), (0, 2)]),
-                    movement.CastlingMovement(board, (0, -2), (0, -4), (0, 3), [(0, -1), (0, -2), (0, -3)]),
+                    movement.CastlingMovement(board, (0, -2), (0, -4), (0, 3), [(0, -1), (0, -2), (0, -3)])
                 ]
             )
         )
@@ -80,7 +80,7 @@ class Pawn(PromotablePiece):
             movement.MultiMovement(
                 board,
                 move=[movement.EnPassantTargetMovement(board, [(1, 0, 1)], [(1, 0, 2)], [(1, 0, 1)])],
-                capture=[movement.EnPassantMovement(board, [(1, 1, 1), (1, -1, 1)])],
+                capture=[movement.EnPassantMovement(board, [(1, 1, 1), (1, -1, 1)])]
             ),
             promotions,
             promotion_squares

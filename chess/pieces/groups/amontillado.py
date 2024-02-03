@@ -26,7 +26,7 @@ class Crabster(Piece):
     def __init__(self, board, board_pos, side):
         super().__init__(
             board, board_pos, side,
-            movement.RiderMovement(board, symv([(2, 1, 1), (2, 2, 1), (-1, 1, 1), (-1, 2, 1)])),
+            movement.RiderMovement(board, symv([(2, 1, 1), (2, 2, 1), (-1, 1, 1), (-1, 2, 1)]))
         )
 
 

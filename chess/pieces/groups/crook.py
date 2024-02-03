@@ -18,7 +18,7 @@ class LionCub(Piece):
                     movement.RiderMovement(board, [(i, j, 1)]),
                     movement.RiderMovement(board, [
                         (k, l, 1) for k, l in rot([(1, 0)]) if (i, j) != (-k, -l)
-                    ]),
+                    ])
                 ])
             )
             movements.append(
@@ -29,7 +29,7 @@ class LionCub(Piece):
                     movement.MultiMovement(board, move=[
                         movement.RiderMovement(board, [
                             (k, l, 1) for k, l in rot([(1, 0)]) + [(0, 0)] if (i, j) != (-k, -l)
-                        ]),
+                        ])
                     ])
                 ])
             )

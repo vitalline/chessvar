@@ -17,7 +17,7 @@ class LGriffon(Piece):
                     movement.RiderMovement(board, [kl])
                 ]) for ij, kl in zip(
                     [(1, 1), (-1, 1), (-1, -1), (1, -1)],
-                    [(1, 0), (0, 1), (-1, 0), (0, -1)],
+                    [(1, 0), (0, 1), (-1, 0), (0, -1)]
                 )
             ]),
             side == Side.BLACK
@@ -38,7 +38,7 @@ class RGriffon(Piece):
                     movement.RiderMovement(board, [kl])
                 ]) for ij, kl in zip(
                     [(1, 1), (-1, 1), (-1, -1), (1, -1)],
-                    [(0, 1), (-1, 0), (0, -1), (1, 0)],
+                    [(0, 1), (-1, 0), (0, -1), (1, 0)]
                 )
             ]),
             side == Side.WHITE
@@ -59,7 +59,7 @@ class LAanca(Piece):
                     movement.RiderMovement(board, [kl])
                 ]) for ij, kl in zip(
                     [(1, 0), (0, 1), (-1, 0), (0, -1)],
-                    [(1, -1), (1, 1), (-1, 1), (-1, -1)],
+                    [(1, -1), (1, 1), (-1, 1), (-1, -1)]
                 )
             ]),
             side == Side.WHITE
@@ -80,7 +80,7 @@ class RAanca(Piece):
                     movement.RiderMovement(board, [kl])
                 ]) for ij, kl in zip(
                     [(1, 0), (0, 1), (-1, 0), (0, -1)],
-                    [(1, 1), (-1, 1), (-1, -1), (1, -1)],
+                    [(1, 1), (-1, 1), (-1, -1), (1, -1)]
                 )
             ]),
             side == Side.BLACK

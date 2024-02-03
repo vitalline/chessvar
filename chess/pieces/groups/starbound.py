@@ -38,16 +38,16 @@ class Sinerider(Piece):
             movements.append(
                 movement.BentMovement(board, [
                     movement.RiderMovement(board, [(1, i, 1)]),
-                    movement.RiderMovement(board, [(1, j, 1)]),
+                    movement.RiderMovement(board, [(1, j, 1)])
                 ])
             )
             movements.append(
                 movement.ChainMovement(board, [
                     movement.MultiMovement(board, capture=[
-                        movement.RiderMovement(board, [(1, i, 1)]),
+                        movement.RiderMovement(board, [(1, i, 1)])
                     ]),
                     movement.MultiMovement(board, move=[
-                        movement.RiderMovement(board, [(1, j, 1), (0, 0)]),
+                        movement.RiderMovement(board, [(1, j, 1), (0, 0)])
                     ])
                 ])
             )
@@ -67,7 +67,7 @@ class Turneagle(Piece):
                     movement.RiderMovement(board, [(i, j, 1)]),
                     movement.RiderMovement(board, [
                         (k, l, 1) for k, l in rot([(1, 1)]) if (i, j) != (-k, -l)
-                    ]),
+                    ])
                 ])
             )
             movements.append(
@@ -78,7 +78,7 @@ class Turneagle(Piece):
                     movement.MultiMovement(board, move_or_capture=[
                         movement.RiderMovement(board, [
                             (k, l, 1) for k, l in rot([(1, 1)]) + [(0, 0)] if (i, j) != (-k, -l)
-                        ]),
+                        ])
                     ])
                 ])
             )
