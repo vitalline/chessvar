@@ -47,15 +47,20 @@ class RRhino(Piece):
         )
 
 
-class Gnomon(Piece):
-    name = 'Gnomon'
-    file_name = 'vNvWnH'
+class Wyvern(Piece):
+    name = 'Wyvern'
+    file_name = 'WyafshhW'
     asset_folder = 'fizz'
 
     def __init__(self, board, board_pos, side):
         super().__init__(
             board, board_pos, side,
-            movement.RiderMovement(board, sym([(0, 1, 3, 3), (1, 0, 1), (2, 1, 1), (1, 0, 3, 3)]))
+            movement.MultiMovement(board, [
+                movement.BentMovement(board, [
+                    movement.RiderMovement(board, [(i, j, 1)]),
+                    movement.HalflingRiderMovement(board, [(i or k, j or k)], (i, j))
+                ]) for i, j in rot([(1, 0)]) for k in (1, -1)
+            ])
         )
 
 

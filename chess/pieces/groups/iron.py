@@ -3,20 +3,20 @@ from chess.movement.util import rot, symv
 from chess.pieces.pieces import Piece
 
 
-class Platypus(Piece):
-    name = 'Platypus'
-    file_name = 'B2sR2fW'
+class Musth(Piece):
+    name = 'Musth'
+    file_name = 'FAfsW'
     asset_folder = 'iron'
 
     def __init__(self, board, board_pos, side):
         super().__init__(
             board, board_pos, side,
-            movement.RiderMovement(board, symv([(1, 0, 1), (1, 1, 2), (0, 1, 2), (-1, 1, 2)]))
+            movement.RiderMovement(board, rot([(1, 1, 1), (2, 2, 1)]) + symv([(0, 1, 1)]) + [(1, 0, 1)])
         )
 
 
-class Enforcer(Piece):
-    name = 'Enforcer'
+class Officer(Piece):
+    name = 'Officer'
     file_name = 'vvNfKbW'
     asset_folder = 'iron'
 

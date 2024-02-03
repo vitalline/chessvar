@@ -3,15 +3,15 @@ from chess.movement.util import rot, symv
 from chess.pieces.pieces import Piece
 
 
-class Muskrat(Piece):
-    name = 'Muskrat'
-    file_name = 'sbRfB'
+class Lobefin(Piece):
+    name = 'Lobefin'
+    file_name = 'DfAAbB'
     asset_folder = 'drip'
 
     def __init__(self, board, board_pos, side):
         super().__init__(
             board, board_pos, side,
-            movement.RiderMovement(board, symv([(-1, 0), (0, 1), (1, 1)]))
+            movement.RiderMovement(board, rot([(2, 0)]) + symv([(2, 2), (-1, 1)])),
         )
 
 
@@ -27,36 +27,25 @@ class Crabrider(Piece):
         )
 
 
-class Wizard(Piece):
-    name = 'Wizard'
-    file_name = 'CF'
+class Sandbar(Piece):
+    name = 'Sandbar'
+    file_name = 'WfDfsbbN'
     asset_folder = 'drip'
 
     def __init__(self, board, board_pos, side):
         super().__init__(
             board, board_pos, side,
-            movement.RiderMovement(board, rot([(1, 1, 1), (1, 3, 1), (3, 1, 1)]))
+            movement.RiderMovement(board, symv([(1, 2, 1), (-2, 1, 1)]) + rot([(1, 0, 1)]) + [(2, 0, 1)]),
         )
 
 
-class Eagle(Piece):
-    name = 'Eagle'
-    file_name = 'RbBfFfAcfafF'
+class Oyster(Piece):
+    name = 'Oyster'
+    file_name = 'WfDffbsNNfAAbB'
     asset_folder = 'drip'
 
     def __init__(self, board, board_pos, side):
         super().__init__(
             board, board_pos, side,
-            movement.MultiMovement(board, [
-                movement.RiderMovement(board, rot([(1, 0)]) + symv([(-1, 1), (1, 1, 1), (2, 2, 1)]))
-            ] + [
-                movement.ChainMovement(board, [
-                    movement.MultiMovement(board, capture=[
-                        movement.RiderMovement(board, [(i, j, 1)])
-                    ]),
-                    movement.MultiMovement(board, move_or_capture=[
-                        movement.RiderMovement(board, [(i, j, 1), (0, 0)])
-                    ])
-                ]) for i, j in symv([(1, 1)])
-            ])
+            movement.RiderMovement(board, symv([(2, 1), (2, 2), (-1, 1), (-1, 2)]) + rot([(1, 0, 1)]) + [(2, 0, 1)]),
         )

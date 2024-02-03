@@ -1,5 +1,5 @@
 from chess.movement import movement
-from chess.movement.util import rot, sym
+from chess.movement.util import rot, sym, symv
 from chess.pieces.pieces import Piece
 
 
@@ -15,20 +15,20 @@ class Wader(Piece):
         )
 
 
-class Nightrider(Piece):
-    name = 'Nightrider'
-    file_name = 'NN'
+class Darter(Piece):
+    name = 'Darter'
+    file_name = 'fNWbAA'
     asset_folder = 'avian'
 
     def __init__(self, board, board_pos, side):
         super().__init__(
             board, board_pos, side,
-            movement.RiderMovement(board, sym([(1, 2), (2, 1)]))
+            movement.RiderMovement(board, rot([(1, 0, 1)]) + symv([(2, 1, 1), (-2, 2)]))
         )
 
 
-class Faalcon(Piece):
-    name = 'Faalcon'
+class Falcon(Piece):
+    name = 'Falcon'
     file_name = 'FAA'
     asset_folder = 'avian'
 

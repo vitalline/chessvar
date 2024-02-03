@@ -3,16 +3,16 @@ from chess.movement.util import rot
 from chess.pieces.pieces import Piece
 
 
-class Bacon(Piece):
-    name = 'Bacon'
-    file_name = 'FpR'
+class Belwaffle(Piece):
+    name = 'Belwaffle'
+    file_name = 'pRWA'
     asset_folder = 'breakfast'
 
     def __init__(self, board, board_pos, side):
         super().__init__(
             board, board_pos, side,
             movement.MultiMovement(board, [
-                movement.RiderMovement(board, rot([(1, 1, 1)])),
+                movement.RiderMovement(board, rot([(1, 0, 1), (2, 2, 1)])),
                 movement.CannonRiderMovement(board, rot([(1, 0)]))
             ])
         )
@@ -33,29 +33,24 @@ class Pancake(Piece):
         )
 
 
-class Scramble(Piece):
-    name = 'Scramble'
-    file_name = 'pBmB'
+class Bacon(Piece):
+    name = 'Bacon'
+    file_name = 'pBFD'
     asset_folder = 'breakfast'
 
     def __init__(self, board, board_pos, side):
         super().__init__(
             board, board_pos, side,
-            movement.MultiMovement(
-                board,
-                move_or_capture=[
-                    movement.CannonRiderMovement(board, rot([(1, 1)]))
-                ],
-                move=[
-                    movement.RiderMovement(board, rot([(1, 1)]))
-                ]
-            )
+            movement.MultiMovement(board, [
+                movement.RiderMovement(board, rot([(1, 1, 1), (2, 0, 1)])),
+                movement.CannonRiderMovement(board, rot([(1, 1)]))
+            ])
         )
 
 
 class Omelet(Piece):
     name = 'Omelet'
-    file_name = 'KpQ'
+    file_name = 'pQK'
     asset_folder = 'breakfast'
 
     def __init__(self, board, board_pos, side):

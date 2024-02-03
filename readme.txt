@@ -47,6 +47,8 @@ Shift + RMB/Backspace: promote piece
 Ctrl + RMB/Backspace: revoke first move of a piece
 
 source:
+https://www.reddit.com/r/chessvariants/comments/190l46o/2024_chess_with_different_armies_thread/
+https://www.reddit.com/r/chessvariants/comments/15dzby8/new_and_even_more_thought_out_chess_with/
 https://www.reddit.com/r/chessvariants/comments/vmdk1s/a_new_and_improved_chess_with_different_armies/
 https://en.wikipedia.org/wiki/Chess_with_different_armies
 https://www.chessvariants.org/unequal.dir/cwda.html

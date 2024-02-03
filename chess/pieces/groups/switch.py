@@ -49,8 +49,8 @@ class Bear(Piece):
         )
 
 
-class Pandabear(Piece):
-    name = 'Pandabear'
+class Earl(Piece):
+    name = 'Earl'
     file_name = 'K[W-DD][F-AA]'
     asset_folder = 'switch'
 

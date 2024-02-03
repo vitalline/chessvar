@@ -44,16 +44,28 @@ class Mortar(Piece):
         )
 
 
+class Napoleon(Piece):
+    name = 'Napoleon'
+    file_name = 'fbNW'
+    asset_folder = 'cannon'
+
+    def __init__(self, board, board_pos, side):
+        super().__init__(
+            board, board_pos, side,
+            movement.RiderMovement(board, rot([(1, 0, 1)]) + sym([(2, 1, 1)]))
+        )
+
+
 class Carronade(Piece):
     name = 'Carronade'
-    file_name = 'FssBpB'
+    file_name = 'ssBpB'
     asset_folder = 'cannon'
 
     def __init__(self, board, board_pos, side):
         super().__init__(
             board, board_pos, side,
             movement.MultiMovement(board, [
-                movement.RiderMovement(board, rot([(1, 1, 1)])),
+                # movement.RiderMovement(board, rot([(1, 1, 1)])),
                 movement.SpaciousRiderMovement(board, rot([(1, 1)])),
                 movement.CannonRiderMovement(board, rot([(1, 1)]))
             ])
@@ -62,7 +74,7 @@ class Carronade(Piece):
 
 class Bertha(Piece):
     name = 'Bertha'
-    file_name = 'KssQpQ'
+    file_name = 'WssQpQ'
     asset_folder = 'cannon'
 
     def __init__(self, board, board_pos, side):
@@ -70,7 +82,7 @@ class Bertha(Piece):
             board, board_pos, side,
             movement.MultiMovement(board, [
                 movement.RiderMovement(board, rot([(1, 0, 1)])),
-                movement.RiderMovement(board, rot([(1, 1, 1)])),
+                # movement.RiderMovement(board, rot([(1, 1, 1)])),
                 movement.SpaciousRiderMovement(board, rot([(1, 0)])),
                 movement.SpaciousRiderMovement(board, rot([(1, 1)])),
                 movement.CannonRiderMovement(board, rot([(1, 0)])),

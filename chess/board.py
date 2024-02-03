@@ -30,7 +30,7 @@ from chess.pieces.groups import knight as kn
 from chess.pieces.groups import mash as ms
 from chess.pieces.groups import pizza as pz
 from chess.pieces.groups import rookie as rk
-from chess.pieces.groups import splash as sp, starbound as st, stone as so, switch as sw
+from chess.pieces.groups import starbound as st, stone as so, switch as sw
 from chess.pieces.groups import zebra as zb
 from chess.pieces.groups.util import NoPiece
 from chess.pieces.pieces import Side
@@ -54,15 +54,15 @@ piece_groups = [
     },
     {
         'name': "Amazing Armada",
-        'set': [am.Cannon, am.Camel, am.Knife, am.Amazon, fide.King, am.Knife, am.Camel, am.Cannon],
+        'set': [am.Cannon, am.Camel, am.Nightrider, am.Amazon, fide.King, am.Nightrider, am.Camel, am.Cannon],
     },
     {
         'name': "Amontillado Arbiters",
-        'set': [ao.Hasdrubal, ao.Crabster, ao.Bed, ao.Hamilcar, fide.King, ao.Bed, ao.Crabster, ao.Hasdrubal],
+        'set': [ao.Hasdrubal, ao.Barcfil, ao.Bed, ao.Hamilcar, fide.King, ao.Bed, ao.Barcfil, ao.Hasdrubal],
     },
     {
         'name': "Avian Airforce",
-        'set': [av.Wader, av.Nightrider, av.Faalcon, av.Kingfisher, fide.King, av.Faalcon, av.Nightrider, av.Wader],
+        'set': [av.Wader, av.Darter, av.Falcon, av.Kingfisher, fide.King, av.Falcon, av.Darter, av.Wader],
     },
     {
         'name': "Beautiful Beasts",
@@ -70,11 +70,11 @@ piece_groups = [
     },
     {
         'name': 'Breakfast Blasters',
-        'set': [bk.Bacon, bk.Pancake, bk.Scramble, bk.Omelet, fide.King, bk.Scramble, bk.Pancake, bk.Bacon],
+        'set': [bk.Belwaffle, bk.Pancake, bk.Bacon, bk.Omelet, fide.King, bk.Bacon, bk.Pancake, bk.Belwaffle],
     },
     {
         'name': "Burning Barbarians",
-        'set': [br.Caddy, br.Sorcerer, br.DragonHorse, br.DragonKing, cb.King, br.DragonHorse, br.Sorcerer, br.Caddy],
+        'set': [br.Champion, br.DragonHorse, br.Wizard, br.DragonKing, cb.King, br.Wizard, br.DragonHorse, br.Champion],
     },
     {
         'name': "Cartankerous Camelids",
@@ -82,7 +82,7 @@ piece_groups = [
     },
     {
         'name': "Claustrophobic Cannoneers",
-        'set': [cn.Howitzer, cn.Mortar, cn.Carronade, cn.Bertha, fide.King, cn.Carronade, cn.Mortar, cn.Howitzer],
+        'set': [cn.Mortar, cn.Napoleon, cn.Carronade, cn.Bertha, fide.King, cn.Carronade, cn.Napoleon, cn.Howitzer]
     },
     {
         'name': "Cruel Crooks",
@@ -94,27 +94,27 @@ piece_groups = [
     },
     {
         'name': "Dripping Droogs",
-        'set': [dr.Muskrat, dr.Crabrider, dr.Wizard, dr.Eagle, fide.King, dr.Wizard, dr.Crabrider, dr.Muskrat],
+        'set': [dr.Lobefin, dr.Crabrider, dr.Sandbar, dr.Oyster, fide.King, dr.Sandbar, dr.Crabrider, dr.Lobefin],
     },
     {
         'name': "Fighting Fizzies",
-        'set': [fi.LRhino, fi.Gnomon, fi.Crabinal, fi.EagleScout, fide.King, fi.Crabinal, fi.Gnomon, fi.RRhino],
+        'set': [fi.LRhino, fi.Wyvern, fi.Crabinal, fi.EagleScout, fide.King, fi.Crabinal, fi.Wyvern, fi.RRhino],
     },
     {
         'name': "Forward Forgers",
-        'set': [fw.Rock, fw.Knishop, fw.Bishight, fw.Forequeen, fide.King, fw.Bishight, fw.Knishop, fw.Rock],
+        'set': [fw.IvoryRook, fw.Knishop, fw.Bishight, fw.Forequeen, fide.King, fw.Bishight, fw.Knishop, fw.IvoryRook],
     },
     {
         'name': "Horseback Harassers",
-        'set': [hs.Guard2, hs.Horserider, hs.Elephas, hs.Marauder, fide.King, hs.Elephas, hs.Horserider, hs.Guard2],
+        'set': [hs.Naysayer, hs.Horserider, hs.Tapir, hs.Marauder, fide.King, hs.Tapir, hs.Horserider, hs.Naysayer],
     },
     {
         'name': "Irritant Irons",
-        'set': [ir.Platypus, ir.Enforcer, ir.SRider, ir.GRider, fide.King, ir.SRider, ir.Enforcer, ir.Platypus],
+        'set': [ir.Musth, ir.Officer, ir.SRider, ir.GRider, fide.King, ir.SRider, ir.Officer, ir.Musth],
     },
     {
         'name': "Meticulous Mashers",
-        'set': [ms.Forfer, ms.Napoleon, ms.Bandage, ms.Rancor, fide.King, ms.Bandage, ms.Napoleon, ms.Forfer]
+        'set': [ms.Forfer, ms.Scout, ms.Bandit, ms.Rancher, fide.King, ms.Bandit, ms.Scout, ms.Forfer]
     },
     {
         'name': "Pizza Pounders",
@@ -122,7 +122,7 @@ piece_groups = [
     },
     {
         'name': "Seeping Switchers",
-        'set': [sw.Panda, sw.Marquis, sw.Bear, sw.Pandabear, fide.King, sw.Bear, sw.Marquis, sw.Panda],
+        'set': [sw.Panda, sw.Marquis, sw.Bear, sw.Earl, fide.King, sw.Bear, sw.Marquis, sw.Panda],
     },
     {
         'name': "Starbound Sliders",
@@ -130,15 +130,11 @@ piece_groups = [
     },
     {
         'name': "Stoic Stones",
-        'set': [so.Champion, so.Tower, so.Stele, so.Caryatid, fide.King, so.Stele, so.Tower, so.Champion],
-    },
-    {
-        'name': "Superior Splashers",
-        'set': [sp.Mammoth, sp.Kirin, sp.Deacon, sp.Brigadier, fide.King, sp.Deacon, sp.Kirin, sp.Mammoth],
+        'set': [so.Caecilian, so.Brick, so.Stele, so.Caryatid, fide.King, so.Stele, so.Brick, so.Caecilian],
     },
     {
         'name': 'Zany Zebroids',
-        'set': [zb.Zed, zb.Officer, zb.Levey, zb.Relish, fide.King, zb.Levey, zb.Officer, zb.Zed],
+        'set': [zb.Eliphas, zb.Sorcerer, zb.Adze, zb.FMarauder, fide.King, zb.Adze, zb.Sorcerer, zb.Eliphas],
     }
 ]
 
@@ -323,6 +319,11 @@ class Board(Window):
         self.ply_count += 1
 
         piece_sets = {side: piece_groups[self.piece_sets[side]]['set'].copy() for side in self.piece_sets}
+
+        # Special condition for Spacious Cannoneers as black: Swap the positions of Mortar and Howitzer
+        black_piece_set = piece_sets[Side.BLACK]
+        if black_piece_set[0] == cn.Mortar and black_piece_set[7] == cn.Howitzer:
+            black_piece_set[0], black_piece_set[7] = black_piece_set[7], black_piece_set[0]
 
         if update or shuffle:
             self.future_move_history = []

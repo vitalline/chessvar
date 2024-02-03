@@ -1,17 +1,17 @@
 from chess.movement import movement
-from chess.movement.util import symv
+from chess.movement.util import rot2, symv
 from chess.pieces.pieces import Piece
 
 
-class Rock(Piece):
-    name = 'Bishight'
-    file_name = 'fsRbhN'
+class IvoryRook(Piece):
+    name = 'Ivory Rook'
+    file_name = 'vRsWsD'
     asset_folder = 'forward'
 
     def __init__(self, board, board_pos, side):
         super().__init__(
             board, board_pos, side,
-            movement.RiderMovement(board, symv([(1, 0), (0, 1), (-1, 2, 1), (-2, 1, 1)]))
+            movement.RiderMovement(board, rot2([(1, 0), (0, 1, 1), (0, 2, 1)]))
         )
 
 

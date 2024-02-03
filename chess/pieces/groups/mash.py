@@ -15,20 +15,20 @@ class Forfer(Piece):
         )
 
 
-class Napoleon(Piece):
-    name = 'Napoleon'
-    file_name = 'fbNW'
+class Scout(Piece):
+    name = 'Scout'
+    file_name = 'WT'
     asset_folder = 'mash'
 
     def __init__(self, board, board_pos, side):
         super().__init__(
             board, board_pos, side,
-            movement.RiderMovement(board, rot([(1, 0, 1)]) + sym([(2, 1, 1)]))
+            movement.RiderMovement(board, rot([(1, 0, 1), (3, 0, 1)]))
         )
 
 
-class Bandage(Piece):
-    name = 'Bandage'
+class Bandit(Piece):
+    name = 'Bandit'
     file_name = 'B4nD'
     asset_folder = 'mash'
 
@@ -39,8 +39,8 @@ class Bandage(Piece):
         )
 
 
-class Rancor(Piece):
-    name = 'Rancor'
+class Rancher(Piece):
+    name = 'Rancher'
     file_name = 'R4N2'
     asset_folder = 'mash'
 

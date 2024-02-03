@@ -130,11 +130,12 @@ class RiderMovement(BaseDirectionalMovement):
 
 class HalflingRiderMovement(RiderMovement):
 
-    def __init__(self, board: Board, directions: list[AnyDirection]):
+    def __init__(self, board: Board, directions: list[AnyDirection], shift: Direction = (0, 0)):
         super().__init__(board, directions)
         self.board_size = self.board.board_height, self.board.board_width
         self.current_distance = 0
         self.max_distance = 0
+        self.shift = shift
 
     @staticmethod
     def distance_to_edge(position: int, direction: int, size: int) -> int:
@@ -143,7 +144,7 @@ class HalflingRiderMovement(RiderMovement):
     def initialize_direction(self, direction: AnyDirection, pos_from: Position, piece: Piece) -> None:
         self.current_distance = 0
         self.max_distance = min(ceil(
-            self.distance_to_edge(pos_from[i], direction[i], self.board_size[i]) / 2
+            self.distance_to_edge(pos_from[i] + self.shift[i], direction[i], self.board_size[i]) / 2
         ) for i in range(2))
 
     def advance_direction(self, move: Move, direction: AnyDirection, pos_from: Position, piece: Piece) -> None:
@@ -151,6 +152,9 @@ class HalflingRiderMovement(RiderMovement):
 
     def stop_condition(self, move: Move, direction: AnyDirection, piece: Piece, theoretical: bool = False) -> bool:
         return self.current_distance >= self.max_distance or super().stop_condition(move, direction, piece, theoretical)
+
+    def __copy_args__(self):
+        return self.board, copy(self.directions), self.shift
 
 
 class CannonRiderMovement(RiderMovement):

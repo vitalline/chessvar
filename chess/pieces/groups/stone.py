@@ -3,27 +3,27 @@ from chess.movement.util import rot
 from chess.pieces.pieces import Piece
 
 
-class Champion(Piece):
-    name = 'Champion'
-    file_name = 'WAD'
+class Caecilian(Piece):
+    name = 'Caecilian'
+    file_name = 'HA'
     asset_folder = 'stone'
 
     def __init__(self, board, board_pos, side):
         super().__init__(
             board, board_pos, side,
-            movement.RiderMovement(board, rot([(1, 0, 1), (2, 0, 1), (2, 2, 1)]))
+            movement.RiderMovement(board, rot([(2, 2, 1), (3, 0, 1)]))
         )
 
 
-class Tower(Piece):
-    name = 'Tower'
-    file_name = 'HnA'
+class Brick(Piece):
+    name = 'Brick'
+    file_name = 'WDT'
     asset_folder = 'stone'
 
     def __init__(self, board, board_pos, side):
         super().__init__(
             board, board_pos, side,
-            movement.RiderMovement(board, rot([(3, 0, 1), (1, 1, 2, 2)]))
+            movement.RiderMovement(board, rot([(1, 0, 1), (2, 0, 1), (3, 3, 1)]))
         )
 
 

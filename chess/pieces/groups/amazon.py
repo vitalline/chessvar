@@ -31,15 +31,15 @@ class Camel(Piece):
         )
 
 
-class Knife(Piece):
-    name = 'Knife'
-    file_name = 'NF'
+class Nightrider(Piece):
+    name = 'Nightrider'
+    file_name = 'NN'
     asset_folder = 'amazon'
 
     def __init__(self, board, board_pos, side):
         super().__init__(
             board, board_pos, side,
-            movement.RiderMovement(board, sym([(1, 1, 1), (1, 2, 1), (2, 1, 1)]))
+            movement.RiderMovement(board, sym([(1, 2), (2, 1)]))
         )
 
 

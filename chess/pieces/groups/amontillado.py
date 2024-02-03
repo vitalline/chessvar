@@ -18,17 +18,16 @@ class Hasdrubal(Piece):
         )
 
 
-class Crabster(Piece):
-    name = 'Crabster'
-    file_name = 'ffbsNfAbF'
+class Barcfil(Piece):
+    name = 'Barcfil'
+    file_name = 'AfsbbN'
     asset_folder = 'amontillado'
 
     def __init__(self, board, board_pos, side):
         super().__init__(
             board, board_pos, side,
-            movement.RiderMovement(board, symv([(2, 1, 1), (2, 2, 1), (-1, 1, 1), (-1, 2, 1)]))
+            movement.RiderMovement(board, symv([(1, 2, 1), (2, 2, 1), (-2, 1, 1), (-2, 2, 1)]))
         )
-
 
 class Bed(Piece):
     name = 'Bed'
