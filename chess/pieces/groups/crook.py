@@ -59,17 +59,17 @@ class Boyscout(Piece):
     asset_folder = 'crook'
 
     def __init__(self, board, board_pos, side):
-        chain_movements = []
+        movements = []
         for i, j in [(1, 1), (-1, 1), (-1, -1), (1, -1)]:
             for k, l in [(-i, j), (i, -j)]:
                 rider_movements = []
                 for m in range(int(ceil(max(board.board_width, board.board_height) / 2))):
                     rider_movements.append(movement.RiderMovement(board, [(i, j, 1)]))
                     rider_movements.append(movement.RiderMovement(board, [(k, l, 1)]))
-                chain_movements.append(movement.BentMovement(board, rider_movements))
+                movements.append(movement.BentMovement(board, rider_movements))
         super().__init__(
             board, board_pos, side,
-            movement.MultiMovement(board, chain_movements)
+            movement.MultiMovement(board, movements)
         )
 
 

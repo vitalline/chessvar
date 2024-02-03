@@ -19,10 +19,19 @@ from chess.movement.move import Move
 from chess.movement.util import Position, add
 from chess.pieces import pieces as abc
 from chess.pieces.groups import classic as fide
-from chess.pieces.groups import amazon as am, amontillado as ao, avian as av, beast as bs, burn as br, cannon as ca
-from chess.pieces.groups import colorbound as cb, crook as cr, demirifle as de, drip as dr, fizz as fi, forward as fw
-from chess.pieces.groups import iron as ir, knight as kn, mash as ms, pizza as pz, rookie as rk, splash as sp
-from chess.pieces.groups import starbound as st, stone as so, switch as sw
+from chess.pieces.groups import amazon as am, amontillado as ao, avian as av
+from chess.pieces.groups import beast as bs, breakfast as bk, burn as br
+from chess.pieces.groups import camel as ca, cannon as cn, colorbound as cb, crook as cr
+from chess.pieces.groups import demirifle as de, drip as dr
+from chess.pieces.groups import fizz as fi, forward as fw
+from chess.pieces.groups import horse as hs
+from chess.pieces.groups import iron as ir
+from chess.pieces.groups import knight as kn
+from chess.pieces.groups import mash as ms
+from chess.pieces.groups import pizza as pz
+from chess.pieces.groups import rookie as rk
+from chess.pieces.groups import splash as sp, starbound as st, stone as so, switch as sw
+from chess.pieces.groups import zebra as zb
 from chess.pieces.groups.util import NoPiece
 from chess.pieces.pieces import Side
 
@@ -60,12 +69,20 @@ piece_groups = [
         'set': [bs.Ouroboros, bs.Quagga, bs.Roc, bs.Buffalo, fide.King, bs.Roc, bs.Quagga, bs.Ouroboros],
     },
     {
+        'name': 'Breakfast Blasters',
+        'set': [bk.Bacon, bk.Pancake, bk.Scramble, bk.Omelet, fide.King, bk.Scramble, bk.Pancake, bk.Bacon],
+    },
+    {
         'name': "Burning Barbarians",
         'set': [br.Caddy, br.Sorcerer, br.DragonHorse, br.DragonKing, cb.King, br.DragonHorse, br.Sorcerer, br.Caddy],
     },
     {
+        'name': "Cartankerous Camelids",
+        'set': [ca.Llama, ca.Cashier, ca.Cabbage, ca.Warlock, fide.King, ca.Cabbage, ca.Cashier, ca.Llama],
+    },
+    {
         'name': "Claustrophobic Cannoneers",
-        'set': [ca.Howitzer, ca.Mortar, ca.Carronade, ca.Bertha, fide.King, ca.Carronade, ca.Mortar, ca.Howitzer],
+        'set': [cn.Howitzer, cn.Mortar, cn.Carronade, cn.Bertha, fide.King, cn.Carronade, cn.Mortar, cn.Howitzer],
     },
     {
         'name': "Cruel Crooks",
@@ -86,6 +103,10 @@ piece_groups = [
     {
         'name': "Forward Forgers",
         'set': [fw.Rock, fw.Knishop, fw.Bishight, fw.Forequeen, fide.King, fw.Bishight, fw.Knishop, fw.Rock],
+    },
+    {
+        'name': "Horseback Harassers",
+        'set': [hs.Guard2, hs.Horserider, hs.Elephas, hs.Marauder, fide.King, hs.Elephas, hs.Horserider, hs.Guard2],
     },
     {
         'name': "Irritant Irons",
@@ -114,6 +135,10 @@ piece_groups = [
     {
         'name': "Superior Splashers",
         'set': [sp.Mammoth, sp.Kirin, sp.Deacon, sp.Brigadier, fide.King, sp.Deacon, sp.Kirin, sp.Mammoth],
+    },
+    {
+        'name': 'Zany Zebroids',
+        'set': [zb.Zed, zb.Officer, zb.Levey, zb.Relish, fide.King, zb.Levey, zb.Officer, zb.Zed],
     }
 ]
 

@@ -16,10 +16,9 @@ class Howitzer(Piece):
                 move_or_capture=[
                     movement.RiderMovement(board, rot([(1, 0, 1)])),
                     movement.SpaciousRiderMovement(board, rot([(1, 0)]))
-                ],
-                move=[
+                ], move=[
                     movement.CannonRiderMovement(board, rot([(1, 0)]))
-                ],
+                ]
             )
         )
 
@@ -40,7 +39,7 @@ class Mortar(Piece):
                 ],
                 capture=[
                     movement.CannonRiderMovement(board, rot([(1, 0)]))
-                ],
+                ]
             )
         )
 
@@ -53,14 +52,11 @@ class Carronade(Piece):
     def __init__(self, board, board_pos, side):
         super().__init__(
             board, board_pos, side,
-            movement.MultiMovement(
-                board,
-                move_or_capture=[
-                    movement.RiderMovement(board, rot([(1, 1, 1)])),
-                    movement.SpaciousRiderMovement(board, rot([(1, 1)])),
-                    movement.CannonRiderMovement(board, rot([(1, 1)]))
-                ],
-            )
+            movement.MultiMovement(board, [
+                movement.RiderMovement(board, rot([(1, 1, 1)])),
+                movement.SpaciousRiderMovement(board, rot([(1, 1)])),
+                movement.CannonRiderMovement(board, rot([(1, 1)]))
+            ])
         )
 
 
@@ -72,16 +68,13 @@ class Bertha(Piece):
     def __init__(self, board, board_pos, side):
         super().__init__(
             board, board_pos, side,
-            movement.MultiMovement(
-                board,
-                move_or_capture=[
-                    movement.RiderMovement(board, rot([(1, 0, 1)])),
-                    movement.RiderMovement(board, rot([(1, 1, 1)])),
-                    movement.SpaciousRiderMovement(board, rot([(1, 0)])),
-                    movement.SpaciousRiderMovement(board, rot([(1, 1)])),
-                    movement.CannonRiderMovement(board, rot([(1, 0)])),
-                    movement.CannonRiderMovement(board, rot([(1, 1)]))
-                ],
-            )
+            movement.MultiMovement(board, [
+                movement.RiderMovement(board, rot([(1, 0, 1)])),
+                movement.RiderMovement(board, rot([(1, 1, 1)])),
+                movement.SpaciousRiderMovement(board, rot([(1, 0)])),
+                movement.SpaciousRiderMovement(board, rot([(1, 1)])),
+                movement.CannonRiderMovement(board, rot([(1, 0)])),
+                movement.CannonRiderMovement(board, rot([(1, 1)]))
+            ])
         )
 
