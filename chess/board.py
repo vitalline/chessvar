@@ -61,7 +61,7 @@ piece_groups = [
     },
     {
         'name': "Burning Barbarians",
-        'set': [br.Caddy, br.Sorcerer, br.DragonHorse, br.DragonKing, fide.King, br.DragonHorse, br.Sorcerer, br.Caddy],
+        'set': [br.Caddy, br.Sorcerer, br.DragonHorse, br.DragonKing, cb.King, br.DragonHorse, br.Sorcerer, br.Caddy],
     },
     {
         'name': "Claustrophobic Cannoneers",
