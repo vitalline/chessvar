@@ -1082,11 +1082,12 @@ class Board(Window):
         if self.edit_mode:
             self.color_pieces()  # reverting the piece colors to normal in case they were changed
             return  # let's not advance the turn while editing the board to hopefully make things easier for everyone
-        self.load_check()
         pass_check_side = Side.NONE
-        if self.check_side == self.turn_side:  # if the player is in check and passes the turn, the game ends
-            self.game_over = True
-            pass_check_side = self.check_side
+        if self.move_history and self.move_history[-1] is None:
+            self.load_check()
+            if self.check_side == self.turn_side:  # if the player is in check and passes the turn, the game ends
+                self.game_over = True
+                pass_check_side = self.check_side
         self.turn_side = self.turn_side.opponent()
         self.load_all_moves()  # this updates the check status as well
         self.show_moves()
