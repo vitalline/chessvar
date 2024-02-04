@@ -480,11 +480,14 @@ class MultiMovement(BaseMovement):
     def moves(self, pos_from: Position, piece: Piece, theoretical: bool = False):
         for movement in self.move_or_capture + self.move:
             for move in movement.moves(pos_from, piece, theoretical):
-                if theoretical or self.board.not_a_piece(move.pos_to) or piece == self.board.get_piece(move.pos_to):
+                if theoretical or ((to_piece := self.board.get_piece(move.pos_to)).is_empty() or piece == to_piece):
                     yield copy(move)
         for movement in self.move_or_capture + self.capture:
             for move in movement.moves(pos_from, piece, theoretical):
-                if theoretical or self.board.get_side(move.pos_to) == piece.side.opponent():
+                if theoretical or (
+                    (to_piece := self.board.get_piece(move.pos_to)).side == piece.side.opponent()
+                    and (not to_piece.is_empty() or isinstance(movement, EnPassantMovement))
+                ):
                     yield copy(move)
 
     def update(self, move: Move, piece: Piece):

@@ -790,7 +790,7 @@ class Board(Window):
                     move.set(swapped_piece=new_piece)
                 elif isinstance(move.movement, movement.EnPassantMovement) and new_piece.is_empty():
                     move.set(captured_piece=self.en_passant_target)
-                else:
+                elif not new_piece.is_empty():
                     move.set(captured_piece=new_piece)
 
     def set_position(self, piece: abc.Piece, pos: Position) -> None:
