@@ -17,7 +17,7 @@ class Naysayer(Piece):
             rider_movements = []
             for m in range(int(ceil(max(board.board_width, board.board_height) / 2))):
                 rider_movements.append(movement.RiderMovement(board, [(i, j, 2, 2)]))
-            movements.append(movement.BentMovement(board, deepcopy(rider_movements)))
+            movements.append(movement.BentMovement(board, rider_movements))
         super().__init__(
             board, board_pos, side,
             movement.MultiMovement(board, [movement.RiderMovement(board, rot([(1, 0, 3, 3)]))] + movements)

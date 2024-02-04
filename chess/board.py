@@ -28,6 +28,7 @@ from chess.pieces.groups import horse as hs
 from chess.pieces.groups import iron as ir
 from chess.pieces.groups import knight as kn
 from chess.pieces.groups import mash as ms
+from chess.pieces.groups import nocturnal as no
 from chess.pieces.groups import pizza as pz
 from chess.pieces.groups import rookie as rk
 from chess.pieces.groups import starbound as st, stone as so, switch as sw
@@ -127,6 +128,10 @@ piece_groups = [
     {
         'name': "Meticulous Mashers",
         'set': [ms.Forfer, ms.Scout, ms.Bandit, ms.Rancher, fide.King, ms.Bandit, ms.Scout, ms.Forfer]
+    },
+    {
+        'name': "Nocturnal Naysayers",
+        'set': [no.Bard, no.Nightsling, no.Moarider, no.Nanking, fide.King, no.Moarider, no.Nightsling, no.Bard],
     },
     {
         'name': "Pizza Pounders",
