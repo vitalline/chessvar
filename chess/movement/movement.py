@@ -115,13 +115,13 @@ class RiderMovement(BaseDirectionalMovement):
             self.board.not_on_board(next_pos_to)
             or move.pos_from == next_pos_to
             or len(direction) > 2 and direction[2] and (
-                    move.pos_to == self.transform(add(move.pos_from, mul(direction[:2], direction[2])))
+                move.pos_to == self.transform(add(move.pos_from, mul(direction[:2], direction[2])))
             )
             or not theoretical and (
-                piece.side == self.board.get_side(next_pos_to) and piece != self.board.get_piece(next_pos_to)
+                piece.side == (next_piece := self.board.get_piece(next_pos_to)).side and piece != next_piece
                 or (
-                    piece.side == self.board.get_side(move.pos_to).opponent()
-                    and not self.board.not_a_piece(move.pos_to)
+                    piece.side == (current_piece := self.board.get_piece(move.pos_to)).side.opponent()
+                    and not current_piece.is_empty()
                     and move.pos_from != move.pos_to
                 )
             )
@@ -176,6 +176,10 @@ class CannonRiderMovement(RiderMovement):
         return super().skip_condition(move, direction, piece, theoretical) if self.jumped == 1 else not theoretical
 
     def stop_condition(self, move: Move, direction: AnyDirection, piece: Piece, theoretical: bool = False) -> bool:
+        if self.jumped == 0 and not theoretical:
+            next_pos_to = self.transform(add(move.pos_to, direction[:2]))
+            if piece.side == (next_piece := self.board.get_piece(next_pos_to)).side and piece != next_piece:
+                return True
         return super().stop_condition(move, direction, piece, theoretical or self.jumped != 1)
 
 
