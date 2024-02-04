@@ -3,10 +3,10 @@ from chess.movement.util import rot, sym
 from chess.pieces.pieces import Piece
 
 
-class CyWaffle(Piece):
-    name = 'Cylindrical Waffle'
-    file_name = 'sorcerer2'
-    asset_folder = 'other'
+class Waffle(Piece):
+    name = 'Waffle'
+    file_name = 'oWoA'
+    asset_folder = 'cylindrical'
 
     def __init__(self, board, board_pos, side):
         super().__init__(
@@ -15,10 +15,10 @@ class CyWaffle(Piece):
         )
 
 
-class CyKnight(Piece):
-    name = 'Cylindrical Knight'
-    file_name = 'knight2'
-    asset_folder = 'classic2'
+class Knight(Piece):
+    name = 'Knight'
+    file_name = 'oN'
+    asset_folder = 'cylindrical'
 
     def __init__(self, board, board_pos, side):
         super().__init__(
@@ -27,10 +27,10 @@ class CyKnight(Piece):
         )
 
 
-class CyBishop(Piece):
-    name = 'Cylindrical Bishop'
-    file_name = 'bishop2'
-    asset_folder = 'classic2'
+class Bishop(Piece):
+    name = 'Bishop'
+    file_name = 'oB'
+    asset_folder = 'cylindrical'
 
     def __init__(self, board, board_pos, side):
         super().__init__(
@@ -39,10 +39,10 @@ class CyBishop(Piece):
         )
 
 
-class CyChancellor(Piece):
-    name = 'Cylindrical Chancellor'
-    file_name = 'chancellor2'
-    asset_folder = 'other'
+class Chancellor(Piece):
+    name = 'Chancellor'
+    file_name = 'oRoN'
+    asset_folder = 'cylindrical'
 
     def __init__(self, board, board_pos, side):
         super().__init__(

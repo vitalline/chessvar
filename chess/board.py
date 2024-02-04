@@ -21,9 +21,9 @@ from chess.pieces import pieces as abc
 from chess.pieces.groups import classic as fide
 from chess.pieces.groups import amazon as am, amontillado as ao, avian as av
 from chess.pieces.groups import beast as bs, breakfast as bk, burn as br
-from chess.pieces.groups import camel as ca, cannon as cn, colorbound as cb, crook as cr
+from chess.pieces.groups import camel as ca, cannon as cn, colorbound as cb, crook as cr, cylindrical as cy
 from chess.pieces.groups import demirifle as de, drip as dr
-from chess.pieces.groups import fizz as fi, forward as fw
+from chess.pieces.groups import fairy as fa, fizz as fi, fly as fl, forward as fw
 from chess.pieces.groups import horse as hs
 from chess.pieces.groups import iron as ir
 from chess.pieces.groups import knight as kn
@@ -69,7 +69,7 @@ piece_groups = [
         'set': [bs.Ouroboros, bs.Quagga, bs.Roc, bs.Buffalo, fide.King, bs.Roc, bs.Quagga, bs.Ouroboros],
     },
     {
-        'name': 'Breakfast Blasters',
+        'name': "Breakfast Blasters",
         'set': [bk.Belwaffle, bk.Pancake, bk.Bacon, bk.Omelet, fide.King, bk.Bacon, bk.Pancake, bk.Belwaffle],
     },
     {
@@ -89,6 +89,10 @@ piece_groups = [
         'set': [cr.LionCub, cr.Rhino, cr.Boyscout, cr.Griffon, fide.King, cr.Boyscout, cr.Rhino, cr.LionCub],
     },
     {
+        'name': "Cylindrical Cinders",
+        'set': [cy.Waffle, cy.Knight, cy.Bishop, cy.Chancellor, fide.King, cy.Bishop, cy.Knight, cy.Waffle],
+    },
+    {
         'name': "Demirifle Destroyers",
         'set': [de.Snail, de.Crab, de.Lobster, de.Crabsnail, fide.King, de.Lobster, de.Crab, de.Snail],
     },
@@ -97,8 +101,16 @@ piece_groups = [
         'set': [dr.Lobefin, dr.Crabrider, dr.Sandbar, dr.Oyster, fide.King, dr.Sandbar, dr.Crabrider, dr.Lobefin],
     },
     {
+        'name': "Fearful Fairies",
+        'set': [fa.Frog, fa.Dullahan, fa.Elephant, fa.Unicorn, fide.King, fa.Elephant, fa.Dullahan, fa.Frog],
+    },
+    {
         'name': "Fighting Fizzies",
         'set': [fi.LRhino, fi.Wyvern, fi.Crabinal, fi.EagleScout, fide.King, fi.Crabinal, fi.Wyvern, fi.RRhino],
+    },
+    {
+        'name': "Flying Flagellants",
+        'set': [fl.Quetzal, fl.Owl, fl.Hoatzin, fl.Eagle, fide.King, fl.Hoatzin, fl.Owl, fl.Quetzal],
     },
     {
         'name': "Forward Forgers",
@@ -133,7 +145,7 @@ piece_groups = [
         'set': [so.Caecilian, so.Brick, so.Stele, so.Caryatid, fide.King, so.Stele, so.Brick, so.Caecilian],
     },
     {
-        'name': 'Zany Zebroids',
+        'name': "Zany Zebroids",
         'set': [zb.Eliphas, zb.Sorcerer, zb.Adze, zb.FMarauder, fide.King, zb.Adze, zb.Sorcerer, zb.Eliphas],
     }
 ]
@@ -455,7 +467,9 @@ class Board(Window):
     def find_move(self, pos_from: Position, pos_to: Position) -> Move | None:
         for move in self.moves.get(pos_from, ()):
             if move.pos_from == move.pos_to:
-                if move.captured_piece is None or pos_to == move.captured_piece.board_pos:
+                if move.captured_piece is None and pos_to == move.pos_to:
+                    return copy(move)
+                if move.captured_piece is not None and pos_to == move.captured_piece.board_pos:
                     return copy(move)
             elif pos_to == move.pos_to:
                 return copy(move)

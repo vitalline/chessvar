@@ -1,0 +1,51 @@
+from chess.movement import movement
+from chess.movement.util import rot
+from chess.pieces.pieces import Piece
+
+
+class Frog(Piece):
+    name = 'Frog'
+    file_name = 'FH'
+    asset_folder = 'fairy'
+
+    def __init__(self, board, board_pos, side):
+        super().__init__(
+            board, board_pos, side,
+            movement.RiderMovement(board, rot([(1, 1, 1), (3, 0, 1)]))
+        )
+
+
+class Dullahan(Piece):
+    name = 'Dullahan'
+    file_name = 'NF'
+    asset_folder = 'fairy'
+
+    def __init__(self, board, board_pos, side):
+        super().__init__(
+            board, board_pos, side,
+            movement.RiderMovement(board, rot([(1, 1, 1), (1, 2, 1), (2, 1, 1)]))
+        )
+
+
+class Elephant(Piece):
+    name = 'Elephant'
+    file_name = 'FA'
+    asset_folder = 'fairy'
+
+    def __init__(self, board, board_pos, side):
+        super().__init__(
+            board, board_pos, side,
+            movement.RiderMovement(board, rot([(1, 1, 1), (2, 2, 1)]))
+        )
+
+
+class Unicorn(Piece):
+    name = 'Unicorn'
+    file_name = 'BNN'
+    asset_folder = 'fairy'
+
+    def __init__(self, board, board_pos, side):
+        super().__init__(
+            board, board_pos, side,
+            movement.RiderMovement(board, rot([(1, 1), (1, 2), (2, 1)]))
+        )

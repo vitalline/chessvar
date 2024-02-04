@@ -109,29 +109,6 @@ class Muskrat(Piece):
         )
 
 
-class Eagle(Piece):
-    name = 'Eagle'
-    file_name = 'RbBfFfAcfafF'
-    asset_folder = 'other'
-
-    def __init__(self, board, board_pos, side):
-        super().__init__(
-            board, board_pos, side,
-            movement.MultiMovement(board, [
-                movement.RiderMovement(board, rot([(1, 0)]) + symv([(-1, 1), (1, 1, 1), (2, 2, 1)]))
-            ] + [
-                movement.ChainMovement(board, [
-                    movement.MultiMovement(board, capture=[
-                        movement.RiderMovement(board, [(i, j, 1)])
-                    ]),
-                    movement.MultiMovement(board, move_or_capture=[
-                        movement.RiderMovement(board, [(i, j, 1), (0, 0)])
-                    ])
-                ]) for i, j in symv([(1, 1)])
-            ])
-        )
-
-
 class Guard2(Piece):
     name = 'Guardpotentate'
     file_name = 'Q2'
