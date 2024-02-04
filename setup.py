@@ -23,7 +23,7 @@ def gen_data_files(include: Iterable[str], exclude: Iterable[str] = ()):
 
 setup(
     name='chess',
-    version='0.1.0',
+    version='0.2.5',
     options={'build_exe': {
         'build_exe': join('dist', 'chess'),
         'include_files': gen_data_files(['assets']) + [('readme.txt',) * 2]
