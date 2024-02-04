@@ -15,7 +15,7 @@ class Champion(Piece):
         )
 
 
-class DragonHorse(Piece):
+class DraHorse(Piece):
     name = 'Dragon Horse'
     file_name = 'BW'
     asset_folder = 'burn'
@@ -39,7 +39,7 @@ class Wizard(Piece):
         )
 
 
-class DragonKing(Piece):
+class DraKing(Piece):
     name = 'Dragon King'
     file_name = 'RF'
     asset_folder = 'burn'

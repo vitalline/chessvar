@@ -74,7 +74,7 @@ piece_groups = [
     },
     {
         'name': "Burning Barbarians",
-        'set': [br.Champion, br.DragonHorse, br.Wizard, br.DragonKing, cb.King, br.Wizard, br.DragonHorse, br.Champion],
+        'set': [br.Champion, br.DraHorse, br.Wizard, br.DraKing, fide.King, br.Wizard, br.DraHorse, br.Champion],
     },
     {
         'name': "Cartankerous Camelids",
@@ -98,7 +98,7 @@ piece_groups = [
     },
     {
         'name': "Dripping Droogs",
-        'set': [dr.Lobefin, dr.Crabrider, dr.Sandbar, dr.Oyster, fide.King, dr.Sandbar, dr.Crabrider, dr.Lobefin],
+        'set': [dr.Lobefin, dr.Crabrider, dr.Sandbar, dr.Oyster, cb.King, dr.Sandbar, dr.Crabrider, dr.Lobefin],
     },
     {
         'name': "Fearful Fairies",
