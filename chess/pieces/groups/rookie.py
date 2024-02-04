@@ -15,8 +15,8 @@ class Fork(Piece):
         )
 
 
-class WarMachine(Piece):
-    name = 'War Machine'
+class Woodrook(Piece):
+    name = 'Woodrook'
     file_name = 'WD'
     asset_folder = 'rookie'
 

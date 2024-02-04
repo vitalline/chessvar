@@ -32,6 +32,7 @@ from chess.pieces.groups import nocturnal as no
 from chess.pieces.groups import pizza as pz
 from chess.pieces.groups import rookie as rk
 from chess.pieces.groups import starbound as st, stone as so, switch as sw
+from chess.pieces.groups import thrash as th
 from chess.pieces.groups import zebra as zb
 from chess.pieces.groups.util import NoPiece
 from chess.pieces.pieces import Side
@@ -47,7 +48,7 @@ piece_groups = [
     },
     {
         'name': "Remarkable Rookies",
-        'set': [rk.Fork, rk.WarMachine, rk.Dove, rk.Chancellor, fide.King, rk.Dove, rk.WarMachine, rk.Fork],
+        'set': [rk.Fork, rk.Woodrook, rk.Dove, rk.Chancellor, fide.King, rk.Dove, rk.Woodrook, rk.Fork],
     },
     {
         'name': "Nutty Knights",
@@ -148,6 +149,10 @@ piece_groups = [
     {
         'name': "Stoic Stones",
         'set': [so.Caecilian, so.Brick, so.Stele, so.Caryatid, fide.King, so.Stele, so.Brick, so.Caecilian],
+    },
+    {
+        'name': "Threeleaping Thrashers",
+        'set': [th.Trident, th.Nipper, th.Bullfrog, th.Duchess, fide.King, th.Bullfrog, th.Nipper, th.Trident],
     },
     {
         'name': "Zany Zebroids",
