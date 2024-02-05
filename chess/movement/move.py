@@ -19,7 +19,7 @@ class Move(object):
             captured_piece: Piece | None = None,
             swapped_piece: Piece | None = None,
             promotion: Type[Piece] | None = None,
-            chained_move: Move | None = None,
+            chained_move: Move | bool | None = False,
             is_edit: bool = False
     ):
         self.pos_from = pos_from

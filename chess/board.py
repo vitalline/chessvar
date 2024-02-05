@@ -525,10 +525,9 @@ class Board(Window):
             move = self.move_history[-1]
             if move is not None and not move.is_edit:
                 pos_from = move.pos_from
-                chained_move = move
-                while chained_move.chained_move:
-                    chained_move = chained_move.chained_move
-                move = chained_move
+                if not isinstance(move.movement, movement.CastlingMovement):
+                    while move.chained_move:
+                        move = move.chained_move
                 capture = move.captured_piece
                 pos_to = capture.board_pos if move.pos_from == move.pos_to and capture is not None else move.pos_to
                 if pos_from is not None and pos_from != pos_to:
@@ -760,32 +759,33 @@ class Board(Window):
                     return
                 self.update_move(move)
                 move.promotion = None  # do not auto-promote because we are selecting promotion type manually
-                if move.chained_move:
-                    move.chained_move = None  # do not chain moves because we are selecting move chain manually
-                chained_move = None
-                move.piece.move(move)
+                if (
+                    (move.chained_move or self.chain_moves.get((move.pos_from, move.pos_to)))
+                    and not isinstance(move.movement, movement.CastlingMovement)
+                ):
+                    move.chained_move = None  # do not chain moves because we are selecting chained move manually
+                chained_move = move
+                while chained_move:
+                    chained_move.piece.move(chained_move)
+                    if self.promotion_piece is None:
+                        self.log(f"[Ply {self.ply_count}] Move: {chained_move}")
+                    chained_move = chained_move.chained_move
                 if self.chain_start is None:
                     self.chain_start = move
                     self.move_history.append(self.chain_start)
                 else:
                     last_move = self.chain_start
-                    chained_move = last_move
-                    while chained_move.chained_move:
-                        chained_move = chained_move.chained_move
-                    chained_move.chained_move = move
-                if self.promotion_piece is None:
-                    self.log(f"[Ply {self.ply_count}] Move: {move}")
-                if (
-                    chained_move and chained_move.chained_move is False
-                    or not self.chain_moves.get((move.pos_from, move.pos_to))
-                ):
+                    while last_move.chained_move:
+                        last_move = last_move.chained_move
+                    last_move.chained_move = move
+                if move.chained_move is None:
+                    self.load_all_moves()
+                    self.select_piece(move.pos_to)
+                else:
                     self.chain_start = None
                     if self.promotion_piece is None:
                         self.ply_count += 1
                     self.advance_turn()
-                else:
-                    self.load_all_moves()
-                    self.select_piece(move.pos_to)
             else:
                 self.reset_position(self.get_piece(self.selected_square))
                 if not self.square_was_clicked:
@@ -1133,9 +1133,9 @@ class Board(Window):
             self.color_pieces()  # reverting the piece colors to normal in case they were changed
             return  # let's not advance the turn while editing the board to hopefully make things easier for everyone
         pass_check_side = Side.NONE
-        if self.move_history and self.move_history[-1] is None:
-            self.load_check()
-            if self.check_side == self.turn_side:  # if the player is in check and passes the turn, the game ends
+        if self.move_history and (self.move_history[-1] is None or self.move_history[-1].is_edit):
+            self.load_check()  # here's something that can only happen if the board was edited or the turn was passed:
+            if self.check_side == self.turn_side:  # if the player is in check at the end of their turn, the game ends
                 self.game_over = True
                 pass_check_side = self.check_side
         self.turn_side = self.turn_side.opponent()
@@ -1146,7 +1146,7 @@ class Board(Window):
         if pass_check_side != Side.NONE:
             self.check_side = pass_check_side
         if self.game_over:
-            # the game has ended. let's find out who won and show it by changing piece colors... unless edit mode is on!
+            # the game has ended. let's find out who won and show it by changing piece colors
             if pass_check_side != Side.NONE:
                 # the last player was in check and passed the turn, the game ends and the current player wins
                 self.log(f"[Ply {self.ply_count}] Game over! {pass_check_side.opponent().name()} wins.")

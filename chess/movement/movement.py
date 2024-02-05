@@ -304,21 +304,10 @@ class CastlingMovement(BaseMovement):
                     return ()
                 if pos in self.board.castling_threats:
                     return ()
-        return (Move(pos_from, add(pos_from, piece.side.direction(self.direction)), self),)
-
-    def update(self, move: Move, piece: Piece):
-        if sub(move.pos_to, move.pos_from) == piece.side.direction(self.direction):
-            other_piece_pos = add(move.pos_from, piece.side.direction(self.other_piece))
-            other_piece_pos_to = add(other_piece_pos, piece.side.direction(self.other_direction))
-            self.board.move(Move(other_piece_pos, other_piece_pos_to, self, self.board.get_piece(other_piece_pos)))
-        super().update(move, piece)
-
-    def undo(self, move: Move, piece: Piece):
-        super().undo(move, piece)
-        if sub(move.pos_to, move.pos_from) == piece.side.direction(self.direction):
-            other_piece_pos = add(move.pos_from, piece.side.direction(self.other_piece))
-            other_piece_pos_to = add(other_piece_pos, piece.side.direction(self.other_direction))
-            self.board.undo(Move(other_piece_pos, other_piece_pos_to, self, self.board.get_piece(other_piece_pos_to)))
+        self_move = Move(pos_from, add(pos_from, piece.side.direction(self.direction)), self)
+        other_piece_pos_to = add(other_piece_pos, piece.side.direction(self.other_direction))
+        other_move = Move(other_piece_pos, other_piece_pos_to, self, other_piece)
+        return self_move.set(chained_move=other_move),
 
     def __copy_args__(self):
         return self.board, self.direction, self.other_piece, self.other_direction, copy(self.gap)
