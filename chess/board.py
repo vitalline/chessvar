@@ -1377,7 +1377,7 @@ class Board(Window):
                     last_move = move
                     while last_move.chained_move:
                         last_move = last_move.chained_move
-                    if last_move.pos_to == royal.board_pos:
+                    if last_move.pos_to == royal.board_pos or last_move.captured_piece == royal:
                         self.check_side = self.turn_side
                         self.castling_threats = castle_squares
                         break
