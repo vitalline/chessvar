@@ -95,6 +95,24 @@ class Move(object):
             and self.is_edit == other.is_edit
         )
 
+    def matches(self, other: Move) -> bool:
+        return (
+            not not other
+            and self.pos_from == other.pos_from
+            and self.pos_to == other.pos_to
+            # ignore movement check for the time being
+            and type(self.piece) is type(other.piece)
+            and type(self.captured_piece) is type(other.captured_piece)
+            and type(self.swapped_piece) is type(other.swapped_piece)
+            and self.promotion == other.promotion
+            and (
+                self.chained_move.matches(other.chained_move)
+                if isinstance(self.chained_move, Move) else
+                self.chained_move == other.chained_move
+            )
+            and self.is_edit == other.is_edit
+        )
+
     def __str__(self) -> str:
         if self.pos_from is not None and self.pos_to is not None and self.pos_from != self.pos_to:
             if self.is_edit:

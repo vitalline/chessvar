@@ -2,10 +2,11 @@ from __future__ import annotations
 
 from copy import copy, deepcopy
 from math import ceil
+from random import randrange
 from typing import TYPE_CHECKING
 
 from chess.movement.move import Move
-from chess.movement.util import AnyDirection, ClashResolution, Direction, Position, add, merge, mul, sub
+from chess.movement.util import AnyDirection, ClashResolution, Direction, Position, add, merge, mul
 
 if TYPE_CHECKING:
     from chess.board import Board
@@ -497,3 +498,28 @@ class MultiMovement(BaseMovement):
 
     def __copy_args__(self):
         return self.board, deepcopy(self.move_or_capture), deepcopy(self.move), deepcopy(self.capture)
+
+
+class ProbabilisticMovement(MultiMovement):
+    def __init__(self, board: Board, movements: list[BaseMovement]):
+        super().__init__(board, movements)
+        self.movements = self.move_or_capture
+
+    def moves(self, pos_from: Position, piece: Piece, theoretical: bool = False):
+        if theoretical:
+            yield from super().moves(pos_from, piece, theoretical)
+        else:
+            try:
+                current_ply = self.board.ply_count + self.board.ply_simulation - 1
+                current_roll = self.board.roll_history[current_ply][pos_from]
+                yield from self.movements[current_roll].moves(pos_from, piece, theoretical)
+            except IndexError:
+                yield from super().moves(pos_from, piece, theoretical)
+            except KeyError:
+                return ()
+
+    def roll(self):
+        return randrange(len(self.movements))
+
+    def __copy_args__(self):
+        return self.board, deepcopy(self.movements)
