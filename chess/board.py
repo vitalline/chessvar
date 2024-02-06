@@ -873,6 +873,8 @@ class Board(Window):
             self.reset_position(move.captured_piece)
             if self.is_trickster_mode(False):  # reset_trickster_mode() does not reset removed pieces
                 move.captured_piece.angle = 0  # so instead we have to do it manually as a workaround
+            # removed pieces don't get updated by update_hide_mode() either so we also do it manually
+            move.captured_piece.reload(hidden=self.should_hide(move.captured_piece))
             self.pieces[capture_pos[0]][capture_pos[1]] = move.captured_piece
             self.piece_sprite_list.append(move.captured_piece)
         if move.pos_to is not None and move.pos_from != move.pos_to:
@@ -921,10 +923,10 @@ class Board(Window):
                 move_chain.append(chained_move)
                 chained_move = chained_move.chained_move
             for chained_move in move_chain[::-1]:
+                self.undo(chained_move)
                 self.log(f'''[Ply {self.ply_count}] Undo: {
                     f"{'Edit' if chained_move.is_edit else 'Move'}: " + str(chained_move)
                 }''')
-                self.undo(chained_move)
             if last_move.is_edit:
                 if not self.edit_mode:
                     self.turn_side = self.turn_side.opponent()
