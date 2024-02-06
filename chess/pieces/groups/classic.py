@@ -1,5 +1,5 @@
 from chess.movement import movement
-from chess.movement.util import rot, sym
+from chess.movement.util import rot, symv
 from chess.pieces.pieces import Piece, PromotablePiece, RoyalPiece
 
 
@@ -23,7 +23,7 @@ class Knight(Piece):
     def __init__(self, board, board_pos, side):
         super().__init__(
             board, board_pos, side,
-            movement.RiderMovement(board, sym([(1, 2, 1), (2, 1, 1)]))
+            movement.RiderMovement(board, rot([(1, 2, 1), (2, 1, 1)]))
         )
 
 
@@ -35,7 +35,7 @@ class Bishop(Piece):
     def __init__(self, board, board_pos, side):
         super().__init__(
             board, board_pos, side,
-            movement.RiderMovement(board, sym([(1, 1)]))
+            movement.RiderMovement(board, rot([(1, 1)]))
         )
 
 
@@ -80,7 +80,7 @@ class Pawn(PromotablePiece):
             movement.MultiMovement(
                 board,
                 move=[movement.EnPassantTargetMovement(board, [(1, 0, 1)], [(1, 0, 2)], [(1, 0, 1)])],
-                capture=[movement.EnPassantMovement(board, [(1, 1, 1), (1, -1, 1)])]
+                capture=[movement.EnPassantMovement(board, symv([(1, 1, 1)]))]
             ),
             promotions,
             promotion_squares

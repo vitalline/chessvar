@@ -1,5 +1,5 @@
 from chess.movement import movement
-from chess.movement.util import rot, sym
+from chess.movement.util import rot
 from chess.pieces.pieces import Piece
 
 

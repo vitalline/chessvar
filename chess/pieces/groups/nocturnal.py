@@ -2,7 +2,7 @@ from copy import deepcopy
 from math import ceil
 
 from chess.movement import movement
-from chess.movement.util import rot, sym, symv
+from chess.movement.util import rot, symv
 from chess.pieces.pieces import Piece
 
 
@@ -29,11 +29,11 @@ class Nightsling(Piece):
             movement.MultiMovement(
                 board,
                 move=[
-                    movement.RiderMovement(board, sym([(1, 2), (2, 1)]))
+                    movement.RiderMovement(board, rot([(1, 2), (2, 1)]))
                 ],
                 capture=[
-                    movement.RiderMovement(board, sym([(1, 2, 1), (2, 1, 1)])),
-                    movement.CannonRiderMovement(board, sym([(1, 2), (2, 1)]))
+                    movement.RiderMovement(board, rot([(1, 2, 1), (2, 1, 1)])),
+                    movement.CannonRiderMovement(board, rot([(1, 2), (2, 1)]))
                 ]
             )
         )

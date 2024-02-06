@@ -1,5 +1,5 @@
 from chess.movement import movement
-from chess.movement.util import rot, sym
+from chess.movement.util import rot
 from chess.pieces.pieces import Piece
 
 
@@ -23,7 +23,7 @@ class Knight(Piece):
     def __init__(self, board, board_pos, side):
         super().__init__(
             board, board_pos, side,
-            movement.CylindricalRiderMovement(board, sym([(1, 2, 1), (2, 1, 1)]))
+            movement.CylindricalRiderMovement(board, rot([(1, 2, 1), (2, 1, 1)]))
         )
 
 
@@ -35,7 +35,7 @@ class Bishop(Piece):
     def __init__(self, board, board_pos, side):
         super().__init__(
             board, board_pos, side,
-            movement.CylindricalRiderMovement(board, sym([(1, 1)]))
+            movement.CylindricalRiderMovement(board, rot([(1, 1)]))
         )
 
 

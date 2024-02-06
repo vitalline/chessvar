@@ -1,7 +1,7 @@
 from math import ceil
 
 from chess.movement import movement
-from chess.movement.util import rot, sym, symv
+from chess.movement.util import rot, symv
 from chess.pieces.pieces import Piece, Side
 
 

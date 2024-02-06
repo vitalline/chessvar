@@ -1,5 +1,5 @@
 from chess.movement import movement
-from chess.movement.util import rot, sym, symv
+from chess.movement.util import rot, symv
 from chess.pieces.pieces import Piece
 
 
@@ -35,7 +35,7 @@ class Falcon(Piece):
     def __init__(self, board, board_pos, side):
         super().__init__(
             board, board_pos, side,
-            movement.RiderMovement(board, sym([(1, 1, 1), (2, 2)]))
+            movement.RiderMovement(board, rot([(1, 1, 1), (2, 2)]))
         )
 
 
