@@ -1,8 +1,8 @@
 /assets.*/
 /build/
-/cx_dist/
 /dist/
 /main.build/
 /main.dist/
 /venv/
+/*.bak/
 *.spec
