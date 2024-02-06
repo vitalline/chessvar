@@ -17,7 +17,7 @@ class Trident(Piece):
 
 class Nipper(Piece):
     name = 'Nipper'
-    file_name = 'NT'
+    file_name = 'NG'
     asset_folder = 'thrash'
 
     def __init__(self, board, board_pos, side):
@@ -41,7 +41,7 @@ class Bullfrog(Piece):
 
 class Duchess(Piece):
     name = 'Duchess'
-    file_name = 'KATDH'
+    file_name = 'KAGDH'
     asset_folder = 'thrash'
 
     def __init__(self, board, board_pos, side):

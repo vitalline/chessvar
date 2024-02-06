@@ -17,7 +17,7 @@ class Forfer(Piece):
 
 class Scout(Piece):
     name = 'Scout'
-    file_name = 'WT'
+    file_name = 'WH'
     asset_folder = 'mash'
 
     def __init__(self, board, board_pos, side):

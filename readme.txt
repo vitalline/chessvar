@@ -29,6 +29,9 @@ Shift + F: fast-forward to last move
 Ctrl + G: reset graphics mode (colors)
 Shift + G: cycle graphics mode forward (+1)
 Ctrl + Shift + G: cycle graphics mode backward (-1)
+Ctrl + H: show all pieces
+Shift + H: hide all pieces
+Ctrl + Shift + H: hide unique pieces
 Ctrl + Z: undo last move (if any)
 Ctrl + Shift + Z: redo last move (if any)
 Ctrl + Y: redo last move (if any)

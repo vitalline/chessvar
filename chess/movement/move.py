@@ -112,20 +112,32 @@ class Move(object):
         if self.piece:
             if self.piece.is_empty() and not (self.promotion and self.pos_from == self.pos_to):
                 string = f"{self.piece.side.name()} {string}"
-            elif self.piece.is_empty() and self.promotion and self.pos_from == self.pos_to:
+            elif self.piece.is_empty() and not self.piece.board.hide_mode:
                 string = f"{self.piece.side.name()} {self.promotion.name} {string}"
-            else:
+            elif not self.piece.is_hidden:
                 string = f"{self.piece.side.name()} {self.piece.name} {string}"
+            else:
+                string = f"{self.piece.side.name()} ??? {string}"
         else:
             string = f"Piece {string}"
         if self.captured_piece:
-            string += f", takes {self.captured_piece.side.name()} {self.captured_piece.name}"
+            if self.captured_piece.is_hidden:
+                string += f", takes {self.captured_piece.side.name()} ???"
+            else:
+                string += f", takes {self.captured_piece.side.name()} {self.captured_piece.name}"
             if self.captured_piece.board_pos != self.pos_to:
                 string += f" on {to_alpha(self.captured_piece.board_pos)}"
         if self.swapped_piece:
-            string += f", swaps with {self.swapped_piece.side.name()} {self.swapped_piece.name}"
+            if self.swapped_piece.is_hidden:
+                string += f", swaps with {self.swapped_piece.side.name()} ???"
+            else:
+                string += f", swaps with {self.swapped_piece.side.name()} {self.swapped_piece.name}"
         if self.promotion and self.pos_from is not None and not (
             self.piece and self.piece.is_empty() and self.pos_from == self.pos_to
         ):
-            string += f", promotes to {self.promotion.name}"
+            if self.piece:
+                if self.piece.board.hide_mode:
+                    string += f", promotes to ???"
+                else:
+                    string += f", promotes to {self.promotion.name}"
         return string

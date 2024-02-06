@@ -226,6 +226,7 @@ class Board(Window):
         self.turn_side = Side.WHITE  # side whose turn it is
         self.check_side = Side.NONE  # side that is currently in check
         self.castling_threats = set()  # squares that are attacked in a way that prevents castling
+        self.hide_mode = 0  # 0: don't hide, 1: hide all pieces, 2: hide pieces unique to the current set
         self.flip_mode = False  # whether the board is flipped
         self.edit_mode = False  # allows to edit the board position if set to True
         self.game_over = False  # act 6 act 6 intermission 3 (game over)
@@ -334,9 +335,9 @@ class Board(Window):
             self.piece_sets = {side: randrange(len(piece_groups)) for side in self.piece_sets}
 
         self.log(
-            f"[Ply {self.ply_count}] Starting new game: "
-            f"{piece_groups[self.piece_sets[Side.WHITE]]['name']} vs "
-            f"{piece_groups[self.piece_sets[Side.BLACK]]['name']}"
+            f"[Ply {self.ply_count}] Game: "
+            f"{piece_groups[self.piece_sets[Side.WHITE]]['name'] if not self.hide_mode else '???'} vs. "
+            f"{piece_groups[self.piece_sets[Side.BLACK]]['name'] if not self.hide_mode else '???'}"
         )
         self.ply_count += 1
 
@@ -408,12 +409,14 @@ class Board(Window):
             )
             self.pieces[row][col].set_color(
                 self.color_scheme.get(
-                    f"{self.pieces[row][col].side.file_name()}piece_color",
+                    f"{self.pieces[row][col].side.key_name()}piece_color",
                     self.color_scheme["piece_color"]
                 ),
                 self.color_scheme["colored_pieces"]
             )
             self.pieces[row][col].scale = self.square_size / self.pieces[row][col].texture.width
+            if self.should_hide(self.pieces[row][col]):
+                self.pieces[row][col].reload(hidden=True)
             self.piece_sprite_list.append(self.pieces[row][col])
 
         self.load_all_moves()
@@ -508,19 +511,21 @@ class Board(Window):
         move_sprites = dict()
         pos = self.selected_square or self.hovered_square or self.get_board_position(self.highlight.position)
         if not self.not_on_board(pos):
-            theoretical = self.get_side(pos) == self.turn_side.opponent()
-            move_dict = self.theoretical_moves if theoretical else self.moves
-            for move in move_dict.get(pos, ()):
-                capture = move.captured_piece
-                pos_to = capture.board_pos if move.pos_from == move.pos_to and capture is not None else move.pos_to
-                if pos_to in move_sprites:
-                    continue
-                sprite = Sprite(f"assets/util/{'move' if self.not_a_piece(pos_to) else 'capture'}.png")
-                sprite.color = self.color_scheme["selection_color" if self.selected_square else "highlight_color"]
-                sprite.position = self.get_screen_position(pos_to)
-                sprite.scale = self.square_size / sprite.texture.width
-                self.move_sprite_list.append(sprite)
-                move_sprites[pos_to] = sprite
+            piece = self.get_piece(pos)
+            if not piece.is_empty() and not piece.is_hidden:
+                theoretical = piece.side == self.turn_side.opponent()
+                move_dict = self.theoretical_moves if theoretical else self.moves
+                for move in move_dict.get(pos, ()):
+                    capture = move.captured_piece
+                    pos_to = capture.board_pos if move.pos_from == move.pos_to and capture is not None else move.pos_to
+                    if pos_to in move_sprites:
+                        continue
+                    sprite = Sprite(f"assets/util/{'move' if self.not_a_piece(pos_to) else 'capture'}.png")
+                    sprite.color = self.color_scheme["selection_color" if self.selected_square else "highlight_color"]
+                    sprite.position = self.get_screen_position(pos_to)
+                    sprite.scale = self.square_size / sprite.texture.width
+                    self.move_sprite_list.append(sprite)
+                    move_sprites[pos_to] = sprite
         if not self.selected_square and self.move_history and not self.edit_mode:
             move = self.move_history[-1]
             if move is not None and not move.is_edit:
@@ -1064,7 +1069,7 @@ class Board(Window):
             promotion_piece.scale = self.square_size / promotion_piece.texture.width
             promotion_piece.set_color(
                 self.color_scheme.get(
-                    f"{promotion_piece.side.file_name()}piece_color",
+                    f"{promotion_piece.side.key_name()}piece_color",
                     self.color_scheme["piece_color"]
                 ),
                 self.color_scheme["colored_pieces"]
@@ -1092,7 +1097,7 @@ class Board(Window):
         ) if issubclass(new_type, abc.PromotablePiece) else new_type(self, pos, new_side)
         self.pieces[pos[0]][pos[1]].set_color(
             self.color_scheme.get(
-                f"{new_side.file_name()}piece_color",
+                f"{new_side.key_name()}piece_color",
                 self.color_scheme["piece_color"]
             ),
             self.color_scheme["colored_pieces"]
@@ -1108,7 +1113,7 @@ class Board(Window):
             piece.set_color(
                 color if color is not None else
                 self.color_scheme.get(
-                    f"{piece.side.file_name()}piece_color",
+                    f"{piece.side.key_name()}piece_color",
                     self.color_scheme["piece_color"]
                 ),
                 self.color_scheme["colored_pieces"]
@@ -1149,17 +1154,17 @@ class Board(Window):
             # the game has ended. let's find out who won and show it by changing piece colors
             if pass_check_side != Side.NONE:
                 # the last player was in check and passed the turn, the game ends and the current player wins
-                self.log(f"[Ply {self.ply_count}] Game over! {pass_check_side.opponent().name()} wins.")
+                self.log(f"[Ply {self.ply_count}] Info: Game over! {pass_check_side.opponent().name()} wins.")
             elif self.check_side != Side.NONE:
                 # the current player was checkmated, the game ends and the opponent wins
-                self.log(f"[Ply {self.ply_count}] Checkmate! {self.check_side.opponent().name()} wins.")
+                self.log(f"[Ply {self.ply_count}] Info: Checkmate! {self.check_side.opponent().name()} wins.")
             else:
                 # the current player was stalemated, the game ends in a draw
-                self.log(f"[Ply {self.ply_count}] Stalemate! It's a draw.")
+                self.log(f"[Ply {self.ply_count}] Info: Stalemate! It's a draw.")
         else:
             if self.check_side != Side.NONE:
                 # the game is still going, but the current player is in check
-                self.log(f"[Ply {self.ply_count}] {self.check_side.name()} is in check!")
+                self.log(f"[Ply {self.ply_count}] Info: {self.check_side.name()} is in check!")
             else:
                 # the game is still going and there is no check
                 pass
@@ -1204,7 +1209,7 @@ class Board(Window):
             if isinstance(sprite, abc.Piece):
                 sprite.set_color(
                     self.color_scheme.get(
-                        f"{sprite.side.file_name()}piece_color",
+                        f"{sprite.side.key_name()}piece_color",
                         self.color_scheme["piece_color"]
                     ),
                     self.color_scheme["colored_pieces"]
@@ -1220,14 +1225,14 @@ class Board(Window):
                 self.color_pieces(
                     self.check_side,
                     self.color_scheme.get(
-                        f"{self.check_side.file_name()}loss_color",
+                        f"{self.check_side.key_name()}loss_color",
                         self.color_scheme["loss_color"]
                     ),
                 )
                 self.color_pieces(
                     self.check_side.opponent(),
                     self.color_scheme.get(
-                        f"{self.check_side.opponent().file_name()}win_color",
+                        f"{self.check_side.opponent().key_name()}win_color",
                         self.color_scheme["win_color"]
                     ),
                 )
@@ -1235,14 +1240,14 @@ class Board(Window):
                 self.color_pieces(
                     Side.WHITE,
                     self.color_scheme.get(
-                        f"{Side.WHITE.file_name()}draw_color",
+                        f"{Side.WHITE.key_name()}draw_color",
                         self.color_scheme["draw_color"]
                     ),
                 )
                 self.color_pieces(
                     Side.BLACK,
                     self.color_scheme.get(
-                        f"{Side.BLACK.file_name()}draw_color",
+                        f"{Side.BLACK.key_name()}draw_color",
                         self.color_scheme["draw_color"]
                     ),
                 )
@@ -1251,13 +1256,20 @@ class Board(Window):
                 self.color_pieces(
                     self.check_side,
                     self.color_scheme.get(
-                        f"{self.check_side.file_name()}check_color",
+                        f"{self.check_side.key_name()}check_color",
                         self.color_scheme["check_color"]
                     ),
                 )
                 self.color_pieces(self.check_side.opponent())
             else:
                 self.color_pieces()
+
+    def should_hide(self, piece: abc.Piece) -> bool:
+        return self.hide_mode == 1 or (self.hide_mode == 2 and not issubclass(type(piece), abc.RoyalPiece | fide.Pawn))
+
+    def update_hide_mode(self) -> None:
+        for piece in sum(self.movable_pieces.values(), [*self.promotion_piece_sprite_list]):
+            piece.reload(hidden=self.should_hide(piece))
 
     def is_trickster_mode(self, value: bool = True) -> bool:
         return value == (self.trickster_color_index != 0)
@@ -1567,6 +1579,25 @@ class Board(Window):
                 self.reset_trickster_mode()
             else:
                 self.update_colors()
+        if symbol == key.H:  # Hide
+            old_hide_mode = self.hide_mode
+            if modifiers & key.MOD_ACCEL and modifiers & key.MOD_SHIFT:
+                self.hide_mode = 2
+            elif modifiers & key.MOD_SHIFT:
+                self.hide_mode = 1
+            else:
+                self.hide_mode = 0
+            if old_hide_mode != self.hide_mode:
+                if self.hide_mode:
+                    self.log(f"[Ply {self.ply_count}] Hide: {'All' if self.hide_mode == 1 else 'Unique'} pieces hidden")
+                else:
+                    self.log(
+                        f"[Ply {self.ply_count}] Show: Pieces revealed: "
+                        f"{piece_groups[self.piece_sets[Side.WHITE]]['name']} vs. "
+                        f"{piece_groups[self.piece_sets[Side.BLACK]]['name']}"
+                    )
+                self.update_hide_mode()
+                self.show_moves()
         if symbol == key.T and modifiers & key.MOD_ACCEL:  # Trickster mode
             if self.color_scheme["scheme_type"] == "cherub":
                 self.trickster_color_index = (

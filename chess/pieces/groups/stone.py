@@ -17,7 +17,7 @@ class Caecilian(Piece):
 
 class Brick(Piece):
     name = 'Brick'
-    file_name = 'WDT'
+    file_name = 'WDG'
     asset_folder = 'stone'
 
     def __init__(self, board, board_pos, side):

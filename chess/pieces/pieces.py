@@ -48,6 +48,15 @@ class Side(Enum):
             case _:
                 return ""
 
+    def key_name(self):
+        match self:
+            case Side.WHITE:
+                return "white_"
+            case Side.BLACK:
+                return "black_"
+            case _:
+                return ""
+
     def file_name(self):
         match self:
             case Side.WHITE:
@@ -70,7 +79,8 @@ class Piece(Sprite):
             side: Side = Side.NONE,
             movement: BaseMovement | None = None,
             flipped_horizontally: bool = False,
-            flipped_vertically: bool = False
+            flipped_vertically: bool = False,
+            is_hidden: bool = False
     ):
         self.board = board
         self.board_pos = board_pos
@@ -78,8 +88,9 @@ class Piece(Sprite):
         self.movement = movement if movement is not None else BaseMovement(board)
         self.flipped_horizontally = flipped_horizontally
         self.flipped_vertically = flipped_vertically
+        self.is_hidden = is_hidden
         super().__init__(
-            f"assets/{self.asset_folder}/{self.side.file_name()}{self.file_name}.png",
+            self.texture_path(),
             flipped_horizontally=self.flipped_horizontally,
             flipped_vertically=self.flipped_vertically,
         )
@@ -100,7 +111,37 @@ class Piece(Sprite):
         clone.movement = copy(self.movement)
         clone.scale = self.scale
         clone.flipped_horizontally = self.flipped_horizontally
+        clone.flipped_vertically = self.flipped_vertically
+        clone.is_hidden = self.is_hidden
         return clone
+
+    def texture_path(
+        self, asset_folder: str = None, side: Side = None, file_name: str = None, force_color: bool = False
+    ):
+        if side is None:
+            side = Side.WHITE if force_color else self.side
+        should_hide = self.is_hidden and side is not Side.NONE
+        if asset_folder is None:
+            asset_folder = "other" if should_hide else self.asset_folder
+        if file_name is None:
+            file_name = "ghost" if should_hide else self.file_name
+        return f"assets/{asset_folder}/{side.file_name()}{file_name}.png"
+
+    def reload(self, asset_folder: str = None, side: Side = None, file_name: str = None, hidden: bool = None):
+        if hidden is not None:
+            self.is_hidden = hidden
+        texture_path = self.texture_path(
+            asset_folder=asset_folder, side=side, file_name=file_name, force_color=(max(self.color) != min(self.color))
+        )
+        if self.texture.name != texture_path:
+            color = self.color
+            new_texture = load_texture(
+                texture_path,
+                flipped_horizontally=self.flipped_horizontally if not hidden else False,
+                flipped_vertically=self.flipped_vertically if not hidden else False,
+            )
+            self.texture = new_texture
+            self.color = color
 
     def set_color(self, color: Color, force_color: bool = False):
         if not self.name:
@@ -113,17 +154,9 @@ class Piece(Sprite):
             if max(color) == min(color):  # if color is grayscale
                 if max(self.color) != min(self.color):  # but was not grayscale
                     side = self.side  # make piece match the side
-        new_texture = None
-        if side != Side.NONE:  # if side was defined and does not match the current texture
-            if self.texture.name != f"assets/{self.asset_folder}/{side.file_name()}{self.file_name}.png":
-                new_texture = load_texture(  # make piece match the side
-                    f"assets/{self.asset_folder}/{side.file_name()}{self.file_name}.png",
-                    flipped_horizontally=self.flipped_horizontally,
-                    flipped_vertically=self.flipped_vertically,
-                )
-        if new_texture is not None:
-            self.texture = new_texture
         self.color = color
+        if side != Side.NONE:  # if side was defined and does not match the current texture
+            self.reload(side=side)
 
 
 class PromotablePiece(Piece):
