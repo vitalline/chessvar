@@ -3,7 +3,7 @@ from __future__ import annotations
 from enum import Enum
 from itertools import product
 from random import choice, randint
-from typing import TYPE_CHECKING, Type
+from typing import TYPE_CHECKING, Type, TypeVar
 
 from chess.movement.movement import BaseMovement, RiderMovement
 from chess.movement.util import AnyDirection, ClashResolution, merge, sym
@@ -137,11 +137,14 @@ def rng_directions() -> list[list[AnyDirection]]:
     return [merge(pair[0], pair[1], ClashResolution.FORMER) for pair in product(bases, modifiers) if pair != ([], [])]
 
 
-def gen_movement[M: BaseMovement](board: Board, base_type: Type[M], params: list[AnyDirection]):
+M = TypeVar('M', bound=BaseMovement)
+
+
+def gen_movement(board: Board, base_type: Type[M], params: list[AnyDirection]):
     return type('', (base_type, object), {})(board, params)
 
 
-def gen_movements[M: BaseMovement](board: Board, settings: list[tuple[Type[M], list[AnyDirection]]]):
+def gen_movements(board: Board, settings: list[tuple[Type[M], list[AnyDirection]]]):
     return [gen_movement(board, setting[0], setting[1]) for setting in settings]
 
 
