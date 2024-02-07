@@ -27,7 +27,7 @@ class Lancer(Piece):
         )
 
 
-class Sinerider(Piece):
+class SineRdr(Piece):
     name = 'Sinerider'
     file_name = 'fFmfafFfafmFmfaqFfaqmFsRbB'
     asset_folder = 'starbound'

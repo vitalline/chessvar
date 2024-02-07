@@ -39,7 +39,7 @@ class Nightsling(Piece):
         )
 
 
-class Moarider(Piece):
+class MoaRdr(Piece):
     name = 'Moarider'
     file_name = 'afs(afzafz)F'
     asset_folder = 'nocturnal'

@@ -31,7 +31,7 @@ class Camel(Piece):
         )
 
 
-class Nightrider(Piece):
+class NightRdr(Piece):
     name = 'Nightrider'
     file_name = 'NN'
     asset_folder = 'amazon'

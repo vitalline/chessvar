@@ -21,7 +21,8 @@ from chess.pieces import pieces as abc
 from chess.pieces.groups import classic as fide
 from chess.pieces.groups import amazon as am, amontillado as ao, avian as av
 from chess.pieces.groups import beast as bs, breakfast as bk, burn as br
-from chess.pieces.groups import camel as ca, cannon as cn, colorbound as cb, crook as cr, cylindrical as cy
+from chess.pieces.groups import camel as ca, cannon as cn, color as co
+from chess.pieces.groups import colorbound as cb, crook as cr, cylindrical as cy
 from chess.pieces.groups import demirifle as de, drip as dr
 from chess.pieces.groups import fairy as fa, fizz as fi, fly as fl, forward as fw
 from chess.pieces.groups import horse as hs
@@ -56,7 +57,7 @@ piece_groups = [
     },
     {
         'name': "Amazing Armada",
-        'set': [am.Cannon, am.Camel, am.Nightrider, am.Amazon, fide.King, am.Nightrider, am.Camel, am.Cannon],
+        'set': [am.Cannon, am.Camel, am.NightRdr, am.Amazon, fide.King, am.NightRdr, am.Camel, am.Cannon],
     },
     {
         'name': "Amontillado Arbiters",
@@ -84,7 +85,11 @@ piece_groups = [
     },
     {
         'name': "Claustrophobic Cannoneers",
-        'set': [cn.Mortar, cn.Napoleon, cn.Carronade, cn.Bertha, fide.King, cn.Carronade, cn.Napoleon, cn.Howitzer]
+        'set': [cn.Mortar, cn.Napoleon, cn.Carronade, cn.Bertha, fide.King, cn.Carronade, cn.Napoleon, cn.Howitzer],
+    },
+    {
+        'name': "Colorful Characters",
+        'set': [co.ElkRdr, co.DCannon, co.Nightlight, co.Nanqueen, fide.King, co.Nightlight, co.DCannon, co.CaribouRdr],
     },
     {
         'name': "Cruel Crooks",
@@ -100,7 +105,7 @@ piece_groups = [
     },
     {
         'name': "Dripping Droogs",
-        'set': [dr.Lobefin, dr.Crabrider, dr.Sandbar, dr.Oyster, cb.King, dr.Sandbar, dr.Crabrider, dr.Lobefin],
+        'set': [dr.Lobefin, dr.CrabRdr, dr.Sandbar, dr.Oyster, cb.King, dr.Sandbar, dr.CrabRdr, dr.Lobefin],
     },
     {
         'name': "Fearful Fairies",
@@ -120,19 +125,19 @@ piece_groups = [
     },
     {
         'name': "Horseback Harassers",
-        'set': [hs.Naysayer, hs.Horserider, hs.Tapir, hs.Marauder, fide.King, hs.Tapir, hs.Horserider, hs.Naysayer],
+        'set': [hs.Naysayer, hs.HorseRdr, hs.Tapir, hs.Marauder, fide.King, hs.Tapir, hs.HorseRdr, hs.Naysayer],
     },
     {
         'name': "Irritant Irons",
-        'set': [ir.Musth, ir.Officer, ir.SRider, ir.GRider, fide.King, ir.SRider, ir.Officer, ir.Musth],
+        'set': [ir.Musth, ir.Officer, ir.SilverRdr, ir.GoldRdr, fide.King, ir.SilverRdr, ir.Officer, ir.Musth],
     },
     {
         'name': "Meticulous Mashers",
-        'set': [ms.Forfer, ms.Scout, ms.Bandit, ms.Rancher, fide.King, ms.Bandit, ms.Scout, ms.Forfer]
+        'set': [ms.Forfer, ms.Scout, ms.Bandit, ms.Rancher, fide.King, ms.Bandit, ms.Scout, ms.Forfer],
     },
     {
         'name': "Nocturnal Naysayers",
-        'set': [no.Bard, no.Nightsling, no.Moarider, no.Nanking, fide.King, no.Moarider, no.Nightsling, no.Bard],
+        'set': [no.Bard, no.Nightsling, no.MoaRdr, no.Nanking, fide.King, no.MoaRdr, no.Nightsling, no.Bard],
     },
     {
         'name': "Pizza Pounders",
@@ -148,7 +153,7 @@ piece_groups = [
     },
     {
         'name': "Starbound Sliders",
-        'set': [st.Star, st.Lancer, st.Sinerider, st.Turneagle, fide.King, st.Sinerider, st.Lancer, st.Star],
+        'set': [st.Star, st.Lancer, st.SineRdr, st.Turneagle, fide.King, st.SineRdr, st.Lancer, st.Star],
     },
     {
         'name': "Stoic Stones",
@@ -350,9 +355,10 @@ class Board(Window):
 
         piece_sets = {side: piece_groups[self.piece_sets[side]]['set'].copy() for side in self.piece_sets}
 
-        # Special condition for Claustrophobic Cannoneers as black: Swap the positions of Mortar and Howitzer
-        black_piece_set = piece_sets[Side.BLACK]
-        if black_piece_set[0] == cn.Mortar and black_piece_set[7] == cn.Howitzer:
+        # Special condition for Claustrophobic Cannoneers and Colorful Characters as black
+        # Swap the positions of rook replacement pieces
+        if piece_groups[self.piece_sets[Side.BLACK]]['name'] in {"Claustrophobic Cannoneers", "Colorful Characters"}:
+            black_piece_set = piece_sets[Side.BLACK]
             black_piece_set[0], black_piece_set[7] = black_piece_set[7], black_piece_set[0]
 
         if update or shuffle:

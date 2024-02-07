@@ -24,7 +24,7 @@ class Naysayer(Piece):
         )
 
 
-class Horserider(Piece):
+class HorseRdr(Piece):
     name = 'Horserider'
     file_name = 'afs(afzafz)W'
     asset_folder = 'horse'

@@ -15,7 +15,7 @@ class Lobefin(Piece):
         )
 
 
-class Crabrider(Piece):
+class CrabRdr(Piece):
     name = 'Crabrider'
     file_name = 'ffbsNN'
     asset_folder = 'drip'

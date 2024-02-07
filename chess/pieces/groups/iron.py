@@ -27,7 +27,7 @@ class Officer(Piece):
         )
 
 
-class SRider(Piece):
+class SilverRdr(Piece):
     name = 'Silverrider'
     file_name = 'BfR'
     asset_folder = 'iron'
@@ -39,7 +39,7 @@ class SRider(Piece):
         )
 
 
-class GRider(Piece):
+class GoldRdr(Piece):
     name = 'Goldrider'
     file_name = 'RfB'
     asset_folder = 'iron'
