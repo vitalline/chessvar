@@ -66,7 +66,7 @@ class BaseDirectionalMovement(BaseMovement):
 
     def moves(self, pos_from: Position, piece: Piece, theoretical: bool = False):
         if self.board.not_on_board(pos_from):
-            return
+            return ()
         direction_id = 0
         while direction_id < len(self.directions):
             direction = piece.side.direction(self.directions[direction_id])
@@ -119,12 +119,8 @@ class RiderMovement(BaseDirectionalMovement):
                 move.pos_to == self.transform(add(move.pos_from, mul(direction[:2], direction[2])))
             )
             or not theoretical and (
-                piece.side == (next_piece := self.board.get_piece(next_pos_to)).side and piece != next_piece
-                or (
-                    piece.side == (current_piece := self.board.get_piece(move.pos_to)).side.opponent()
-                    and not current_piece.is_empty()
-                    and move.pos_from != move.pos_to
-                )
+                (piece.side == (next_piece := self.board.get_piece(next_pos_to)).side and piece != next_piece)
+                or (piece.side == self.board.get_side(move.pos_to).opponent() and move.pos_from != move.pos_to)
             )
         )
 
@@ -356,33 +352,20 @@ class EnPassantMovement(RiderMovement):
     def __init__(self, board: Board, directions: list[AnyDirection]):
         super().__init__(board, directions)
 
+    def moves(self, pos_from: Position, piece: Piece, theoretical: bool = False):
+        for move in super().moves(pos_from, piece, theoretical):
+            if not theoretical:
+                if move.pos_to in self.board.en_passant_markers:
+                    move.captured_piece = self.board.en_passant_target
+            yield move
 
-class BentMovement(BaseMovement):
-    def __init__(self, board: Board, movements: list[BaseDirectionalMovement], start_index: int = 0):
+
+class BaseMultiMovement(BaseMovement):
+    def __init__(self, board: Board, movements: list[BaseMovement]):
         super().__init__(board)
-        self.start_index = start_index
         self.movements = movements
         for movement in self.movements:
             movement.board = board  # just in case.
-
-    def moves(self, pos_from: Position, piece: Piece, theoretical: bool = False, index: int = 0):
-        if index >= len(self.movements):
-            return
-        directions = self.movements[index].directions
-        for direction in directions:
-            self.movements[index].directions = [direction]
-            move = None
-            for move in self.movements[index].moves(pos_from, piece, theoretical):
-                if self.start_index <= index:
-                    yield copy(move)
-            if (
-                    move is not None and len(direction) > 2 and direction[2] and
-                    move.pos_to == add(pos_from, piece.side.direction(mul(direction[:2], direction[2])))
-                    and (theoretical or self.board.get_piece(move.pos_to).is_empty())
-            ):
-                for bent_move in self.moves(move.pos_to, piece, theoretical, index + 1):
-                    yield copy(bent_move).set(pos_from=pos_from)
-        self.movements[index].directions = directions
 
     def update(self, move: Move, piece: Piece):
         for movement in self.movements:
@@ -401,23 +384,50 @@ class BentMovement(BaseMovement):
         super().update(move, piece)
 
     def __copy_args__(self):
-        return self.board, deepcopy(self.movements), self.start_index
+        return self.board, deepcopy(self.movements)
 
 
-class ChainMovement(BaseMovement):
-    def __init__(self, board: Board, movements: list[BaseMovement]):
-        super().__init__(board)
-        self.movements = movements
-        for movement in self.movements:
-            movement.board = board  # just in case.
+class BentMovement(BaseMultiMovement):
+    def __init__(self, board: Board, movements: list[BaseDirectionalMovement], start_index: int = 0):
+        super().__init__(board, movements)
+        self.start_index = start_index
 
     def moves(self, pos_from: Position, piece: Piece, theoretical: bool = False, index: int = 0):
         if index >= len(self.movements):
-            return
+            return ()
+        movement = self.movements[index]
+        if isinstance(movement, BaseDirectionalMovement):
+            directions = movement.directions
+            for direction in directions:
+                movement.directions = [direction]
+                move = None
+                for move in movement.moves(pos_from, piece, theoretical):
+                    if self.start_index <= index:
+                        yield copy(move)
+                if (
+                        move is not None and len(direction) > 2 and direction[2] and
+                        move.pos_to == add(pos_from, piece.side.direction(mul(direction[:2], direction[2])))
+                        and (theoretical or self.board.get_piece(move.pos_to).is_empty())
+                ):
+                    for bent_move in self.moves(move.pos_to, piece, theoretical, index + 1):
+                        yield copy(bent_move).set(pos_from=pos_from)
+            movement.directions = directions
+
+    def __copy_args__(self):
+        return self.board, deepcopy(self.movements), self.start_index
+
+
+class ChainMovement(BaseMultiMovement):
+    def __init__(self, board: Board, movements: list[BaseMovement]):
+        super().__init__(board, movements)
+
+    def moves(self, pos_from: Position, piece: Piece, theoretical: bool = False, index: int = 0):
+        if index >= len(self.movements):
+            return ()
         if index == len(self.movements) - 1:
             for move in self.movements[index].moves(pos_from, piece, theoretical):
                 yield copy(move).set(chained_move=False)
-            return
+            return ()
         if theoretical:
             for move in self.movements[index].moves(pos_from, piece, theoretical):
                 for chained_move in self.moves(move.pos_to, piece, theoretical, index + 1):
@@ -432,27 +442,8 @@ class ChainMovement(BaseMovement):
                 self.board.undo(move)  # also let's not forget to undo the move before something unexpected could happen
                 yield from chain_options  # yielding from cache might be a weird thing to do but it works and i'm tired.
 
-    def update(self, move: Move, piece: Piece):
-        for movement in self.movements:
-            movement.update(move, piece)
-        super().update(move, piece)
 
-    def undo(self, move: Move, piece: Piece):
-        super().undo(move, piece)
-        for movement in self.movements:
-            movement.undo(move, piece)
-
-    def reload(self, move: Move, piece: Piece):
-        super().undo(move, piece)
-        for movement in self.movements:
-            movement.reload(move, piece)
-        super().update(move, piece)
-
-    def __copy_args__(self):
-        return self.board, deepcopy(self.movements)
-
-
-class MultiMovement(BaseMovement):
+class MultiMovement(BaseMultiMovement):
     def __init__(
             self,
             board: Board,
@@ -463,63 +454,71 @@ class MultiMovement(BaseMovement):
         self.move_or_capture = move_or_capture or []
         self.move = move or []
         self.capture = capture or []
-        super().__init__(board)
-        for movement in self.move_or_capture + self.move + self.capture:
-            movement.board = board  # again, just in case.
+        super().__init__(board, self.move_or_capture + self.move + self.capture)
 
     def moves(self, pos_from: Position, piece: Piece, theoretical: bool = False):
-        for movement in self.move_or_capture + self.move:
-            for move in movement.moves(pos_from, piece, theoretical):
-                if theoretical or ((to_piece := self.board.get_piece(move.pos_to)).is_empty() or piece == to_piece):
+        if theoretical:
+            for movement in self.movements:
+                for move in movement.moves(pos_from, piece, theoretical):
                     yield copy(move)
-        for movement in self.move_or_capture + self.capture:
-            for move in movement.moves(pos_from, piece, theoretical):
-                if theoretical or (
-                    (to_piece := self.board.get_piece(move.pos_to)).side == piece.side.opponent()
-                    and (not to_piece.is_empty() or isinstance(movement, EnPassantMovement))
-                ):
-                    yield copy(move)
-
-    def update(self, move: Move, piece: Piece):
-        for movement in self.move_or_capture + self.move + self.capture:
-            movement.update(move, piece)
-        super().update(move, piece)
-
-    def undo(self, move: Move, piece: Piece):
-        super().undo(move, piece)
-        for movement in self.move_or_capture + self.move + self.capture:
-            movement.undo(move, piece)
-
-    def reload(self, move: Move, piece: Piece):
-        super().undo(move, piece)
-        for movement in self.move_or_capture + self.move + self.capture:
-            movement.reload(move, piece)
-        super().update(move, piece)
+        else:
+            for movement in self.move_or_capture + self.move:
+                for move in movement.moves(pos_from, piece, theoretical):
+                    to_piece = self.board.get_piece(move.pos_to)
+                    if to_piece.is_empty() or piece == to_piece:
+                        yield copy(move)
+            for movement in self.move_or_capture + self.capture:
+                for move in movement.moves(pos_from, piece, theoretical):
+                    captured_piece = move.captured_piece or self.board.get_piece(move.pos_to)
+                    if captured_piece.side == piece.side.opponent():
+                        yield copy(move)
 
     def __copy_args__(self):
         return self.board, deepcopy(self.move_or_capture), deepcopy(self.move), deepcopy(self.capture)
 
 
-class ProbabilisticMovement(MultiMovement):
-    def __init__(self, board: Board, movements: list[BaseMovement]):
-        super().__init__(board, movements)
-        self.movements = self.move_or_capture
+class ColorMovement(BaseMultiMovement):
+    def __init__(
+            self,
+            board: Board,
+            light: list[BaseMovement] | None = None,
+            dark: list[BaseMovement] | None = None
+    ):
+        self.light = light or []
+        self.dark = dark or []
+        super().__init__(board, self.light + self.dark)
 
     def moves(self, pos_from: Position, piece: Piece, theoretical: bool = False):
+        if self.board.is_light_square(pos_from):
+            for movement in self.light:
+                for move in movement.moves(pos_from, piece, theoretical):
+                    yield copy(move)
+        if self.board.is_dark_square(pos_from):
+            for movement in self.dark:
+                for move in movement.moves(pos_from, piece, theoretical):
+                    yield copy(move)
+
+
+class ProbabilisticMovement(BaseMultiMovement):
+    def __init__(self, board: Board, movements: list[BaseMovement]):
+        super().__init__(board, movements)
+
+    def moves(self, pos_from: Position, piece: Piece, theoretical: bool = False):
+        movements = []
         if theoretical:
-            yield from super().moves(pos_from, piece, theoretical)
+            movements = self.movements
         else:
             try:
                 current_ply = self.board.ply_count + self.board.ply_simulation - 1
                 current_roll = self.board.roll_history[current_ply][pos_from]
-                yield from self.movements[current_roll].moves(pos_from, piece, theoretical)
+                movements = [self.movements[current_roll]]
             except IndexError:
-                yield from super().moves(pos_from, piece, theoretical)
+                movements = self.movements
             except KeyError:
-                return ()
+                pass
+        for movement in movements:
+            for move in movement.moves(pos_from, piece, theoretical):
+                yield copy(move)
 
     def roll(self):
         return randrange(len(self.movements))
-
-    def __copy_args__(self):
-        return self.board, deepcopy(self.movements)

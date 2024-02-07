@@ -293,7 +293,7 @@ class Board(Window):
         # initialize board sprites
         for row, col in product(range(self.board_height), range(self.board_width)):
             sprite = Sprite("assets/util/square.png")
-            sprite.color = self.color_scheme["light_square_color" if (row + col) % 2 else "dark_square_color"]
+            sprite.color = self.color_scheme[f"{'light' if self.is_light_square((row, col)) else 'dark'}_square_color"]
             sprite.position = self.get_screen_position((row, col))
             sprite.scale = self.square_size / sprite.texture.width
             self.board_sprite_list.append(sprite)
@@ -350,7 +350,7 @@ class Board(Window):
 
         piece_sets = {side: piece_groups[self.piece_sets[side]]['set'].copy() for side in self.piece_sets}
 
-        # Special condition for Spacious Cannoneers as black: Swap the positions of Mortar and Howitzer
+        # Special condition for Claustrophobic Cannoneers as black: Swap the positions of Mortar and Howitzer
         black_piece_set = piece_sets[Side.BLACK]
         if black_piece_set[0] == cn.Mortar and black_piece_set[7] == cn.Howitzer:
             black_piece_set[0], black_piece_set[7] = black_piece_set[7], black_piece_set[0]
@@ -471,6 +471,16 @@ class Board(Window):
         return x, y
 
     # From now on we shall unanimously assume that the first coordinate corresponds to row number (AKA vertical axis).
+
+    @staticmethod
+    def get_square_color(pos: Position) -> int:
+        return (pos[0] + pos[1]) % 2
+
+    def is_dark_square(self, pos: Position) -> bool:
+        return self.get_square_color(pos) == 0
+
+    def is_light_square(self, pos: Position) -> bool:
+        return self.get_square_color(pos) == 1
 
     def get_piece(self, pos: Position | None) -> abc.Piece:
         return NoPiece(self, pos, Side.NONE) if self.not_on_board(pos) else self.pieces[pos[0]][pos[1]]
@@ -811,15 +821,13 @@ class Board(Window):
 
     def update_move(self, move: Move) -> None:
         move.set(piece=self.get_piece(move.pos_from))
-        if move.pos_from != move.pos_to:
-            new_piece = self.get_piece(move.pos_to)
-            if new_piece.side != Side.NONE:
-                if move.swapped_piece is not None:
-                    move.set(swapped_piece=new_piece)
-                elif isinstance(move.movement, movement.EnPassantMovement) and new_piece.is_empty():
-                    move.set(captured_piece=self.en_passant_target)
-                elif not new_piece.is_empty():
-                    move.set(captured_piece=new_piece)
+        new_piece = move.swapped_piece or move.captured_piece
+        new_piece = self.get_piece(new_piece.board_pos if new_piece is not None else move.pos_to)
+        if move.piece != new_piece and not new_piece.is_empty():
+            if move.swapped_piece is not None:
+                move.set(swapped_piece=new_piece)
+            else:
+                move.set(captured_piece=new_piece)
 
     def set_position(self, piece: abc.Piece, pos: Position) -> None:
         piece.board_pos = pos
@@ -943,12 +951,6 @@ class Board(Window):
             if last_move.is_edit:
                 if not self.edit_mode:
                     self.turn_side = self.turn_side.opponent()
-                if (
-                        last_move.piece is not None
-                        and last_move.piece.is_empty()
-                        and last_move.piece.board_pos not in self.en_passant_markers
-                ):
-                    last_move.piece.side = Side.NONE
         else:
             self.log(f"[Ply {self.ply_count}] Undo: Pass: {self.turn_side.name()}'s turn")
         if self.move_history:
@@ -1222,8 +1224,8 @@ class Board(Window):
         for sprite in self.label_list:
             sprite.color = self.color_scheme["text_color"]
         for sprite in self.board_sprite_list:
-            color = sum(self.get_board_position(sprite.position)) % 2
-            sprite.color = self.color_scheme["light_square_color" if color else "dark_square_color"]
+            position = self.get_board_position(sprite.position)
+            sprite.color = self.color_scheme[f"{'light' if self.is_light_square(position) else 'dark'}_square_color"]
         for sprite in self.promotion_area_sprite_list:
             sprite.color = self.color_scheme["promotion_area_color"]
         for sprite in self.promotion_piece_sprite_list:
@@ -1309,7 +1311,8 @@ class Board(Window):
                         isinstance(sprite, abc.Piece) and not sprite.is_empty()
                         and not (self.game_over and not self.edit_mode and sprite.side == self.check_side)
                 ):
-                    sprite.angle += self.trickster_angle_delta / 11 * 360 * (1 if sum(sprite.board_pos) % 2 else -1)
+                    direction = 1 if self.is_light_square(sprite.board_pos) else -1
+                    sprite.angle += self.trickster_angle_delta / 11 * 360 * direction
         self.trickster_angle_delta = 0
 
     def reset_trickster_mode(self) -> None:
@@ -1456,15 +1459,10 @@ class Board(Window):
         if self.en_passant_target is not None and self.en_passant_target.board_pos != piece_pos:
             return
         self.en_passant_target = self.get_piece(piece_pos)
-        if self.not_a_piece(marker_pos):
-            self.replace(self.get_piece(marker_pos), NoPiece, self.en_passant_target.side)
         self.en_passant_markers.add(marker_pos)
 
     def clear_en_passant(self) -> None:
         self.en_passant_target = None
-        for marker in self.en_passant_markers:
-            if self.not_a_piece(marker):
-                self.replace(self.get_piece(marker), NoPiece, Side.NONE)
         self.en_passant_markers = set()
 
     def on_key_press(self, symbol, modifiers):
