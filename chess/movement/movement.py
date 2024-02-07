@@ -6,7 +6,7 @@ from random import randrange
 from typing import TYPE_CHECKING
 
 from chess.movement.move import Move
-from chess.movement.util import AnyDirection, ClashResolution, Direction, Position, add, merge, mul
+from chess.movement.util import AnyDirection, Direction, Position, add, sub, mul, ddiv
 
 if TYPE_CHECKING:
     from chess.board import Board
@@ -105,9 +105,10 @@ class RiderMovement(BaseDirectionalMovement):
             return False
         if not direction[3]:
             return False
-        for i in range(1, direction[3]):
-            if move.pos_to == self.transform(add(move.pos_from, mul(direction[:2], i))):
-                return True
+        offset = sub(move.pos_to, move.pos_from)
+        steps = ddiv(offset, direction[:2])
+        if 0 < steps < direction[3]:
+            return True
         return False
 
     def stop_condition(self, move: Move, direction: AnyDirection, piece: Piece, theoretical: bool = False) -> bool:
@@ -235,37 +236,6 @@ class RangedCaptureRiderMovement(RiderMovement):
         return super().stop_condition(move, direction, piece, theoretical)
 
 
-class FirstMoveRiderMovement(RiderMovement):
-    def __init__(self, board: Board, directions: list[AnyDirection], first_move_directions: list[AnyDirection]):
-        super().__init__(board, directions)
-        self.base_directions = directions
-        self.first_move_directions = first_move_directions
-        self.directions = merge(self.directions, self.first_move_directions, ClashResolution.EXPAND)
-
-    def update(self, move: Move, piece: Piece):
-        if not self.total_moves:
-            self.directions = self.base_directions
-        super().update(move, piece)
-
-    def undo(self, move: Move, piece: Piece):
-        super().undo(move, piece)
-        if not self.total_moves:
-            self.directions = merge(self.directions, self.first_move_directions, ClashResolution.EXPAND)
-
-    def __copy_args__(self):
-        return self.board, copy(self.base_directions), copy(self.first_move_directions)
-
-    def __copy__(self):
-        clone = self.__class__(*self.__copy_args__())
-        clone.total_moves = self.total_moves
-        if self.total_moves:
-            clone.directions = clone.base_directions
-        return clone
-
-    def __deepcopy__(self, memo):
-        return self.__copy__()
-
-
 class CastlingMovement(BaseMovement):
     def __init__(
             self,
@@ -310,45 +280,36 @@ class CastlingMovement(BaseMovement):
         return self.board, self.direction, self.other_piece, self.other_direction, copy(self.gap)
 
 
-class EnPassantTargetMovement(FirstMoveRiderMovement):
-    def __init__(
-            self,
-            board: Board,
-            directions: list[AnyDirection],
-            first_move_directions: list[AnyDirection],
-            en_passant_directions: list[AnyDirection]
-    ):
-        super().__init__(board, directions, first_move_directions)
-        self.en_passant_directions = en_passant_directions
+class EnPassantTargetRiderMovement(RiderMovement):
+    def __init__(self, board: Board, directions: list[AnyDirection]):
+        super().__init__(board, directions)
 
     def update(self, move: Move, piece: Piece):
-        if not self.total_moves:
-            current_directions = self.directions
-            self.directions = self.base_directions
-            result_set = {base_move.pos_to for base_move in self.moves(move.pos_from, piece, True)}
-            if move.pos_to not in result_set:  # if this is not a move that could be made whenever:
-                self.directions = self.first_move_directions
-                for first_move in self.moves(move.pos_from, piece, True):
-                    if move.pos_to == first_move.pos_to:  # and if it is a move that can only be made as the first move:
-                        for direction in self.en_passant_directions:
-                            en_passant_square = add(move.pos_from, move.piece.side.direction(direction[:2]))
-                            if self.board.not_a_piece(en_passant_square):
-                                self.board.mark_en_passant(move.pos_to, en_passant_square)  # mark ALL the squares!
-                        break  # and yes this is totally inefficient but like who even cares at this point really
-            self.directions = current_directions
+        for direction in self.directions:
+            direction = piece.side.direction(direction)
+            offset = sub(move.pos_to, move.pos_from)
+            steps = ddiv(offset, direction[:2])
+            if len(direction) > 2 and direction[2] > 0:
+                steps = min(steps, direction[2])
+            if steps < 2:
+                continue
+            positions = [add(move.pos_from, mul(direction[:2], i)) for i in range(1, steps)]
+            is_clear = True
+            for pos in positions:
+                if not self.board.not_a_piece(pos):
+                    is_clear = False
+                    break
+            if is_clear:
+                for pos in positions:
+                    self.board.mark_en_passant(move.pos_to, pos)
         super().update(move, piece)
 
     def undo(self, move: Move, piece: Piece):
         super().undo(move, piece)
         self.board.clear_en_passant()
 
-    def __copy_args__(self):
-        return (
-            self.board, copy(self.base_directions), copy(self.first_move_directions), copy(self.en_passant_directions)
-        )
 
-
-class EnPassantMovement(RiderMovement):
+class EnPassantRiderMovement(RiderMovement):
     def __init__(self, board: Board, directions: list[AnyDirection]):
         super().__init__(board, directions)
 
@@ -385,6 +346,27 @@ class BaseMultiMovement(BaseMovement):
 
     def __copy_args__(self):
         return self.board, deepcopy(self.movements)
+
+
+class FirstMoveMovement(BaseMultiMovement):
+    def __init__(
+            self,
+            board: Board,
+            movements: list[BaseMovement] | None = None,
+            first_move_movements: list[BaseMovement] | None = None
+    ):
+        self.base_movements = movements or []
+        self.first_move_movements = first_move_movements or []
+        super().__init__(board, self.base_movements + self.first_move_movements)
+
+    def moves(self, pos_from: Position, piece: Piece, theoretical: bool = False):
+        movements = self.movements if not self.total_moves else self.base_movements
+        for movement in movements:
+            for move in movement.moves(pos_from, piece, theoretical):
+                yield copy(move)
+
+    def __copy_args__(self):
+        return self.board, copy(self.movements), copy(self.first_move_movements)
 
 
 class BentMovement(BaseMultiMovement):

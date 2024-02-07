@@ -79,8 +79,16 @@ class Pawn(PromotablePiece):
             board, board_pos, side,
             movement.MultiMovement(
                 board,
-                move=[movement.EnPassantTargetMovement(board, [(1, 0, 1)], [(1, 0, 2)], [(1, 0, 1)])],
-                capture=[movement.EnPassantMovement(board, symv([(1, 1, 1)]))]
+                move=[
+                    movement.FirstMoveMovement(
+                        board,
+                        [movement.RiderMovement(board, [(1, 0, 1)])],
+                        [movement.EnPassantTargetRiderMovement(board, [(1, 0, 2)])]
+                    )
+                ],
+                capture=[
+                    movement.EnPassantRiderMovement(board, symv([(1, 1, 1)]))
+                ]
             ),
             promotions,
             promotion_squares

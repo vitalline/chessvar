@@ -29,6 +29,26 @@ def mul(pos: Direction, factor: int) -> Direction:
     return pos[0] * factor, pos[1] * factor
 
 
+def idiv(pos: Direction, factor: int) -> Direction:
+    return pos[0] // factor, pos[1] // factor
+
+
+def ddiv(pos: Direction, qpos: Direction) -> int:
+    if qpos[0] == 0 and qpos[1] == 0:
+        return 0
+    if qpos[0] == 0 and qpos[1] != 0 and pos[1] % qpos[1] == 0:
+        return pos[1] // qpos[1]
+    if qpos[1] == 0 and qpos[0] != 0 and pos[0] % qpos[0] == 0:
+        return pos[0] // qpos[0]
+    if (
+        qpos[0] != 0 and qpos[1] != 0 and
+        pos[0] % qpos[0] == 0 and pos[1] % qpos[1] == 0 and
+        pos[0] // qpos[0] == pos[1] // qpos[1]
+    ):
+        return pos[0] // qpos[0]
+    return 0
+
+
 def rot(poss: list[AnyDirection]) -> list[AnyDirection]:
     return list(set(sum([[
         (pos[0], pos[1], *pos[2:]), (pos[1], -pos[0], *pos[2:]),
