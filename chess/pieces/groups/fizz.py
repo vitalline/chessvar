@@ -58,7 +58,7 @@ class Wyvern(Piece):
             movement.MultiMovement(board, [
                 movement.BentMovement(board, [
                     movement.RiderMovement(board, [(i, j, 1)]),
-                    movement.HalflingRiderMovement(board, [(i or k, j or k)], (i, j))
+                    movement.HalflingRiderMovement(board, [(i or k, j or k)], 1)
                 ]) for i, j in rot([(1, 0)]) for k in (1, -1)
             ])
         )
