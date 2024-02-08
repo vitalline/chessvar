@@ -37,6 +37,8 @@ Ctrl + Shift + Z: redo last move (if any)
 Ctrl + Y: redo last move (if any)
 Ctrl + L: save game log
 Shift + L: clear game log
+Ctrl + D: print debug info
+Shift + D: save debug info
 Shift + [/]: select random piece (that can move)
 Ctrl + [/]: play random move (with selected piece if one exists)
 Ctrl + E: enter board edit mode

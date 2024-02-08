@@ -195,6 +195,9 @@ movements = []
 
 base_dir = abspath(curdir)
 
+invalid_chars = ':<>|"?*'
+invalid_chars_trans_table = str.maketrans(invalid_chars, '_' * len(invalid_chars))
+
 
 class Board(Window):
 
@@ -1677,6 +1680,38 @@ class Board(Window):
                 self.save_log()
             if modifiers & key.MOD_SHIFT:  # Clear log
                 self.clear_log()
+        if symbol == key.D:  # Debug
+            debug_log_data = []  # noqa
+            debug_log_data.append(f"Info: Board size: {self.board_width}x{self.board_height}")
+            debug_log_data.append(f"Info: {len(piece_groups)} armies defined")
+            digits = len(str(len(piece_groups)))
+            for i, group in enumerate(piece_groups):
+                debug_log_data.append(f"Army: ({i:0{digits}d}) {group['name']}")
+            white, black = self.piece_sets[Side.WHITE], self.piece_sets[Side.BLACK]
+            debug_log_data.append(
+                f"Game: "
+                f"({white:0{digits}d}) {piece_groups[white]['name']} vs. "
+                f"({black:0{digits}d}) {piece_groups[black]['name']}"
+            )
+            # TODO: Add piece names, piece types (movable/royal/quasiroyal/probabilistic), and promotions (pawn/edit)
+            if self.hide_mode:
+                self.log(f"Hide: {'All' if self.hide_mode == 1 else 'Unique'} pieces hidden")
+            else:
+                self.log(f"Hide: OFF")
+            debug_log_data.append(f"Mode: {'EDIT' if self.edit_mode else 'PLAY'}")
+            debug_log_data.append(f"Turn: {self.turn_side.name()}")
+            debug_log_data.append(f"Info: Current ply: {self.ply_count}")
+            debug_log_data.append(f"Info: Actions made: {len(self.move_history)}")
+            debug_log_data.append(f"Info: Future actions: {len(self.future_move_history)}")
+            debug_log_data.append(f"Info: Moves possible: {len(sum(self.moves.values(), []))}")
+            debug_log_data.append(f"Info: Side in check: {self.check_side.name()}")
+            debug_log_data.append(f"Info: Game over: {self.game_over}")
+            # TODO: Add move history, future move history, and roll history
+            if modifiers & key.MOD_ACCEL:  # Print debug info
+                for string in debug_log_data:
+                    print(f"[Debug] {string}")
+            if modifiers & key.MOD_SHIFT:  # Save debug info
+                self.save_log(debug_log_data, "debug")
         if symbol == key.SLASH:  # (?) Random
             if self.edit_mode:
                 return
@@ -1767,10 +1802,19 @@ class Board(Window):
         self.log_data.append(string)
         print(string)
 
-    def save_log(self) -> None:
-        if self.log_data:
-            with open(join(base_dir, f"log_{datetime.now():%Y-%m-%d_%H-%M-%S}.txt"), "w") as log_file:
-                log_file.write("\n".join(self.log_data))
+    def save_log(
+            self,
+            log_data: list[str] | None = None,
+            log_name: str = "log",
+            ts_format: str = "%Y-%m-%d_%H-%M-%S"
+    ) -> None:
+        if not log_data:
+            log_data = self.log_data
+        if log_data:
+            name_args = [log_name, datetime.now().strftime(ts_format)]
+            file_name = '_'.join(s for s in name_args if s).translate(invalid_chars_trans_table)
+            with open(join(base_dir, f"{file_name}.txt"), "w") as log_file:
+                log_file.write("\n".join(log_data))
 
     def clear_log(self) -> None:
         self.log_data.clear()
