@@ -1105,6 +1105,8 @@ class Board(Window):
             if promotion is None:
                 continue
             promotion_piece = promotion(self, pos, piece.side)
+            if self.should_hide(promotion_piece):
+                promotion_piece.reload(hidden=True)
             promotion_piece.scale = self.square_size / promotion_piece.texture.width
             promotion_piece.set_color(
                 self.color_scheme.get(
@@ -1134,6 +1136,8 @@ class Board(Window):
             promotions=self.promotions[new_side],
             promotion_squares=promotion_squares[new_side],
         ) if issubclass(new_type, abc.PromotablePiece) else new_type(self, pos, new_side)
+        if self.should_hide(self.pieces[pos[0]][pos[1]]):
+            self.pieces[pos[0]][pos[1]].reload(hidden=True)
         self.pieces[pos[0]][pos[1]].set_color(
             self.color_scheme.get(
                 f"{new_side.key_name()}piece_color",
