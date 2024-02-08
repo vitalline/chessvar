@@ -20,20 +20,21 @@ from chess.movement.util import Position, add
 from chess.pieces import pieces as abc
 from chess.pieces.groups import classic as fide
 from chess.pieces.groups import amazon as am, amontillado as ao, avian as av
-from chess.pieces.groups import beast as bs, breakfast as bk, burn as br, buzz as bz
+from chess.pieces.groups import backward as bw, beast as bs, breakfast as bk, burn as br, buzz as bz
 from chess.pieces.groups import camel as ca, cannon as cn, color as co, colorbound as cb
 from chess.pieces.groups import crash as cs, crook as cr, cylindrical as cy
 from chess.pieces.groups import demirifle as de, drip as dr
 from chess.pieces.groups import fairy as fa, fizz as fi, fly as fl, forward as fw
 from chess.pieces.groups import horse as hs
-from chess.pieces.groups import iron as ir
+from chess.pieces.groups import inadjacent as ia, iron as ir
 from chess.pieces.groups import knight as kn
 from chess.pieces.groups import mash as ms
-from chess.pieces.groups import nocturnal as no
-from chess.pieces.groups import pawn as pa, pizza as pz, probable as pr
+from chess.pieces.groups import narrow as na, nocturnal as no
+from chess.pieces.groups import pawn as pa, perimeter as pe, pizza as pz, probable as pr
 from chess.pieces.groups import rookie as rk
 from chess.pieces.groups import starbound as st, stone as so, switch as sw
 from chess.pieces.groups import thrash as th
+from chess.pieces.groups import wide as wd
 from chess.pieces.groups import zebra as zb
 from chess.pieces.groups.util import NoPiece
 from chess.pieces.pieces import Side
@@ -66,6 +67,10 @@ piece_groups = [
     {
         'name': "Avian Airforce",
         'set': [av.Wader, av.Darter, av.Falcon, av.Kingfisher, fide.King, av.Falcon, av.Darter, av.Wader],
+    },
+    {
+        'name': "Backward Barnacles",
+        'set': [bw.Whelk, bw.Walrus, bw.Seagull, bw.Shark, fide.King, bw.Seagull, bw.Walrus, bw.Whelk],
     },
     {
         'name': "Beautiful Beasts",
@@ -136,6 +141,10 @@ piece_groups = [
         'set': [hs.Naysayer, hs.HorseRdr, hs.Tapir, hs.Marauder, fide.King, hs.Tapir, hs.HorseRdr, hs.Naysayer],
     },
     {
+        'name': "Inadjacent Intimidators",
+        'set': [ia.Bireme, ia.Tigon, ia.Bicycle, ia.Biplane, fide.King, ia.Bicycle, ia.Tigon, ia.Bireme],
+    },
+    {
         'name': "Irritant Irons",
         'set': [ir.Musth, ir.Officer, ir.SilverRdr, ir.GoldRdr, fide.King, ir.SilverRdr, ir.Officer, ir.Musth],
     },
@@ -144,12 +153,20 @@ piece_groups = [
         'set': [ms.Forfer, ms.Scout, ms.Bandit, ms.Rancher, fide.King, ms.Bandit, ms.Scout, ms.Forfer],
     },
     {
+        'name': "Narrow Nightmares",
+        'set': [na.Deerfly, na.Ship, na.Filescout, na.Horsefly, fide.King, na.Filescout, na.Ship, na.Deerfly],
+    },
+    {
         'name': "Nocturnal Naysayers",
         'set': [no.Bard, no.Nightsling, no.MoaRdr, no.Nanking, fide.King, no.MoaRdr, no.Nightsling, no.Bard],
     },
     {
         'name': "Pawnshop Praetorians",
         'set': [pa.Paladin, pa.Guarddog, pa.Stewardess, pa.Dowager, fide.King, pa.Stewardess, pa.Guarddog, pa.Paladin],
+    },
+    {
+        'name': "Perimeter Prancers",
+        'set': [pe.Fencer, pe.Castle, pe.Kirin, pe.Fort, fide.King, pe.Kirin, pe.Castle, pe.Fencer],
     },
     {
         'name': "Pizza Pounders",
@@ -174,6 +191,10 @@ piece_groups = [
     {
         'name': "Threeleaping Thrashers",
         'set': [th.Trident, th.Nipper, th.Bullfrog, th.Duchess, fide.King, th.Bullfrog, th.Nipper, th.Trident],
+    },
+    {
+        'name': "Wide Wildmen",
+        'set': [wd.Ogre, wd.Sidesail, wd.Sidewinder, wd.Ogress, fide.King, wd.Sidewinder, wd.Sidesail, wd.Ogre],
     },
     {
         'name': "Zany Zebroids",

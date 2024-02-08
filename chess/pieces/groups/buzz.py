@@ -1,5 +1,5 @@
 from chess.movement import movement
-from chess.movement.util import rot, sym
+from chess.movement.util import rot, sym, symh, symv
 from chess.pieces.pieces import Piece
 
 
@@ -46,14 +46,14 @@ class Mantis(Piece):
 
     def __init__(self, board, board_pos, side):
         movements = [movement.RiderMovement(board, sym([(1, 1), (2, 1, 1)]))]
-        for i, j in sym([(0, 2)]):
-            for k, l in sym([(1, 0)]):
-                movements.append(movement.BentMovement(
-                    board, [
+        for i, j in symv([(0, 2)]):
+            for k, l in symh([(1, 0)]):
+                movements.append(
+                    movement.BentMovement(board, [
                         movement.RiderMovement(board, [(i, j, 1)]),
                         movement.RiderMovement(board, [(k, l)])
-                    ]
-                ))
+                    ])
+                )
         super().__init__(
             board, board_pos, side,
             movement.MultiMovement(board, movements)

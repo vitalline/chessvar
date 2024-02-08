@@ -60,7 +60,7 @@ class Boyscout(Piece):
 
     def __init__(self, board, board_pos, side):
         movements = []
-        for i, j in [(1, 1), (-1, 1), (-1, -1), (1, -1)]:
+        for i, j in rot([(1, 1)]):
             for k, l in [(-i, j), (i, -j)]:
                 rider_movements = []
                 for m in range(int(ceil(max(board.board_width, board.board_height) / 2))):
@@ -83,8 +83,8 @@ class Griffon(Piece):
             board, board_pos, side,
             movement.MultiMovement(board, [
                 movement.BentMovement(board, [
-                    movement.RiderMovement(board, [(i, j, 1)]),
-                    movement.RiderMovement(board, [(k, l)])
-                ]) for i, j in rot([(1, 1)]) for k, l in ((i, 0), (0, j))
+                    movement.RiderMovement(board, [(i or k, j or k, 1)]),
+                    movement.RiderMovement(board, [(i, j)])
+                ]) for i, j in rot([(1, 0)]) for k in (1, -1)
             ])
         )

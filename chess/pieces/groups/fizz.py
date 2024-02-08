@@ -49,7 +49,7 @@ class RRhino(Piece):
 
 class Wyvern(Piece):
     name = 'Wyvern'
-    file_name = 'WyafshhW'
+    file_name = 'WhhyafsW'
     asset_folder = 'fizz'
 
     def __init__(self, board, board_pos, side):
@@ -86,7 +86,7 @@ class EagleScout(Piece):
 
     def __init__(self, board, board_pos, side):
         movements = []
-        for i, j in [(1, 1), (-1, 1), (-1, -1), (1, -1)]:
+        for i, j in rot([(1, 1)]):
             for k, l in [(-i, j), (i, -j)]:
                 rider_movements = []
                 for m in range(int(ceil(max(board.board_width, board.board_height) / 2))):
