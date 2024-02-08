@@ -749,7 +749,7 @@ class Board(Window):
                 elif modifiers & key.MOD_SHIFT:
                     move.set(pos_from=pos, pos_to=pos, piece=self.get_piece(pos))
                     side = self.get_side(pos)
-                    if side == Side.NONE:
+                    if not side:
                         side = Side.WHITE if pos[0] < self.board_height / 2 else Side.BLACK
                         move.piece.side = side
                     if len(self.edit_promotions[side]) == 1:
@@ -1007,7 +1007,7 @@ class Board(Window):
                 self.update_move(last_move)
                 self.update_move(self.future_move_history[-1])
                 side = self.get_side(last_move.pos_from)
-                if side == Side.NONE:
+                if not side:
                     side = Side.WHITE if last_move.pos_from[0] < self.board_height / 2 else Side.BLACK
                     last_move.piece.side = side
             chained_move = last_move
@@ -1180,21 +1180,21 @@ class Board(Window):
         self.show_moves()
         if not sum(self.moves.values(), []):
             self.game_over = True
-        if pass_check_side != Side.NONE:
+        if pass_check_side:
             self.check_side = pass_check_side
         if self.game_over:
             # the game has ended. let's find out who won and show it by changing piece colors
-            if pass_check_side != Side.NONE:
+            if pass_check_side:
                 # the last player was in check and passed the turn, the game ends and the current player wins
                 self.log(f"[Ply {self.ply_count}] Info: Game over! {pass_check_side.opponent().name()} wins.")
-            elif self.check_side != Side.NONE:
+            elif self.check_side:
                 # the current player was checkmated, the game ends and the opponent wins
                 self.log(f"[Ply {self.ply_count}] Info: Checkmate! {self.check_side.opponent().name()} wins.")
             else:
                 # the current player was stalemated, the game ends in a draw
                 self.log(f"[Ply {self.ply_count}] Info: Stalemate! It's a draw.")
         else:
-            if self.check_side != Side.NONE:
+            if self.check_side:
                 # the game is still going, but the current player is in check
                 self.log(f"[Ply {self.ply_count}] Info: {self.check_side.name()} is in check!")
             else:
@@ -1253,7 +1253,7 @@ class Board(Window):
 
     def color_all_pieces(self) -> None:
         if self.game_over:
-            if self.check_side != Side.NONE:
+            if self.check_side:
                 self.color_pieces(
                     self.check_side,
                     self.color_scheme.get(
@@ -1284,7 +1284,7 @@ class Board(Window):
                     ),
                 )
         else:
-            if self.check_side != Side.NONE:
+            if self.check_side:
                 self.color_pieces(
                     self.check_side,
                     self.color_scheme.get(
@@ -1420,7 +1420,7 @@ class Board(Window):
         self.probabilistic_pieces = {Side.WHITE: [], Side.BLACK: []}
         for row, col in product(range(self.board_height), range(self.board_width)):
             piece = self.get_piece((row, col))
-            if piece.side != Side.NONE:
+            if piece.side:
                 self.movable_pieces[piece.side].append(piece)
                 if isinstance(piece, abc.RoyalPiece):
                     self.royal_pieces[piece.side].append(piece)
@@ -1458,10 +1458,10 @@ class Board(Window):
                         break
                     if last_move.pos_to in castle_squares:
                         self.castling_threats.add(last_move.pos_to)
-                if self.check_side != Side.NONE:
+                if self.check_side:
                     break
             self.ply_simulation -= 1
-            if self.check_side != Side.NONE:
+            if self.check_side:
                 break
 
     def mark_en_passant(self, piece_pos: Position, marker_pos: Position) -> None:
@@ -1683,7 +1683,8 @@ class Board(Window):
         if symbol == key.D:  # Debug
             debug_log_data = []  # noqa
             debug_log_data.append(f"Info: Board size: {self.board_width}x{self.board_height}")
-            debug_log_data.append(f"Info: {len(piece_groups)} armies defined")
+            # TODO: Add color scheme data
+            debug_log_data.append(f"Info: Armies defined: {len(piece_groups)}")
             digits = len(str(len(piece_groups)))
             for i, group in enumerate(piece_groups):
                 debug_log_data.append(f"Army: ({i:0{digits}d}) {group['name']}")
@@ -1695,16 +1696,16 @@ class Board(Window):
             )
             # TODO: Add piece names, piece types (movable/royal/quasiroyal/probabilistic), and promotions (pawn/edit)
             if self.hide_mode:
-                self.log(f"Hide: {'All' if self.hide_mode == 1 else 'Unique'} pieces hidden")
+                debug_log_data.append(f"Hide: {'All' if self.hide_mode == 1 else 'Unique'} pieces hidden")
             else:
-                self.log(f"Hide: OFF")
+                debug_log_data.append(f"Hide: OFF")
             debug_log_data.append(f"Mode: {'EDIT' if self.edit_mode else 'PLAY'}")
-            debug_log_data.append(f"Turn: {self.turn_side.name()}")
+            debug_log_data.append(f"Turn: {self.turn_side.name() if self.turn_side else 'None'}")
             debug_log_data.append(f"Info: Current ply: {self.ply_count}")
             debug_log_data.append(f"Info: Actions made: {len(self.move_history)}")
             debug_log_data.append(f"Info: Future actions: {len(self.future_move_history)}")
             debug_log_data.append(f"Info: Moves possible: {len(sum(self.moves.values(), []))}")
-            debug_log_data.append(f"Info: Side in check: {self.check_side.name()}")
+            debug_log_data.append(f"Info: Side in check: {self.check_side.name() if self.check_side else 'None'}")
             debug_log_data.append(f"Info: Game over: {self.game_over}")
             # TODO: Add move history, future move history, and roll history
             if modifiers & key.MOD_ACCEL:  # Print debug info

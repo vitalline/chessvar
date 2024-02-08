@@ -21,6 +21,9 @@ class Side(Enum):
     BLACK = 2
     ANY = -1
 
+    def __bool__(self):
+        return self is not Side.NONE
+
     def opponent(self):
         match self:
             case Side.WHITE:
@@ -98,7 +101,7 @@ class Piece(Sprite):
             self.position = self.board.get_screen_position(self.board_pos)
 
     def is_empty(self):
-        return self.side == Side.NONE or not self.name
+        return not self.side or not self.name
 
     def move(self, move: Move):
         self.board.move(move)
@@ -120,7 +123,7 @@ class Piece(Sprite):
     ):
         if side is None:
             side = Side.WHITE if force_color else self.side
-        should_hide = self.is_hidden and side is not Side.NONE
+        should_hide = self.is_hidden and side
         if asset_folder is None:
             asset_folder = "other" if should_hide else self.asset_folder
         if file_name is None:
@@ -147,7 +150,7 @@ class Piece(Sprite):
         if not self.name:
             return
         side = Side.WHITE if force_color else Side.NONE
-        if side == Side.NONE:
+        if not side:
             if max(color) != min(color):  # if color is not grayscale
                 if max(self.color) == min(self.color):  # but was grayscale
                     side = Side.WHITE  # make piece white so that it can be colored
@@ -155,7 +158,7 @@ class Piece(Sprite):
                 if max(self.color) != min(self.color):  # but was not grayscale
                     side = self.side  # make piece match the side
         self.color = color
-        if side != Side.NONE:  # if side was defined and does not match the current texture
+        if side:  # if side was defined and does not match the current texture
             self.reload(side=side)
 
 
