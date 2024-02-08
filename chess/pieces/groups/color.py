@@ -19,7 +19,7 @@ class ElkRdr(Piece):
         )
 
 
-class CaribouRdr(Piece):
+class CaribRdr(Piece):
     name = 'Caribourider'
     file_name = '(Rl,NNd)'
     asset_folder = 'color'
