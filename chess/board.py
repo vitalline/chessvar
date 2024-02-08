@@ -20,9 +20,9 @@ from chess.movement.util import Position, add
 from chess.pieces import pieces as abc
 from chess.pieces.groups import classic as fide
 from chess.pieces.groups import amazon as am, amontillado as ao, avian as av
-from chess.pieces.groups import beast as bs, breakfast as bk, burn as br
-from chess.pieces.groups import camel as ca, cannon as cn, color as co
-from chess.pieces.groups import colorbound as cb, crook as cr, cylindrical as cy
+from chess.pieces.groups import beast as bs, breakfast as bk, burn as br, buzz as bz
+from chess.pieces.groups import camel as ca, cannon as cn, color as co, colorbound as cb
+from chess.pieces.groups import crash as cs, crook as cr, cylindrical as cy
 from chess.pieces.groups import demirifle as de, drip as dr
 from chess.pieces.groups import fairy as fa, fizz as fi, fly as fl, forward as fw
 from chess.pieces.groups import horse as hs
@@ -30,7 +30,7 @@ from chess.pieces.groups import iron as ir
 from chess.pieces.groups import knight as kn
 from chess.pieces.groups import mash as ms
 from chess.pieces.groups import nocturnal as no
-from chess.pieces.groups import pizza as pz, probable as pr
+from chess.pieces.groups import pawn as pa, pizza as pz, probable as pr
 from chess.pieces.groups import rookie as rk
 from chess.pieces.groups import starbound as st, stone as so, switch as sw
 from chess.pieces.groups import thrash as th
@@ -80,6 +80,10 @@ piece_groups = [
         'set': [br.Champion, br.DraHorse, br.Wizard, br.DraKing, fide.King, br.Wizard, br.DraHorse, br.Champion],
     },
     {
+        'name': "Buzzing Busters",
+        'set': [bz.Mosquito, bz.Dragonfly, bz.Locust, bz.Mantis, fide.King, bz.Locust, bz.Dragonfly, bz.Mosquito],
+    },
+    {
         'name': "Cartankerous Camelids",
         'set': [ca.Llama, ca.Cashier, ca.Cabbage, ca.Warlock, fide.King, ca.Cabbage, ca.Cashier, ca.Llama],
     },
@@ -90,6 +94,10 @@ piece_groups = [
     {
         'name': "Colorful Characters",
         'set': [co.ElkRdr, co.DCannon, co.Nightlight, co.Nanqueen, fide.King, co.Nightlight, co.DCannon, co.CaribouRdr],
+    },
+    {
+        'name': "Contrarian Crashers",
+        'set': [cs.Merlion, cs.Biskni, cs.IStewardess, cs.IPaladess, fide.King, cs.IStewardess, cs.Biskni, cs.Merlion],
     },
     {
         'name': "Cruel Crooks",
@@ -140,6 +148,10 @@ piece_groups = [
         'set': [no.Bard, no.Nightsling, no.MoaRdr, no.Nanking, fide.King, no.MoaRdr, no.Nightsling, no.Bard],
     },
     {
+        'name': "Pawnshop Praetorians",
+        'set': [pa.Paladin, pa.Guarddog, pa.Stewardess, pa.Dowager, fide.King, pa.Stewardess, pa.Guarddog, pa.Paladin],
+    },
+    {
         'name': "Pizza Pounders",
         'set': [pz.Pepperoni, pz.Mushroom, pz.Sausage, pz.Meatball, fide.King, pz.Sausage, pz.Mushroom, pz.Pepperoni],
     },
@@ -165,7 +177,7 @@ piece_groups = [
     },
     {
         'name': "Zany Zebroids",
-        'set': [zb.Eliphas, zb.Sorcerer, zb.Adze, zb.FMarauder, fide.King, zb.Adze, zb.Sorcerer, zb.Eliphas],
+        'set': [zb.Eliphas, zb.Sorcerer, zb.Adze, zb.IMarauder, fide.King, zb.Adze, zb.Sorcerer, zb.Eliphas],
     }
 ]
 

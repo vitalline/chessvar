@@ -46,7 +46,7 @@ class Adze(Piece):
         )
 
 
-class FMarauder(Piece):
+class IMarauder(Piece):
     name = 'Contramarauder'
     file_name = 'Fafs(afz)F'
     asset_folder = 'zebra'
