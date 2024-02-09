@@ -130,7 +130,7 @@ class Move(object):
         if self.piece:
             if self.piece.is_empty() and not (self.promotion and self.pos_from == self.pos_to):
                 string = f"{self.piece.side.name()} {string}"
-            elif self.piece.is_empty() and not self.piece.board.hide_mode:
+            elif self.piece.is_empty() and not self.piece.board.should_hide_pieces:
                 string = f"{self.piece.side.name()} {self.promotion.name} {string}"
             elif not self.piece.is_hidden:
                 string = f"{self.piece.side.name()} {self.piece.name} {string}"
@@ -154,7 +154,7 @@ class Move(object):
             self.piece and self.piece.is_empty() and self.pos_from == self.pos_to
         ):
             if self.piece:
-                if self.piece.board.hide_mode:
+                if self.piece.board.should_hide_pieces:
                     string += f", promotes to ???"
                 else:
                     string += f", promotes to {self.promotion.name}"

@@ -204,6 +204,8 @@ piece_groups = [
     }
 ]
 
+penultima_textures = [f'ghost{s}' if s else None for s in ('R', 'N', 'B', 'Q', None, 'B', 'N', 'R')]
+
 board_width = 8
 board_height = 8
 
@@ -275,7 +277,8 @@ class Board(Window):
         self.turn_side = Side.WHITE  # side whose turn it is
         self.check_side = Side.NONE  # side that is currently in check
         self.castling_threats = set()  # squares that are attacked in a way that prevents castling
-        self.hide_mode = 0  # 0: don't hide, 1: hide all pieces, 2: hide pieces unique to the current set
+        self.should_hide_pieces = 0  # 0: don't hide, 1: hide all pieces, 2: penultima mode
+        self.should_hide_moves = None  # whether to hide the move markers; None defaults to should_hide_pieces
         self.flip_mode = False  # whether the board is flipped
         self.edit_mode = False  # allows to edit the board position if set to True
         self.game_over = False  # act 6 act 6 intermission 3 (game over)
@@ -290,6 +293,7 @@ class Board(Window):
         self.royal_pieces = {Side.WHITE: [], Side.BLACK: []}  # these have to stay on the board and should be protected
         self.quasi_royal_pieces = {Side.WHITE: [], Side.BLACK: []}  # at least one of these has to stay on the board
         self.probabilistic_pieces = {Side.WHITE: [], Side.BLACK: []}  # pieces that can move probabilistically
+        self.penultima_pieces = {}  # piece textures that are used for penultima mode
         self.moves = {}  # dictionary of valid moves from any square that has a movable piece on it
         self.chain_moves = {}  # dictionary of valid moves that can be chained from a specific move (marked as from/to)
         self.chain_start = None  # move that started the current chain (if any)
@@ -367,7 +371,7 @@ class Board(Window):
             self.trickster_color_delta += delta_time
             self.trickster_angle_delta += delta_time
 
-    def reset_board(self, shuffle: bool = False, update: bool = False) -> None:
+    def reset_board(self, update: bool = False) -> None:
         self.deselect_piece()  # you know, just in case
         self.turn_side = Side.WHITE
         self.game_over = False
@@ -381,13 +385,10 @@ class Board(Window):
             for sprite in sprite_list:
                 sprite_list.remove(sprite)
 
-        if shuffle:
-            self.piece_sets = {side: randrange(len(piece_groups)) for side in self.piece_sets}
-
         self.log(
             f"[Ply {self.ply_count}] Game: "
-            f"{piece_groups[self.piece_sets[Side.WHITE]]['name'] if not self.hide_mode else '???'} vs. "
-            f"{piece_groups[self.piece_sets[Side.BLACK]]['name'] if not self.hide_mode else '???'}"
+            f"{piece_groups[self.piece_sets[Side.WHITE]]['name'] if not self.should_hide_pieces else '???'} vs. "
+            f"{piece_groups[self.piece_sets[Side.BLACK]]['name'] if not self.should_hide_pieces else '???'}"
         )
         self.ply_count += 1
 
@@ -396,7 +397,7 @@ class Board(Window):
             piece_group = piece_groups[self.piece_sets[side]]
             piece_sets[side] = piece_group.get(f"set_{side.key_name()[0]}", piece_group.get('set', [])).copy()
 
-        if update or shuffle:
+        if update:
             self.roll_history = []
             self.future_move_history = []
             self.promotions = {side: [] for side in self.promotions}
@@ -426,6 +427,11 @@ class Board(Window):
                             used_piece_set.add(piece)
                             promotion_types.append(piece)
                     self.edit_promotions[side].extend(promotion_types[::-1])
+            self.penultima_pieces = {}
+            for side in self.piece_sets:
+                for i, piece in enumerate(piece_sets[side]):
+                    if penultima_textures[i]:
+                        self.penultima_pieces[piece] = penultima_textures[i]
         else:
             self.future_move_history += self.move_history[::-1]
 
@@ -456,6 +462,7 @@ class Board(Window):
                     self, (row, col), piece_side
                 )
             )
+            self.update_piece(self.pieces[row][col])
             self.pieces[row][col].set_color(
                 self.color_scheme.get(
                     f"{self.pieces[row][col].side.key_name()}piece_color",
@@ -464,8 +471,6 @@ class Board(Window):
                 self.color_scheme["colored_pieces"]
             )
             self.pieces[row][col].scale = self.square_size / self.pieces[row][col].texture.width
-            if self.should_hide(self.pieces[row][col]):
-                self.pieces[row][col].reload(hidden=True)
             self.piece_sprite_list.append(self.pieces[row][col])
 
         self.load_all_moves()
@@ -934,7 +939,7 @@ class Board(Window):
             if self.is_trickster_mode(False):  # reset_trickster_mode() does not reset removed pieces
                 move.captured_piece.angle = 0  # so instead we have to do it manually as a workaround
             # removed pieces don't get updated by update_hide_mode() either so we also do it manually
-            move.captured_piece.reload(hidden=self.should_hide(move.captured_piece))
+            self.update_piece(move.captured_piece)
             self.pieces[capture_pos[0]][capture_pos[1]] = move.captured_piece
             self.piece_sprite_list.append(move.captured_piece)
         if move.pos_to is not None and move.pos_from != move.pos_to:
@@ -1120,8 +1125,7 @@ class Board(Window):
             if promotion is None:
                 continue
             promotion_piece = promotion(self, pos, piece.side)
-            if self.should_hide(promotion_piece):
-                promotion_piece.reload(hidden=True)
+            self.update_piece(promotion_piece)
             promotion_piece.scale = self.square_size / promotion_piece.texture.width
             promotion_piece.set_color(
                 self.color_scheme.get(
@@ -1151,8 +1155,7 @@ class Board(Window):
             promotions=self.promotions[new_side],
             promotion_squares=promotion_squares[new_side],
         ) if issubclass(new_type, abc.PromotablePiece) else new_type(self, pos, new_side)
-        if self.should_hide(self.pieces[pos[0]][pos[1]]):
-            self.pieces[pos[0]][pos[1]].reload(hidden=True)
+        self.update_piece(self.pieces[pos[0]][pos[1]])
         self.pieces[pos[0]][pos[1]].set_color(
             self.color_scheme.get(
                 f"{new_side.key_name()}piece_color",
@@ -1328,12 +1331,23 @@ class Board(Window):
             else:
                 self.color_pieces()
 
-    def should_hide(self, piece: abc.Piece) -> bool:
-        return self.hide_mode == 1 or (self.hide_mode == 2 and not issubclass(type(piece), abc.RoyalPiece | fide.Pawn))
+    def update_piece(self, piece: abc.Piece) -> None:
+        if self.should_hide_pieces == 1 or (self.should_hide_pieces == 2 and type(piece) in self.penultima_pieces):
+            asset_folder = 'other'
+        else:
+            asset_folder = None
+        if self.should_hide_pieces == 1:
+            file_name = 'ghost'
+        elif self.should_hide_pieces == 2 and type(piece) in self.penultima_pieces:
+            file_name = self.penultima_pieces[type(piece)]
+        else:
+            file_name = None
+        hidden = self.should_hide_moves if self.should_hide_moves is not None else bool(self.should_hide_pieces)
+        piece.reload(hidden=hidden, asset_folder=asset_folder, file_name=file_name)
 
-    def update_hide_mode(self) -> None:
+    def update_pieces(self) -> None:
         for piece in sum(self.movable_pieces.values(), [*self.promotion_piece_sprite_list]):
-            piece.reload(hidden=self.should_hide(piece))
+            self.update_piece(piece)
 
     def is_trickster_mode(self, value: bool = True) -> bool:
         return value == (self.trickster_color_index != 0)
@@ -1582,12 +1596,14 @@ class Board(Window):
         if self.held_buttons:
             return
         if symbol == key.R:  # Restart
-            if modifiers & key.MOD_ACCEL and modifiers & key.MOD_SHIFT:
-                self.piece_sets = {Side.WHITE: 0, Side.BLACK: 0}
+            if modifiers & key.MOD_ACCEL and modifiers & key.MOD_SHIFT:  # Randomize piece sets (same for both sides)
+                piece_set = randrange(len(piece_groups))
+                self.piece_sets = {side: piece_set for side in self.piece_sets}
                 self.reset_board(update=True)
-            elif modifiers & key.MOD_SHIFT:
-                self.reset_board(shuffle=True)
-            elif modifiers & key.MOD_ACCEL:
+            elif modifiers & key.MOD_SHIFT:  # Randomize piece sets (separately for each side)
+                self.piece_sets = {side: randrange(len(piece_groups)) for side in self.piece_sets}
+                self.reset_board(update=True)
+            elif modifiers & key.MOD_ACCEL:  # Restart with the same piece sets
                 self.reset_board()
         if symbol == key.F11:  # Full screen (toggle)
             self.set_fullscreen(not self.fullscreen)
@@ -1696,23 +1712,46 @@ class Board(Window):
             else:
                 self.update_colors()
         if symbol == key.H:  # Hide
-            old_hide_mode = self.hide_mode
-            if modifiers & key.MOD_ACCEL and modifiers & key.MOD_SHIFT:
-                self.hide_mode = 2
-            elif modifiers & key.MOD_SHIFT:
-                self.hide_mode = 1
-            else:
-                self.hide_mode = 0
-            if old_hide_mode != self.hide_mode:
-                if self.hide_mode:
-                    self.log(f"[Ply {self.ply_count}] Hide: {'All' if self.hide_mode == 1 else 'Unique'} pieces hidden")
-                else:
+            old_should_hide_pieces = self.should_hide_pieces
+            if modifiers & key.MOD_ACCEL and modifiers & key.MOD_SHIFT:  # Show
+                self.should_hide_pieces = 0
+            elif modifiers & key.MOD_SHIFT:  # Hide
+                self.should_hide_pieces = 1
+            elif modifiers & key.MOD_ACCEL:  # Penultima mode
+                self.should_hide_pieces = 2
+            if old_should_hide_pieces != self.should_hide_pieces:
+                if self.should_hide_pieces == 0:
                     self.log(
-                        f"[Ply {self.ply_count}] Show: Pieces revealed: "
+                        f"[Ply {self.ply_count}] Info: Pieces revealed: "
                         f"{piece_groups[self.piece_sets[Side.WHITE]]['name']} vs. "
                         f"{piece_groups[self.piece_sets[Side.BLACK]]['name']}"
                     )
-                self.update_hide_mode()
+                elif self.should_hide_pieces == 1:
+                    self.log(f"[Ply {self.ply_count}] Info: Pieces hidden")
+                elif self.should_hide_pieces == 2:
+                    self.log(f"[Ply {self.ply_count}] Info: Penultima mode activated!")
+                else:
+                    self.should_hide_pieces = old_should_hide_pieces
+                self.update_pieces()
+                self.show_moves()
+        if symbol == key.M:  # Moves
+            old_should_hide_moves = self.should_hide_moves
+            if modifiers & key.MOD_ACCEL and modifiers & key.MOD_SHIFT:  # Default
+                self.should_hide_moves = None
+            elif modifiers & key.MOD_SHIFT:  # Hide
+                self.should_hide_moves = True
+            elif modifiers & key.MOD_ACCEL:  # Show
+                self.should_hide_moves = False
+            if old_should_hide_moves != self.should_hide_moves:
+                if self.should_hide_moves is None:
+                    self.log(f"[Ply {self.ply_count}] Info: Move markers default to piece visibility")
+                elif self.should_hide_moves is False:
+                    self.log(f"[Ply {self.ply_count}] Info: Move markers default to shown")
+                elif self.should_hide_moves is True:
+                    self.log(f"[Ply {self.ply_count}] Info: Move markers default to hidden")
+                else:
+                    self.should_hide_moves = old_should_hide_moves
+                self.update_pieces()
                 self.show_moves()
         if symbol == key.T and modifiers & key.MOD_ACCEL:  # Trickster mode
             if self.color_scheme["scheme_type"] == "cherub":
@@ -1893,12 +1932,12 @@ class Board(Window):
             debug_log_data.append(f"{side.name()} promotions: {piece_list if piece_list else 'None'}")
             piece_list = ', '.join(piece.name for piece in self.edit_promotions[side])
             debug_log_data.append(f"{side.name()} replacements: {piece_list if piece_list else 'None'}")
-        if self.hide_mode:
-            debug_log_data.append(f"Hide: {'All' if self.hide_mode == 1 else 'Unique'} pieces hidden")
-        else:
-            debug_log_data.append("Hide: OFF")
-        debug_log_data.append(f"Mode: {'EDIT' if self.edit_mode else 'PLAY'}")
-        debug_log_data.append(f"Turn: {self.turn_side.name() if self.turn_side else 'None'}")
+        piece_modes = {0: 'Shown', 1: 'Hidden', 2: 'Penultima'}
+        debug_log_data.append(f"Piece visibility: {piece_modes[self.should_hide_pieces]}")
+        move_modes = {None: 'Default', False: 'Shown', True: 'Hidden'}
+        debug_log_data.append(f"Move visibility: {move_modes[self.should_hide_moves]}")
+        debug_log_data.append(f"Board mode: {'Edit' if self.edit_mode else 'Play'}")
+        debug_log_data.append(f"Turn side: {self.turn_side.name() if self.turn_side else 'None'}")
         debug_log_data.append(f"Current ply: {self.ply_count}")
         debug_log_data.append(f"Actions made: {len(self.move_history)}")
         debug_log_data.append(f"Future actions: {len(self.future_move_history)}")

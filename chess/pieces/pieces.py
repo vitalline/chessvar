@@ -123,25 +123,36 @@ class Piece(Sprite):
     ):
         if side is None:
             side = Side.WHITE if force_color else self.side
-        should_hide = self.is_hidden and side
         if asset_folder is None:
-            asset_folder = "other" if should_hide else self.asset_folder
+            asset_folder = self.asset_folder
         if file_name is None:
-            file_name = "ghost" if should_hide else self.file_name
+            file_name = self.file_name
         return f"assets/{asset_folder}/{side.file_name()}{file_name}.png"
 
-    def reload(self, asset_folder: str = None, side: Side = None, file_name: str = None, hidden: bool = None):
+    def reload(
+            self,
+            asset_folder: str = None,
+            side: Side = None,
+            file_name: str = None,
+            hidden: bool = None,
+            flipped_horizontally: bool = None,
+            flipped_vertically: bool = None
+    ):
         if hidden is not None:
             self.is_hidden = hidden
         texture_path = self.texture_path(
             asset_folder=asset_folder, side=side, file_name=file_name, force_color=(max(self.color) != min(self.color))
         )
+        if flipped_horizontally is None:
+            flipped_horizontally = self.flipped_horizontally if not hidden else False
+        if flipped_vertically is None:
+            flipped_vertically = self.flipped_vertically if not hidden else False
         if self.texture.name != texture_path:
             color = self.color
             new_texture = load_texture(
                 texture_path,
-                flipped_horizontally=self.flipped_horizontally if not hidden else False,
-                flipped_vertically=self.flipped_vertically if not hidden else False,
+                flipped_horizontally=flipped_horizontally,
+                flipped_vertically=flipped_vertically,
             )
             self.texture = new_texture
             self.color = color

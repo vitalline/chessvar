@@ -7,7 +7,7 @@ F11: toggle full screen
 Escape: exit application
 Ctrl + R: start game with current armies
 Shift + R: start game with random armies
-Ctrl + Shift + R: start game with default armies
+Ctrl + Shift + R: start game with a random army (same for both players)
 Ctrl + [-]: make window smaller (-5px/square)
 Shift + [-]: make window square (use smaller dimension)
 Ctrl + Shift + [-]: make window very small (25px/square)
@@ -29,9 +29,12 @@ Shift + F: fast-forward to last move
 Ctrl + G: reset graphics mode (colors)
 Shift + G: cycle graphics mode forward (+1)
 Ctrl + Shift + G: cycle graphics mode backward (-1)
-Ctrl + H: show all pieces
-Shift + H: hide all pieces
-Ctrl + Shift + H: hide unique pieces
+Ctrl + H: hide pieces (Penultima mode)
+Shift + H: hide pieces (pieceblind mode)
+Ctrl + Shift + H: show pieces
+Ctrl + M: show move markers
+Shift + M: hide move markers
+Ctrl + Shift + M: show move markers if pieces are shown, hide otherwise
 Ctrl + Z: undo last move (if any)
 Ctrl + Shift + Z: redo last move (if any)
 Ctrl + Y: redo last move (if any)
@@ -41,7 +44,7 @@ Ctrl + D: print debug info
 Shift + D: save debug info
 Shift + [/]: select random piece (that can move)
 Ctrl + [/]: play random move (with selected piece if one exists)
-Ctrl + E: enter board edit mode
+Ctrl + E: toggle board edit mode
 
 controls (edit mode):
 LMB, Enter: select piece, move selected piece (click or drag)
