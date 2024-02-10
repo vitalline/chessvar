@@ -1773,11 +1773,11 @@ class Board(Window):
                 self.clear_log()
         if symbol == key.D:  # Debug
             debug_log_data = self.debug_info()
-            if modifiers & key.MOD_ACCEL:  # Print debug info
+            if modifiers & key.MOD_ACCEL:  # Save debug info
+                self.save_log(debug_log_data, "debug")
+            if modifiers & key.MOD_SHIFT:  # Print debug info
                 for string in debug_log_data:
                     print(f"[Debug] {string}")
-            if modifiers & key.MOD_SHIFT:  # Save debug info
-                self.save_log(debug_log_data, "debug")
         if symbol == key.SLASH:  # (?) Random
             if self.edit_mode:
                 return
