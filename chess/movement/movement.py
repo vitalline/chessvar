@@ -2,7 +2,6 @@ from __future__ import annotations
 
 from copy import copy, deepcopy
 from math import ceil
-from random import randrange
 from typing import TYPE_CHECKING
 
 from chess.movement.move import Move
@@ -506,4 +505,4 @@ class ProbabilisticMovement(BaseMultiMovement):
                 yield copy(move)
 
     def roll(self):
-        return randrange(len(self.movements))
+        return self.board.roll_rng.randrange(len(self.movements))

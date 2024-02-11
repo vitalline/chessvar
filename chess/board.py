@@ -3,8 +3,8 @@ from datetime import datetime
 from itertools import product, zip_longest
 from math import ceil, sqrt
 from os import curdir, name as os_name, system
-from os.path import abspath, join
-from random import choice, randrange
+from os.path import abspath, isfile, join
+from random import Random
 from typing import Type
 
 from PIL.ImageColor import getrgb
@@ -14,6 +14,7 @@ from arcade import start_render
 
 from chess.color import colors, trickster_colors
 from chess.color import average, darken, desaturate, lighten, saturate
+from chess.config import Config
 from chess.movement import movement
 from chess.movement.move import Move
 from chess.movement.util import Position, add
@@ -228,9 +229,13 @@ min_size = 25
 max_size = 100
 size_step = 5
 
+base_rng = Random()
+max_seed = 2 ** 32 - 1
+
 movements = []
 
 base_dir = abspath(curdir)
+config_path = join(base_dir, 'config.ini')
 
 invalid_chars = ':<>|"?*'
 invalid_chars_trans_table = str.maketrans(invalid_chars, '_' * len(invalid_chars))
@@ -240,6 +245,10 @@ class Board(Window):
 
     def __init__(self):
         # super boring initialization stuff (bluh bluh)
+        self.board_config = Config(config_path)
+        if not isfile(config_path):
+            self.board_config.save(config_path)
+
         self.board_width, self.board_height = board_width, board_height
         self.square_size = default_size
 
@@ -274,6 +283,12 @@ class Board(Window):
         self.move_history = []  # list of moves made so far
         self.future_move_history = []  # list of moves that were undone, in reverse order
         self.roll_history = []  # list of rolls made so far (used for ProbabilisticMovement)
+        self.move_seed = None  # seed for move selection
+        self.move_rng = None  # random number generator for move selection
+        self.roll_seed = None  # seed for probabilistic movement
+        self.roll_rng = None  # random number generator for probabilistic movement
+        self.set_seed = None  # seed for piece set selection
+        self.set_rng = None  # random number generator for piece set selection
         self.turn_side = Side.WHITE  # side whose turn it is
         self.check_side = Side.NONE  # side that is currently in check
         self.castling_threats = set()  # squares that are attacked in a way that prevents castling
@@ -313,6 +328,19 @@ class Board(Window):
         self.piece_sprite_list = SpriteList()  # sprites for the pieces
         self.promotion_area_sprite_list = SpriteList()  # sprites for the promotion area background tiles
         self.promotion_piece_sprite_list = SpriteList()  # sprites for the possible promotion pieces
+
+        # load piece set ids from the config
+        self.piece_set_ids = {side: self.board_config[f'{side.key_name()}id'] for side in self.piece_set_ids}
+
+        # initialize random number seeds and generators
+        self.roll_seed = (
+            self.board_config['roll_seed'] if self.board_config['use_roll_seed'] else base_rng.randint(0, max_seed)
+        )
+        self.roll_rng = Random(self.roll_seed)
+        self.set_seed = (
+            self.board_config['set_seed'] if self.board_config['use_set_seed'] else base_rng.randint(0, max_seed)
+        )
+        self.set_rng = Random(self.set_seed)
 
         # initialize row/column labels
         label_kwargs = {
@@ -441,9 +469,20 @@ class Board(Window):
         else:
             self.future_move_history += self.move_history[::-1]
 
-        if not self.move_history and self.roll_history:
+        if not self.board_config['update_roll_seed']:
+            self.roll_history = []
+
+        update_seed = not self.move_history and self.roll_history
+
+        if update_seed:
             self.roll_history = []
             self.future_move_history = []
+
+        if update or update_seed:
+            if self.board_config['update_roll_seed']:
+                self.roll_seed = self.roll_rng.randint(0, 2 ** 32 - 1)
+
+        self.roll_rng = Random(self.roll_seed)
 
         self.move_history = []
 
@@ -1633,12 +1672,15 @@ class Board(Window):
         if self.held_buttons:
             return
         if symbol == key.R:  # Restart
-            if modifiers & key.MOD_ACCEL and modifiers & key.MOD_SHIFT:  # Randomize piece sets (same for both sides)
-                piece_set = randrange(len(piece_groups))
-                self.piece_set_ids = {side: piece_set for side in self.piece_set_ids}
-                self.reset_board(update=True)
-            elif modifiers & key.MOD_SHIFT:  # Randomize piece sets (separately for each side)
-                self.piece_set_ids = {side: randrange(len(piece_groups)) for side in self.piece_set_ids}
+            if modifiers & key.MOD_SHIFT:  # Randomize piece sets
+                blocked_ids = set(self.piece_set_ids.values()).union(self.board_config['block_ids'])
+                piece_set_ids = list(i for i in range(len(piece_groups)) if i not in blocked_ids)
+                if modifiers & key.MOD_ACCEL:  # Randomize piece sets (same for both sides)
+                    piece_set_ids = self.set_rng.sample(piece_set_ids, 1)
+                    self.piece_set_ids = {side: piece_set_ids[0] for side in self.piece_set_ids}
+                else:  # Randomize piece sets (different for each side)
+                    piece_set_ids = self.set_rng.sample(piece_set_ids, len(self.piece_set_ids))
+                    self.piece_set_ids = {side: set_id for side, set_id in zip(self.piece_set_ids, piece_set_ids)}
                 self.reset_board(update=True)
             elif modifiers & key.MOD_ACCEL:  # Restart with the same piece sets
                 self.reset_board()
@@ -1793,7 +1835,7 @@ class Board(Window):
         if symbol == key.T and modifiers & key.MOD_ACCEL:  # Trickster mode
             if self.color_scheme["scheme_type"] == "cherub":
                 self.trickster_color_index = (
-                    randrange(len(trickster_colors)) + 1 if self.is_trickster_mode(False) else 0
+                    base_rng.randrange(len(trickster_colors)) + 1 if self.is_trickster_mode(False) else 0
                 )
                 self.reset_trickster_mode()
         if symbol == key.Z and modifiers & key.MOD_ACCEL:  # Undo
@@ -1821,7 +1863,7 @@ class Board(Window):
             if modifiers & key.MOD_SHIFT:  # Random piece
                 self.deselect_piece()
                 if self.moves:
-                    self.select_piece(choice(list(self.moves.keys())))
+                    self.select_piece(base_rng.choice(list(self.moves.keys())))
             if modifiers & key.MOD_ACCEL:  # Random move
                 if self.game_over:
                     return
@@ -1831,7 +1873,7 @@ class Board(Window):
                     else sum(self.moves.values(), [])  # Pick from all possible moves
                 )
                 if choices:
-                    random_move = choice(choices)
+                    random_move = base_rng.choice(choices)
                     chained_move = random_move
                     while chained_move:
                         self.update_move(chained_move)
@@ -1935,6 +1977,7 @@ class Board(Window):
         for i, group in enumerate(piece_groups):
             debug_log_data.append(f"ID {i:0{digits}d}: {group['name']}")
         white, black = self.piece_set_ids[Side.WHITE], self.piece_set_ids[Side.BLACK]
+        debug_log_data.append(f"ID blocklist: {', '.join(str(i) for i in self.board_config['block_ids']) or 'None'}")
         debug_log_data.append(
             f"Game: "
             f"(ID {white:0{digits}d}) {piece_groups[white]['name']} vs. "
@@ -2004,6 +2047,8 @@ class Board(Window):
                 debug_log_data.append(f"    {pos}: {value}")
         if not self.roll_history:
             debug_log_data[-1] += " None"
+        debug_log_data.append(f"Roll seed: {self.roll_seed} (update: {self.board_config['update_roll_seed']})")
+        debug_log_data.append(f"Set seed: {self.set_seed}")
         return debug_log_data
 
     def on_resize(self, width: float, height: float):

@@ -7,4 +7,5 @@
 /*.bak/
 /**/debug_*.txt
 /**/log_*.txt
+*.ini
 *.spec

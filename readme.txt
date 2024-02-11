@@ -6,8 +6,8 @@ Tab: select next piece or square
 F11: toggle full screen
 Escape: exit application
 Ctrl + R: start game with current armies
-Shift + R: start game with random armies
-Ctrl + Shift + R: start game with a random army (same for both players)
+Shift + R: start game with new random armies (different for each player)
+Ctrl + Shift + R: start game with a new random army (same for both players)
 Ctrl + [-]: make window smaller (-5px/square)
 Shift + [-]: make window square (use smaller dimension)
 Ctrl + Shift + [-]: make window very small (25px/square)
