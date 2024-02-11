@@ -190,9 +190,11 @@ class PromotablePiece(Piece):
     def move(self, move: Move):
         super().move(move)
         if self.board_pos in self.promotion_squares:
+            if move.is_edit:
+                return
             if not self.promotions:
                 return
-            if move.promotion is not None:
+            if move.promotion and move.promotion is not True:
                 self.board.replace(self, move.promotion)
                 return
             if len(self.promotions) == 1:

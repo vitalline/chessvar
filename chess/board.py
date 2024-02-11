@@ -829,7 +829,8 @@ class Board(Window):
                     self.deselect_piece()
                     return
                 self.update_move(move)
-                move.promotion = None  # do not auto-promote because we are selecting promotion type manually
+                if move.promotion is not None:
+                    move.promotion = True  # do not auto-promote because we are selecting promotion type manually
                 if (
                     (move.chained_move or self.chain_moves.get((move.pos_from, move.pos_to)))
                     and not isinstance(move.movement, movement.CastlingMovement)
