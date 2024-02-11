@@ -962,7 +962,8 @@ class Board(Window):
     def undo_last_move(self) -> None:
         if not self.move_history:
             return
-        if self.promotion_piece is not None:
+        in_promotion = self.promotion_piece is not None
+        if in_promotion:
             if self.move_history and self.future_move_history:
                 past, future = self.move_history[-1], self.future_move_history[-1]
                 if (
@@ -990,9 +991,13 @@ class Board(Window):
                 chained_move = chained_move.chained_move
             for chained_move in move_chain[::-1]:
                 self.undo(chained_move)
+                logged_move = copy(chained_move)
+                if in_promotion:
+                    logged_move.set(promotion=True)
                 self.log(f'''[Ply {self.ply_count}] Undo: {
-                    f"{'Edit' if chained_move.is_edit else 'Move'}: " + str(chained_move)
+                    f"{'Edit' if logged_move.is_edit else 'Move'}: " + str(logged_move)
                 }''')
+                in_promotion = False
             if last_move.promotion is True:
                 if last_move.piece.is_empty():
                     last_move.piece.side = Side.NONE
