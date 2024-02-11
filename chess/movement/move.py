@@ -18,7 +18,7 @@ class Move(object):
             piece: Piece | None = None,
             captured_piece: Piece | None = None,
             swapped_piece: Piece | None = None,
-            promotion: Type[Piece] | None = None,
+            promotion: Type[Piece] | bool | None = None,
             chained_move: Move | bool | None = False,
             is_edit: bool = False
     ):
@@ -40,7 +40,7 @@ class Move(object):
             piece: Piece | None = None,
             captured_piece: Piece | None = None,
             swapped_piece: Piece | None = None,
-            promotion: Type[Piece] | None = None,
+            promotion: Type[Piece] | bool | None = None,
             chained_move: Move | bool | None = None,
             is_edit: bool | None = None
     ) -> Move:
@@ -50,7 +50,7 @@ class Move(object):
         self.movement = movement or self.movement
         self.captured_piece = captured_piece or self.captured_piece
         self.swapped_piece = swapped_piece or self.swapped_piece
-        self.promotion = promotion or self.promotion
+        self.promotion = promotion if promotion is not None else self.promotion
         self.chained_move = chained_move if chained_move is not None else self.chained_move
         self.is_edit = is_edit if is_edit is not None else self.is_edit
         return self
@@ -114,21 +114,25 @@ class Move(object):
         )
 
     def __str__(self) -> str:
-        if self.pos_from is not None and self.pos_to is not None and self.pos_from != self.pos_to:
+        moved = self.pos_from != self.pos_to
+        if self.pos_from is not None and self.pos_to is not None and moved:
             if self.is_edit:
                 string = f"on {to_alpha(self.pos_from)} is moved to {to_alpha(self.pos_to)}"
             else:
                 string = f"on {to_alpha(self.pos_from)} goes to {to_alpha(self.pos_to)}"
-        elif self.pos_from is None or (self.piece and self.piece.is_empty() and self.pos_from == self.pos_to):
-            string = f"appears on {to_alpha(self.pos_to)}"
+        elif self.pos_from is None or (self.piece and self.piece.is_empty() and not moved):
+            if self.promotion is True:
+                string = f"wants something to appear on {to_alpha(self.pos_to)}"
+            else:
+                string = f"appears on {to_alpha(self.pos_to)}"
         elif self.pos_to is None:
             string = f"disappears from {to_alpha(self.pos_from)}"
-        elif self.pos_from == self.pos_to:
+        elif not moved:
             string = f"decides to stay on {to_alpha(self.pos_from)}"
         else:
-            string = 'does something very mysterious'
+            string = "does something very mysterious"
         if self.piece:
-            if self.piece.is_empty() and not (self.promotion and self.pos_from == self.pos_to):
+            if self.piece.is_empty() and not (self.promotion and self.promotion is not True and not moved):
                 string = f"{self.piece.side.name()} {string}"
             elif self.piece.is_empty() and not self.piece.board.should_hide_pieces:
                 string = f"{self.piece.side.name()} {self.promotion.name} {string}"
@@ -150,12 +154,12 @@ class Move(object):
                 string += f", swaps with {self.swapped_piece.side.name()} ???"
             else:
                 string += f", swaps with {self.swapped_piece.side.name()} {self.swapped_piece.name}"
-        if self.promotion and self.pos_from is not None and not (
-            self.piece and self.piece.is_empty() and self.pos_from == self.pos_to
-        ):
+        if self.promotion and self.pos_from is not None and not (self.piece and self.piece.is_empty() and not moved):
             if self.piece:
-                if self.piece.board.should_hide_pieces:
-                    string += f", promotes to ???"
+                if self.promotion is True:
+                    string += f", tries to promote"
+                elif self.piece.board.should_hide_pieces:
+                    string += ", promotes to ???"
                 else:
                     string += f", promotes to {self.promotion.name}"
         return string

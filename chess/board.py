@@ -790,7 +790,7 @@ class Board(Window):
                     if len(self.edit_promotions[side]) == 1:
                         move.set(promotion=self.edit_promotions[side][0])
                     elif len(self.edit_promotions[side]) > 1:
-                        move.set(promotion=move.piece.__class__)
+                        move.set(promotion=True)
                         move.piece.move(move)
                         self.move_history.append(move)
                         self.start_promotion(move.piece, self.edit_promotions[side])
@@ -966,8 +966,8 @@ class Board(Window):
                 past, future = self.move_history[-1], self.future_move_history[-1]
                 if (
                     past.pos_from == future.pos_from and past.pos_to == future.pos_to
-                    and ((past.captured_piece is not None) != (future.swapped_piece is not None))
-                    and ((past.swapped_piece is not None) != (future.captured_piece is not None))
+                    and not (past.captured_piece is not None and future.swapped_piece is not None)
+                    and not (past.swapped_piece is not None and future.captured_piece is not None)
                     and future.promotion is not None
                 ):
                     past.promotion = future.promotion
@@ -992,6 +992,9 @@ class Board(Window):
                 self.log(f'''[Ply {self.ply_count}] Undo: {
                     f"{'Edit' if chained_move.is_edit else 'Move'}: " + str(chained_move)
                 }''')
+            if last_move.promotion is True:
+                if last_move.piece.is_empty():
+                    last_move.piece.side = Side.NONE
             if last_move.is_edit:
                 if not self.edit_mode:
                     self.turn_side = self.turn_side.opponent()
@@ -1018,8 +1021,8 @@ class Board(Window):
                 past, future = self.move_history[-1], self.future_move_history[-1]
                 if (
                     past.pos_from == future.pos_from and past.pos_to == future.pos_to
-                    and ((past.captured_piece is not None) != (future.swapped_piece is not None))
-                    and ((past.swapped_piece is not None) != (future.captured_piece is not None))
+                    and not (past.captured_piece is not None and future.swapped_piece is not None)
+                    and not (past.swapped_piece is not None and future.captured_piece is not None)
                     and future.promotion is not None
                 ):
                     past.promotion = future.promotion
@@ -1037,7 +1040,12 @@ class Board(Window):
         if last_move is None:
             self.log(f"[Ply {self.ply_count}] Redo: Pass: {self.turn_side.opponent().name()}'s turn")
             self.clear_en_passant()
-        elif not piece_was_moved:
+            self.move_history.append(last_move)
+        elif piece_was_moved:
+            self.log(f'''[Ply {self.ply_count}] Redo: {
+            f"{'Edit' if last_move.is_edit else 'Move'}: " + str(last_move)
+            }''')
+        else:
             if last_move.pos_from is not None:
                 self.update_move(last_move)
                 self.update_move(self.future_move_history[-1])
@@ -1063,8 +1071,11 @@ class Board(Window):
                 if history_move:
                     self.update_move(history_move)
             if not isinstance(last_move.piece, abc.PromotablePiece) and last_move.promotion is not None:
-                self.replace(last_move.piece, last_move.promotion)
-        self.move_history.append(last_move)
+                if last_move.promotion is True:
+                    self.start_promotion(last_move.piece, self.edit_promotions[last_move.piece.side])
+                else:
+                    self.replace(last_move.piece, last_move.promotion)
+            self.move_history.append(last_move)
         # do not pop move from future history because compare_history() will do it for us
         if last_move is not None and last_move.is_edit and not self.edit_mode:
             self.turn_side = self.turn_side.opponent()
@@ -1124,7 +1135,18 @@ class Board(Window):
             self.promotion_area_sprite_list.append(background_sprite)
             if promotion is None:
                 continue
-            promotion_piece = promotion(self, pos, piece.side)
+            piece_sets = {}
+            for side in self.piece_sets:
+                piece_group = piece_groups[self.piece_sets[side]]
+                piece_sets[side] = piece_group.get(f"set_{side.key_name()[0]}", piece_group.get('set', [])).copy()
+            promotion_side = piece.side
+            if self.should_hide_pieces == 2:  # if in Penultima mode, mark promotion pieces with their respective sides
+                if promotion not in piece_sets[promotion_side] and promotion not in [fide.Pawn]:
+                    promotion_side = promotion_side.opponent()
+            elif self.should_hide_pieces == 0:  # if in regular mode, mark king replacements with their respective sides
+                if issubclass(promotion, abc.RoyalPiece) and promotion not in piece_sets[promotion_side]:
+                    promotion_side = promotion_side.opponent()
+            promotion_piece = promotion(self, pos, promotion_side)
             self.update_piece(promotion_piece)
             promotion_piece.scale = self.square_size / promotion_piece.texture.width
             promotion_piece.set_color(
