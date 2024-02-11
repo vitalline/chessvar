@@ -286,14 +286,15 @@ class Board(Window):
         self.trickster_color_delta = 0  # but it's not like that's ever going to happen right
         self.trickster_angle_delta = 0  # this is just a normal chess game after all
         self.pieces = []  # list of pieces on the board
-        self.piece_sets = {Side.WHITE: 0, Side.BLACK: 0}  # piece sets to use for each side
+        self.piece_set_ids = {Side.WHITE: 0, Side.BLACK: 0}  # ids of piece sets to use for each side
+        self.piece_sets = {Side.WHITE: [], Side.BLACK: []}  # types of pieces each side starts with
         self.promotions = {Side.WHITE: [], Side.BLACK: []}  # types of pieces each side promote to
         self.edit_promotions = {Side.WHITE: [], Side.BLACK: []}  # types of pieces each side can promote to in edit mode
         self.movable_pieces = {Side.WHITE: [], Side.BLACK: []}  # pieces that can be moved by each side
         self.royal_pieces = {Side.WHITE: [], Side.BLACK: []}  # these have to stay on the board and should be protected
         self.quasi_royal_pieces = {Side.WHITE: [], Side.BLACK: []}  # at least one of these has to stay on the board
         self.probabilistic_pieces = {Side.WHITE: [], Side.BLACK: []}  # pieces that can move probabilistically
-        self.penultima_pieces = {}  # piece textures that are used for penultima mode
+        self.penultima_pieces = {Side.WHITE: {}, Side.BLACK: {}}  # piece textures that are used for penultima mode
         self.moves = {}  # dictionary of valid moves from any square that has a movable piece on it
         self.chain_moves = {}  # dictionary of valid moves that can be chained from a specific move (marked as from/to)
         self.chain_start = None  # move that started the current chain (if any)
@@ -387,15 +388,15 @@ class Board(Window):
 
         self.log(
             f"[Ply {self.ply_count}] Game: "
-            f"{piece_groups[self.piece_sets[Side.WHITE]]['name'] if not self.should_hide_pieces else '???'} vs. "
-            f"{piece_groups[self.piece_sets[Side.BLACK]]['name'] if not self.should_hide_pieces else '???'}"
+            f"{piece_groups[self.piece_set_ids[Side.WHITE]]['name'] if not self.should_hide_pieces else '???'} vs. "
+            f"{piece_groups[self.piece_set_ids[Side.BLACK]]['name'] if not self.should_hide_pieces else '???'}"
         )
         self.ply_count += 1
 
-        piece_sets = {}
-        for side in self.piece_sets:
-            piece_group = piece_groups[self.piece_sets[side]]
-            piece_sets[side] = piece_group.get(f"set_{side.key_name()[0]}", piece_group.get('set', [])).copy()
+        self.piece_sets = {Side.WHITE: [], Side.BLACK: []}
+        for side in self.piece_set_ids:
+            piece_group = piece_groups[self.piece_set_ids[side]]
+            self.piece_sets[side] = piece_group.get(f"set_{side.key_name()[0]}", piece_group.get('set', [])).copy()
 
         if update:
             self.roll_history = []
@@ -404,8 +405,8 @@ class Board(Window):
             for side in self.promotions:
                 used_piece_set = set()
                 for pieces in (
-                        piece_sets[side][3::-1], piece_sets[side.opponent()][3::-1],
-                        piece_sets[side][5:], piece_sets[side.opponent()][5:],
+                        self.piece_sets[side][3::-1], self.piece_sets[side.opponent()][3::-1],
+                        self.piece_sets[side][5:], self.piece_sets[side.opponent()][5:],
                 ):
                     promotion_types = []
                     for piece in pieces:
@@ -417,9 +418,9 @@ class Board(Window):
             for side in self.edit_promotions:
                 used_piece_set = set()
                 for pieces in (
-                    piece_sets[side][3::-1], piece_sets[side.opponent()][3::-1],
-                    piece_sets[side][5:], piece_sets[side.opponent()][5:],
-                    [piece_sets[side.opponent()][4], fide.Pawn, piece_sets[side][4]]
+                    self.piece_sets[side][3::-1], self.piece_sets[side.opponent()][3::-1],
+                    self.piece_sets[side][5:], self.piece_sets[side.opponent()][5:],
+                    [self.piece_sets[side.opponent()][4], fide.Pawn, self.piece_sets[side][4]]
                 ):
                     promotion_types = []
                     for piece in pieces:
@@ -427,11 +428,16 @@ class Board(Window):
                             used_piece_set.add(piece)
                             promotion_types.append(piece)
                     self.edit_promotions[side].extend(promotion_types[::-1])
-            self.penultima_pieces = {}
-            for side in self.piece_sets:
-                for i, piece in enumerate(piece_sets[side]):
-                    if penultima_textures[i]:
-                        self.penultima_pieces[piece] = penultima_textures[i]
+            self.penultima_pieces = {side: {} for side in self.penultima_pieces}
+            for player_side in self.penultima_pieces:
+                for piece_side in (player_side, player_side.opponent()):
+                    for i, piece in enumerate(self.piece_sets[piece_side]):
+                        if penultima_textures[i]:
+                            texture = penultima_textures[i]
+                            if piece_side == player_side.opponent():
+                                texture += 'O'
+                            if piece not in self.penultima_pieces[player_side]:
+                                self.penultima_pieces[player_side][piece] = texture
         else:
             self.future_move_history += self.move_history[::-1]
 
@@ -450,7 +456,7 @@ class Board(Window):
             piece_type = types[row][col]
             piece_side = sides[row][col]
             if isinstance(piece_type, abc.Side):
-                piece_type = piece_sets[piece_side][col]
+                piece_type = self.piece_sets[piece_side][col]
             self.pieces[row].append(
                 piece_type(
                     self, (row, col), piece_side,
@@ -1141,19 +1147,11 @@ class Board(Window):
             self.promotion_area_sprite_list.append(background_sprite)
             if promotion is None:
                 continue
-            piece_sets = {}
-            for side in self.piece_sets:
-                piece_group = piece_groups[self.piece_sets[side]]
-                piece_sets[side] = piece_group.get(f"set_{side.key_name()[0]}", piece_group.get('set', [])).copy()
-            promotion_side = piece.side
-            if self.should_hide_pieces == 2:  # if in Penultima mode, mark promotion pieces with their respective sides
-                if promotion not in piece_sets[promotion_side] and promotion not in [fide.Pawn]:
-                    promotion_side = promotion_side.opponent()
-            elif self.should_hide_pieces == 0:  # if in regular mode, mark king replacements with their respective sides
-                if issubclass(promotion, abc.RoyalPiece) and promotion not in piece_sets[promotion_side]:
-                    promotion_side = promotion_side.opponent()
-            promotion_piece = promotion(self, pos, promotion_side)
-            self.update_piece(promotion_piece)
+            promotion_piece = promotion(self, pos, piece.side)
+            if issubclass(promotion, abc.RoyalPiece) and promotion not in self.piece_sets[piece.side]:
+                self.update_piece(promotion_piece, asset_folder='other')
+            else:
+                self.update_piece(promotion_piece)
             promotion_piece.scale = self.square_size / promotion_piece.texture.width
             promotion_piece.set_color(
                 self.color_scheme.get(
@@ -1359,23 +1357,34 @@ class Board(Window):
             else:
                 self.color_pieces()
 
-    def update_piece(self, piece: abc.Piece) -> None:
-        if self.should_hide_pieces == 1 or (self.should_hide_pieces == 2 and type(piece) in self.penultima_pieces):
-            asset_folder = 'other'
-        else:
-            asset_folder = None
-        if self.should_hide_pieces == 1:
-            file_name = 'ghost'
-        elif self.should_hide_pieces == 2 and type(piece) in self.penultima_pieces:
-            file_name = self.penultima_pieces[type(piece)]
-        else:
-            file_name = None
+    def update_piece(self, piece: abc.Piece, asset_folder: str | None = None, file_name: str | None = None) -> None:
+        penultima_pieces = self.penultima_pieces.get(piece.side, {})
+        if asset_folder is None:
+            if self.should_hide_pieces == 1:
+                asset_folder = 'other'
+            elif self.should_hide_pieces == 2 and type(piece) in penultima_pieces:
+                asset_folder = 'other'
+            else:
+                asset_folder = None
+        if file_name is None:
+            if self.should_hide_pieces == 1:
+                file_name = 'ghost'
+            elif self.should_hide_pieces == 2 and type(piece) in penultima_pieces:
+                file_name = penultima_pieces[type(piece)]
+            else:
+                file_name = None
         hidden = self.should_hide_moves if self.should_hide_moves is not None else bool(self.should_hide_pieces)
         piece.reload(hidden=hidden, asset_folder=asset_folder, file_name=file_name)
 
     def update_pieces(self) -> None:
-        for piece in sum(self.movable_pieces.values(), [*self.promotion_piece_sprite_list]):
+        for piece in sum(self.movable_pieces.values(), []):
             self.update_piece(piece)
+        for piece in self.promotion_piece_sprite_list:
+            if isinstance(piece, abc.Piece) and not piece.is_empty():
+                if isinstance(piece, abc.RoyalPiece) and type(piece) not in self.piece_sets[piece.side]:
+                    self.update_piece(piece, asset_folder='other')
+                else:
+                    self.update_piece(piece)
 
     def is_trickster_mode(self, value: bool = True) -> bool:
         return value == (self.trickster_color_index != 0)
@@ -1626,10 +1635,10 @@ class Board(Window):
         if symbol == key.R:  # Restart
             if modifiers & key.MOD_ACCEL and modifiers & key.MOD_SHIFT:  # Randomize piece sets (same for both sides)
                 piece_set = randrange(len(piece_groups))
-                self.piece_sets = {side: piece_set for side in self.piece_sets}
+                self.piece_set_ids = {side: piece_set for side in self.piece_set_ids}
                 self.reset_board(update=True)
             elif modifiers & key.MOD_SHIFT:  # Randomize piece sets (separately for each side)
-                self.piece_sets = {side: randrange(len(piece_groups)) for side in self.piece_sets}
+                self.piece_set_ids = {side: randrange(len(piece_groups)) for side in self.piece_set_ids}
                 self.reset_board(update=True)
             elif modifiers & key.MOD_ACCEL:  # Restart with the same piece sets
                 self.reset_board()
@@ -1691,7 +1700,7 @@ class Board(Window):
                     self.advance_turn()
             elif modifiers & key.MOD_SHIFT:  # Shift white piece set
                 d = -1 if modifiers & key.MOD_ACCEL else 1
-                self.piece_sets[Side.WHITE] = (self.piece_sets[Side.WHITE] + d) % len(piece_groups)
+                self.piece_set_ids[Side.WHITE] = (self.piece_set_ids[Side.WHITE] + d) % len(piece_groups)
                 self.reset_board(update=True)
         if symbol == key.B:  # Black
             if modifiers & key.MOD_ACCEL and not modifiers & key.MOD_SHIFT:  # Black is in control
@@ -1704,7 +1713,7 @@ class Board(Window):
                     self.advance_turn()
             elif modifiers & key.MOD_SHIFT:  # Shift black piece set
                 d = -1 if modifiers & key.MOD_ACCEL else 1
-                self.piece_sets[Side.BLACK] = (self.piece_sets[Side.BLACK] + d) % len(piece_groups)
+                self.piece_set_ids[Side.BLACK] = (self.piece_set_ids[Side.BLACK] + d) % len(piece_groups)
                 self.reset_board(update=True)
         if symbol == key.N:  # Next
             if modifiers & key.MOD_ACCEL and not modifiers & key.MOD_SHIFT:  # Next player is in control
@@ -1715,13 +1724,13 @@ class Board(Window):
                 self.compare_history()
                 self.advance_turn()
             elif modifiers & key.MOD_SHIFT:
-                if self.piece_sets[Side.WHITE] == self.piece_sets[Side.BLACK]:  # Next piece set
+                if self.piece_set_ids[Side.WHITE] == self.piece_set_ids[Side.BLACK]:  # Next piece set
                     d = -1 if modifiers & key.MOD_ACCEL else 1
-                    self.piece_sets[Side.WHITE] = (self.piece_sets[Side.WHITE] + d) % len(piece_groups)
-                    self.piece_sets[Side.BLACK] = (self.piece_sets[Side.BLACK] + d) % len(piece_groups)
+                    self.piece_set_ids[Side.WHITE] = (self.piece_set_ids[Side.WHITE] + d) % len(piece_groups)
+                    self.piece_set_ids[Side.BLACK] = (self.piece_set_ids[Side.BLACK] + d) % len(piece_groups)
                 else:  # Next player goes first
-                    piece_sets = self.piece_sets[Side.WHITE], self.piece_sets[Side.BLACK]
-                    self.piece_sets[Side.BLACK], self.piece_sets[Side.WHITE] = piece_sets
+                    piece_set_ids = self.piece_set_ids[Side.WHITE], self.piece_set_ids[Side.BLACK]
+                    self.piece_set_ids[Side.BLACK], self.piece_set_ids[Side.WHITE] = piece_set_ids
                 self.reset_board(update=True)
         if symbol == key.F:
             if modifiers & key.MOD_ACCEL:  # Flip
@@ -1751,8 +1760,8 @@ class Board(Window):
                 if self.should_hide_pieces == 0:
                     self.log(
                         f"[Ply {self.ply_count}] Info: Pieces revealed: "
-                        f"{piece_groups[self.piece_sets[Side.WHITE]]['name']} vs. "
-                        f"{piece_groups[self.piece_sets[Side.BLACK]]['name']}"
+                        f"{piece_groups[self.piece_set_ids[Side.WHITE]]['name']} vs. "
+                        f"{piece_groups[self.piece_set_ids[Side.BLACK]]['name']}"
                     )
                 elif self.should_hide_pieces == 1:
                     self.log(f"[Ply {self.ply_count}] Info: Pieces hidden")
@@ -1925,17 +1934,14 @@ class Board(Window):
         digits = len(str(len(piece_groups)))
         for i, group in enumerate(piece_groups):
             debug_log_data.append(f"ID {i:0{digits}d}: {group['name']}")
-        white, black = self.piece_sets[Side.WHITE], self.piece_sets[Side.BLACK]
+        white, black = self.piece_set_ids[Side.WHITE], self.piece_set_ids[Side.BLACK]
         debug_log_data.append(
             f"Game: "
             f"(ID {white:0{digits}d}) {piece_groups[white]['name']} vs. "
             f"(ID {black:0{digits}d}) {piece_groups[black]['name']}"
         )
-        piece_sets = {}
-        for side in self.piece_sets:
-            piece_group = piece_groups[self.piece_sets[side]]
-            piece_sets[side] = piece_group.get(f"set_{side.key_name()[0]}", piece_group.get('set', [])).copy()
-            debug_log_data.append(f"{side.name()} setup: {', '.join(piece.name for piece in piece_sets[side])}")
+        for side in self.piece_set_ids:
+            debug_log_data.append(f"{side.name()} setup: {', '.join(piece.name for piece in self.piece_sets[side])}")
             debug_log_data.append(f"{side.name()} pieces:")
             for piece in self.movable_pieces[side]:
                 debug_log_data.append(f'  {piece.board_pos}: {piece.name}')
