@@ -725,12 +725,19 @@ class Board(Window):
                 if pos in self.promotion_area:
                     self.move_history[-1].set(promotion=self.promotion_area[pos])
                     self.replace(self.promotion_piece, self.promotion_area[pos])
+                    self.load_pieces()
+                    self.update_auto_ranged_pieces(self.move_history[-1], self.turn_side.opponent())
                     self.end_promotion()
-                    self.log(
-                        f"[Ply {self.ply_count}] "
-                        f"{'Edit' if self.move_history[-1].is_edit else 'Move'}: "
-                        f"{self.move_history[-1]}"
-                    )
+                    chained_move = self.move_history[-1]
+                    while chained_move:
+                        self.log(
+                            f"[Ply {self.ply_count}] "
+                            f"{'Edit' if chained_move.is_edit else 'Move'}: "
+                            f"{chained_move}"
+                        )
+                        chained_move = chained_move.chained_move
+                        if chained_move:
+                            self.move(chained_move)
                     self.ply_count += not self.move_history[-1].is_edit
                     self.compare_history()
                     self.advance_turn()
@@ -911,7 +918,7 @@ class Board(Window):
                     while last_move.chained_move:
                         last_move = last_move.chained_move
                     last_move.chained_move = move
-                if move.chained_move is None:
+                if move.chained_move is None and not self.promotion_piece:
                     self.load_all_moves()
                     self.select_piece(move.pos_to)
                 else:
@@ -941,20 +948,27 @@ class Board(Window):
         # This is because the only army using this mechanic only has leaping pieces, so it is not necessary
         # as the situation described can only happen if a piece gained mobility after another piece moved,
         # which can only happen with riders (or lame leapers), of which there are none that can auto-capture.
+        if move.is_edit:
+            return
         auto_ranged_pieces = self.auto_ranged_pieces[side]
-        if isinstance(move.movement, movement.AutoRangedCaptureRiderMovement):
-            auto_ranged_pieces = [move.piece] + [piece for piece in auto_ranged_pieces if piece != move.piece]
+        moved_piece = move.piece
+        if move.promotion and move.promotion is not True and self.promotion_piece:
+            moved_piece = self.get_piece(move.pos_to)
+        if isinstance(moved_piece.movement, movement.AutoRangedCaptureRiderMovement):
+            auto_ranged_pieces = [moved_piece] + [piece for piece in auto_ranged_pieces if piece != moved_piece]
         captures = {}
         captured = set()
         for piece in auto_ranged_pieces:
-            pos_from = piece.board_pos if piece != move.piece else move.pos_to
+            pos_from = piece.board_pos if piece != moved_piece else move.pos_to
             if pos_from in captured:
                 continue
             for capture in piece.movement.moves(pos_from, piece):
                 if move.pos_to == capture.pos_to:
-                    captured_piece = move.piece
+                    captured_piece = moved_piece
                 else:
                     captured_piece = self.get_piece(capture.pos_to)
+                if capture.pos_to == move.pos_from:
+                    continue
                 if captured_piece.side == piece.side.opponent():
                     if capture.pos_to in captured:
                         continue
@@ -1126,6 +1140,8 @@ class Board(Window):
                 ):
                     past.promotion = future.promotion
                     self.replace(self.promotion_piece, future.promotion)
+                    self.load_pieces()
+                    self.update_auto_ranged_pieces(self.move_history[-1], self.turn_side.opponent())
                     self.end_promotion()
                 else:
                     return
@@ -1141,9 +1157,14 @@ class Board(Window):
             self.clear_en_passant()
             self.move_history.append(last_move)
         elif piece_was_moved:
-            self.log(f'''[Ply {self.ply_count}] Redo: {
-            f"{'Edit' if last_move.is_edit else 'Move'}: " + str(last_move)
-            }''')
+            chained_move = last_move
+            while chained_move:
+                self.log(f'''[Ply {self.ply_count}] Redo: {
+                f"{'Edit' if chained_move.is_edit else 'Move'}: " + str(chained_move)
+                }''')
+                chained_move = chained_move.chained_move
+                if chained_move:
+                    self.move(chained_move)
         else:
             if last_move.pos_from is not None:
                 self.update_move(last_move)
@@ -1171,11 +1192,15 @@ class Board(Window):
                     self.update_move(chained_move)
                 if history_move:
                     self.update_move(history_move)
-            if not isinstance(last_move.piece, abc.PromotablePiece) and last_move.promotion is not None:
-                if last_move.promotion is True:
-                    self.start_promotion(last_move.piece, self.edit_promotions[last_move.piece.side])
-                else:
-                    self.replace(last_move.piece, last_move.promotion)
+                if not isinstance(chained_move.piece, abc.PromotablePiece) and chained_move.promotion is not None:
+                    if chained_move.promotion is True:
+                        self.start_promotion(chained_move.piece, self.edit_promotions[chained_move.piece.side])
+                    else:
+                        self.promotion_piece = True
+                        self.replace(chained_move.piece, chained_move.promotion)
+                        self.load_pieces()
+                        self.update_auto_ranged_pieces(chained_move, self.turn_side.opponent())
+                        self.promotion_piece = None
             self.move_history.append(last_move)
         # do not pop move from future history because compare_history() will do it for us
         turn_side = self.turn_side
@@ -1317,12 +1342,6 @@ class Board(Window):
         if self.edit_mode:
             self.color_pieces()  # reverting the piece colors to normal in case they were changed
             return  # let's not advance the turn while editing the board to hopefully make things easier for everyone
-        pass_check_side = Side.NONE
-        if self.move_history and (self.move_history[-1] is None or self.move_history[-1].is_edit):
-            self.load_check()  # here's something that can only happen if the board was edited or the turn was passed:
-            if self.check_side == self.turn_side:  # if the player is in check at the end of their turn, the game ends
-                self.game_over = True
-                pass_check_side = self.check_side
         if self.move_history and self.move_history[-1] and self.move_history[-1].is_edit:
             # if the board was edited, reset probabilistic moves because they would need to be recalculated
             self.roll_history = self.roll_history[:self.ply_count - 1]
@@ -1331,14 +1350,9 @@ class Board(Window):
         self.show_moves()
         if not sum(self.moves.get(self.turn_side, {}).values(), []):
             self.game_over = True
-        if pass_check_side:
-            self.check_side = pass_check_side
         if self.game_over:
             # the game has ended. let's find out who won and show it by changing piece colors
-            if pass_check_side:
-                # the last player was in check and passed the turn, the game ends and the current player wins
-                self.log(f"[Ply {self.ply_count}] Info: Game over! {pass_check_side.opponent().name()} wins.")
-            elif self.check_side:
+            if self.check_side:
                 # the current player was checkmated, the game ends and the opponent wins
                 self.log(f"[Ply {self.ply_count}] Info: Checkmate! {self.check_side.opponent().name()} wins.")
             else:
@@ -1559,11 +1573,23 @@ class Board(Window):
                         self.update_move(move)
                         self.update_auto_ranged_pieces(move, turn_side.opponent())
                         self.move(move)
+                        if move.promotion and move.promotion is not True:
+                            self.promotion_piece = True
+                            self.replace(move.piece, move.promotion)
+                            self.load_pieces()
+                            self.update_auto_ranged_pieces(move, turn_side.opponent())
+                            self.promotion_piece = None
                         move_chain = [move]
                         chained_move = move.chained_move
                         while chained_move:
                             self.update_move(chained_move)
                             self.move(chained_move)
+                            if chained_move.promotion and chained_move.promotion is not True:
+                                self.promotion_piece = True
+                                self.replace(chained_move.piece, chained_move.promotion)
+                                self.load_pieces()
+                                self.update_auto_ranged_pieces(chained_move, turn_side.opponent())
+                                self.promotion_piece = None
                             move_chain.append(chained_move)
                             chained_move = chained_move.chained_move
                         self.ply_simulation += 1
@@ -1571,6 +1597,9 @@ class Board(Window):
                         self.ply_simulation -= 1
                         if royal_pieces[turn_side] and not self.royal_pieces[turn_side]:
                             self.check_side = turn_side
+                        if royal_pieces[self.turn_side.opponent()] and not self.royal_pieces[self.turn_side.opponent()]:
+                            check_side = self.turn_side.opponent()
+                            self.game_over = True
                         if self.check_side != turn_side:
                             self.moves[turn_side].setdefault(move.pos_from, []).append(move)
                             if move.chained_move:
@@ -1594,6 +1623,8 @@ class Board(Window):
                 if moves_exist is None:
                     moves_exist = False
                 final_check = True
+                if self.game_over:
+                    break
                 if turn_side == self.turn_side and probabilistic_pieces[turn_side] and generate_rolls:
                     if len(self.roll_history) < self.ply_count:
                         self.roll_history.append({})
@@ -1694,9 +1725,12 @@ class Board(Window):
             self.ply_simulation += 1
             for piece in self.movable_pieces[self.turn_side.opponent()]:
                 for move in piece.moves():
-                    self.update_move(move)
-                    self.update_auto_ranged_pieces(move, self.turn_side)
-                    last_move = move
+                    last_move = copy(move)
+                    self.update_move(last_move)
+                    if last_move.promotion and last_move.promotion is not True and not last_move.is_edit:
+                        new_piece = last_move.promotion(self, last_move.pos_to, last_move.piece.side)
+                        last_move.piece = new_piece
+                    self.update_auto_ranged_pieces(last_move, self.turn_side)
                     while last_move:
                         if last_move.pos_to == royal.board_pos or last_move.captured_piece == royal:
                             self.check_side = self.turn_side
@@ -1846,6 +1880,8 @@ class Board(Window):
                     self.clear_en_passant()
                     self.compare_history()
                     self.advance_turn()
+                    if self.edit_mode:
+                        self.turn_side = self.turn_side.opponent()
             elif modifiers & key.MOD_SHIFT:  # Shift white piece set
                 d = -1 if modifiers & key.MOD_ACCEL else 1
                 self.piece_set_ids[Side.WHITE] = (self.piece_set_ids[Side.WHITE] + d) % len(piece_groups)
@@ -1859,6 +1895,8 @@ class Board(Window):
                     self.clear_en_passant()
                     self.compare_history()
                     self.advance_turn()
+                    if self.edit_mode:
+                        self.turn_side = self.turn_side.opponent()
             elif modifiers & key.MOD_SHIFT:  # Shift black piece set
                 d = -1 if modifiers & key.MOD_ACCEL else 1
                 self.piece_set_ids[Side.BLACK] = (self.piece_set_ids[Side.BLACK] + d) % len(piece_groups)
@@ -1871,6 +1909,8 @@ class Board(Window):
                 self.clear_en_passant()
                 self.compare_history()
                 self.advance_turn()
+                if self.edit_mode:
+                    self.turn_side = self.turn_side.opponent()
             elif modifiers & key.MOD_SHIFT:
                 if self.piece_set_ids[Side.WHITE] == self.piece_set_ids[Side.BLACK]:  # Next piece set
                     d = -1 if modifiers & key.MOD_ACCEL else 1
