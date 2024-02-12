@@ -236,6 +236,31 @@ class RangedCaptureRiderMovement(RiderMovement):
         return super().stop_condition(move, direction, piece, theoretical)
 
 
+class RangedAutoCaptureRiderMovement(RiderMovement):
+    def __init__(self, board: Board, directions: list[AnyDirection]):
+        super().__init__(board, directions)
+
+    def moves(self, pos_from: Position, piece: Piece, theoretical: bool = False):
+        for move in super().moves(pos_from, piece, theoretical):
+            if not theoretical:
+                captures = {}
+                for capture in super().moves(move.pos_to, piece):
+                    captured_piece = self.board.get_piece(capture.pos_to)
+                    if captured_piece.side == piece.side.opponent():
+                        captures[capture.pos_to] = copy(capture)
+                        captures[capture.pos_to].set(piece=piece, pos_to=move.pos_to, captured_piece=captured_piece)
+                last_chain_move = move
+                for capture_pos_to in sorted(captures):
+                    last_chain_move.chained_move = captures[capture_pos_to]
+                    last_chain_move = last_chain_move.chained_move
+            yield move
+
+
+class AutoRangedCaptureRiderMovement(RiderMovement):
+    def __init__(self, board: Board, directions: list[AnyDirection]):
+        super().__init__(board, directions)
+
+
 class CastlingMovement(BaseMovement):
     def __init__(
             self,
