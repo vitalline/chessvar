@@ -33,7 +33,7 @@ class SineRdr(Piece):
     asset_folder = 'starbound'
 
     def __init__(self, board, board_pos, side):
-        movements = [movement.RiderMovement(board, symv([(1, 0), (0, 1), (-1, 1)]))]
+        movements = [movement.RiderMovement(board, symv([(0, 1), (-1, 1)]))]
         for i, j in rot([(1, 1)]):
             movements.append(
                 movement.BentMovement(board, [
