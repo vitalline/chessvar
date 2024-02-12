@@ -499,7 +499,7 @@ class ProbabilisticMovement(BaseMultiMovement):
             except IndexError:
                 movements = self.movements
             except KeyError:
-                pass
+                movements = self.movements
         for movement in movements:
             for move in movement.moves(pos_from, piece, theoretical):
                 yield copy(move)

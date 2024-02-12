@@ -310,10 +310,14 @@ class Board(Window):
         self.quasi_royal_pieces = {Side.WHITE: [], Side.BLACK: []}  # at least one of these has to stay on the board
         self.probabilistic_pieces = {Side.WHITE: [], Side.BLACK: []}  # pieces that can move probabilistically
         self.penultima_pieces = {Side.WHITE: {}, Side.BLACK: {}}  # piece textures that are used for penultima mode
-        self.moves = {}  # dictionary of valid moves from any square that has a movable piece on it
-        self.chain_moves = {}  # dictionary of valid moves that can be chained from a specific move (marked as from/to)
+        self.moves = {Side.WHITE: {}, Side.BLACK: {}}  # dictionary of valid moves from any square
+        self.chain_moves = {Side.WHITE: {}, Side.BLACK: {}}  # dictionary of moves chained from a certain move (from/to)
         self.chain_start = None  # move that started the current chain (if any)
-        self.theoretical_moves = {}  # dictionary of theoretical moves from any square that has an opposing piece on it
+        self.theoretical_moves = {Side.WHITE: {}, Side.BLACK: {}}  # dictionary of theoretical moves from any square
+        self.moves_queried = {Side.WHITE: False, Side.BLACK: False}  # whether moves have been queried for each side
+        self.theoretical_moves_queried = {Side.WHITE: False, Side.BLACK: False}  # same for theoretical moves
+        self.display_moves = {Side.WHITE: False, Side.BLACK: False}  # whether to display moves for each side
+        self.display_theoretical_moves = {Side.WHITE: False, Side.BLACK: False}  # same for theoretical moves
         self.anchor = 0, 0  # used to have the board scale from the origin instead of the center
         self.highlight = Sprite("assets/util/selection.png")  # sprite for the highlight marker
         self.highlight.color = self.color_scheme["highlight_color"]  # color it according to the color scheme
@@ -587,7 +591,7 @@ class Board(Window):
         return self.not_a_piece(self.selected_square)
 
     def find_move(self, pos_from: Position, pos_to: Position) -> Move | None:
-        for move in self.moves.get(pos_from, ()):
+        for move in self.moves.get(self.turn_side, {}).get(pos_from, ()):
             if move.pos_from == move.pos_to:
                 if move.captured_piece is None and pos_to == move.pos_to:
                     return copy(move)
@@ -622,8 +626,12 @@ class Board(Window):
         if not self.not_on_board(pos):
             piece = self.get_piece(pos)
             if not piece.is_empty() and not piece.is_hidden:
-                theoretical = piece.side == self.turn_side.opponent()
-                move_dict = self.theoretical_moves if theoretical else self.moves
+                if self.display_theoretical_moves[piece.side]:
+                    move_dict = self.theoretical_moves.get(piece.side, {})
+                elif self.display_moves[piece.side]:
+                    move_dict = self.moves.get(piece.side, {})
+                else:
+                    move_dict = {}
                 for move in move_dict.get(pos, ()):
                     capture = move.captured_piece
                     pos_to = capture.board_pos if move.pos_from == move.pos_to and capture is not None else move.pos_to
@@ -735,7 +743,9 @@ class Board(Window):
                     self.square_was_clicked = True
                     self.clicked_square = pos
                     return
-                if pos not in {move.pos_to for move in self.moves.get(self.selected_square, ())}:
+                if pos not in {
+                    move.pos_to for move in self.moves.get(self.turn_side, {}).get(self.selected_square, ())
+                }:
                     self.deselect_piece()
             if (
                 pos != self.selected_square
@@ -877,7 +887,7 @@ class Board(Window):
                 if move.promotion is not None:
                     move.promotion = True  # do not auto-promote because we are selecting promotion type manually
                 if (
-                    (move.chained_move or self.chain_moves.get((move.pos_from, move.pos_to)))
+                    (move.chained_move or self.chain_moves.get(self.turn_side, {}).get((move.pos_from, move.pos_to)))
                     and not isinstance(move.movement, movement.CastlingMovement)
                 ):
                     move.chained_move = None  # do not chain moves because we are selecting chained move manually
@@ -1128,11 +1138,12 @@ class Board(Window):
                     self.replace(last_move.piece, last_move.promotion)
             self.move_history.append(last_move)
         # do not pop move from future history because compare_history() will do it for us
+        turn_side = self.turn_side
         if last_move is not None and last_move.is_edit and not self.edit_mode:
             self.turn_side = self.turn_side.opponent()
         if (
             last_chain_move is None or last_chain_move.chained_move is False
-            or not self.chain_moves.get((last_chain_move.pos_from, last_chain_move.pos_to))
+            or not self.chain_moves.get(turn_side, {}).get((last_chain_move.pos_from, last_chain_move.pos_to))
         ):
             if self.promotion_piece is None:
                 self.ply_count += 1 if last_move is None else not last_move.is_edit
@@ -1278,7 +1289,7 @@ class Board(Window):
         self.turn_side = self.turn_side.opponent()
         self.load_all_moves()  # this updates the check status as well
         self.show_moves()
-        if not sum(self.moves.values(), []):
+        if not sum(self.moves.get(self.turn_side, {}).values(), []):
             self.game_over = True
         if pass_check_side:
             self.check_side = pass_check_side
@@ -1455,7 +1466,15 @@ class Board(Window):
                 if isinstance(sprite, abc.Piece) and not sprite.is_empty():
                     sprite.angle = 0
 
-    def load_all_moves(self) -> None:
+    def load_all_moves(
+            self,
+            force_reload: bool = True,
+            moves_for: Side | None = None,
+            theoretical_moves_for:  Side | None = None
+    ) -> None:
+        if force_reload:
+            self.moves_queried = {side: False for side in self.moves_queried}
+            self.theoretical_moves_queried = {side: False for side in self.theoretical_moves_queried}
         self.load_check()
         movable_pieces = {side: self.movable_pieces[side].copy() for side in self.movable_pieces}
         royal_pieces = {side: self.royal_pieces[side].copy() for side in self.royal_pieces}
@@ -1469,65 +1488,97 @@ class Board(Window):
         if last_chain_move:
             while last_chain_move.chained_move:
                 last_chain_move = last_chain_move.chained_move
-        chain_moves = (
-            self.chain_moves[(last_chain_move.pos_from, last_chain_move.pos_to)]
-            if last_chain_move is not None else None
-        )
-        self.moves = {}
-        self.chain_moves = {}
-        generate_rolls = len(self.roll_history) < self.ply_count
-        final_check = False
-        moves_exist = None
-        iterations = 0
-        while not final_check:
-            rolled_moves_exist = False
-            for piece in movable_pieces[self.turn_side] if chain_moves is None else [last_chain_move.piece]:
-                for move in piece.moves() if chain_moves is None else chain_moves:
-                    self.update_move(move)
-                    self.move(move)
-                    move_chain = [move]
-                    chained_move = move.chained_move
-                    while chained_move:
-                        self.update_move(chained_move)
-                        self.move(chained_move)
-                        move_chain.append(chained_move)
-                        chained_move = chained_move.chained_move
-                    self.ply_simulation += 1
-                    self.load_check()
-                    self.ply_simulation -= 1
-                    if self.check_side != self.turn_side:
-                        self.moves.setdefault(move.pos_from, []).append(move)
-                        if move.chained_move:
-                            self.chain_moves.setdefault((move.pos_from, move.pos_to), []).append(move.chained_move)
-                        if moves_exist is None:
-                            moves_exist = True
-                        rolled_moves_exist = True
-                    for chained_move in move_chain[::-1]:
-                        self.undo(chained_move)
-                    self.check_side = check_side
-                    self.castling_threats = castling_threats.copy()
-                    if en_passant_target is not None:
-                        self.en_passant_target = en_passant_target
-                        self.en_passant_markers = en_passant_markers.copy()
-                        for marker in self.en_passant_markers:
-                            self.mark_en_passant(self.en_passant_target.board_pos, marker)
-            if moves_exist is None:
-                moves_exist = False
-            final_check = True
-            if probabilistic_pieces[self.turn_side] and generate_rolls:
-                if len(self.roll_history) < self.ply_count:
-                    self.roll_history.append({})
-                if moves_exist and (not iterations or not rolled_moves_exist):
-                    for piece in probabilistic_pieces[self.turn_side]:
-                        self.roll_history[-1][piece.board_pos] = piece.movement.roll()
-                    self.moves = {}
-                    self.chain_moves = {}
-                    final_check = False
-                    iterations += 1
-        self.theoretical_moves = {}
-        for piece in movable_pieces[self.turn_side.opponent()]:
-            for move in piece.moves(theoretical=True):
-                self.theoretical_moves.setdefault(move.pos_from, []).append(move)
+        if moves_for is None:
+            moves_for = self.turn_side
+        if moves_for == Side.ANY:
+            turn_sides = [Side.WHITE, Side.BLACK]
+        elif moves_for == Side.NONE:
+            turn_sides = []
+        else:
+            turn_sides = [moves_for]
+        self.display_moves = {side: False for side in self.display_moves}
+        for turn_side in turn_sides:
+            self.display_moves[turn_side] = True
+            if self.moves_queried.get(turn_side, False):
+                continue
+            chain_moves = (
+                self.chain_moves.get(turn_side, {}).get((last_chain_move.pos_from, last_chain_move.pos_to), None)
+                if last_chain_move is not None else None
+            )
+            self.moves[turn_side] = {}
+            self.chain_moves[turn_side] = {}
+            generate_rolls = len(self.roll_history) < self.ply_count
+            final_check = False
+            moves_exist = None
+            iterations = 0
+            while not final_check:
+                rolled_moves_exist = False
+                for piece in movable_pieces[turn_side] if chain_moves is None else [last_chain_move.piece]:
+                    for move in piece.moves() if chain_moves is None else chain_moves:
+                        self.update_move(move)
+                        self.move(move)
+                        move_chain = [move]
+                        chained_move = move.chained_move
+                        while chained_move:
+                            self.update_move(chained_move)
+                            self.move(chained_move)
+                            move_chain.append(chained_move)
+                            chained_move = chained_move.chained_move
+                        self.ply_simulation += 1
+                        self.load_check()
+                        self.ply_simulation -= 1
+                        if self.check_side != turn_side:
+                            self.moves[turn_side].setdefault(move.pos_from, []).append(move)
+                            if move.chained_move:
+                                (
+                                    self.chain_moves[turn_side]
+                                    .setdefault((move.pos_from, move.pos_to), [])
+                                    .append(move.chained_move)
+                                )
+                            if moves_exist is None:
+                                moves_exist = True
+                            rolled_moves_exist = True
+                        for chained_move in move_chain[::-1]:
+                            self.undo(chained_move)
+                        self.check_side = check_side
+                        self.castling_threats = castling_threats.copy()
+                        if en_passant_target is not None:
+                            self.en_passant_target = en_passant_target
+                            self.en_passant_markers = en_passant_markers.copy()
+                            for marker in self.en_passant_markers:
+                                self.mark_en_passant(self.en_passant_target.board_pos, marker)
+                if moves_exist is None:
+                    moves_exist = False
+                final_check = True
+                if turn_side == self.turn_side and probabilistic_pieces[turn_side] and generate_rolls:
+                    if len(self.roll_history) < self.ply_count:
+                        self.roll_history.append({})
+                    if moves_exist and (not iterations or not rolled_moves_exist):
+                        for piece in probabilistic_pieces[turn_side]:
+                            self.roll_history[-1][piece.board_pos] = piece.movement.roll()
+                        self.moves[turn_side] = {}
+                        self.chain_moves[turn_side] = {}
+                        final_check = False
+                        iterations += 1
+            self.moves_queried[turn_side] = True
+        if theoretical_moves_for is None:
+            theoretical_moves_for = self.turn_side.opponent()
+        if theoretical_moves_for == Side.ANY:
+            turn_sides = [Side.WHITE, Side.BLACK]
+        elif theoretical_moves_for == Side.NONE:
+            turn_sides = []
+        else:
+            turn_sides = [theoretical_moves_for]
+        self.display_theoretical_moves = {side: False for side in self.display_theoretical_moves}
+        for turn_side in turn_sides:
+            self.display_theoretical_moves[turn_side] = True
+            if self.theoretical_moves_queried.get(turn_side, False):
+                continue
+            self.theoretical_moves[turn_side] = {}
+            for piece in movable_pieces[turn_side]:
+                for move in piece.moves(theoretical=True):
+                    self.theoretical_moves[turn_side].setdefault(move.pos_from, []).append(move)
+            self.theoretical_moves_queried[turn_side] = True
         self.movable_pieces = movable_pieces
         self.royal_pieces = royal_pieces
         self.quasi_royal_pieces = quasi_royal_pieces
@@ -1538,7 +1589,7 @@ class Board(Window):
     def unique_moves(self) -> list[Move]:
         move_list = []
         data_set = set()
-        for move in sum(self.moves.values(), []):
+        for move in sum(self.moves.get(self.turn_side, {}).values(), []):
             move_data = []
             while move:
                 move_data.append(move.pos_from)
@@ -1653,7 +1704,7 @@ class Board(Window):
             if not self.selected_square:
                 positions = {piece.board_pos for piece in self.movable_pieces[side]}
             elif not self.edit_mode:
-                positions = {move.pos_to for move in self.moves.get(self.selected_square, {})}
+                positions = {move.pos_to for move in self.moves.get(self.turn_side, {}).get(self.selected_square, {})}
             else:
                 positions = set(product(range(self.board_height), range(self.board_width)))
             if not positions:
@@ -1722,9 +1773,9 @@ class Board(Window):
             if self.edit_mode:
                 self.compare_history()
                 self.advance_turn()
-                self.moves = {}
-                self.chain_moves = {}
-                self.theoretical_moves = {}
+                self.moves = {side: {} for side in self.moves}
+                self.chain_moves = {side: {} for side in self.chain_moves}
+                self.theoretical_moves = {side: {} for side in self.theoretical_moves}
                 self.show_moves()
             else:
                 self.turn_side = self.turn_side.opponent()
@@ -1832,6 +1883,17 @@ class Board(Window):
                     self.should_hide_moves = old_should_hide_moves
                 self.update_pieces()
                 self.show_moves()
+        if symbol == key.K:  # Move markers
+            selected_square = self.selected_square
+            if modifiers & key.MOD_ACCEL and modifiers & key.MOD_SHIFT:  # Default
+                self.load_all_moves(False)
+            elif modifiers & key.MOD_ACCEL:  # Valid moves
+                self.load_all_moves(False, Side.ANY, Side.NONE)
+            elif modifiers & key.MOD_SHIFT:  # Theoretical moves
+                self.load_all_moves(False, Side.NONE, Side.ANY)
+            if selected_square:
+                self.select_piece(selected_square)
+            self.show_moves()
         if symbol == key.T and modifiers & key.MOD_ACCEL:  # Trickster mode
             if self.color_scheme["scheme_type"] == "cherub":
                 self.trickster_color_index = (
@@ -1860,17 +1922,18 @@ class Board(Window):
         if symbol == key.SLASH:  # (?) Random
             if self.edit_mode:
                 return
+            moves = self.moves.get(self.turn_side, {})
             if modifiers & key.MOD_SHIFT:  # Random piece
                 self.deselect_piece()
-                if self.moves:
-                    self.select_piece(base_rng.choice(list(self.moves.keys())))
+                if moves:
+                    self.select_piece(base_rng.choice(list(moves.keys())))
             if modifiers & key.MOD_ACCEL:  # Random move
                 if self.game_over:
                     return
                 choices = (
-                    self.moves.get(self.selected_square, [])
-                    if self.selected_square            # Pick from moves of selected piece
-                    else sum(self.moves.values(), [])  # Pick from all possible moves
+                    moves.get(self.selected_square, [])
+                    if self.selected_square       # Pick from moves of selected piece
+                    else sum(moves.values(), [])  # Pick from all possible moves
                 )
                 if choices:
                     random_move = base_rng.choice(choices)
@@ -2018,7 +2081,7 @@ class Board(Window):
         debug_log_data.append(f"Current ply: {self.ply_count}")
         debug_log_data.append(f"Actions made: {len(self.move_history)}")
         debug_log_data.append(f"Future actions: {len(self.future_move_history)}")
-        debug_log_data.append(f"Moves possible: {len(sum(self.moves.values(), []))}")
+        debug_log_data.append(f"Moves possible: {len(sum(self.moves[self.turn_side].values(), []))}")
         debug_log_data.append(f"Unique moves: {len(self.unique_moves())}")
         debug_log_data.append(f"Check side: {self.check_side.name() if self.check_side else 'None'}")
         debug_log_data.append(f"Game over: {self.game_over}")
