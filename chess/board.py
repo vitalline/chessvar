@@ -335,7 +335,7 @@ class Board(Window):
         self.promotion_piece_sprite_list = SpriteList()  # sprites for the possible promotion pieces
 
         # load piece set ids from the config
-        self.piece_set_ids = {side: self.board_config[f'{side.key_name()}id'] for side in self.piece_set_ids}
+        self.piece_set_ids = {side: self.board_config[f'{side.key()}id'] for side in self.piece_set_ids}
 
         # initialize random number seeds and generators
         self.roll_seed = (
@@ -429,7 +429,7 @@ class Board(Window):
         self.piece_sets = {Side.WHITE: [], Side.BLACK: []}
         for side in self.piece_set_ids:
             piece_group = piece_groups[self.piece_set_ids[side]]
-            self.piece_sets[side] = piece_group.get(f"set_{side.key_name()[0]}", piece_group.get('set', [])).copy()
+            self.piece_sets[side] = piece_group.get(f"set_{side.key()[0]}", piece_group.get('set', [])).copy()
 
         if update:
             self.roll_history = []
@@ -515,7 +515,7 @@ class Board(Window):
             self.update_piece(self.pieces[row][col])
             self.pieces[row][col].set_color(
                 self.color_scheme.get(
-                    f"{self.pieces[row][col].side.key_name()}piece_color",
+                    f"{self.pieces[row][col].side.key()}piece_color",
                     self.color_scheme["piece_color"]
                 ),
                 self.color_scheme["colored_pieces"]
@@ -962,7 +962,7 @@ class Board(Window):
             pos_from = piece.board_pos if piece != moved_piece else move.pos_to
             if pos_from in captured:
                 continue
-            for capture in piece.movement.moves(pos_from, piece):
+            for capture in piece.movement.moves(pos_from, piece, True):
                 if move.pos_to == capture.pos_to:
                     captured_piece = moved_piece
                 else:
@@ -1067,6 +1067,7 @@ class Board(Window):
             (move.piece or move).movement.undo(move, move.piece)
 
     def undo_last_move(self) -> None:
+        self.deselect_piece()
         if not self.move_history:
             return
         in_promotion = self.promotion_piece is not None
@@ -1112,7 +1113,7 @@ class Board(Window):
                 if not self.edit_mode:
                     self.turn_side = self.turn_side.opponent()
         else:
-            self.log(f"[Ply {self.ply_count}] Undo: Pass: {self.turn_side.name()}'s turn")
+            self.log(f"[Ply {self.ply_count}] Undo: Pass: {self.turn_side}'s turn")
         if self.move_history:
             move = self.move_history[-1]
             if move is not None and (not move.is_edit or (move.pos_from == move.pos_to and move.promotion is None)):
@@ -1125,9 +1126,15 @@ class Board(Window):
             self.load_all_moves()
         self.chain_start = None
         self.future_move_history = future_move_history
-        self.future_move_history.append(last_move)
+        if self.move_history:
+            copies = [copy(move).set(chained_move=False) for move in (self.move_history[-1], last_move)]
+            if not copies[0].matches(copies[1]):
+                self.future_move_history.append(last_move)
+        else:
+            self.future_move_history.append(last_move)
 
     def redo_last_move(self) -> None:
+        self.deselect_piece()
         piece_was_moved = False
         if self.promotion_piece is not None:
             if self.move_history and self.future_move_history:
@@ -1150,10 +1157,28 @@ class Board(Window):
             piece_was_moved = True
         if not self.future_move_history:
             return
-        last_move = copy(self.future_move_history[-1])
+        last_history_move = self.future_move_history[-1]
+        last_move = last_history_move
+        if self.chain_start:
+            if not last_history_move:
+                return
+            last_chain_move = self.chain_start
+            while last_chain_move:
+                if last_history_move:
+                    copies = [copy(move).set(chained_move=False) for move in (last_history_move, last_chain_move)]
+                    if not copies[0].matches(copies[1]):
+                        return
+                    last_history_move = last_history_move.chained_move
+                    last_chain_move = last_chain_move.chained_move
+                else:
+                    return
+            if last_history_move:
+                last_move = last_history_move
+            else:
+                return
         last_chain_move = last_move
-        if last_move is None:
-            self.log(f"[Ply {self.ply_count}] Redo: Pass: {self.turn_side.opponent().name()}'s turn")
+        if self.future_move_history[-1] is None:
+            self.log(f"[Ply {self.ply_count}] Redo: Pass: {self.turn_side.opponent()}'s turn")
             self.clear_en_passant()
             self.move_history.append(last_move)
         elif piece_was_moved:
@@ -1169,14 +1194,11 @@ class Board(Window):
             if last_move.pos_from is not None:
                 self.update_move(last_move)
                 self.update_auto_ranged_pieces(last_move, self.turn_side.opponent())
-                self.update_move(self.future_move_history[-1])
-                self.update_auto_ranged_pieces(self.future_move_history[-1], self.turn_side.opponent())
                 side = self.get_side(last_move.pos_from)
                 if not side:
                     side = Side.WHITE if last_move.pos_from[0] < self.board_height / 2 else Side.BLACK
                     last_move.piece.side = side
             chained_move = last_move
-            history_move = self.future_move_history[-1]
             while chained_move:
                 chained_move = copy(chained_move)
                 chained_move.piece.move(chained_move)
@@ -1186,22 +1208,26 @@ class Board(Window):
                 last_chain_move = chained_move
                 if chained_move:
                     chained_move = chained_move.chained_move
-                if history_move:
-                    history_move = history_move.chained_move
                 if chained_move:
                     self.update_move(chained_move)
-                if history_move:
-                    self.update_move(history_move)
-                if not isinstance(chained_move.piece, abc.PromotablePiece) and chained_move.promotion is not None:
-                    if chained_move.promotion is True:
-                        self.start_promotion(chained_move.piece, self.edit_promotions[chained_move.piece.side])
-                    else:
-                        self.promotion_piece = True
-                        self.replace(chained_move.piece, chained_move.promotion)
-                        self.load_pieces()
-                        self.update_auto_ranged_pieces(chained_move, self.turn_side.opponent())
-                        self.promotion_piece = None
-            self.move_history.append(last_move)
+                if chained_move:
+                    if not isinstance(chained_move.piece, abc.PromotablePiece) and chained_move.promotion is not None:
+                        if chained_move.promotion is True:
+                            self.start_promotion(chained_move.piece, self.edit_promotions[chained_move.piece.side])
+                        else:
+                            self.promotion_piece = True
+                            self.replace(chained_move.piece, chained_move.promotion)
+                            self.load_pieces()
+                            self.update_auto_ranged_pieces(chained_move, self.turn_side.opponent())
+                            self.promotion_piece = None
+            if self.chain_start is None:
+                self.chain_start = last_move
+                self.move_history.append(last_move)
+            else:
+                last_history_move = self.chain_start
+                while last_history_move.chained_move:
+                    last_history_move = last_history_move.chained_move
+                last_history_move.chained_move = last_move
         # do not pop move from future history because compare_history() will do it for us
         turn_side = self.turn_side
         if last_move is not None and last_move.is_edit and not self.edit_mode:
@@ -1210,6 +1236,7 @@ class Board(Window):
             last_chain_move is None or last_chain_move.chained_move is False
             or not self.chain_moves.get(turn_side, {}).get((last_chain_move.pos_from, last_chain_move.pos_to))
         ):
+            self.chain_start = None
             if self.promotion_piece is None:
                 self.ply_count += 1 if last_move is None else not last_move.is_edit
                 self.compare_history()
@@ -1270,7 +1297,7 @@ class Board(Window):
             promotion_piece.scale = self.square_size / promotion_piece.texture.width
             promotion_piece.set_color(
                 self.color_scheme.get(
-                    f"{promotion_piece.side.key_name()}piece_color",
+                    f"{promotion_piece.side.key()}piece_color",
                     self.color_scheme["piece_color"]
                 ),
                 self.color_scheme["colored_pieces"]
@@ -1299,7 +1326,7 @@ class Board(Window):
         self.update_piece(self.pieces[pos[0]][pos[1]])
         self.pieces[pos[0]][pos[1]].set_color(
             self.color_scheme.get(
-                f"{new_side.key_name()}piece_color",
+                f"{new_side.key()}piece_color",
                 self.color_scheme["piece_color"]
             ),
             self.color_scheme["colored_pieces"]
@@ -1315,7 +1342,7 @@ class Board(Window):
             piece.set_color(
                 color if color is not None else
                 self.color_scheme.get(
-                    f"{piece.side.key_name()}piece_color",
+                    f"{piece.side.key()}piece_color",
                     self.color_scheme["piece_color"]
                 ),
                 self.color_scheme["colored_pieces"]
@@ -1354,14 +1381,14 @@ class Board(Window):
             # the game has ended. let's find out who won and show it by changing piece colors
             if self.check_side:
                 # the current player was checkmated, the game ends and the opponent wins
-                self.log(f"[Ply {self.ply_count}] Info: Checkmate! {self.check_side.opponent().name()} wins.")
+                self.log(f"[Ply {self.ply_count}] Info: Checkmate! {self.check_side.opponent()} wins.")
             else:
                 # the current player was stalemated, the game ends in a draw
                 self.log(f"[Ply {self.ply_count}] Info: Stalemate! It's a draw.")
         else:
             if self.check_side:
                 # the game is still going, but the current player is in check
-                self.log(f"[Ply {self.ply_count}] Info: {self.check_side.name()} is in check!")
+                self.log(f"[Ply {self.ply_count}] Info: {self.check_side} is in check!")
             else:
                 # the game is still going and there is no check
                 pass
@@ -1406,7 +1433,7 @@ class Board(Window):
             if isinstance(sprite, abc.Piece):
                 sprite.set_color(
                     self.color_scheme.get(
-                        f"{sprite.side.key_name()}piece_color",
+                        f"{sprite.side.key()}piece_color",
                         self.color_scheme["piece_color"]
                     ),
                     self.color_scheme["colored_pieces"]
@@ -1422,14 +1449,14 @@ class Board(Window):
                 self.color_pieces(
                     self.check_side,
                     self.color_scheme.get(
-                        f"{self.check_side.key_name()}loss_color",
+                        f"{self.check_side.key()}loss_color",
                         self.color_scheme["loss_color"]
                     ),
                 )
                 self.color_pieces(
                     self.check_side.opponent(),
                     self.color_scheme.get(
-                        f"{self.check_side.opponent().key_name()}win_color",
+                        f"{self.check_side.opponent().key()}win_color",
                         self.color_scheme["win_color"]
                     ),
                 )
@@ -1437,14 +1464,14 @@ class Board(Window):
                 self.color_pieces(
                     Side.WHITE,
                     self.color_scheme.get(
-                        f"{Side.WHITE.key_name()}draw_color",
+                        f"{Side.WHITE.key()}draw_color",
                         self.color_scheme["draw_color"]
                     ),
                 )
                 self.color_pieces(
                     Side.BLACK,
                     self.color_scheme.get(
-                        f"{Side.BLACK.key_name()}draw_color",
+                        f"{Side.BLACK.key()}draw_color",
                         self.color_scheme["draw_color"]
                     ),
                 )
@@ -1453,7 +1480,7 @@ class Board(Window):
                 self.color_pieces(
                     self.check_side,
                     self.color_scheme.get(
-                        f"{self.check_side.key_name()}check_color",
+                        f"{self.check_side.key()}check_color",
                         self.color_scheme["check_color"]
                     ),
                 )
@@ -1875,7 +1902,7 @@ class Board(Window):
             if modifiers & key.MOD_ACCEL and not modifiers & key.MOD_SHIFT:  # White is in control
                 if self.turn_side != Side.WHITE:
                     self.move_history.append(None)
-                    self.log(f"[Ply {self.ply_count}] Pass: {Side.WHITE.name()}'s turn")
+                    self.log(f"[Ply {self.ply_count}] Pass: {Side.WHITE}'s turn")
                     self.ply_count += 1
                     self.clear_en_passant()
                     self.compare_history()
@@ -1890,7 +1917,7 @@ class Board(Window):
             if modifiers & key.MOD_ACCEL and not modifiers & key.MOD_SHIFT:  # Black is in control
                 if self.turn_side != Side.BLACK:
                     self.move_history.append(None)
-                    self.log(f"[Ply {self.ply_count}] Pass: {Side.BLACK.name()}'s turn")
+                    self.log(f"[Ply {self.ply_count}] Pass: {Side.BLACK}'s turn")
                     self.ply_count += 1
                     self.clear_en_passant()
                     self.compare_history()
@@ -1904,7 +1931,7 @@ class Board(Window):
         if symbol == key.N:  # Next
             if modifiers & key.MOD_ACCEL and not modifiers & key.MOD_SHIFT:  # Next player is in control
                 self.move_history.append(None)
-                self.log(f"[Ply {self.ply_count}] Pass: {self.turn_side.opponent().name()}'s turn")
+                self.log(f"[Ply {self.ply_count}] Pass: {self.turn_side.opponent()}'s turn")
                 self.ply_count += 1
                 self.clear_en_passant()
                 self.compare_history()
@@ -2142,48 +2169,48 @@ class Board(Window):
             f"(ID {black:0{digits}d}) {piece_groups[black]['name']}"
         )
         for side in self.piece_set_ids:
-            debug_log_data.append(f"{side.name()} setup: {', '.join(piece.name for piece in self.piece_sets[side])}")
-            debug_log_data.append(f"{side.name()} pieces:")
+            debug_log_data.append(f"{side} setup: {', '.join(piece.name for piece in self.piece_sets[side])}")
+            debug_log_data.append(f"{side} pieces:")
             for piece in self.movable_pieces[side]:
                 debug_log_data.append(f'  {piece.board_pos}: {piece.name}')
             if not self.movable_pieces[side]:
                 debug_log_data[-1] += " None"
-            debug_log_data.append(f"{side.name()} royal pieces:")
+            debug_log_data.append(f"{side} royal pieces:")
             for piece in self.royal_pieces[side]:
                 debug_log_data.append(f'  {piece.board_pos}: {piece.name}')
             if not self.royal_pieces[side]:
                 debug_log_data[-1] += " None"
-            debug_log_data.append(f"{side.name()} quasiroyal pieces:")
+            debug_log_data.append(f"{side} quasiroyal pieces:")
             for piece in self.quasi_royal_pieces[side]:
                 debug_log_data.append(f'  {piece.board_pos}: {piece.name}')
             if not self.quasi_royal_pieces[side]:
                 debug_log_data[-1] += " None"
-            debug_log_data.append(f"{side.name()} probabilistic pieces:")
+            debug_log_data.append(f"{side} probabilistic pieces:")
             for piece in self.probabilistic_pieces[side]:
                 debug_log_data.append(f'  {piece.board_pos}: {piece.name}')
             if not self.probabilistic_pieces[side]:
                 debug_log_data[-1] += " None"
-            debug_log_data.append(f"{side.name()} auto-ranged pieces:")
+            debug_log_data.append(f"{side} auto-ranged pieces:")
             for piece in self.auto_ranged_pieces[side]:
                 debug_log_data.append(f'  {piece.board_pos}: {piece.name}')
             if not self.auto_ranged_pieces[side]:
                 debug_log_data[-1] += " None"
             piece_list = ', '.join(piece.name for piece in self.promotions[side])
-            debug_log_data.append(f"{side.name()} promotions: {piece_list if piece_list else 'None'}")
+            debug_log_data.append(f"{side} promotions: {piece_list if piece_list else 'None'}")
             piece_list = ', '.join(piece.name for piece in self.edit_promotions[side])
-            debug_log_data.append(f"{side.name()} replacements: {piece_list if piece_list else 'None'}")
+            debug_log_data.append(f"{side} replacements: {piece_list if piece_list else 'None'}")
         piece_modes = {0: 'Shown', 1: 'Hidden', 2: 'Penultima'}
         debug_log_data.append(f"Piece visibility: {piece_modes[self.should_hide_pieces]}")
         move_modes = {None: 'Default', False: 'Shown', True: 'Hidden'}
         debug_log_data.append(f"Move visibility: {move_modes[self.should_hide_moves]}")
         debug_log_data.append(f"Board mode: {'Edit' if self.edit_mode else 'Play'}")
-        debug_log_data.append(f"Turn side: {self.turn_side.name() if self.turn_side else 'None'}")
+        debug_log_data.append(f"Turn side: {self.turn_side if self.turn_side else 'None'}")
         debug_log_data.append(f"Current ply: {self.ply_count}")
         debug_log_data.append(f"Actions made: {len(self.move_history)}")
         debug_log_data.append(f"Future actions: {len(self.future_move_history)}")
         debug_log_data.append(f"Moves possible: {len(sum(self.moves[self.turn_side].values(), []))}")
         debug_log_data.append(f"Unique moves: {len(self.unique_moves())}")
-        debug_log_data.append(f"Check side: {self.check_side.name() if self.check_side else 'None'}")
+        debug_log_data.append(f"Check side: {self.check_side if self.check_side else 'None'}")
         debug_log_data.append(f"Game over: {self.game_over}")
         debug_log_data.append("Action history:")
         for move in self.move_history:

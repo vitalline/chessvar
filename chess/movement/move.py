@@ -77,7 +77,7 @@ class Move(object):
             self.captured_piece.__copy__() if isinstance(self.captured_piece, Piece) else self.captured_piece,
             self.swapped_piece.__copy__() if isinstance(self.swapped_piece, Piece) else self.swapped_piece,
             self.promotion,
-            self.chained_move.__copy__() if isinstance(self.chained_move, Move) else self.chained_move,
+            self.chained_move.__deepcopy__(memo) if isinstance(self.chained_move, Move) else self.chained_move,
             self.is_edit
         )
 
@@ -133,27 +133,27 @@ class Move(object):
             string = "does something very mysterious"
         if self.piece:
             if self.piece.is_empty() and not (self.promotion and self.promotion is not True and not moved):
-                string = f"{self.piece.side.name()} {string}"
+                string = f"{self.piece.side} {string}"
             elif self.piece.is_empty() and not self.piece.board.should_hide_pieces:
-                string = f"{self.piece.side.name()} {self.promotion.name} {string}"
+                string = f"{self.piece.side} {self.promotion.name} {string}"
             elif not self.piece.is_hidden:
-                string = f"{self.piece.side.name()} {self.piece.name} {string}"
+                string = f"{self.piece.side} {self.piece.name} {string}"
             else:
-                string = f"{self.piece.side.name()} ??? {string}"
+                string = f"{self.piece.side} ??? {string}"
         else:
             string = f"Piece {string}"
         if self.captured_piece:
             if self.captured_piece.is_hidden:
-                string += f", takes {self.captured_piece.side.name()} ???"
+                string += f", takes {self.captured_piece.side} ???"
             else:
-                string += f", takes {self.captured_piece.side.name()} {self.captured_piece.name}"
+                string += f", takes {self.captured_piece.side} {self.captured_piece.name}"
             if self.captured_piece.board_pos != self.pos_to:
                 string += f" on {to_alpha(self.captured_piece.board_pos)}"
         if self.swapped_piece:
             if self.swapped_piece.is_hidden:
-                string += f", swaps with {self.swapped_piece.side.name()} ???"
+                string += f", swaps with {self.swapped_piece.side} ???"
             else:
-                string += f", swaps with {self.swapped_piece.side.name()} {self.swapped_piece.name}"
+                string += f", swaps with {self.swapped_piece.side} {self.swapped_piece.name}"
         if self.promotion and self.pos_from is not None and not (self.piece and self.piece.is_empty() and not moved):
             if self.piece:
                 if self.promotion is True:

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from copy import copy
 from enum import Enum
+from os.path import isfile
 from typing import TYPE_CHECKING, Type
 
 from arcade import Color, Sprite, load_texture
@@ -42,7 +43,7 @@ class Side(Enum):
             case _:
                 return 0 if dpos is None else 0 if type(dpos) is int else (0, 0)
 
-    def name(self):
+    def __str__(self):
         match self:
             case Side.WHITE:
                 return "White"
@@ -51,7 +52,7 @@ class Side(Enum):
             case _:
                 return ""
 
-    def key_name(self):
+    def key(self):
         match self:
             case Side.WHITE:
                 return "white_"
@@ -60,7 +61,7 @@ class Side(Enum):
             case _:
                 return ""
 
-    def file_name(self):
+    def file_prefix(self):
         match self:
             case Side.WHITE:
                 return "0."
@@ -71,8 +72,8 @@ class Side(Enum):
 
 
 class Piece(Sprite):
-    name = ''
-    file_name = ''
+    name = '(Piece)'
+    file_name = 'none'
     asset_folder = 'util'
 
     def __init__(
@@ -101,7 +102,7 @@ class Piece(Sprite):
             self.position = self.board.get_screen_position(self.board_pos)
 
     def is_empty(self):
-        return not self.side or not self.name
+        return not self.side
 
     def move(self, move: Move):
         self.board.move(move)
@@ -127,7 +128,9 @@ class Piece(Sprite):
             asset_folder = self.asset_folder
         if file_name is None:
             file_name = self.file_name
-        return f"assets/{asset_folder}/{side.file_name()}{file_name}.png"
+        path = f"assets/{asset_folder}/{side.file_prefix()}{file_name}.png"
+        fallback_path = f"assets/{asset_folder}/{file_name}.png"
+        return path if isfile(path) else fallback_path
 
     def reload(
             self,
