@@ -35,6 +35,9 @@ Ctrl + Shift + H: show pieces
 Ctrl + M: show move markers
 Shift + M: hide move markers
 Ctrl + Shift + M: show move markers if pieces are shown, hide otherwise
+Ctrl + K: show valid moves for both sides
+Shift + K: show theoretical moves for both sides
+Ctrl + Shift + K: show valid moves for current player, theoretical moves for other player
 Ctrl + Z: undo last move (if any)
 Ctrl + Shift + Z: redo last move (if any)
 Ctrl + Y: redo last move (if any)
