@@ -895,7 +895,10 @@ class Board(Window):
                 if move.promotion is not None:
                     move.promotion = True  # do not auto-promote because we are selecting promotion type manually
                 if (
-                    (move.chained_move or self.chain_moves.get(self.turn_side, {}).get((move.pos_from, move.pos_to)))
+                    (
+                        move.chained_move or
+                        self.chain_moves.get(self.turn_side, {}).get((move.pos_from, move.pos_to))
+                    )
                     and not isinstance(
                         move.movement,
                         movement.CastlingMovement |
@@ -1689,25 +1692,46 @@ class Board(Window):
         self.check_side = check_side
         self.castling_threats = castling_threats
 
-    def unique_moves(self) -> list[Move]:
-        move_list = []
-        data_set = set()
-        for move in sum(self.moves.get(self.turn_side, {}).values(), []):
-            move_data = []
-            while move:
-                move_data.append(move.pos_from)
+    def unique_moves(self, side: Side | None = None) -> dict[Side, dict[Position, list[Move]]]:
+        if side is None:
+            side = self.turn_side
+        self.load_all_moves(False, moves_for=side)
+        if side == Side.ANY:
+            turn_sides = [Side.WHITE, Side.BLACK]
+        elif side == Side.NONE:
+            turn_sides = []
+        else:
+            turn_sides = [side]
+        moves = {}
+        for turn_side in turn_sides:
+            moves[turn_side] = {}
+            move_data_set = set()
+            for move in sum(self.moves.get(turn_side, {}).values(), []):
+                move_data = [move.pos_from]
                 if move.pos_from == move.pos_to and move.captured_piece:
                     move_data.append(move.captured_piece.board_pos)
                 else:
                     move_data.append(move.pos_to)
                 if move.promotion is not None:
                     move_data.append(move.promotion)
-                move = move.chained_move
-            move_data = tuple(move_data)
-            if move_data not in data_set:
-                data_set.add(move_data)
-                move_list.append(move)
-        return move_list
+                move_data = tuple(move_data)
+                if move_data not in move_data_set:
+                    move_data_set.add(move_data)
+                    move = copy(move)
+                    if (
+                        (
+                            move.chained_move or
+                            self.chain_moves.get(turn_side, {}).get((move.pos_from, move.pos_to))
+                        )
+                        and not isinstance(
+                            move.movement,
+                            movement.CastlingMovement |
+                            movement.RangedAutoCaptureRiderMovement
+                        )
+                    ):
+                        move.chained_move = None  # do not chain moves because we are only counting one-move sequences
+                    moves[turn_side].setdefault(move.pos_from, []).append(move)
+        return moves
 
     def load_pieces(self):
         self.movable_pieces = {Side.WHITE: [], Side.BLACK: []}
@@ -2044,7 +2068,7 @@ class Board(Window):
         if symbol == key.SLASH:  # (?) Random
             if self.edit_mode:
                 return
-            moves = self.moves.get(self.turn_side, {})
+            moves = self.unique_moves()[self.turn_side]
             if modifiers & key.MOD_SHIFT:  # Random piece
                 self.deselect_piece()
                 if moves:
@@ -2058,17 +2082,31 @@ class Board(Window):
                     else sum(moves.values(), [])  # Pick from all possible moves
                 )
                 if choices:
-                    random_move = base_rng.choice(choices)
-                    chained_move = random_move
+                    move = base_rng.choice(choices)
+                    self.update_auto_ranged_pieces(move, self.turn_side.opponent())
+                    chained_move = move
                     while chained_move:
-                        self.update_move(chained_move)
-                        random_move.piece.move(random_move)
-                        self.log(f"[Ply {self.ply_count}] Move: {chained_move}")
+                        chained_move.piece.move(chained_move)
+                        if self.promotion_piece is None:
+                            self.log(f"[Ply {self.ply_count}] Move: {chained_move}")
                         chained_move = chained_move.chained_move
-                    self.move_history.append(random_move)
-                    self.ply_count += 1
-                    self.compare_history()
-                    self.advance_turn()
+                    if self.chain_start is None:
+                        self.chain_start = move
+                        self.move_history.append(self.chain_start)
+                    else:
+                        last_move = self.chain_start
+                        while last_move.chained_move:
+                            last_move = last_move.chained_move
+                        last_move.chained_move = move
+                    if move.chained_move is None and not self.promotion_piece:
+                        self.load_all_moves()
+                        self.select_piece(move.pos_to)
+                    else:
+                        self.chain_start = None
+                        if self.promotion_piece is None:
+                            self.ply_count += 1
+                            self.compare_history()
+                        self.advance_turn()
 
     def on_key_release(self, symbol: int, modifiers: int):
         if symbol == key.ENTER:  # Simulate LMB
@@ -2209,7 +2247,7 @@ class Board(Window):
         debug_log_data.append(f"Actions made: {len(self.move_history)}")
         debug_log_data.append(f"Future actions: {len(self.future_move_history)}")
         debug_log_data.append(f"Moves possible: {len(sum(self.moves[self.turn_side].values(), []))}")
-        debug_log_data.append(f"Unique moves: {len(self.unique_moves())}")
+        debug_log_data.append(f"Unique moves: {sum(len(i) for i in self.unique_moves()[self.turn_side].values())}")
         debug_log_data.append(f"Check side: {self.check_side if self.check_side else 'None'}")
         debug_log_data.append(f"Game over: {self.game_over}")
         debug_log_data.append("Action history:")
