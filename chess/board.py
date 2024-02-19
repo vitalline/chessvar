@@ -1625,11 +1625,12 @@ class Board(Window):
                         self.ply_simulation += 1
                         self.load_check()
                         self.ply_simulation -= 1
-                        if royal_pieces[turn_side] and not self.royal_pieces[turn_side]:
-                            self.check_side = turn_side
-                        if royal_pieces[self.turn_side.opponent()] and not self.royal_pieces[self.turn_side.opponent()]:
-                            check_side = self.turn_side.opponent()
-                            self.game_over = True
+                        for chained_move in move_chain:
+                            if chained_move.captured_piece in royal_pieces[turn_side]:
+                                self.check_side = turn_side
+                            if chained_move.captured_piece in royal_pieces[turn_side.opponent()]:
+                                check_side = self.turn_side.opponent()
+                                self.game_over = True
                         if self.check_side != turn_side:
                             self.moves[turn_side].setdefault(move.pos_from, []).append(move)
                             if move.chained_move:
