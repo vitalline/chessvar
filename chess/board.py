@@ -1904,7 +1904,7 @@ class Board(Window):
                 size = max(round(width / (self.board_width + 2)), round(height / (self.board_height + 2)))
                 self.set_size((self.board_width + 2) * size, (self.board_height + 2) * size)
         if symbol == key.KEY_0 and modifiers & key.MOD_ACCEL:  # Reset window size
-            self.set_size((self.board_width + 2) * self.square_size, (self.board_height + 2) * self.square_size)
+            self.set_size((self.board_width + 2) * default_size, (self.board_height + 2) * default_size)
         if symbol == key.E and modifiers & key.MOD_ACCEL:  # Edit mode (toggle)
             self.edit_mode = not self.edit_mode
             self.log(f"[Ply {self.ply_count}] Mode: {'EDIT' if self.edit_mode else 'PLAY'}")
