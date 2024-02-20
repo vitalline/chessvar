@@ -1599,7 +1599,7 @@ class Board(Window):
             while not final_check:
                 rolled_moves_exist = False
                 for piece in movable_pieces[turn_side] if chain_moves is None else [last_chain_move.piece]:
-                    for move in piece.moves() if chain_moves is None else chain_moves:
+                    for move in list(piece.moves()) if chain_moves is None else chain_moves:
                         self.update_move(move)
                         self.update_auto_ranged_pieces(move, turn_side.opponent())
                         self.move(move)
