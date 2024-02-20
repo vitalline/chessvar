@@ -1656,9 +1656,9 @@ class Board(Window):
                 final_check = True
                 if self.game_over:
                     break
+                while len(self.roll_history) < self.ply_count:
+                    self.roll_history.append({})
                 if turn_side == self.turn_side and probabilistic_pieces[turn_side] and generate_rolls:
-                    if len(self.roll_history) < self.ply_count:
-                        self.roll_history.append({})
                     if moves_exist and (not iterations or not rolled_moves_exist):
                         for piece in probabilistic_pieces[turn_side]:
                             self.roll_history[-1][piece.board_pos] = piece.movement.roll()
@@ -1696,7 +1696,11 @@ class Board(Window):
     def unique_moves(self, side: Side | None = None) -> dict[Side, dict[Position, list[Move]]]:
         if side is None:
             side = self.turn_side
+        display_moves = copy(self.display_moves)
+        display_theoretical_moves = copy(self.display_theoretical_moves)
         self.load_all_moves(False, moves_for=side)
+        self.display_moves = display_moves
+        self.display_theoretical_moves = display_theoretical_moves
         if side == Side.ANY:
             turn_sides = [Side.WHITE, Side.BLACK]
         elif side == Side.NONE:
@@ -2274,6 +2278,8 @@ class Board(Window):
             debug_log_data.append(f"  Roll {i + 1}:")
             for pos, value in roll.items():
                 debug_log_data.append(f"    {pos}: {value}")
+            if not roll:
+                debug_log_data[-1] += " None"
         if not self.roll_history:
             debug_log_data[-1] += " None"
         debug_log_data.append(f"Roll seed: {self.roll_seed} (update: {self.board_config['update_roll_seed']})")
