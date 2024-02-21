@@ -1130,8 +1130,14 @@ class Board(Window):
         self.chain_start = None
         self.future_move_history = future_move_history
         if self.move_history:
-            copies = [copy(move).set(chained_move=False) for move in (self.move_history[-1], last_move)]
-            if not copies[0].matches(copies[1]):
+            copies = [
+                copy(move).set(chained_move=False) if move is not None else None
+                for move in (self.move_history[-1], last_move)
+            ]
+            if (
+                (copies[0] is None) != (copies[1] is None) or
+                (copies[0] is not None and not copies[0].matches(copies[1]))
+            ):
                 self.future_move_history.append(last_move)
         else:
             self.future_move_history.append(last_move)
@@ -1168,8 +1174,14 @@ class Board(Window):
             last_chain_move = self.chain_start
             while last_chain_move:
                 if last_history_move:
-                    copies = [copy(move).set(chained_move=False) for move in (last_history_move, last_chain_move)]
-                    if not copies[0].matches(copies[1]):
+                    copies = [
+                        copy(move).set(chained_move=False) if move is not None else None
+                        for move in (last_history_move, last_chain_move)
+                    ]
+                    if (
+                        (copies[0] is None) != (copies[1] is None) or
+                        (copies[0] is not None and not copies[0].matches(copies[1]))
+                    ):
                         return
                     last_history_move = last_history_move.chained_move
                     last_chain_move = last_chain_move.chained_move
