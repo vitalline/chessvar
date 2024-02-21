@@ -1768,8 +1768,7 @@ class Board(Window):
             castle_moves = [
                 move for move in royal.moves() if isinstance(
                     move.movement,
-                    movement.CastlingMovement |
-                    movement.RangedAutoCaptureRiderMovement
+                    movement.CastlingMovement
                 )
             ]
             castle_movements = set(move.movement for move in castle_moves)
