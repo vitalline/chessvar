@@ -1605,79 +1605,63 @@ class Board(Window):
             self.moves[turn_side] = {}
             self.chain_moves[turn_side] = {}
             generate_rolls = len(self.roll_history) < self.ply_count
-            final_check = False
-            moves_exist = None
-            iterations = 0
-            while not final_check:
-                rolled_moves_exist = False
-                for piece in movable_pieces[turn_side] if chain_moves is None else [last_chain_move.piece]:
-                    for move in list(piece.moves()) if chain_moves is None else chain_moves:
-                        self.update_move(move)
+            while len(self.roll_history) < self.ply_count:
+                self.roll_history.append({})
+            if turn_side == self.turn_side and probabilistic_pieces[turn_side] and generate_rolls:
+                for piece in probabilistic_pieces[turn_side]:
+                    self.roll_history[-1][piece.board_pos] = piece.movement.roll()
+                self.moves[turn_side] = {}
+                self.chain_moves[turn_side] = {}
+            for piece in movable_pieces[turn_side] if chain_moves is None else [last_chain_move.piece]:
+                for move in list(piece.moves()) if chain_moves is None else chain_moves:
+                    self.update_move(move)
+                    self.update_auto_ranged_pieces(move, turn_side.opponent())
+                    self.move(move)
+                    if move.promotion and move.promotion is not True:
+                        self.promotion_piece = True
+                        self.replace(move.piece, move.promotion)
+                        self.load_pieces()
                         self.update_auto_ranged_pieces(move, turn_side.opponent())
-                        self.move(move)
-                        if move.promotion and move.promotion is not True:
+                        self.promotion_piece = None
+                    move_chain = [move]
+                    chained_move = move.chained_move
+                    while chained_move:
+                        self.update_move(chained_move)
+                        self.move(chained_move)
+                        if chained_move.promotion and chained_move.promotion is not True:
                             self.promotion_piece = True
-                            self.replace(move.piece, move.promotion)
+                            self.replace(chained_move.piece, chained_move.promotion)
                             self.load_pieces()
-                            self.update_auto_ranged_pieces(move, turn_side.opponent())
+                            self.update_auto_ranged_pieces(chained_move, turn_side.opponent())
                             self.promotion_piece = None
-                        move_chain = [move]
-                        chained_move = move.chained_move
-                        while chained_move:
-                            self.update_move(chained_move)
-                            self.move(chained_move)
-                            if chained_move.promotion and chained_move.promotion is not True:
-                                self.promotion_piece = True
-                                self.replace(chained_move.piece, chained_move.promotion)
-                                self.load_pieces()
-                                self.update_auto_ranged_pieces(chained_move, turn_side.opponent())
-                                self.promotion_piece = None
-                            move_chain.append(chained_move)
-                            chained_move = chained_move.chained_move
-                        self.ply_simulation += 1
-                        self.load_check()
-                        self.ply_simulation -= 1
-                        for chained_move in move_chain:
-                            if chained_move.captured_piece in royal_pieces[turn_side]:
-                                self.check_side = turn_side
-                            if chained_move.captured_piece in royal_pieces[turn_side.opponent()]:
-                                check_side = self.turn_side.opponent()
-                                self.game_over = True
-                        if self.check_side != turn_side:
-                            self.moves[turn_side].setdefault(move.pos_from, []).append(move)
-                            if move.chained_move:
-                                (
-                                    self.chain_moves[turn_side]
-                                    .setdefault((move.pos_from, move.pos_to), [])
-                                    .append(move.chained_move)
-                                )
-                            if moves_exist is None:
-                                moves_exist = True
-                            rolled_moves_exist = True
-                        for chained_move in move_chain[::-1]:
-                            self.undo(chained_move)
-                        self.check_side = check_side
-                        self.castling_threats = castling_threats.copy()
-                        if en_passant_target is not None:
-                            self.en_passant_target = en_passant_target
-                            self.en_passant_markers = en_passant_markers.copy()
-                            for marker in self.en_passant_markers:
-                                self.mark_en_passant(self.en_passant_target.board_pos, marker)
-                if moves_exist is None:
-                    moves_exist = False
-                final_check = True
-                if self.game_over:
-                    break
-                while len(self.roll_history) < self.ply_count:
-                    self.roll_history.append({})
-                if turn_side == self.turn_side and probabilistic_pieces[turn_side] and generate_rolls:
-                    if moves_exist and (not iterations or not rolled_moves_exist):
-                        for piece in probabilistic_pieces[turn_side]:
-                            self.roll_history[-1][piece.board_pos] = piece.movement.roll()
-                        self.moves[turn_side] = {}
-                        self.chain_moves[turn_side] = {}
-                        final_check = False
-                        iterations += 1
+                        move_chain.append(chained_move)
+                        chained_move = chained_move.chained_move
+                    self.ply_simulation += 1
+                    self.load_check()
+                    self.ply_simulation -= 1
+                    for chained_move in move_chain:
+                        if chained_move.captured_piece in royal_pieces[turn_side]:
+                            self.check_side = turn_side
+                        if chained_move.captured_piece in royal_pieces[turn_side.opponent()]:
+                            check_side = self.turn_side.opponent()
+                            self.game_over = True
+                    if self.check_side != turn_side:
+                        self.moves[turn_side].setdefault(move.pos_from, []).append(move)
+                        if move.chained_move:
+                            (
+                                self.chain_moves[turn_side]
+                                .setdefault((move.pos_from, move.pos_to), [])
+                                .append(move.chained_move)
+                            )
+                    for chained_move in move_chain[::-1]:
+                        self.undo(chained_move)
+                    self.check_side = check_side
+                    self.castling_threats = castling_threats.copy()
+                    if en_passant_target is not None:
+                        self.en_passant_target = en_passant_target
+                        self.en_passant_markers = en_passant_markers.copy()
+                        for marker in self.en_passant_markers:
+                            self.mark_en_passant(self.en_passant_target.board_pos, marker)
             self.moves_queried[turn_side] = True
         if theoretical_moves_for is None:
             theoretical_moves_for = self.turn_side.opponent()
@@ -1791,6 +1775,8 @@ class Board(Window):
             )
             self.ply_simulation += 1
             for piece in self.movable_pieces[self.turn_side.opponent()]:
+                if isinstance(piece.movement, movement.ProbabilisticMovement):
+                    continue
                 for move in piece.moves():
                     last_move = copy(move)
                     self.update_move(last_move)
