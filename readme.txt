@@ -24,6 +24,9 @@ Ctrl + Shift + B: cycle black army backward (-1)
 Ctrl + N: pass turn to next player
 Shift + N: cycle both armies forward (+1) if they're the same, swap otherwise
 Ctrl + Shift + N: cycle both armies backward (-1) if they're the same, swap otherwise
+Ctrl + P: reset replacement pieces to current armies
+Shift + P: cycle replacement pieces forward (+1)
+Ctrl + Shift + P: cycle replacement pieces backward (-1)
 Ctrl + F: flip board
 Shift + F: fast-forward to last move
 Ctrl + G: reset graphics mode (colors)
@@ -54,7 +57,7 @@ LMB, Enter: select piece, move selected piece (click or drag)
 Shift + LMB/Enter: swap piece with selected piece
 Ctrl + LMB/Enter: copy selected piece
 RMB, Backspace: remove piece
-Shift + RMB/Backspace: promote piece
+Shift + RMB/Backspace: replace piece
 Ctrl + RMB/Backspace: revoke first move of a piece
 
 source:

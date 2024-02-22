@@ -302,6 +302,7 @@ class Board(Window):
         self.trickster_angle_delta = 0  # this is just a normal chess game after all
         self.pieces = []  # list of pieces on the board
         self.piece_set_ids = {Side.WHITE: 0, Side.BLACK: 0}  # ids of piece sets to use for each side
+        self.piece_set_id_offset = 0  # offset for piece set ids, used when placing pieces in edit mode
         self.piece_sets = {Side.WHITE: [], Side.BLACK: []}  # types of pieces each side starts with
         self.promotions = {Side.WHITE: [], Side.BLACK: []}  # types of pieces each side promote to
         self.edit_promotions = {Side.WHITE: [], Side.BLACK: []}  # types of pieces each side can promote to in edit mode
@@ -405,6 +406,64 @@ class Board(Window):
             self.trickster_color_delta += delta_time
             self.trickster_angle_delta += delta_time
 
+    def get_piece_sets(self, piece_set_ids: dict[Side, int] | None = None) -> dict[Side, list[Type[abc.Piece]]]:
+        if piece_set_ids is None:
+            piece_set_ids = self.piece_set_ids
+        piece_sets = {Side.WHITE: [], Side.BLACK: []}
+        for side in piece_set_ids:
+            piece_group = piece_groups[piece_set_ids[side]]
+            piece_sets[side] = piece_group.get(f"set_{side.key()[0]}", piece_group.get('set', [])).copy()
+        return piece_sets
+
+    def reset_promotions(self, piece_sets: dict[Side, list[Type[abc.Piece]]] | None = None) -> None:
+        if piece_sets is None:
+            piece_sets = self.piece_sets
+        self.promotions = {side: [] for side in self.promotions}
+        for side in self.promotions:
+            used_piece_set = set()
+            for pieces in (
+                    piece_sets[side][3::-1], piece_sets[side.opponent()][3::-1],
+                    piece_sets[side][5:], piece_sets[side.opponent()][5:],
+            ):
+                promotion_types = []
+                for piece in pieces:
+                    if piece not in used_piece_set and not issubclass(piece, abc.RoyalPiece):
+                        used_piece_set.add(piece)
+                        promotion_types.append(piece)
+                self.promotions[side].extend(promotion_types[::-1])
+
+    def reset_edit_promotions(self, piece_sets: dict[Side, list[Type[abc.Piece]]] | None = None) -> None:
+        if piece_sets is None:
+            piece_sets = self.piece_sets
+        self.edit_promotions = {side: [] for side in self.edit_promotions}
+        for side in self.edit_promotions:
+            used_piece_set = set()
+            for pieces in (
+                piece_sets[side][3::-1], piece_sets[side.opponent()][3::-1],
+                piece_sets[side][5:], piece_sets[side.opponent()][5:],
+                [piece_sets[side.opponent()][4], fide.Pawn, piece_sets[side][4]]
+            ):
+                promotion_types = []
+                for piece in pieces:
+                    if piece not in used_piece_set:
+                        used_piece_set.add(piece)
+                        promotion_types.append(piece)
+                self.edit_promotions[side].extend(promotion_types[::-1])
+
+    def reset_penultima_pieces(self, piece_sets: dict[Side, list[Type[abc.Piece]]] | None = None) -> None:
+        if piece_sets is None:
+            piece_sets = self.piece_sets
+        self.penultima_pieces = {side: {} for side in self.penultima_pieces}
+        for player_side in self.penultima_pieces:
+            for piece_side in (player_side, player_side.opponent()):
+                for i, piece in enumerate(piece_sets[piece_side]):
+                    if penultima_textures[i]:
+                        texture = penultima_textures[i]
+                        if piece_side == player_side.opponent():
+                            texture += 'O'
+                        if piece not in self.penultima_pieces[player_side]:
+                            self.penultima_pieces[player_side][piece] = texture
+
     def reset_board(self, update: bool = False) -> None:
         self.deselect_piece()  # you know, just in case
         self.turn_side = Side.WHITE
@@ -426,51 +485,15 @@ class Board(Window):
         )
         self.ply_count += 1
 
-        self.piece_sets = {Side.WHITE: [], Side.BLACK: []}
-        for side in self.piece_set_ids:
-            piece_group = piece_groups[self.piece_set_ids[side]]
-            self.piece_sets[side] = piece_group.get(f"set_{side.key()[0]}", piece_group.get('set', [])).copy()
+        self.piece_sets = self.get_piece_sets()
 
         if update:
+            self.piece_set_id_offset = 0
             self.roll_history = []
             self.future_move_history = []
-            self.promotions = {side: [] for side in self.promotions}
-            for side in self.promotions:
-                used_piece_set = set()
-                for pieces in (
-                        self.piece_sets[side][3::-1], self.piece_sets[side.opponent()][3::-1],
-                        self.piece_sets[side][5:], self.piece_sets[side.opponent()][5:],
-                ):
-                    promotion_types = []
-                    for piece in pieces:
-                        if piece not in used_piece_set and not issubclass(piece, abc.RoyalPiece):
-                            used_piece_set.add(piece)
-                            promotion_types.append(piece)
-                    self.promotions[side].extend(promotion_types[::-1])
-            self.edit_promotions = {side: [] for side in self.edit_promotions}
-            for side in self.edit_promotions:
-                used_piece_set = set()
-                for pieces in (
-                    self.piece_sets[side][3::-1], self.piece_sets[side.opponent()][3::-1],
-                    self.piece_sets[side][5:], self.piece_sets[side.opponent()][5:],
-                    [self.piece_sets[side.opponent()][4], fide.Pawn, self.piece_sets[side][4]]
-                ):
-                    promotion_types = []
-                    for piece in pieces:
-                        if piece not in used_piece_set:
-                            used_piece_set.add(piece)
-                            promotion_types.append(piece)
-                    self.edit_promotions[side].extend(promotion_types[::-1])
-            self.penultima_pieces = {side: {} for side in self.penultima_pieces}
-            for player_side in self.penultima_pieces:
-                for piece_side in (player_side, player_side.opponent()):
-                    for i, piece in enumerate(self.piece_sets[piece_side]):
-                        if penultima_textures[i]:
-                            texture = penultima_textures[i]
-                            if piece_side == player_side.opponent():
-                                texture += 'O'
-                            if piece not in self.penultima_pieces[player_side]:
-                                self.penultima_pieces[player_side][piece] = texture
+            self.reset_promotions()
+            self.reset_edit_promotions()
+            self.reset_penultima_pieces()
         else:
             self.future_move_history += self.move_history[::-1]
 
@@ -1972,6 +1995,23 @@ class Board(Window):
                     piece_set_ids = self.piece_set_ids[Side.WHITE], self.piece_set_ids[Side.BLACK]
                     self.piece_set_ids[Side.BLACK], self.piece_set_ids[Side.WHITE] = piece_set_ids
                 self.reset_board(update=True)
+        if symbol == key.P:  # Promotion
+            old_offset = self.piece_set_id_offset
+            if modifiers & key.MOD_SHIFT:  # Shift promotion piece set
+                d = -1 if modifiers & key.MOD_ACCEL else 1
+                self.piece_set_id_offset = (self.piece_set_id_offset + d) % len(piece_groups)
+            elif modifiers & key.MOD_ACCEL:  # Reset promotion piece set
+                self.piece_set_id_offset = 0
+            if old_offset != self.piece_set_id_offset:
+                piece_sets = self.get_piece_sets({
+                    side: (self.piece_set_ids[side] + self.piece_set_id_offset) % len(piece_groups)
+                    for side in self.piece_set_ids
+                })
+                self.reset_edit_promotions(piece_sets)
+                promotion_piece = self.promotion_piece
+                if promotion_piece:
+                    self.end_promotion()
+                    self.start_promotion(promotion_piece, self.edit_promotions[promotion_piece.side])
         if symbol == key.F:
             if modifiers & key.MOD_ACCEL:  # Flip
                 self.flip_board()
