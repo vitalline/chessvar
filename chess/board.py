@@ -1129,10 +1129,10 @@ class Board(Window):
             self.load_all_moves()
         self.chain_start = None
         self.future_move_history = future_move_history
-        if self.move_history:
+        if self.future_move_history:
             copies = [
                 copy(move).set(chained_move=False) if move is not None else None
-                for move in (self.move_history[-1], last_move)
+                for move in (self.future_move_history[-1], last_move)
             ]
             if (
                 (copies[0] is None) != (copies[1] is None) or
@@ -1222,10 +1222,6 @@ class Board(Window):
                 }''')
                 last_chain_move = chained_move
                 if chained_move:
-                    chained_move = chained_move.chained_move
-                if chained_move:
-                    self.update_move(chained_move)
-                if chained_move:
                     if not isinstance(chained_move.piece, abc.PromotablePiece) and chained_move.promotion is not None:
                         if chained_move.promotion is True:
                             self.start_promotion(chained_move.piece, self.edit_promotions[chained_move.piece.side])
@@ -1235,6 +1231,9 @@ class Board(Window):
                             self.load_pieces()
                             self.update_auto_ranged_pieces(chained_move, self.turn_side.opponent())
                             self.promotion_piece = None
+                    chained_move = chained_move.chained_move
+                    if chained_move:
+                        self.update_move(chained_move)
             if self.chain_start is None:
                 self.chain_start = last_move
                 self.move_history.append(last_move)
