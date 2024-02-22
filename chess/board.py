@@ -1152,7 +1152,7 @@ class Board(Window):
                     past.pos_from == future.pos_from and past.pos_to == future.pos_to
                     and not (past.captured_piece is not None and future.swapped_piece is not None)
                     and not (past.swapped_piece is not None and future.captured_piece is not None)
-                    and future.promotion is not None
+                    and future.promotion is not None and future.promotion is not True
                 ):
                     past.promotion = future.promotion
                     self.replace(self.promotion_piece, future.promotion)
