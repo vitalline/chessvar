@@ -114,6 +114,7 @@ class Move(object):
         )
 
     def __str__(self) -> str:
+        board = self.piece.board
         moved = self.pos_from != self.pos_to
         if self.pos_from is not None and self.pos_to is not None and moved:
             if self.is_edit:
@@ -134,8 +135,13 @@ class Move(object):
         if self.piece:
             if self.piece.is_empty() and not (self.promotion and self.promotion is not True and not moved):
                 string = f"{self.piece.side} {string}"
-            elif self.piece.is_empty() and not self.piece.board.should_hide_pieces:
+            elif self.piece.is_empty() and not board.should_hide_pieces:
                 string = f"{self.piece.side} {self.promotion.name} {string}"
+            elif self.piece.is_empty():
+                if board.get_piece(self.pos_to).texture_name == self.promotion.file_name:
+                    string = f"{self.piece.side} {self.promotion.name} {string}"
+                else:
+                    string = f"{self.piece.side} ??? {string}"
             elif not self.piece.is_hidden:
                 string = f"{self.piece.side} {self.piece.name} {string}"
             else:
@@ -158,7 +164,7 @@ class Move(object):
             if self.piece:
                 if self.promotion is True:
                     string += f", tries to promote"
-                elif self.piece.board.should_hide_pieces:
+                elif board.should_hide_pieces:
                     string += ", promotes to ???"
                 else:
                     string += f", promotes to {self.promotion.name}"

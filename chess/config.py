@@ -7,6 +7,7 @@ DEFAULT_CONFIG = {
     'Chess': {
         'white_id': 0,
         'black_id': 0,
+        'edit_id': '',
         'use_set_seed': False,
         'set_seed': 0,
         'use_roll_seed': False,
@@ -40,6 +41,11 @@ class Config(dict):
                     self[item] = [
                         int(s) for i in self.base_config[section][item].split(',') if (s := i.strip()).isdigit()
                     ]
+                if item == 'edit_id':
+                    if self.base_config[section][item].strip() == '':
+                        self[item] = None
+                    else:
+                        self[item] = self.base_config.getint(section, item)
 
     def save(self, path) -> None:
         for section in self.base_config:
@@ -47,6 +53,8 @@ class Config(dict):
                 self.base_config[section][item] = str(self[item])
                 if item.startswith('block_'):
                     self.base_config[section][item] = ', '.join(str(s) for s in self[item])
+                if item == 'edit_id' and self[item] is None:
+                    self.base_config[section][item] = ''
         with open(path, 'w') as file:
             self.base_config.write(file)
 

@@ -93,6 +93,10 @@ class Piece(Sprite):
         self.flipped_horizontally = flipped_horizontally
         self.flipped_vertically = flipped_vertically
         self.is_hidden = is_hidden
+        self.is_colored = False
+        self.texture_folder = self.asset_folder
+        self.texture_side = self.side
+        self.texture_name = self.file_name
         super().__init__(
             self.texture_path(),
             flipped_horizontally=self.flipped_horizontally,
@@ -119,17 +123,9 @@ class Piece(Sprite):
         clone.is_hidden = self.is_hidden
         return clone
 
-    def texture_path(
-        self, asset_folder: str = None, side: Side = None, file_name: str = None, force_color: bool = False
-    ):
-        if side is None:
-            side = Side.WHITE if force_color else self.side
-        if asset_folder is None:
-            asset_folder = self.asset_folder
-        if file_name is None:
-            file_name = self.file_name
-        path = f"assets/{asset_folder}/{side.file_prefix()}{file_name}.png"
-        fallback_path = f"assets/{asset_folder}/{file_name}.png"
+    def texture_path(self) -> str:
+        path = f"assets/{self.texture_folder}/{self.texture_side.file_prefix()}{self.texture_name}.png"
+        fallback_path = f"assets/{self.texture_folder}/{self.texture_name}.png"
         return path if isfile(path) else fallback_path
 
     def reload(
@@ -143,9 +139,10 @@ class Piece(Sprite):
     ):
         if hidden is not None:
             self.is_hidden = hidden
-        texture_path = self.texture_path(
-            asset_folder=asset_folder, side=side, file_name=file_name, force_color=(max(self.color) != min(self.color))
-        )
+        self.texture_folder = asset_folder or self.texture_folder
+        self.texture_side = side or self.texture_side
+        self.texture_name = file_name or self.texture_name
+        texture_path = self.texture_path()
         if flipped_horizontally is None:
             flipped_horizontally = self.flipped_horizontally if not hidden else False
         if flipped_vertically is None:

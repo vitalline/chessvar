@@ -302,7 +302,7 @@ class Board(Window):
         self.trickster_angle_delta = 0  # this is just a normal chess game after all
         self.pieces = []  # list of pieces on the board
         self.piece_set_ids = {Side.WHITE: 0, Side.BLACK: 0}  # ids of piece sets to use for each side
-        self.piece_set_id_offset = 0  # offset for piece set ids, used when placing pieces in edit mode
+        self.edit_piece_set_id = None  # id of piece set used when placing pieces in edit mode, None uses current sets
         self.piece_sets = {Side.WHITE: [], Side.BLACK: []}  # types of pieces each side starts with
         self.promotions = {Side.WHITE: [], Side.BLACK: []}  # types of pieces each side promote to
         self.edit_promotions = {Side.WHITE: [], Side.BLACK: []}  # types of pieces each side can promote to in edit mode
@@ -337,6 +337,7 @@ class Board(Window):
 
         # load piece set ids from the config
         self.piece_set_ids = {side: self.board_config[f'{side.key()}id'] for side in self.piece_set_ids}
+        self.edit_piece_set_id = self.board_config['edit_id']
 
         # initialize random number seeds and generators
         self.roll_seed = (
@@ -406,9 +407,11 @@ class Board(Window):
             self.trickster_color_delta += delta_time
             self.trickster_angle_delta += delta_time
 
-    def get_piece_sets(self, piece_set_ids: dict[Side, int] | None = None) -> dict[Side, list[Type[abc.Piece]]]:
+    def get_piece_sets(self, piece_set_ids: dict[Side, int] | int | None = None) -> dict[Side, list[Type[abc.Piece]]]:
         if piece_set_ids is None:
             piece_set_ids = self.piece_set_ids
+        elif isinstance(piece_set_ids, int):
+            piece_set_ids = {side: piece_set_ids for side in self.piece_set_ids}  # type: ignore
         piece_sets = {Side.WHITE: [], Side.BLACK: []}
         for side in piece_set_ids:
             piece_group = piece_groups[piece_set_ids[side]]
@@ -434,7 +437,7 @@ class Board(Window):
 
     def reset_edit_promotions(self, piece_sets: dict[Side, list[Type[abc.Piece]]] | None = None) -> None:
         if piece_sets is None:
-            piece_sets = self.piece_sets
+            piece_sets = self.get_piece_sets(self.edit_piece_set_id)
         self.edit_promotions = {side: [] for side in self.edit_promotions}
         for side in self.edit_promotions:
             used_piece_set = set()
@@ -488,7 +491,7 @@ class Board(Window):
         self.piece_sets = self.get_piece_sets()
 
         if update:
-            self.piece_set_id_offset = 0
+            self.edit_piece_set_id = self.board_config['edit_id']
             self.roll_history = []
             self.future_move_history = []
             self.reset_promotions()
@@ -1125,6 +1128,9 @@ class Board(Window):
                 chained_move = chained_move.chained_move
             for chained_move in move_chain[::-1]:
                 self.undo(chained_move)
+                if chained_move.promotion is not None:
+                    if not chained_move.piece.is_empty():
+                        self.update_piece(chained_move.piece)
                 logged_move = copy(chained_move)
                 if in_promotion:
                     logged_move.set(promotion=True)
@@ -1329,7 +1335,7 @@ class Board(Window):
             promotion_piece = promotion(self, pos, piece.side)
             if issubclass(promotion, abc.RoyalPiece) and promotion not in self.piece_sets[piece.side]:
                 self.update_piece(promotion_piece, asset_folder='other')
-            else:
+            elif self.edit_piece_set_id is None:
                 self.update_piece(promotion_piece)
             promotion_piece.scale = self.square_size / promotion_piece.texture.width
             promotion_piece.set_color(
@@ -1533,14 +1539,14 @@ class Board(Window):
             elif self.should_hide_pieces == 2 and type(piece) in penultima_pieces:
                 asset_folder = 'other'
             else:
-                asset_folder = None
+                asset_folder = piece.asset_folder
         if file_name is None:
             if self.should_hide_pieces == 1:
                 file_name = 'ghost'
             elif self.should_hide_pieces == 2 and type(piece) in penultima_pieces:
                 file_name = penultima_pieces[type(piece)]
             else:
-                file_name = None
+                file_name = piece.file_name
         hidden = self.should_hide_moves if self.should_hide_moves is not None else bool(self.should_hide_pieces)
         piece.reload(hidden=hidden, asset_folder=asset_folder, file_name=file_name)
 
@@ -1551,7 +1557,7 @@ class Board(Window):
             if isinstance(piece, abc.Piece) and not piece.is_empty():
                 if isinstance(piece, abc.RoyalPiece) and type(piece) not in self.piece_sets[piece.side]:
                     self.update_piece(piece, asset_folder='other')
-                else:
+                elif self.edit_piece_set_id is None:
                     self.update_piece(piece)
 
     def is_trickster_mode(self, value: bool = True) -> bool:
@@ -1996,18 +2002,17 @@ class Board(Window):
                     self.piece_set_ids[Side.BLACK], self.piece_set_ids[Side.WHITE] = piece_set_ids
                 self.reset_board(update=True)
         if symbol == key.P:  # Promotion
-            old_offset = self.piece_set_id_offset
+            old_id = self.edit_piece_set_id
             if modifiers & key.MOD_SHIFT:  # Shift promotion piece set
-                d = -1 if modifiers & key.MOD_ACCEL else 1
-                self.piece_set_id_offset = (self.piece_set_id_offset + d) % len(piece_groups)
+                if self.edit_piece_set_id is not None:
+                    d = -1 if modifiers & key.MOD_ACCEL else 1
+                    self.edit_piece_set_id = (self.edit_piece_set_id + d) % len(piece_groups)
+                else:
+                    self.edit_piece_set_id = 0
             elif modifiers & key.MOD_ACCEL:  # Reset promotion piece set
-                self.piece_set_id_offset = 0
-            if old_offset != self.piece_set_id_offset:
-                piece_sets = self.get_piece_sets({
-                    side: (self.piece_set_ids[side] + self.piece_set_id_offset) % len(piece_groups)
-                    for side in self.piece_set_ids
-                })
-                self.reset_edit_promotions(piece_sets)
+                self.edit_piece_set_id = None
+            if old_id != self.edit_piece_set_id:
+                self.reset_edit_promotions()
                 promotion_piece = self.promotion_piece
                 if promotion_piece:
                     self.end_promotion()
