@@ -435,7 +435,7 @@ class ChainMovement(BaseMultiMovement):
             return ()
         if index == len(self.movements) - 1:
             for move in self.movements[index].moves(pos_from, piece, theoretical):
-                yield copy(move).set(chained_move=False)
+                yield move
             return ()
         if theoretical:
             for move in self.movements[index].moves(pos_from, piece, theoretical):

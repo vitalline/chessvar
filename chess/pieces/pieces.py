@@ -9,6 +9,7 @@ from arcade import Color, Sprite, load_texture
 
 from chess.movement.move import Move
 from chess.movement.util import AnyDirection, Position
+from chess.util import Default
 
 if TYPE_CHECKING:
     from chess.board import Board
@@ -84,7 +85,7 @@ class Piece(Sprite):
             movement: BaseMovement | None = None,
             flipped_horizontally: bool = False,
             flipped_vertically: bool = False,
-            is_hidden: bool = False
+            is_hidden: bool | None = None
     ):
         self.board = board
         self.board_pos = board_pos
@@ -133,20 +134,20 @@ class Piece(Sprite):
             asset_folder: str = None,
             side: Side = None,
             file_name: str = None,
-            hidden: bool = None,
+            is_hidden: bool = None,
             flipped_horizontally: bool = None,
             flipped_vertically: bool = None
     ):
-        if hidden is not None:
-            self.is_hidden = hidden
+        if is_hidden is not None:
+            self.is_hidden = None if is_hidden is Default else is_hidden
         self.texture_folder = asset_folder or self.texture_folder
         self.texture_side = side or self.texture_side
         self.texture_name = file_name or self.texture_name
         texture_path = self.texture_path()
         if flipped_horizontally is None:
-            flipped_horizontally = self.flipped_horizontally if not hidden else False
+            flipped_horizontally = self.flipped_horizontally if not is_hidden else False
         if flipped_vertically is None:
-            flipped_vertically = self.flipped_vertically if not hidden else False
+            flipped_vertically = self.flipped_vertically if not is_hidden else False
         if self.texture.name != texture_path:
             color = self.color
             new_texture = load_texture(
@@ -195,7 +196,7 @@ class PromotablePiece(Piece):
             if not self.promotions:
                 return
             promotion_piece = self.board.promotion_piece
-            if move.promotion and move.promotion is not True:
+            if move.promotion:
                 self.board.promotion_piece = True
                 self.board.replace(self, move.promotion)
                 self.board.load_pieces()

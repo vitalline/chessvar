@@ -39,6 +39,7 @@ from chess.pieces.groups import wide as wd
 from chess.pieces.groups import zebra as zb
 from chess.pieces.groups.util import NoPiece
 from chess.pieces.pieces import Side
+from chess.util import Default, Unset
 
 piece_groups = [
     {
@@ -673,12 +674,16 @@ class Board(Window):
         if not self.selected_square and self.move_history and not self.edit_mode:
             move = self.move_history[-1]
             if move is not None and not move.is_edit:
-                pos_from = move.pos_from
+                pos_from, pos_to = move.pos_from, move.pos_to
+                last_move = move
+                captures = []
                 if not isinstance(move.movement, movement.CastlingMovement):
-                    while move.chained_move:
-                        move = move.chained_move
-                capture = move.captured_piece
-                pos_to = capture.board_pos if move.pos_from == move.pos_to and capture is not None else move.pos_to
+                    while last_move.chained_move:
+                        if last_move.captured_piece:
+                            captures.append(last_move.captured_piece.board_pos)
+                        last_move = last_move.chained_move
+                if last_move.captured_piece:
+                    captures.append(last_move.captured_piece.board_pos)
                 if pos_from is not None and pos_from != pos_to:
                     if pos_from in move_sprites and not self.not_a_piece(pos_from):
                         move_sprites[pos_from].color = self.color_scheme["selection_color"]
@@ -695,6 +700,17 @@ class Board(Window):
                         sprite = Sprite(f"assets/util/{'capture' if self.not_a_piece(pos_to) else 'selection'}.png")
                         sprite.color = self.color_scheme["selection_color"]
                         sprite.position = self.get_screen_position(pos_to)
+                        sprite.scale = self.square_size / sprite.texture.width
+                        self.move_sprite_list.append(sprite)
+                for capture in captures:
+                    if capture == pos_to:
+                        continue
+                    if capture in move_sprites:
+                        move_sprites[capture].color = self.color_scheme["selection_color"]
+                    else:
+                        sprite = Sprite(f"assets/util/{'capture' if self.not_a_piece(capture) else 'selection'}.png")
+                        sprite.color = self.color_scheme["highlight_color"]
+                        sprite.position = self.get_screen_position(capture)
                         sprite.scale = self.square_size / sprite.texture.width
                         self.move_sprite_list.append(sprite)
 
@@ -750,7 +766,9 @@ class Board(Window):
             if self.promotion_piece:
                 if pos in self.promotion_area:
                     self.move_history[-1].set(promotion=self.promotion_area[pos])
-                    self.replace(self.promotion_piece, self.promotion_area[pos])
+                    hide_piece = not (self.move_history[-1].is_edit and self.edit_piece_set_id is not None)
+                    hide_piece = False if hide_piece is False else None
+                    self.replace(self.promotion_piece, self.promotion_area[pos], is_hidden=hide_piece)
                     self.load_pieces()
                     self.update_auto_ranged_pieces(self.move_history[-1], self.turn_side.opponent())
                     self.end_promotion()
@@ -879,7 +897,7 @@ class Board(Window):
                     if len(self.edit_promotions[side]) == 1:
                         move.set(promotion=self.edit_promotions[side][0])
                     elif len(self.edit_promotions[side]) > 1:
-                        move.set(promotion=True)
+                        move.set(promotion=Unset)
                         move.piece.move(move)
                         self.move_history.append(move)
                         self.start_promotion(move.piece, self.edit_promotions[side])
@@ -919,19 +937,16 @@ class Board(Window):
                     return
                 self.update_move(move)
                 if move.promotion is not None:
-                    move.promotion = True  # do not auto-promote because we are selecting promotion type manually
+                    move.promotion = Unset  # do not auto-promote because we are selecting promotion type manually
                 if (
-                    (
-                        move.chained_move or
-                        self.chain_moves.get(self.turn_side, {}).get((move.pos_from, move.pos_to))
-                    )
+                    move.chained_move or self.chain_moves.get(self.turn_side, {}).get((move.pos_from, move.pos_to))
                     and not isinstance(
                         move.movement,
                         movement.CastlingMovement |
                         movement.RangedAutoCaptureRiderMovement
                     )
                 ):
-                    move.chained_move = None  # do not chain moves because we are selecting chained move manually
+                    move.chained_move = Unset  # do not chain moves because we are selecting chained move manually
                 self.update_auto_ranged_pieces(move, self.turn_side.opponent())
                 chained_move = move
                 while chained_move:
@@ -947,7 +962,7 @@ class Board(Window):
                     while last_move.chained_move:
                         last_move = last_move.chained_move
                     last_move.chained_move = move
-                if move.chained_move is None and not self.promotion_piece:
+                if move.chained_move is Unset and not self.promotion_piece:
                     self.load_all_moves()
                     self.select_piece(move.pos_to)
                 else:
@@ -981,7 +996,7 @@ class Board(Window):
             return
         auto_ranged_pieces = self.auto_ranged_pieces[side]
         moved_piece = move.piece
-        if move.promotion and move.promotion is not True and self.promotion_piece:
+        if move.promotion and self.promotion_piece:
             moved_piece = self.get_piece(move.pos_to)
         if isinstance(moved_piece.movement, movement.AutoRangedCaptureRiderMovement):
             auto_ranged_pieces = [moved_piece] + [piece for piece in auto_ranged_pieces if piece != moved_piece]
@@ -1133,12 +1148,12 @@ class Board(Window):
                         self.update_piece(chained_move.piece)
                 logged_move = copy(chained_move)
                 if in_promotion:
-                    logged_move.set(promotion=True)
+                    logged_move.set(promotion=Unset)
                 self.log(f'''[Ply {self.ply_count}] Undo: {
                     f"{'Edit' if logged_move.is_edit else 'Move'}: " + str(logged_move)
                 }''')
                 in_promotion = False
-            if last_move.promotion is True:
+            if last_move.promotion is Unset:
                 if last_move.piece.is_empty():
                     last_move.piece.side = Side.NONE
             if last_move.is_edit:
@@ -1160,7 +1175,7 @@ class Board(Window):
         self.future_move_history = future_move_history
         if self.future_move_history:
             copies = [
-                copy(move).set(chained_move=False) if move is not None else None
+                copy(move).set(chained_move=None) if move is not None else None
                 for move in (self.future_move_history[-1], last_move)
             ]
             if (
@@ -1181,10 +1196,12 @@ class Board(Window):
                     past.pos_from == future.pos_from and past.pos_to == future.pos_to
                     and not (past.captured_piece is not None and future.swapped_piece is not None)
                     and not (past.swapped_piece is not None and future.captured_piece is not None)
-                    and future.promotion is not None and future.promotion is not True
+                    and future.promotion
                 ):
                     past.promotion = future.promotion
-                    self.replace(self.promotion_piece, future.promotion)
+                    hide_piece = not (future.is_edit and self.edit_piece_set_id is not None)
+                    hide_piece = False if hide_piece is False else None
+                    self.replace(self.promotion_piece, future.promotion, is_hidden=hide_piece)
                     self.load_pieces()
                     self.update_auto_ranged_pieces(self.move_history[-1], self.turn_side.opponent())
                     self.end_promotion()
@@ -1204,7 +1221,7 @@ class Board(Window):
             while last_chain_move:
                 if last_history_move:
                     copies = [
-                        copy(move).set(chained_move=False) if move is not None else None
+                        copy(move).set(chained_move=None) if move is not None else None
                         for move in (last_history_move, last_chain_move)
                     ]
                     if (
@@ -1252,11 +1269,13 @@ class Board(Window):
                 last_chain_move = chained_move
                 if chained_move:
                     if not isinstance(chained_move.piece, abc.PromotablePiece) and chained_move.promotion is not None:
-                        if chained_move.promotion is True:
+                        if chained_move.promotion is Unset:
                             self.start_promotion(chained_move.piece, self.edit_promotions[chained_move.piece.side])
                         else:
                             self.promotion_piece = True
-                            self.replace(chained_move.piece, chained_move.promotion)
+                            hide_piece = not (chained_move.is_edit and self.edit_piece_set_id is not None)
+                            hide_piece = False if hide_piece is False else None
+                            self.replace(chained_move.piece, chained_move.promotion, is_hidden=hide_piece)
                             self.load_pieces()
                             self.update_auto_ranged_pieces(chained_move, self.turn_side.opponent())
                             self.promotion_piece = None
@@ -1276,7 +1295,7 @@ class Board(Window):
         if last_move is not None and last_move.is_edit and not self.edit_mode:
             self.turn_side = self.turn_side.opponent()
         if (
-            last_chain_move is None or last_chain_move.chained_move is False
+            last_chain_move is None or last_chain_move.chained_move is None
             or not self.chain_moves.get(turn_side, {}).get((last_chain_move.pos_from, last_chain_move.pos_to))
         ):
             self.chain_start = None
@@ -1284,7 +1303,7 @@ class Board(Window):
                 self.ply_count += 1 if last_move is None else not last_move.is_edit
                 self.compare_history()
             self.advance_turn()
-        elif last_chain_move.chained_move is None:
+        elif last_chain_move.chained_move is Unset:
             self.load_all_moves()
             self.select_piece(last_chain_move.pos_to)
             self.show_moves()
@@ -1337,6 +1356,8 @@ class Board(Window):
                 self.update_piece(promotion_piece, asset_folder='other')
             elif self.edit_piece_set_id is None:
                 self.update_piece(promotion_piece)
+            else:
+                promotion_piece.reload(is_hidden=False)
             promotion_piece.scale = self.square_size / promotion_piece.texture.width
             promotion_piece.set_color(
                 self.color_scheme.get(
@@ -1355,7 +1376,11 @@ class Board(Window):
         self.promotion_piece_sprite_list.clear()
 
     def replace(
-            self, piece: abc.Piece, new_type: Type[abc.Piece | abc.PromotablePiece], new_side: Side | None = None
+            self,
+            piece: abc.Piece,
+            new_type: Type[abc.Piece | abc.PromotablePiece],
+            new_side: Side | None = None,
+            is_hidden: bool | None = None
     ) -> None:
         if new_side is None:
             new_side = piece.side
@@ -1366,6 +1391,7 @@ class Board(Window):
             promotions=self.promotions[new_side],
             promotion_squares=promotion_squares[new_side],
         ) if issubclass(new_type, abc.PromotablePiece) else new_type(self, pos, new_side)
+        self.pieces[pos[0]][pos[1]].reload(is_hidden=is_hidden)
         self.update_piece(self.pieces[pos[0]][pos[1]])
         self.pieces[pos[0]][pos[1]].set_color(
             self.color_scheme.get(
@@ -1534,21 +1560,30 @@ class Board(Window):
     def update_piece(self, piece: abc.Piece, asset_folder: str | None = None, file_name: str | None = None) -> None:
         penultima_pieces = self.penultima_pieces.get(piece.side, {})
         if asset_folder is None:
-            if self.should_hide_pieces == 1:
+            if piece.is_hidden is False:
+                asset_folder = piece.asset_folder
+            elif self.should_hide_pieces == 1:
                 asset_folder = 'other'
             elif self.should_hide_pieces == 2 and type(piece) in penultima_pieces:
                 asset_folder = 'other'
             else:
                 asset_folder = piece.asset_folder
         if file_name is None:
-            if self.should_hide_pieces == 1:
+            if piece.is_hidden is False:
+                file_name = piece.file_name
+            elif self.should_hide_pieces == 1:
                 file_name = 'ghost'
             elif self.should_hide_pieces == 2 and type(piece) in penultima_pieces:
                 file_name = penultima_pieces[type(piece)]
             else:
                 file_name = piece.file_name
-        hidden = self.should_hide_moves if self.should_hide_moves is not None else bool(self.should_hide_pieces)
-        piece.reload(hidden=hidden, asset_folder=asset_folder, file_name=file_name)
+        if piece.is_hidden is False:
+            is_hidden = False
+        elif self.should_hide_moves is not None:
+            is_hidden = self.should_hide_moves or Default
+        else:
+            is_hidden = bool(self.should_hide_pieces) or Default
+        piece.reload(is_hidden=is_hidden, asset_folder=asset_folder, file_name=file_name)
 
     def update_pieces(self) -> None:
         for piece in sum(self.movable_pieces.values(), []):
@@ -1559,6 +1594,8 @@ class Board(Window):
                     self.update_piece(piece, asset_folder='other')
                 elif self.edit_piece_set_id is None:
                     self.update_piece(piece)
+                else:
+                    piece.reload(is_hidden=False)
 
     def is_trickster_mode(self, value: bool = True) -> bool:
         return value == (self.trickster_color_index != 0)
@@ -1645,7 +1682,7 @@ class Board(Window):
                     self.update_move(move)
                     self.update_auto_ranged_pieces(move, turn_side.opponent())
                     self.move(move)
-                    if move.promotion and move.promotion is not True:
+                    if move.promotion:
                         self.promotion_piece = True
                         self.replace(move.piece, move.promotion)
                         self.load_pieces()
@@ -1656,7 +1693,7 @@ class Board(Window):
                     while chained_move:
                         self.update_move(chained_move)
                         self.move(chained_move)
-                        if chained_move.promotion and chained_move.promotion is not True:
+                        if chained_move.promotion:
                             self.promotion_piece = True
                             self.replace(chained_move.piece, chained_move.promotion)
                             self.load_pieces()
@@ -1748,17 +1785,14 @@ class Board(Window):
                     move_data_set.add(move_data)
                     move = copy(move)
                     if (
-                        (
-                            move.chained_move or
-                            self.chain_moves.get(turn_side, {}).get((move.pos_from, move.pos_to))
-                        )
+                        move.chained_move or self.chain_moves.get(turn_side, {}).get((move.pos_from, move.pos_to))
                         and not isinstance(
                             move.movement,
                             movement.CastlingMovement |
                             movement.RangedAutoCaptureRiderMovement
                         )
                     ):
-                        move.chained_move = None  # do not chain moves because we are only counting one-move sequences
+                        move.chained_move = Unset  # do not chain moves because we are only counting one-move sequences
                     moves[turn_side].setdefault(move.pos_from, []).append(move)
         return moves
 
@@ -1808,7 +1842,7 @@ class Board(Window):
                 for move in piece.moves():
                     last_move = copy(move)
                     self.update_move(last_move)
-                    if last_move.promotion and last_move.promotion is not True and not last_move.is_edit:
+                    if last_move.promotion and not last_move.is_edit:
                         new_piece = last_move.promotion(self, last_move.pos_to, last_move.piece.side)
                         last_move.piece = new_piece
                     self.update_auto_ranged_pieces(last_move, self.turn_side)
@@ -2144,7 +2178,7 @@ class Board(Window):
                         while last_move.chained_move:
                             last_move = last_move.chained_move
                         last_move.chained_move = move
-                    if move.chained_move is None and not self.promotion_piece:
+                    if move.chained_move is Unset and not self.promotion_piece:
                         self.load_all_moves()
                         self.select_piece(move.pos_to)
                     else:

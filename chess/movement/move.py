@@ -3,6 +3,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Type
 
 from chess.movement.util import Position, to_alpha
+from chess.util import Default, Unset
 
 if TYPE_CHECKING:
     from chess.movement.movement import BaseMovement
@@ -50,8 +51,14 @@ class Move(object):
         self.movement = movement or self.movement
         self.captured_piece = captured_piece or self.captured_piece
         self.swapped_piece = swapped_piece or self.swapped_piece
-        self.promotion = promotion if promotion is not None else self.promotion
-        self.chained_move = chained_move if chained_move is not None else self.chained_move
+        self.promotion = (
+            promotion if promotion is not None and promotion is not Default
+            else None if promotion is Default else self.promotion
+        )
+        self.chained_move = (
+            chained_move if chained_move is not None and chained_move is not Default
+            else None if chained_move is Default else self.chained_move
+        )
         self.is_edit = is_edit if is_edit is not None else self.is_edit
         return self
 
@@ -122,7 +129,7 @@ class Move(object):
             else:
                 string = f"on {to_alpha(self.pos_from)} goes to {to_alpha(self.pos_to)}"
         elif self.pos_from is None or (self.piece and self.piece.is_empty() and not moved):
-            if self.promotion is True:
+            if self.promotion is Unset:
                 string = f"wants something to appear on {to_alpha(self.pos_to)}"
             else:
                 string = f"appears on {to_alpha(self.pos_to)}"
@@ -133,7 +140,7 @@ class Move(object):
         else:
             string = "does something very mysterious"
         if self.piece:
-            if self.piece.is_empty() and not (self.promotion and self.promotion is not True and not moved):
+            if self.piece.is_empty() and not (self.promotion and not moved):
                 string = f"{self.piece.side} {string}"
             elif self.piece.is_empty() and not board.should_hide_pieces:
                 string = f"{self.piece.side} {self.promotion.name} {string}"
@@ -160,11 +167,11 @@ class Move(object):
                 string += f", swaps with {self.swapped_piece.side} ???"
             else:
                 string += f", swaps with {self.swapped_piece.side} {self.swapped_piece.name}"
-        if self.promotion and self.pos_from is not None and not (self.piece and self.piece.is_empty() and not moved):
-            if self.piece:
-                if self.promotion is True:
-                    string += f", tries to promote"
-                elif board.should_hide_pieces:
+        if self.pos_from is not None and not (self.piece and self.piece.is_empty() and not moved) and self.piece:
+            if self.promotion is Unset:
+                string += f", tries to promote"
+            elif self.promotion:
+                if board.should_hide_pieces:
                     string += ", promotes to ???"
                 else:
                     string += f", promotes to {self.promotion.name}"
