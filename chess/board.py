@@ -682,6 +682,7 @@ class Board(Window):
                         if last_move.captured_piece:
                             captures.append(last_move.captured_piece.board_pos)
                         last_move = last_move.chained_move
+                    pos_to = last_move.pos_to
                 if last_move.captured_piece:
                     captures.append(last_move.captured_piece.board_pos)
                 if pos_from is not None and pos_from != pos_to:
@@ -939,7 +940,7 @@ class Board(Window):
                 if move.promotion is not None:
                     move.promotion = Unset  # do not auto-promote because we are selecting promotion type manually
                 if (
-                    move.chained_move or self.chain_moves.get(self.turn_side, {}).get((move.pos_from, move.pos_to))
+                    (move.chained_move or self.chain_moves.get(self.turn_side, {}).get((move.pos_from, move.pos_to)))
                     and not isinstance(
                         move.movement,
                         movement.CastlingMovement |
@@ -1785,7 +1786,7 @@ class Board(Window):
                     move_data_set.add(move_data)
                     move = copy(move)
                     if (
-                        move.chained_move or self.chain_moves.get(turn_side, {}).get((move.pos_from, move.pos_to))
+                        (move.chained_move or self.chain_moves.get(turn_side, {}).get((move.pos_from, move.pos_to)))
                         and not isinstance(
                             move.movement,
                             movement.CastlingMovement |
