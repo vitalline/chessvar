@@ -27,6 +27,9 @@ Ctrl + Shift + N: cycle both armies backward (-1) if they're the same, swap othe
 Ctrl + P: reset replacement pieces to current armies
 Shift + P: cycle replacement pieces forward (+1)
 Ctrl + Shift + P: cycle replacement pieces backward (-1)
+Ctrl + O: restore default behavior for check/mate (piece-dependent)
+Shift + O: force check/mate if one's last royal piece is threatened
+Ctrl + Shift + O: force check/mate if any royal piece is threatened
 Ctrl + F: flip board
 Shift + F: fast-forward to last move
 Ctrl + G: reset graphics mode (colors)

@@ -293,6 +293,7 @@ class Board(Window):
         self.turn_side = Side.WHITE  # side whose turn it is
         self.check_side = Side.NONE  # side that is currently in check
         self.castling_threats = set()  # squares that are attacked in a way that prevents castling
+        self.royal_piece_mode = 0  # 0: normal, 1: force royal, -1: force quasi-royal
         self.should_hide_pieces = 0  # 0: don't hide, 1: hide all pieces, 2: penultima mode
         self.should_hide_moves = None  # whether to hide the move markers; None defaults to should_hide_pieces
         self.flip_mode = False  # whether the board is flipped
@@ -1815,9 +1816,18 @@ class Board(Window):
                     self.probabilistic_pieces[piece.side].append(piece)
                 if isinstance(piece.movement, movement.AutoRangedCaptureRiderMovement):
                     self.auto_ranged_pieces[piece.side].append(piece)
-        for side in (Side.WHITE, Side.BLACK):
-            if len(self.quasi_royal_pieces[side]) == 1:
-                self.royal_pieces[side].append(self.quasi_royal_pieces[side].pop())
+        if self.royal_piece_mode == 1:  # Force royal pieces
+            for side in (Side.WHITE, Side.BLACK):
+                self.royal_pieces[side].extend(self.quasi_royal_pieces[side])
+                self.quasi_royal_pieces[side].clear()
+        if self.royal_piece_mode == -1:  # Force quasi-royal pieces
+            for side in (Side.WHITE, Side.BLACK):
+                self.quasi_royal_pieces[side].extend(self.royal_pieces[side])
+                self.royal_pieces[side].clear()
+        if self.royal_piece_mode != 1:  # If not forcing to royal and there is only one quasi-royal piece, make it royal
+            for side in (Side.WHITE, Side.BLACK):
+                if len(self.quasi_royal_pieces[side]) == 1:
+                    self.royal_pieces[side].append(self.quasi_royal_pieces[side].pop())
 
     def load_check(self):
         self.load_pieces()
@@ -1995,9 +2005,9 @@ class Board(Window):
                     self.ply_count += 1
                     self.clear_en_passant()
                     self.compare_history()
-                    self.advance_turn()
                     if self.edit_mode:
                         self.turn_side = self.turn_side.opponent()
+                    self.advance_turn()
             elif modifiers & key.MOD_SHIFT:  # Shift white piece set
                 d = -1 if modifiers & key.MOD_ACCEL else 1
                 self.piece_set_ids[Side.WHITE] = (self.piece_set_ids[Side.WHITE] + d) % len(piece_groups)
@@ -2010,9 +2020,9 @@ class Board(Window):
                     self.ply_count += 1
                     self.clear_en_passant()
                     self.compare_history()
-                    self.advance_turn()
                     if self.edit_mode:
                         self.turn_side = self.turn_side.opponent()
+                    self.advance_turn()
             elif modifiers & key.MOD_SHIFT:  # Shift black piece set
                 d = -1 if modifiers & key.MOD_ACCEL else 1
                 self.piece_set_ids[Side.BLACK] = (self.piece_set_ids[Side.BLACK] + d) % len(piece_groups)
@@ -2024,9 +2034,9 @@ class Board(Window):
                 self.ply_count += 1
                 self.clear_en_passant()
                 self.compare_history()
-                self.advance_turn()
                 if self.edit_mode:
                     self.turn_side = self.turn_side.opponent()
+                self.advance_turn()
             elif modifiers & key.MOD_SHIFT:
                 if self.piece_set_ids[Side.WHITE] == self.piece_set_ids[Side.BLACK]:  # Next piece set
                     d = -1 if modifiers & key.MOD_ACCEL else 1
@@ -2052,6 +2062,19 @@ class Board(Window):
                 if promotion_piece:
                     self.end_promotion()
                     self.start_promotion(promotion_piece, self.edit_promotions[promotion_piece.side])
+        if symbol == key.O:  # Royal pieces
+            old_mode = self.royal_piece_mode
+            if modifiers & key.MOD_SHIFT:  # Force royal mode (Shift: all quasi-royal, Ctrl+Shift: all royal)
+                self.royal_piece_mode = 1 if modifiers & key.MOD_ACCEL else -1
+            elif modifiers & key.MOD_ACCEL:  # Default
+                self.royal_piece_mode = 0
+            if old_mode != self.royal_piece_mode:
+                royal_mode_texts = {0: "Default royal pieces", 1: "Quasi-royal to royal", -1: "Royal to quasi-royal"}
+                self.log(f"[Ply {self.ply_count}] Mode: {royal_mode_texts[self.royal_piece_mode]}")
+                self.future_move_history = []  # we don't know if we can redo the future moves anymore, so we clear them
+                self.roll_history = self.roll_history[:self.ply_count - 1]  # and we also have to clear the roll history
+                self.turn_side = self.turn_side.opponent()
+                self.advance_turn()
         if symbol == key.F:
             if modifiers & key.MOD_ACCEL:  # Flip
                 self.flip_board()
