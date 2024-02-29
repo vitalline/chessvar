@@ -2069,8 +2069,14 @@ class Board(Window):
             elif modifiers & key.MOD_ACCEL:  # Default
                 self.royal_piece_mode = 0
             if old_mode != self.royal_piece_mode:
-                royal_mode_texts = {0: "Default royal pieces", 1: "Quasi-royal to royal", -1: "Royal to quasi-royal"}
-                self.log(f"[Ply {self.ply_count}] Mode: {royal_mode_texts[self.royal_piece_mode]}")
+                if self.royal_piece_mode == 0:
+                    self.log(f"[Ply {self.ply_count}] Info: Using default check rule (piece-dependent)")
+                elif self.royal_piece_mode == 1:
+                    self.log(f"[Ply {self.ply_count}] Info: Using royal check rule (threaten any royal piece)")
+                elif self.royal_piece_mode == -1:
+                    self.log(f"[Ply {self.ply_count}] Info: Using quasi-royal check rule (threaten last royal piece)")
+                else:
+                    self.royal_piece_mode = old_mode
                 self.future_move_history = []  # we don't know if we can redo the future moves anymore, so we clear them
                 self.roll_history = self.roll_history[:self.ply_count - 1]  # and we also have to clear the roll history
                 self.turn_side = self.turn_side.opponent()
@@ -2345,6 +2351,8 @@ class Board(Window):
         debug_log_data.append(f"Piece visibility: {piece_modes[self.should_hide_pieces]}")
         move_modes = {None: 'Default', False: 'Shown', True: 'Hidden'}
         debug_log_data.append(f"Move visibility: {move_modes[self.should_hide_moves]}")
+        royal_modes = {0: 'Default', 1: 'Force royal (Threaten Any)', -1: 'Force quasi-royal (Threaten Last)'}
+        debug_log_data.append(f"Royal mode: {royal_modes[self.royal_piece_mode]}")
         debug_log_data.append(f"Board mode: {'Edit' if self.edit_mode else 'Play'}")
         debug_log_data.append(f"Turn side: {self.turn_side if self.turn_side else 'None'}")
         debug_log_data.append(f"Current ply: {self.ply_count}")
