@@ -989,11 +989,11 @@ class Board(Window):
                 move.set(captured_piece=new_piece)
 
     def update_auto_ranged_pieces(self, move: Move, side: Side) -> None:
-        # Note: This method does not account for an auto-capture by the piece of the same side that just moved
-        # (but it does account for auto-capture by the piece that just moved, if it is an auto-capture piece).
+        # Note: This method does not account for an auto-capture by a piece of the side that just made a move
+        # (but it does account for auto-capture by a piece that just moved, if it is an auto-capture piece).
         # This is because the only army using this mechanic only has leaping pieces, so it is not necessary
         # as the situation described can only happen if a piece gained mobility after another piece moved,
-        # which can only happen with riders (or lame leapers), of which there are none that can auto-capture.
+        # which can only happen to riders or lame leapers, of which there are none that can auto-capture.
         if move.is_edit:
             return
         auto_ranged_pieces = self.auto_ranged_pieces[side]
