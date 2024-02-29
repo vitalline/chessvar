@@ -1268,22 +1268,21 @@ class Board(Window):
                 self.log(f'''[Ply {self.ply_count}] Redo: {
                 f"{'Edit' if chained_move.is_edit else 'Move'}: " + str(chained_move)
                 }''')
+                if chained_move.is_edit and chained_move.promotion is not None:
+                    if chained_move.promotion is Unset:
+                        self.start_promotion(chained_move.piece, self.edit_promotions[chained_move.piece.side])
+                    else:
+                        self.promotion_piece = True
+                        hide_piece = not (chained_move.is_edit and self.edit_piece_set_id is not None)
+                        hide_piece = False if hide_piece is False else None
+                        self.replace(chained_move.piece, chained_move.promotion, is_hidden=hide_piece)
+                        self.load_pieces()
+                        self.update_auto_ranged_pieces(chained_move, self.turn_side.opponent())
+                        self.promotion_piece = None
                 last_chain_move = chained_move
+                chained_move = chained_move.chained_move
                 if chained_move:
-                    if not isinstance(chained_move.piece, abc.PromotablePiece) and chained_move.promotion is not None:
-                        if chained_move.promotion is Unset:
-                            self.start_promotion(chained_move.piece, self.edit_promotions[chained_move.piece.side])
-                        else:
-                            self.promotion_piece = True
-                            hide_piece = not (chained_move.is_edit and self.edit_piece_set_id is not None)
-                            hide_piece = False if hide_piece is False else None
-                            self.replace(chained_move.piece, chained_move.promotion, is_hidden=hide_piece)
-                            self.load_pieces()
-                            self.update_auto_ranged_pieces(chained_move, self.turn_side.opponent())
-                            self.promotion_piece = None
-                    chained_move = chained_move.chained_move
-                    if chained_move:
-                        self.update_move(chained_move)
+                    self.update_move(chained_move)
             if self.chain_start is None:
                 self.chain_start = last_move
                 self.move_history.append(last_move)
