@@ -59,7 +59,7 @@ piece_groups = [
         'set': [kn.Forerook, kn.Fibnif, kn.Foreknight, kn.Colonel, fide.King, kn.Foreknight, kn.Fibnif, kn.Forerook],
     },
     {
-        'name': "Amazing Armada",
+        'name': "Amazonian Armada",
         'set': [am.Cannon, am.Camel, am.NightRdr, am.Amazon, fide.King, am.NightRdr, am.Camel, am.Cannon],
     },
     {
