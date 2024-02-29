@@ -1437,6 +1437,7 @@ class Board(Window):
             return
         self.game_over = False
         if self.edit_mode:
+            self.load_pieces()  # loading the new piece positions in order to update the board state
             self.color_pieces()  # reverting the piece colors to normal in case they were changed
             return  # let's not advance the turn while editing the board to hopefully make things easier for everyone
         if self.move_history and self.move_history[-1] and self.move_history[-1].is_edit:

@@ -123,6 +123,18 @@ for i in range(len(colors)):
         colors[i]["text_color"] = colors[i]["promotion_area_color"]
     else:
         colors[i]["text_color"] = (0, 0, 0)
+    if colors[i]["scheme_type"] == "troll" and colors[i]["light_square_color"] == getrgb('#626262'):
+        colors[i]["white_piece_color"] = (128, 128, 128)
+        colors[i]["white_check_color"] = (100, 100, 100)
+        colors[i]["white_win_color"] = (112, 112, 112)
+        colors[i]["white_draw_color"] = (88, 88, 88)
+        colors[i]["white_loss_color"] = (62, 62, 62)
+    elif colors[i]["scheme_type"] == "troll":
+        colors[i]["white_piece_color"] = lighten(colors[i]["light_square_color"], 0.2)
+        colors[i]["white_check_color"] = desaturate(colors[i]["white_piece_color"], 0.25)
+        colors[i]["white_win_color"] = lighten(colors[i]["light_square_color"], 0.25)
+        colors[i]["white_draw_color"] = desaturate(colors[i]["light_square_color"], 0.25)
+        colors[i]["white_loss_color"] = desaturate(colors[i]["white_check_color"], 0.25)
     if colors[i]["scheme_type"] == "cherub":
         colors[i]["colored_pieces"] = True
         colors[i]["white_piece_color"] = (0, 255, 0)
