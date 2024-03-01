@@ -29,13 +29,13 @@ class CrabRdr(Piece):
 
 class Sandbar(Piece):
     name = 'Sandbar'
-    file_name = 'WfDfsbbN'
+    file_name = 'WfDfsbbNN'
     asset_folder = 'drip'
 
     def __init__(self, board, board_pos, side):
         super().__init__(
             board, board_pos, side,
-            movement.RiderMovement(board, symv([(1, 2, 1), (-2, 1, 1)]) + rot([(1, 0, 1)]) + [(2, 0, 1)]),
+            movement.RiderMovement(board, symv([(1, 2), (-2, 1)]) + rot([(1, 0, 1)]) + [(2, 0, 1)]),
         )
 
 
