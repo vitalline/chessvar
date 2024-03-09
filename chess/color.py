@@ -8,6 +8,10 @@ def average(color1: Color, color2: Color) -> Color:
     return tuple(min(255, max(0, round((x1 + x2) / 2))) for x1, x2 in zip(color1, color2))  # type: ignore
 
 
+def multiply(color: Color, amount: float) -> Color:
+    return tuple(min(255, max(0, round(x * amount))) for x in color[:3]) + color[3:]  # type: ignore
+
+
 def lighten(color: Color, amount: float) -> Color:
     h, l, s = rgb_to_hls(*(x / 255 for x in color[:3]))
     return tuple(  # type: ignore
@@ -116,25 +120,31 @@ for i in range(len(colors)):
         r, g, b = (x / 255 for x in colors[i]["background_color"])
         colors[i]["text_color"] = tuple(  # type: ignore
             min(255, max(0, round(x * 255))) for x in hsv_to_rgb(0, 0, rgb_to_hsv(r, g, b)[2] + 0.3)
-        )
+        )  # probably should replace the above line with multiply() call some time later
         colors[i]["highlight_color"] = (255, 255, 255, 80)
         colors[i]["selection_color"] = (255, 255, 255, 120)
     elif colors[i]["scheme_type"] == "color":
         colors[i]["text_color"] = colors[i]["promotion_area_color"]
     else:
         colors[i]["text_color"] = (0, 0, 0)
-    if colors[i]["scheme_type"] == "troll" and colors[i]["light_square_color"] == getrgb('#626262'):
-        colors[i]["white_piece_color"] = (128, 128, 128)
-        colors[i]["white_check_color"] = (100, 100, 100)
-        colors[i]["white_win_color"] = (112, 112, 112)
-        colors[i]["white_draw_color"] = (88, 88, 88)
-        colors[i]["white_loss_color"] = (62, 62, 62)
-    elif colors[i]["scheme_type"] == "troll":
-        colors[i]["white_piece_color"] = lighten(colors[i]["light_square_color"], 0.2)
-        colors[i]["white_check_color"] = desaturate(colors[i]["white_piece_color"], 0.25)
-        colors[i]["white_win_color"] = lighten(colors[i]["light_square_color"], 0.25)
-        colors[i]["white_draw_color"] = desaturate(colors[i]["light_square_color"], 0.25)
-        colors[i]["white_loss_color"] = desaturate(colors[i]["white_check_color"], 0.25)
+    if colors[i]["scheme_type"] == "troll":
+        if colors[i]["light_square_color"] == getrgb('#626262'):
+            colors[i]["white_piece_color"] = (128, 128, 128)
+            colors[i]["white_check_color"] = (100, 100, 100)
+            colors[i]["white_win_color"] = (112, 112, 112)
+            colors[i]["white_draw_color"] = (88, 88, 88)
+            colors[i]["white_loss_color"] = (62, 62, 62)
+        else:
+            colors[i]["white_piece_color"] = lighten(colors[i]["light_square_color"], 0.2)
+            colors[i]["white_check_color"] = desaturate(colors[i]["white_piece_color"], 0.25)
+            colors[i]["white_win_color"] = lighten(colors[i]["light_square_color"], 0.25)
+            colors[i]["white_draw_color"] = desaturate(colors[i]["light_square_color"], 0.25)
+            colors[i]["white_loss_color"] = desaturate(colors[i]["white_check_color"], 0.25)
+        colors[i]["black_piece_color"] = multiply(colors[i]["dark_square_color"], 2)
+        colors[i]["black_check_color"] = multiply(colors[i]["dark_square_color"], 1.5625)
+        colors[i]["black_win_color"] = multiply(colors[i]["dark_square_color"], 1.75)
+        colors[i]["black_draw_color"] = multiply(colors[i]["dark_square_color"], 1.375)
+        colors[i]["black_loss_color"] = multiply(colors[i]["dark_square_color"], 1)
     if colors[i]["scheme_type"] == "cherub":
         colors[i]["colored_pieces"] = True
         colors[i]["white_piece_color"] = (0, 255, 0)

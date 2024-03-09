@@ -161,16 +161,14 @@ class Piece(Sprite):
     def set_color(self, color: Color, force_color: bool = False):
         if not self.name:
             return
-        side = Side.WHITE if force_color else Side.NONE
-        if not side:
+        side = Side.WHITE if force_color else Side.NONE  # if forcing color, make piece white so that it can be colored
+        if not side:  # if not forcing color, determine side based on color
             if max(color) != min(color):  # if color is not grayscale
-                if max(self.color) == min(self.color):  # but was grayscale
-                    side = Side.WHITE  # make piece white so that it can be colored
+                side = Side.WHITE  # make piece white so that it can be colored
             if max(color) == min(color):  # if color is grayscale
-                if max(self.color) != min(self.color):  # but was not grayscale
-                    side = self.side  # make piece match the side
+                side = self.side  # make piece match the side
         self.color = color
-        if side:  # if side was defined and does not match the current texture
+        if side != self.texture_side:  # if side was defined and does not match the current texture
             self.reload(side=side)
 
 
