@@ -1037,27 +1037,38 @@ class Board(Window):
     def move(self, move: Move) -> None:
         self.deselect_piece()
         if move.piece is not None and move.pos_to is not None:
+            # piece was moved to a different square, set its position to the new square
             self.set_position(move.piece, move.pos_to)
         if move.swapped_piece is not None:
+            # piece was swapped with another piece, set the swapped piece's position to the square the move started from
             self.set_position(move.swapped_piece, move.pos_from)
         if move.piece is not None and move.pos_to is None:
+            # piece was removed from the board, empty the square it was on
             self.piece_sprite_list.remove(move.piece)
         if move.pos_to is not None and move.pos_from != move.pos_to:
+            # piece was moved to a different square, empty the square it was moved to and put the piece there
             self.piece_sprite_list.remove(self.pieces[move.pos_to[0]][move.pos_to[1]])
             self.pieces[move.pos_to[0]][move.pos_to[1]] = move.piece
         if move.captured_piece is not None and move.captured_piece.board_pos != move.pos_to:
+            # piece was captured on a different square than the one the capturing piece moved to (e.g. en passant)
+            # empty the square it was captured on (it was not emptied earlier because it was not the one moved to)
             self.piece_sprite_list.remove(move.captured_piece)
         if move.pos_from is not None and move.pos_from != move.pos_to:
+            # existing piece was moved to a different square, create a blank piece on the square that was moved from
             self.pieces[move.pos_from[0]][move.pos_from[1]] = (
                 NoPiece(self, move.pos_from) if move.swapped_piece is None else move.swapped_piece
             )
             self.piece_sprite_list.append(self.pieces[move.pos_from[0]][move.pos_from[1]])
         if move.captured_piece is not None and (capture_pos := move.captured_piece.board_pos) != move.pos_to:
+            # piece was captured on a different square than the one the capturing piece moved to (e.g. en passant)
+            # create a blank piece on the square it was captured on
             self.pieces[capture_pos[0]][capture_pos[1]] = NoPiece(self, capture_pos)
             self.piece_sprite_list.append(self.pieces[capture_pos[0]][capture_pos[1]])
         if move.piece is not None and move.pos_from is None:
+            # piece was added to the board, add it to the sprite list
             self.piece_sprite_list.append(move.piece)
         if not move.is_edit or (move.pos_from == move.pos_to and move.promotion is None):
+            # call movement.update() to update movement state after the move (e.g. pawn double move, castling rights)
             (move.piece or move).movement.update(move, move.piece)
 
     def update_board(self, move: Move) -> None:
@@ -1068,7 +1079,7 @@ class Board(Window):
         if move.pos_from != move.pos_to or move.promotion is not None:
             # piece was added, moved, removed, or promoted
             if move.pos_from is not None:
-                # existing piece was moved, empty the square it moved from and restore its position
+                # existing piece was moved, empty the square it was moved from and restore its position
                 self.set_position(move.piece, move.pos_from)
                 self.piece_sprite_list.remove(self.pieces[move.pos_from[0]][move.pos_from[1]])
             if move.pos_to is not None and move.pos_from != move.pos_to:
@@ -1079,15 +1090,15 @@ class Board(Window):
                 if self.is_trickster_mode(False):  # reset_trickster_mode() does not reset removed pieces
                     move.piece.angle = 0           # so instead we have to do it manually as a workaround
             if move.pos_from is not None:
-                # existing piece was moved, restore it on the square it moved from
+                # existing piece was moved, restore it on the square it was moved from
                 self.pieces[move.pos_from[0]][move.pos_from[1]] = move.piece
                 self.piece_sprite_list.append(move.piece)
         if move.captured_piece is not None:
-            # piece was captured, restore it on the square it was captured from
+            # piece was captured, restore it on the square it was captured on
             capture_pos = move.captured_piece.board_pos
             if capture_pos != move.pos_to:
-                # piece was captured from a different square than the one the capturing piece moved to (e.g. en passant)
-                # empty the square it was captured from (it was not emptied earlier because it was not the one moved to)
+                # piece was captured on a different square than the one the capturing piece moved to (e.g. en passant)
+                # empty the square it was captured on (it was not emptied earlier because it was not the one moved to)
                 self.piece_sprite_list.remove(self.pieces[capture_pos[0]][capture_pos[1]])
             self.reset_position(move.captured_piece)
             if self.is_trickster_mode(False):  # reset_trickster_mode() does not reset removed pieces
@@ -2294,9 +2305,12 @@ class Board(Window):
             with open(join(base_dir, f"{file_name}.txt"), "w") as log_file:
                 log_file.write("\n".join(log_data))
 
-    def clear_log(self) -> None:
-        self.log_data.clear()
-        system("cls" if os_name == "nt" else "clear")
+    def clear_log(self, console: bool = True, file: bool = False) -> None:
+        self.log(f"[Ply {self.ply_count}] Info: Log cleared")
+        if file:
+            self.log_data.clear()
+        if console:
+            system("cls" if os_name == "nt" else "clear")
 
     def debug_info(self) -> list[str]:
         debug_log_data = []  # noqa
