@@ -41,7 +41,7 @@ from chess.pieces.groups.util import NoPiece
 from chess.pieces.pieces import Side
 from chess.util import Default, Unset
 
-piece_groups = [
+piece_groups: list[dict[str, str | list[Type[abc.Piece]]]] = [
     {
         'name': "Fabulous FIDEs",
         'set': [fide.Rook, fide.Knight, fide.Bishop, fide.Queen, fide.King, fide.Bishop, fide.Knight, fide.Rook],
@@ -2315,6 +2315,7 @@ class Board(Window):
     def debug_info(self) -> list[str]:
         debug_log_data = []  # noqa
         debug_log_data.append(f"Board size: {self.board_width}x{self.board_height}")
+        debug_log_data.append(f"Color scheme ID: {self.color_index}")
         debug_log_data.append("Color scheme:")
         color_scheme = deepcopy(self.color_scheme)  # just in case trickster mode messes with the color scheme RIGHT NOW
         for k, v in color_scheme.items():
