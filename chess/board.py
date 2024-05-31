@@ -1953,13 +1953,16 @@ class Board(Window):
                 blocked_ids = set(self.piece_set_ids.values()).union(self.board_config['block_ids'])
                 piece_set_ids = list(i for i in range(len(piece_groups)) if i not in blocked_ids)
                 if modifiers & key.MOD_ACCEL:  # Randomize piece sets (same for both sides)
+                    self.log(f"[Ply {self.ply_count}] Info: Starting new game (with random piece set)")
                     piece_set_ids = self.set_rng.sample(piece_set_ids, 1)
                     self.piece_set_ids = {side: piece_set_ids[0] for side in self.piece_set_ids}
                 else:  # Randomize piece sets (different for each side)
+                    self.log(f"[Ply {self.ply_count}] Info: Starting new game (with random piece sets)")
                     piece_set_ids = self.set_rng.sample(piece_set_ids, len(self.piece_set_ids))
                     self.piece_set_ids = {side: set_id for side, set_id in zip(self.piece_set_ids, piece_set_ids)}
                 self.reset_board(update=True)
             elif modifiers & key.MOD_ACCEL:  # Restart with the same piece sets
+                self.log(f"[Ply {self.ply_count}] Info: Starting new game")
                 self.reset_board()
         if symbol == key.F11:  # Full screen (toggle)
             self.set_fullscreen(not self.fullscreen)
