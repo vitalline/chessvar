@@ -559,7 +559,6 @@ class Board(Window):
         self.deselect_piece()  # again, just in case
         self.turn_side = Side.WHITE
         self.game_over = False
-        self.edit_mode = True
         self.chain_start = None
         self.promotion_piece = None
         self.ply_count = 0
@@ -570,6 +569,9 @@ class Board(Window):
                 sprite_list.remove(sprite)
 
         self.log(f"[Ply {self.ply_count}] Info: Board cleared")
+        if not self.edit_mode:
+            self.log(f"[Ply {self.ply_count}] Mode: EDIT")
+        self.edit_mode = True
         self.ply_count += 1
 
         self.piece_sets = self.get_piece_sets()
