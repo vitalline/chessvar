@@ -540,14 +540,69 @@ class Board(Window):
                     self, (row, col), piece_side
                 )
             )
-            self.update_piece(self.pieces[row][col])
-            self.pieces[row][col].set_color(
-                self.color_scheme.get(
-                    f"{self.pieces[row][col].side.key()}piece_color",
-                    self.color_scheme["piece_color"]
-                ),
-                self.color_scheme["colored_pieces"]
-            )
+            if not self.pieces[row][col].is_empty():
+                self.update_piece(self.pieces[row][col])
+                self.pieces[row][col].set_color(
+                    self.color_scheme.get(
+                        f"{self.pieces[row][col].side.key()}piece_color",
+                        self.color_scheme["piece_color"]
+                    ),
+                    self.color_scheme["colored_pieces"]
+                )
+            self.pieces[row][col].scale = self.square_size / self.pieces[row][col].texture.width
+            self.piece_sprite_list.append(self.pieces[row][col])
+
+        self.load_all_moves()
+        self.show_moves()
+
+    def empty_board(self) -> None:
+        self.deselect_piece()  # again, just in case
+        self.turn_side = Side.WHITE
+        self.game_over = False
+        self.edit_mode = False
+        self.chain_start = None
+        self.promotion_piece = None
+        self.ply_count = 0
+
+        for sprite_list in self.piece_sprite_list, self.promotion_piece_sprite_list, self.promotion_area_sprite_list:
+            sprite_list.clear()
+            for sprite in sprite_list:
+                sprite_list.remove(sprite)
+
+        self.log(f"[Ply {self.ply_count}] Info: Board cleared")
+        self.ply_count += 1
+
+        self.piece_sets = self.get_piece_sets()
+
+        self.edit_piece_set_id = self.board_config['edit_id']
+        self.roll_history = []
+        self.future_move_history = []
+        self.reset_promotions()
+        self.reset_edit_promotions()
+        self.reset_penultima_pieces()
+
+        if not self.board_config['update_roll_seed']:
+            self.roll_history = []
+
+        update_seed = not self.move_history and self.roll_history
+
+        if update_seed:
+            self.roll_history = []
+            self.future_move_history = []
+            if self.board_config['update_roll_seed']:
+                self.roll_seed = self.roll_rng.randint(0, 2 ** 32 - 1)
+
+        self.roll_rng = Random(self.roll_seed)
+
+        self.move_history = []
+
+        self.pieces = []
+
+        for row in range(self.board_height):
+            self.pieces += [[]]
+
+        for row, col in product(range(self.board_height), range(self.board_width)):
+            self.pieces[row].append(NoPiece(self, (row, col)))
             self.pieces[row][col].scale = self.square_size / self.pieces[row][col].texture.width
             self.piece_sprite_list.append(self.pieces[row][col])
 
@@ -605,7 +660,7 @@ class Board(Window):
         return self.get_square_color(pos) == 1
 
     def get_piece(self, pos: Position | None) -> abc.Piece:
-        return NoPiece(self, pos, Side.NONE) if self.not_on_board(pos) else self.pieces[pos[0]][pos[1]]
+        return NoPiece(self, pos) if self.not_on_board(pos) else self.pieces[pos[0]][pos[1]]
 
     def get_side(self, pos: Position | None) -> Side:
         return self.get_piece(pos).side
@@ -1817,7 +1872,7 @@ class Board(Window):
         self.auto_ranged_pieces = {Side.WHITE: [], Side.BLACK: []}
         for row, col in product(range(self.board_height), range(self.board_width)):
             piece = self.get_piece((row, col))
-            if piece.side:
+            if piece.side and not piece.is_empty():
                 self.movable_pieces[piece.side].append(piece)
                 if isinstance(piece, abc.RoyalPiece):
                     self.royal_pieces[piece.side].append(piece)
@@ -1994,23 +2049,26 @@ class Board(Window):
                 self.set_size((self.board_width + 2) * size, (self.board_height + 2) * size)
         if symbol == key.KEY_0 and modifiers & key.MOD_ACCEL:  # Reset window size
             self.set_size((self.board_width + 2) * default_size, (self.board_height + 2) * default_size)
-        if symbol == key.E and modifiers & key.MOD_ACCEL:  # Edit mode (toggle)
-            self.edit_mode = not self.edit_mode
-            self.log(f"[Ply {self.ply_count}] Mode: {'EDIT' if self.edit_mode else 'PLAY'}")
-            self.deselect_piece()
-            self.hide_moves()
-            if self.edit_mode:
-                self.compare_history()
-                self.advance_turn()
-                self.moves = {side: {} for side in self.moves}
-                self.chain_moves = {side: {} for side in self.chain_moves}
-                self.theoretical_moves = {side: {} for side in self.theoretical_moves}
-                self.show_moves()
-            else:
-                self.turn_side = self.turn_side.opponent()
-                self.compare_history()
-                self.advance_turn()
-                self.show_moves()
+        if symbol == key.E:
+            if modifiers & key.MOD_SHIFT:  # Empty board
+                self.empty_board()
+            if modifiers & key.MOD_ACCEL:  # Edit mode (toggle)
+                self.edit_mode = not self.edit_mode
+                self.log(f"[Ply {self.ply_count}] Mode: {'EDIT' if self.edit_mode else 'PLAY'}")
+                self.deselect_piece()
+                self.hide_moves()
+                if self.edit_mode:
+                    self.compare_history()
+                    self.advance_turn()
+                    self.moves = {side: {} for side in self.moves}
+                    self.chain_moves = {side: {} for side in self.chain_moves}
+                    self.theoretical_moves = {side: {} for side in self.theoretical_moves}
+                    self.show_moves()
+                else:
+                    self.turn_side = self.turn_side.opponent()
+                    self.compare_history()
+                    self.advance_turn()
+                    self.show_moves()
         if symbol == key.W:  # White
             if modifiers & key.MOD_ACCEL and not modifiers & key.MOD_SHIFT:  # White is in control
                 if self.turn_side != Side.WHITE:

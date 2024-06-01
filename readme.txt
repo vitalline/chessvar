@@ -53,6 +53,7 @@ Ctrl + D: save debug info
 Shift + D: print debug info
 Shift + [/]: select random piece (that can move)
 Ctrl + [/]: play random move (with selected piece if one exists)
+Shift + E: empty board
 Ctrl + E: toggle board edit mode
 
 controls (edit mode):
