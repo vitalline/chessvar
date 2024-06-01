@@ -559,7 +559,7 @@ class Board(Window):
         self.deselect_piece()  # again, just in case
         self.turn_side = Side.WHITE
         self.game_over = False
-        self.edit_mode = False
+        self.edit_mode = True
         self.chain_start = None
         self.promotion_piece = None
         self.ply_count = 0
