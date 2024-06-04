@@ -8,6 +8,11 @@ Escape: exit application
 Ctrl + R: start game with current armies
 Shift + R: start game with new random armies (different for each player)
 Ctrl + Shift + R: start game with a new random army (same for both players)
+Ctrl + C: save current configuration
+Shift + C: start game with new chaotic armies (different for each player)
+Ctrl + Shift + C: start game with a new chaotic army (same for both players)
+Alt + C: start game with new extra chaotic armies (different for each player)
+Ctrl + Alt + C: start game with a new extra chaotic army (same for both players)
 Ctrl + [-]: make window smaller (-5px/square)
 Shift + [-]: make window square (use smaller dimension)
 Ctrl + Shift + [-]: make window very small (25px/square)

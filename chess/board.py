@@ -211,8 +211,8 @@ penultima_textures = [f'ghost{s}' if s else None for s in ('R', 'N', 'B', 'Q', N
 board_width = 8
 board_height = 8
 
-pawn_row = [fide.Pawn] * board_width
-empty_row = [NoPiece] * board_width
+pawn_row: list[Type[abc.Piece]] = [fide.Pawn] * board_width
+empty_row: list[Type[abc.Piece]] = [NoPiece] * board_width
 
 white_row = [Side.WHITE] * board_width
 black_row = [Side.BLACK] * board_width
@@ -242,6 +242,12 @@ invalid_chars = ':<>|"?*'
 invalid_chars_trans_table = str.maketrans(invalid_chars, '_' * len(invalid_chars))
 
 
+def get_filename(name: str, ext: str, in_dir: str = base_dir, ts_format: str = "%Y-%m-%d_%H-%M-%S") -> str:
+    name_args = [name, datetime.now().strftime(ts_format)]
+    full_name = '_'.join(s for s in name_args if s).translate(invalid_chars_trans_table)
+    return join(in_dir, f"{full_name}.{ext}")
+
+
 class Board(Window):
 
     def __init__(self):
@@ -265,10 +271,14 @@ class Board(Window):
         self.origin = self.width / 2, self.height / 2
         self.set_minimum_size((self.board_width + 2) * min_size, (self.board_height + 2) * min_size)
 
-        self.log_data = []  # list of presently logged strings
-        self.color_index = 0  # index of the current color scheme
+        if self.board_config['color_id'] < 0 or self.board_config['color_id'] >= len(colors):
+            self.board_config['color_id'] %= len(colors)
+            self.board_config.save(config_path)
+
+        self.color_index = self.board_config['color_id']  # index of the current color scheme
         self.color_scheme = colors[self.color_index]  # current color scheme
         self.background_color = self.color_scheme["background_color"]  # background color
+        self.log_data = []  # list of presently logged strings
         self.hovered_square = None  # square we are currently hovering over
         self.clicked_square = None  # square we clicked on
         self.selected_square = None  # square selected for moving
@@ -304,7 +314,10 @@ class Board(Window):
         self.trickster_angle_delta = 0  # this is just a normal chess game after all
         self.pieces = []  # list of pieces on the board
         self.piece_set_ids = {Side.WHITE: 0, Side.BLACK: 0}  # ids of piece sets to use for each side
+        self.piece_set_names = {Side.WHITE: '', Side.BLACK: ''}  # names of piece sets to use for each side
         self.edit_piece_set_id = None  # id of piece set used when placing pieces in edit mode, None uses current sets
+        self.chaos_mode = self.board_config['chaos_mode']  # 0: normal, 1: randomize pieces, 2: randomize asymmetrically
+        self.chaos_sets = {}  # piece sets generated in chaos mode
         self.piece_sets = {Side.WHITE: [], Side.BLACK: []}  # types of pieces each side starts with
         self.promotions = {Side.WHITE: [], Side.BLACK: []}  # types of pieces each side promote to
         self.edit_promotions = {Side.WHITE: [], Side.BLACK: []}  # types of pieces each side can promote to in edit mode
@@ -343,13 +356,23 @@ class Board(Window):
 
         # initialize random number seeds and generators
         self.roll_seed = (
-            self.board_config['roll_seed'] if self.board_config['use_roll_seed'] else base_rng.randint(0, max_seed)
+            self.board_config['roll_seed']
+            if self.board_config['roll_seed'] is not None
+            else base_rng.randint(0, max_seed)
         )
         self.roll_rng = Random(self.roll_seed)
         self.set_seed = (
-            self.board_config['set_seed'] if self.board_config['use_set_seed'] else base_rng.randint(0, max_seed)
+            self.board_config['set_seed']
+            if self.board_config['set_seed'] is not None
+            else base_rng.randint(0, max_seed)
         )
         self.set_rng = Random(self.set_seed)
+        self.chaos_seed = (
+            self.board_config['chaos_seed']
+            if self.board_config['chaos_seed'] is not None
+            else base_rng.randint(0, max_seed)
+        )
+        self.chaos_rng = Random(self.chaos_seed)
 
         # initialize row/column labels
         label_kwargs = {
@@ -409,16 +432,47 @@ class Board(Window):
             self.trickster_color_delta += delta_time
             self.trickster_angle_delta += delta_time
 
-    def get_piece_sets(self, piece_set_ids: dict[Side, int] | int | None = None) -> dict[Side, list[Type[abc.Piece]]]:
+    def get_piece_sets(
+            self,
+            piece_set_ids: dict[Side, int] | int | None = None
+    ) -> tuple[dict[Side, list[Type[abc.Piece]]], dict[Side, str]]:
         if piece_set_ids is None:
             piece_set_ids = self.piece_set_ids
         elif isinstance(piece_set_ids, int):
             piece_set_ids = {side: piece_set_ids for side in self.piece_set_ids}  # type: ignore
         piece_sets = {Side.WHITE: [], Side.BLACK: []}
+        piece_names = {Side.WHITE: [], Side.BLACK: []}
         for side in piece_set_ids:
-            piece_group = piece_groups[piece_set_ids[side]]
-            piece_sets[side] = piece_group.get(f"set_{side.key()[0]}", piece_group.get('set', [])).copy()
-        return piece_sets
+            if piece_set_ids[side] < 0:
+                for i in range(-piece_set_ids[side]):
+                    if i + 1 not in self.chaos_sets:
+                        self.chaos_sets[i + 1] = self.get_chaos_set(side)
+                chaos_set = self.chaos_sets.get(-piece_set_ids[side], [[], '-'])
+                piece_sets[side] = chaos_set[0].copy()
+                piece_names[side] = chaos_set[1]
+            else:
+                piece_group = piece_groups[piece_set_ids[side]]
+                piece_sets[side] = piece_group.get(f"set_{side.key()[0]}", piece_group.get('set', [])).copy()
+                piece_names[side] = piece_group.get('name', '-')
+        return piece_sets, piece_names
+
+    def get_chaos_set(self, side: Side) -> tuple[list[Type[abc.Piece]], str]:
+        if self.chaos_mode == 1:
+            random_set_piece_ids = [[0, 4, 7], [1, 6], [2, 5], [3]]
+        elif self.chaos_mode == 2:
+            random_set_piece_ids = [[0, 4], [1], [2], [3], [5], [6], [7]]
+        else:
+            random_set_piece_ids = []
+        blocked_ids = set(self.piece_set_ids.values()).union(self.board_config['block_ids_chaos'])
+        piece_set_ids = list(i for i in range(len(piece_groups)) if i not in blocked_ids)
+        random_set_ids = self.chaos_rng.choices(piece_set_ids, k=len(random_set_piece_ids))
+        piece_set = empty_row.copy()
+        for i, poss in enumerate(random_set_piece_ids):
+            random_set = piece_groups[random_set_ids[i]]
+            for pos in poss:
+                piece_set[pos] = random_set.get(f"set_{side.key()[0]}", random_set.get('set', empty_row))[pos]
+        piece_set_name = f"({', '.join(piece_set[ids[0]].name for ids in random_set_piece_ids)})"
+        return piece_set, piece_set_name
 
     def reset_promotions(self, piece_sets: dict[Side, list[Type[abc.Piece]]] | None = None) -> None:
         if piece_sets is None:
@@ -439,7 +493,10 @@ class Board(Window):
 
     def reset_edit_promotions(self, piece_sets: dict[Side, list[Type[abc.Piece]]] | None = None) -> None:
         if piece_sets is None:
-            piece_sets = self.get_piece_sets(self.edit_piece_set_id)
+            if self.edit_piece_set_id is None:
+                piece_sets = self.piece_sets
+            else:
+                piece_sets = self.get_piece_sets(self.edit_piece_set_id)[0]
         self.edit_promotions = {side: [] for side in self.edit_promotions}
         for side in self.edit_promotions:
             used_piece_set = set()
@@ -466,6 +523,8 @@ class Board(Window):
                         texture = penultima_textures[i]
                         if piece_side == player_side.opponent():
                             texture += 'O'
+                        if i > 4 and piece != piece_sets[player_side][7 - i]:
+                            texture += '|'
                         if piece not in self.penultima_pieces[player_side]:
                             self.penultima_pieces[player_side][piece] = texture
 
@@ -483,14 +542,23 @@ class Board(Window):
             for sprite in sprite_list:
                 sprite_list.remove(sprite)
 
+        self.piece_sets, self.piece_set_names = self.get_piece_sets()
+
+        if self.chaos_mode:
+            no_chaos = True
+            for i in self.piece_set_ids:
+                if self.piece_set_ids[i] < 0:
+                    no_chaos = False
+                    break
+            if no_chaos:
+                self.chaos_mode = 0
+
         self.log(
             f"[Ply {self.ply_count}] Game: "
-            f"{piece_groups[self.piece_set_ids[Side.WHITE]]['name'] if not self.should_hide_pieces else '???'} vs. "
-            f"{piece_groups[self.piece_set_ids[Side.BLACK]]['name'] if not self.should_hide_pieces else '???'}"
+            f"{self.piece_set_names[Side.WHITE] if not self.should_hide_pieces else '???'} vs. "
+            f"{self.piece_set_names[Side.BLACK] if not self.should_hide_pieces else '???'}"
         )
         self.ply_count += 1
-
-        self.piece_sets = self.get_piece_sets()
 
         if update:
             self.edit_piece_set_id = self.board_config['edit_id']
@@ -573,8 +641,6 @@ class Board(Window):
             self.log(f"[Ply {self.ply_count}] Mode: EDIT")
         self.edit_mode = True
         self.ply_count += 1
-
-        self.piece_sets = self.get_piece_sets()
 
         self.edit_piece_set_id = self.board_config['edit_id']
         self.roll_history = []
@@ -1424,7 +1490,7 @@ class Board(Window):
             if issubclass(promotion, abc.RoyalPiece) and promotion not in self.piece_sets[piece.side]:
                 self.update_piece(promotion_piece, asset_folder='other')
             elif self.edit_piece_set_id is None:
-                self.update_piece(promotion_piece)
+                self.update_piece(promotion_piece, penultima_flip=True)
             else:
                 promotion_piece.reload(is_hidden=False)
             promotion_piece.scale = self.square_size / promotion_piece.texture.width
@@ -1627,7 +1693,15 @@ class Board(Window):
             else:
                 self.color_pieces()
 
-    def update_piece(self, piece: abc.Piece, asset_folder: str | None = None, file_name: str | None = None) -> None:
+    def update_piece(
+            self,
+            piece: abc.Piece,
+            asset_folder: str | None = None,
+            file_name: str | None = None,
+            penultima_flip: bool = Default
+    ) -> None:
+        if penultima_flip is Default:
+            penultima_flip = self.chaos_mode == 2
         penultima_pieces = self.penultima_pieces.get(piece.side, {})
         if asset_folder is None:
             if piece.is_hidden is False:
@@ -1653,7 +1727,8 @@ class Board(Window):
             is_hidden = self.should_hide_moves or Default
         else:
             is_hidden = bool(self.should_hide_pieces) or Default
-        piece.reload(is_hidden=is_hidden, asset_folder=asset_folder, file_name=file_name)
+        file_name, flip = (file_name[:-1], penultima_flip) if file_name[-1] == '|' else (file_name, False)
+        piece.reload(is_hidden=is_hidden, asset_folder=asset_folder, file_name=file_name, flipped_horizontally=flip)
 
     def update_pieces(self) -> None:
         for piece in sum(self.movable_pieces.values(), []):
@@ -1663,7 +1738,7 @@ class Board(Window):
                 if isinstance(piece, abc.RoyalPiece) and type(piece) not in self.piece_sets[piece.side]:
                     self.update_piece(piece, asset_folder='other')
                 elif self.edit_piece_set_id is None:
-                    self.update_piece(piece)
+                    self.update_piece(piece, penultima_flip=True)
                 else:
                     piece.reload(is_hidden=False)
 
@@ -2017,10 +2092,24 @@ class Board(Window):
                     self.log(f"[Ply {self.ply_count}] Info: Starting new game (with random piece sets)")
                     piece_set_ids = self.set_rng.sample(piece_set_ids, len(self.piece_set_ids))
                     self.piece_set_ids = {side: set_id for side, set_id in zip(self.piece_set_ids, piece_set_ids)}
+                self.chaos_mode = 0
                 self.reset_board(update=True)
             elif modifiers & key.MOD_ACCEL:  # Restart with the same piece sets
                 self.log(f"[Ply {self.ply_count}] Info: Starting new game")
                 self.reset_board()
+        if symbol == key.C:
+            if modifiers & (key.MOD_SHIFT | key.MOD_ALT):  # Chaos mode
+                chaotic = "extra chaotic" if modifiers & key.MOD_ALT else "chaotic"
+                sets = "set" if modifiers & key.MOD_ACCEL else "sets"
+                self.log(f"[Ply {self.ply_count}] Info: Starting new game (with {chaotic} piece {sets})")
+                self.chaos_sets = {}
+                self.chaos_mode = 2 if modifiers & key.MOD_ALT else 1
+                self.chaos_seed = self.chaos_rng.randint(0, 2 ** 32 - 1)
+                self.chaos_rng = Random(self.chaos_seed)
+                self.piece_set_ids = {Side.WHITE: -1, Side.BLACK: -1 if modifiers & key.MOD_ACCEL else -2}
+                self.reset_board(update=True)
+            elif modifiers & key.MOD_ACCEL:  # Config
+                self.save_config()
         if symbol == key.F11:  # Full screen (toggle)
             self.set_fullscreen(not self.fullscreen)
         if symbol == key.MINUS:  # (-) Decrease window size
@@ -2084,7 +2173,11 @@ class Board(Window):
                     self.advance_turn()
             elif modifiers & key.MOD_SHIFT:  # Shift white piece set
                 d = -1 if modifiers & key.MOD_ACCEL else 1
-                self.piece_set_ids[Side.WHITE] = (self.piece_set_ids[Side.WHITE] + d) % len(piece_groups)
+                self.piece_set_ids[Side.WHITE] = (
+                    (self.piece_set_ids[Side.WHITE] + len(self.chaos_sets) + d)
+                    % (len(piece_groups) + len(self.chaos_sets))
+                    - len(self.chaos_sets)
+                )
                 self.reset_board(update=True)
         if symbol == key.B:  # Black
             if modifiers & key.MOD_ACCEL and not modifiers & key.MOD_SHIFT:  # Black is in control
@@ -2099,7 +2192,11 @@ class Board(Window):
                     self.advance_turn()
             elif modifiers & key.MOD_SHIFT:  # Shift black piece set
                 d = -1 if modifiers & key.MOD_ACCEL else 1
-                self.piece_set_ids[Side.BLACK] = (self.piece_set_ids[Side.BLACK] + d) % len(piece_groups)
+                self.piece_set_ids[Side.BLACK] = (
+                    (self.piece_set_ids[Side.BLACK] + len(self.chaos_sets) + d)
+                    % (len(piece_groups) + len(self.chaos_sets))
+                    - len(self.chaos_sets)
+                )
                 self.reset_board(update=True)
         if symbol == key.N:  # Next
             if modifiers & key.MOD_ACCEL and not modifiers & key.MOD_SHIFT:  # Next player is in control
@@ -2114,8 +2211,16 @@ class Board(Window):
             elif modifiers & key.MOD_SHIFT:
                 if self.piece_set_ids[Side.WHITE] == self.piece_set_ids[Side.BLACK]:  # Next piece set
                     d = -1 if modifiers & key.MOD_ACCEL else 1
-                    self.piece_set_ids[Side.WHITE] = (self.piece_set_ids[Side.WHITE] + d) % len(piece_groups)
-                    self.piece_set_ids[Side.BLACK] = (self.piece_set_ids[Side.BLACK] + d) % len(piece_groups)
+                    self.piece_set_ids[Side.WHITE] = (
+                        (self.piece_set_ids[Side.WHITE] + len(self.chaos_sets) + d)
+                        % (len(piece_groups) + len(self.chaos_sets))
+                        - len(self.chaos_sets)
+                    )
+                    self.piece_set_ids[Side.BLACK] = (
+                        (self.piece_set_ids[Side.BLACK] + len(self.chaos_sets) + d)
+                        % (len(piece_groups) + len(self.chaos_sets))
+                        - len(self.chaos_sets)
+                    )
                 else:  # Next player goes first
                     piece_set_ids = self.piece_set_ids[Side.WHITE], self.piece_set_ids[Side.BLACK]
                     self.piece_set_ids[Side.BLACK], self.piece_set_ids[Side.WHITE] = piece_set_ids
@@ -2183,8 +2288,8 @@ class Board(Window):
                 if self.should_hide_pieces == 0:
                     self.log(
                         f"[Ply {self.ply_count}] Info: Pieces revealed: "
-                        f"{piece_groups[self.piece_set_ids[Side.WHITE]]['name']} vs. "
-                        f"{piece_groups[self.piece_set_ids[Side.BLACK]]['name']}"
+                        f"{self.piece_set_names[Side.WHITE]} vs. "
+                        f"{self.piece_set_names[Side.BLACK]}"
                     )
                 elif self.should_hide_pieces == 1:
                     self.log(f"[Ply {self.ply_count}] Info: Pieces hidden")
@@ -2357,15 +2462,12 @@ class Board(Window):
     def save_log(
             self,
             log_data: list[str] | None = None,
-            log_name: str = "log",
-            ts_format: str = "%Y-%m-%d_%H-%M-%S"
+            log_name: str = "log"
     ) -> None:
         if not log_data:
             log_data = self.log_data
         if log_data:
-            name_args = [log_name, datetime.now().strftime(ts_format)]
-            file_name = '_'.join(s for s in name_args if s).translate(invalid_chars_trans_table)
-            with open(join(base_dir, f"{file_name}.txt"), "w") as log_file:
+            with open(get_filename(log_name, 'txt'), "w") as log_file:
                 log_file.write("\n".join(log_data))
 
     def clear_log(self, console: bool = True, file: bool = False) -> None:
@@ -2374,6 +2476,18 @@ class Board(Window):
             self.log_data.clear()
         if console:
             system("cls" if os_name == "nt" else "clear")
+
+    def save_config(self) -> None:
+        config = Config(config_path)
+        config['color_id'] = self.color_index
+        config['white_id'] = self.piece_set_ids[Side.WHITE]
+        config['black_id'] = self.piece_set_ids[Side.BLACK]
+        config['edit_id'] = self.edit_piece_set_id
+        config['set_seed'] = self.set_seed
+        config['roll_seed'] = self.roll_seed
+        config['chaos_seed'] = self.chaos_seed
+        config['chaos_mode'] = self.chaos_mode
+        config.save(get_filename('config', 'ini'))
 
     def debug_info(self) -> list[str]:
         debug_log_data = []  # noqa
@@ -2387,12 +2501,11 @@ class Board(Window):
         digits = len(str(len(piece_groups)))
         for i, group in enumerate(piece_groups):
             debug_log_data.append(f"ID {i:0{digits}d}: {group['name']}")
-        white, black = self.piece_set_ids[Side.WHITE], self.piece_set_ids[Side.BLACK]
         debug_log_data.append(f"ID blocklist: {', '.join(str(i) for i in self.board_config['block_ids']) or 'None'}")
         debug_log_data.append(
             f"Game: "
-            f"(ID {white:0{digits}d}) {piece_groups[white]['name']} vs. "
-            f"(ID {black:0{digits}d}) {piece_groups[black]['name']}"
+            f"(ID {self.piece_set_ids[Side.WHITE]:0{digits}d}) {self.piece_set_names[Side.WHITE]} vs. "
+            f"(ID {self.piece_set_ids[Side.BLACK]:0{digits}d}) {self.piece_set_names[Side.BLACK]}"
         )
         for side in self.piece_set_ids:
             debug_log_data.append(f"{side} setup: {', '.join(piece.name for piece in self.piece_sets[side])}")
@@ -2469,6 +2582,7 @@ class Board(Window):
             debug_log_data[-1] += " None"
         debug_log_data.append(f"Roll seed: {self.roll_seed} (update: {self.board_config['update_roll_seed']})")
         debug_log_data.append(f"Set seed: {self.set_seed}")
+        debug_log_data.append(f"Chaos set seed: {self.chaos_seed}")
         return debug_log_data
 
     def on_resize(self, width: float, height: float):
