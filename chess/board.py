@@ -457,22 +457,39 @@ class Board(Window):
         return piece_sets, piece_names
 
     def get_chaos_set(self, side: Side) -> tuple[list[Type[abc.Piece]], str]:
+        # random_set_poss: independent random choices
+        # random_set_poss[]: unique randomly sampled armies
+        # random_set_poss[][]: positions taken by the random army
+        # this is important because in mode 2 same-type pieces have to be distinct to ensure there are no piece repeats!
+        # also, the king type is determined by the queenside rook type because of colorbound castling. see colorbound.py
         if self.chaos_mode == 1:
-            random_set_piece_ids = [[0, 4, 7], [1, 6], [2, 5], [3]]
+            random_set_poss = [[[0, 4, 7]], [[1, 6]], [[2, 5]], [[3]]]
         elif self.chaos_mode == 2:
-            random_set_piece_ids = [[0, 4], [1], [2], [3], [5], [6], [7]]
+            random_set_poss = [[[0, 4], [7]], [[1], [6]], [[2], [5]], [[3]]]
         else:
-            random_set_piece_ids = []
+            random_set_poss = []
         blocked_ids = set(self.piece_set_ids.values()).union(self.board_config['block_ids_chaos'])
         piece_set_ids = list(i for i in range(len(piece_groups)) if i not in blocked_ids)
-        random_set_ids = self.chaos_rng.choices(piece_set_ids, k=len(random_set_piece_ids))
         piece_set = empty_row.copy()
-        for i, poss in enumerate(random_set_piece_ids):
-            random_set = piece_groups[random_set_ids[i]]
-            for pos in poss:
-                piece_set[pos] = random_set.get(f"set_{side.key()[0]}", random_set.get('set', empty_row))[pos]
-        piece_set_name = f"({', '.join(piece_set[ids[0]].name for ids in random_set_piece_ids)})"
-        return piece_set, piece_set_name
+        for i, group in enumerate(random_set_poss):
+            random_set_ids = self.chaos_rng.sample(piece_set_ids, k=len(group))
+            for j, poss in enumerate(group):
+                random_set = piece_groups[random_set_ids[j]]
+                for pos in poss:
+                    piece_set[pos] = random_set.get(f"set_{side.key()[0]}", random_set.get('set', empty_row))[pos]
+        piece_name_order = [[0, 7], [1, 6], [2, 5], [3]]
+        piece_names = []
+        for group in piece_name_order:
+            name_order = []
+            used_names = set()
+            for pos in group:
+                name = piece_set[pos].name
+                if name not in used_names:
+                    name_order.append(name)
+                    used_names.add(name)
+            piece_names.append('/'.join(name_order))
+        piece_set_name = ', '.join(piece_names)
+        return piece_set, f"({piece_set_name})"
 
     def reset_promotions(self, piece_sets: dict[Side, list[Type[abc.Piece]]] | None = None) -> None:
         if piece_sets is None:
@@ -1489,10 +1506,10 @@ class Board(Window):
             promotion_piece = promotion(self, pos, piece.side)
             if issubclass(promotion, abc.RoyalPiece) and promotion not in self.piece_sets[piece.side]:
                 self.update_piece(promotion_piece, asset_folder='other')
-            elif self.edit_piece_set_id is None:
+            elif not self.edit_mode or self.edit_piece_set_id is None:
                 self.update_piece(promotion_piece, penultima_flip=True)
             else:
-                promotion_piece.reload(is_hidden=False)
+                promotion_piece.reload(is_hidden=False, flipped_horizontally=False)
             promotion_piece.scale = self.square_size / promotion_piece.texture.width
             promotion_piece.set_color(
                 self.color_scheme.get(
@@ -1526,8 +1543,7 @@ class Board(Window):
             promotions=self.promotions[new_side],
             promotion_squares=promotion_squares[new_side],
         ) if issubclass(new_type, abc.PromotablePiece) else new_type(self, pos, new_side)
-        self.pieces[pos[0]][pos[1]].reload(is_hidden=is_hidden)
-        self.update_piece(self.pieces[pos[0]][pos[1]])
+        self.update_piece(self.pieces[pos[0]][pos[1]], penultima_hide=is_hidden)
         self.pieces[pos[0]][pos[1]].set_color(
             self.color_scheme.get(
                 f"{new_side.key()}piece_color",
@@ -1698,9 +1714,10 @@ class Board(Window):
             piece: abc.Piece,
             asset_folder: str | None = None,
             file_name: str | None = None,
-            penultima_flip: bool = Default
+            penultima_flip: bool = None,
+            penultima_hide: bool = None,
     ) -> None:
-        if penultima_flip is Default:
+        if penultima_flip is None:
             penultima_flip = self.chaos_mode == 2
         penultima_pieces = self.penultima_pieces.get(piece.side, {})
         if asset_folder is None:
@@ -1721,13 +1738,15 @@ class Board(Window):
                 file_name = penultima_pieces[type(piece)]
             else:
                 file_name = piece.file_name
-        if piece.is_hidden is False:
+        if penultima_hide is not None:
+            is_hidden = penultima_hide
+        elif piece.is_hidden is False:
             is_hidden = False
         elif self.should_hide_moves is not None:
             is_hidden = self.should_hide_moves or Default
         else:
             is_hidden = bool(self.should_hide_pieces) or Default
-        file_name, flip = (file_name[:-1], penultima_flip) if file_name[-1] == '|' else (file_name, False)
+        file_name, flip = (file_name[:-1], penultima_flip) if file_name[-1] == '|' else (file_name, None)
         piece.reload(is_hidden=is_hidden, asset_folder=asset_folder, file_name=file_name, flipped_horizontally=flip)
 
     def update_pieces(self) -> None:
@@ -1737,10 +1756,10 @@ class Board(Window):
             if isinstance(piece, abc.Piece) and not piece.is_empty():
                 if isinstance(piece, abc.RoyalPiece) and type(piece) not in self.piece_sets[piece.side]:
                     self.update_piece(piece, asset_folder='other')
-                elif self.edit_piece_set_id is None:
+                elif not self.edit_mode or self.edit_piece_set_id is None:
                     self.update_piece(piece, penultima_flip=True)
                 else:
-                    piece.reload(is_hidden=False)
+                    piece.reload(is_hidden=False, flipped_horizontally=False)
 
     def is_trickster_mode(self, value: bool = True) -> bool:
         return value == (self.trickster_color_index != 0)
@@ -2086,11 +2105,11 @@ class Board(Window):
                 piece_set_ids = list(i for i in range(len(piece_groups)) if i not in blocked_ids)
                 if modifiers & key.MOD_ACCEL:  # Randomize piece sets (same for both sides)
                     self.log(f"[Ply {self.ply_count}] Info: Starting new game (with random piece set)")
-                    piece_set_ids = self.set_rng.sample(piece_set_ids, 1)
+                    piece_set_ids = self.set_rng.sample(piece_set_ids, k=1)
                     self.piece_set_ids = {side: piece_set_ids[0] for side in self.piece_set_ids}
                 else:  # Randomize piece sets (different for each side)
                     self.log(f"[Ply {self.ply_count}] Info: Starting new game (with random piece sets)")
-                    piece_set_ids = self.set_rng.sample(piece_set_ids, len(self.piece_set_ids))
+                    piece_set_ids = self.set_rng.sample(piece_set_ids, k=len(self.piece_set_ids))
                     self.piece_set_ids = {side: set_id for side, set_id in zip(self.piece_set_ids, piece_set_ids)}
                 self.chaos_mode = 0
                 self.reset_board(update=True)
@@ -2226,21 +2245,22 @@ class Board(Window):
                     self.piece_set_ids[Side.BLACK], self.piece_set_ids[Side.WHITE] = piece_set_ids
                 self.reset_board(update=True)
         if symbol == key.P:  # Promotion
-            old_id = self.edit_piece_set_id
-            if modifiers & key.MOD_SHIFT:  # Shift promotion piece set
-                if self.edit_piece_set_id is not None:
-                    d = -1 if modifiers & key.MOD_ACCEL else 1
-                    self.edit_piece_set_id = (self.edit_piece_set_id + d) % len(piece_groups)
-                else:
-                    self.edit_piece_set_id = 0
-            elif modifiers & key.MOD_ACCEL:  # Reset promotion piece set
-                self.edit_piece_set_id = None
-            if old_id != self.edit_piece_set_id:
-                self.reset_edit_promotions()
-                promotion_piece = self.promotion_piece
-                if promotion_piece:
-                    self.end_promotion()
-                    self.start_promotion(promotion_piece, self.edit_promotions[promotion_piece.side])
+            if self.edit_mode:
+                old_id = self.edit_piece_set_id
+                if modifiers & key.MOD_SHIFT:  # Shift promotion piece set
+                    if self.edit_piece_set_id is not None:
+                        d = -1 if modifiers & key.MOD_ACCEL else 1
+                        self.edit_piece_set_id = (self.edit_piece_set_id + d) % len(piece_groups)
+                    else:
+                        self.edit_piece_set_id = 0
+                elif modifiers & key.MOD_ACCEL:  # Reset promotion piece set
+                    self.edit_piece_set_id = None
+                if old_id != self.edit_piece_set_id:
+                    self.reset_edit_promotions()
+                    promotion_piece = self.promotion_piece
+                    if promotion_piece:
+                        self.end_promotion()
+                        self.start_promotion(promotion_piece, self.edit_promotions[promotion_piece.side])
         if symbol == key.O:  # Royal pieces
             old_mode = self.royal_piece_mode
             if modifiers & key.MOD_SHIFT:  # Force royal mode (Shift: all quasi-royal, Ctrl+Shift: all royal)

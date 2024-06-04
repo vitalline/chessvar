@@ -136,7 +136,7 @@ class Piece(Sprite):
             file_name: str = None,
             is_hidden: bool = None,
             flipped_horizontally: bool = None,
-            flipped_vertically: bool = None
+            flipped_vertically: bool = None,
     ):
         if is_hidden is not None:
             self.is_hidden = None if is_hidden is Default else is_hidden
@@ -145,9 +145,13 @@ class Piece(Sprite):
         self.texture_name = file_name or self.texture_name
         texture_path = self.texture_path()
         if flipped_horizontally is None:
-            flipped_horizontally = self.flipped_horizontally if not is_hidden else False
+            flipped_horizontally = self.flipped_horizontally
+        else:
+            self.flipped_horizontally = flipped_horizontally
         if flipped_vertically is None:
-            flipped_vertically = self.flipped_vertically if not is_hidden else False
+            flipped_vertically = self.flipped_vertically
+        else:
+            self.flipped_vertically = flipped_vertically
         if self.texture.name != texture_path:
             color = self.color
             new_texture = load_texture(

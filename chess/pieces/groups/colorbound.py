@@ -52,6 +52,9 @@ class Archbishop(Piece):
         )
 
 
+# Note: The reason we redefine the King class here is that colorbound Rook-like pieces should preserve color on castling
+# This implementation castles three squares kingside and two squares queenside - the CwDA rule for Colorbound Clobberers
+# This version of the King should also be used for all other armies in which the Rook replacements are colorbound pieces
 class King(RoyalPiece):
     name = 'King'
     file_name = 'K'

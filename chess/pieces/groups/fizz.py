@@ -2,12 +2,12 @@ from math import ceil
 
 from chess.movement import movement
 from chess.movement.util import rot, symv
-from chess.pieces.pieces import Piece, Side
+from chess.pieces.pieces import Piece
 
 
 class LRhino(Piece):
     name = 'Left Rhino'
-    file_name = 'KafrK'
+    file_name = 'KaflK'
     asset_folder = 'fizz'
 
     def __init__(self, board, board_pos, side):
@@ -21,8 +21,7 @@ class LRhino(Piece):
                     [(1, 1), (0, 1), (-1, 1), (-1, 0), (-1, -1), (0, -1), (1, -1), (1, 0)],
                     [(1, 0), (1, 1), (0, 1), (-1, 1), (-1, 0), (-1, -1), (0, -1), (1, -1)]
                 )
-            ]),
-            side == Side.WHITE
+            ])
         )
 
 
@@ -42,8 +41,7 @@ class RRhino(Piece):
                     [(1, 1), (0, 1), (-1, 1), (-1, 0), (-1, -1), (0, -1), (1, -1), (1, 0)],
                     [(0, 1), (-1, 1), (-1, 0), (-1, -1), (0, -1), (1, -1), (1, 0), (1, 1)]
                 )
-            ]),
-            side == Side.BLACK
+            ])
         )
 
 
