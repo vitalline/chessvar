@@ -4,7 +4,7 @@ from chess.pieces.pieces import Piece
 
 
 class Veteran(Piece):
-    name = 'Rook'
+    name = 'Veteran'
     file_name = '{R,KAD}'
     asset_folder = 'probable'
 
