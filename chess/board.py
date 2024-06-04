@@ -1330,7 +1330,7 @@ class Board(Window):
         self.future_move_history = future_move_history
         if self.future_move_history:
             copies = [
-                copy(move).set(chained_move=None) if move is not None else None
+                copy(move).set(chained_move=Default) if move is not None else None
                 for move in (self.future_move_history[-1], last_move)
             ]
             if (
@@ -1376,7 +1376,7 @@ class Board(Window):
             while last_chain_move:
                 if last_history_move:
                     copies = [
-                        copy(move).set(chained_move=None) if move is not None else None
+                        copy(move).set(chained_move=Default) if move is not None else None
                         for move in (last_history_move, last_chain_move)
                     ]
                     if (
@@ -2603,7 +2603,7 @@ class Board(Window):
         if not self.roll_history:
             debug_log_data[-1] += " None"
         debug_log_data.append(f"Roll seed: {self.roll_seed} (update: {self.board_config['update_roll_seed']})")
-        debug_log_data.append(f"Set seed: {self.set_seed}")
+        debug_log_data.append(f"Piece set seed: {self.set_seed}")
         debug_log_data.append(f"Chaos set seed: {self.chaos_seed}")
         return debug_log_data
 
