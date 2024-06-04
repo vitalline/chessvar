@@ -484,6 +484,8 @@ class Board(Window):
             used_names = set()
             for pos in group:
                 name = piece_set[pos].name
+                if piece_set[pos].asset_folder == 'cylindrical':
+                    name = f"Cylindrical {name}"
                 if name not in used_names:
                     name_order.append(name)
                     used_names.add(name)
