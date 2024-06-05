@@ -1720,7 +1720,7 @@ class Board(Window):
             penultima_hide: bool = None,
     ) -> None:
         if penultima_flip is None:
-            penultima_flip = self.chaos_mode == 2
+            penultima_flip = (self.chaos_mode == 2) and (self.piece_set_ids[piece.side] < 0)
         penultima_pieces = self.penultima_pieces.get(piece.side, {})
         if asset_folder is None:
             if piece.is_hidden is False:
