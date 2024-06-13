@@ -1,6 +1,7 @@
 /assets.*/
 /build/
 /dist/
+/dist.*/
 /main.build/
 /main.dist/
 /venv/
