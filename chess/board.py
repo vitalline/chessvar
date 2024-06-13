@@ -326,6 +326,7 @@ class Board(Window):
         self.quasi_royal_pieces = {Side.WHITE: [], Side.BLACK: []}  # at least one of these has to stay on the board
         self.auto_ranged_pieces = {Side.WHITE: [], Side.BLACK: []}  # pieces that auto-capture anywhere they can move to
         self.probabilistic_pieces = {Side.WHITE: [], Side.BLACK: []}  # pieces that can move probabilistically
+        self.probabilistic_piece_history = []  # list of probabilistic piece positions for every ply
         self.penultima_pieces = {Side.WHITE: {}, Side.BLACK: {}}  # piece textures that are used for penultima mode
         self.moves = {Side.WHITE: {}, Side.BLACK: {}}  # dictionary of valid moves from any square
         self.chain_moves = {Side.WHITE: {}, Side.BLACK: {}}  # dictionary of moves chained from a certain move (from/to)
@@ -583,6 +584,7 @@ class Board(Window):
             self.edit_piece_set_id = self.board_config['edit_id']
             self.roll_history = []
             self.future_move_history = []
+            self.probabilistic_piece_history = []
             self.reset_promotions()
             self.reset_edit_promotions()
             self.reset_penultima_pieces()
@@ -597,6 +599,7 @@ class Board(Window):
         if update_seed:
             self.roll_history = []
             self.future_move_history = []
+            self.probabilistic_piece_history = []
 
         if update or update_seed:
             if self.board_config['update_roll_seed']:
@@ -664,20 +667,13 @@ class Board(Window):
         self.edit_piece_set_id = self.board_config['edit_id']
         self.roll_history = []
         self.future_move_history = []
+        self.probabilistic_piece_history = []
         self.reset_promotions()
         self.reset_edit_promotions()
         self.reset_penultima_pieces()
 
-        if not self.board_config['update_roll_seed']:
-            self.roll_history = []
-
-        update_seed = not self.move_history and self.roll_history
-
-        if update_seed:
-            self.roll_history = []
-            self.future_move_history = []
-            if self.board_config['update_roll_seed']:
-                self.roll_seed = self.roll_rng.randint(0, 2 ** 32 - 1)
+        if self.board_config['update_roll_seed']:
+            self.roll_seed = self.roll_rng.randint(0, 2 ** 32 - 1)
 
         self.roll_rng = Random(self.roll_seed)
 
@@ -1031,7 +1027,10 @@ class Board(Window):
                     if self.not_a_piece(pos):
                         self.deselect_piece()
                         return
-                    move.set(pos_from=pos, pos_to=pos, piece=self.get_piece(pos))
+                    piece = self.get_piece(pos)
+                    if isinstance(piece.movement, movement.ProbabilisticMovement):
+                        self.roll_history = self.roll_history[:self.ply_count - 1]
+                    move.set(pos_from=pos, pos_to=pos, piece=piece)
                 elif modifiers & key.MOD_SHIFT:
                     move.set(pos_from=pos, pos_to=pos, piece=self.get_piece(pos))
                     side = self.get_side(pos)
@@ -1283,9 +1282,6 @@ class Board(Window):
             if self.promotion_piece.board_pos in self.en_passant_markers:
                 self.mark_en_passant(self.en_passant_target, self.promotion_piece.board_pos)
             self.end_promotion()
-            past = self.move_history[-1]
-            if not past.is_edit:
-                self.turn_side = self.turn_side.opponent()
         else:
             last_move = self.move_history[-1]
             self.ply_count -= 1 if last_move is None else not last_move.is_edit and self.chain_start is None
@@ -1311,9 +1307,6 @@ class Board(Window):
             if last_move.promotion is Unset:
                 if last_move.piece.is_empty():
                     last_move.piece.side = Side.NONE
-            if last_move.is_edit:
-                if not self.edit_mode:
-                    self.turn_side = self.turn_side.opponent()
         else:
             self.log(f"[Ply {self.ply_count}] Undo: Pass: {self.turn_side}'s turn")
         if self.move_history:
@@ -1322,7 +1315,7 @@ class Board(Window):
                 (move.piece or move).movement.reload(move, move.piece)
         future_move_history = self.future_move_history.copy()
         if self.chain_start is None:
-            self.advance_turn()
+            self.advance_turn(is_undo=True)
         else:
             self.chain_start = None
             self.load_all_moves()
@@ -1334,7 +1327,7 @@ class Board(Window):
                 for move in (self.future_move_history[-1], last_move)
             ]
             if (
-                (copies[0] is None) != (copies[1] is None) or
+                (copies[0] is None) or (copies[1] is None) or
                 (copies[0] is not None and not copies[0].matches(copies[1]))
             ):
                 self.future_move_history.append(last_move)
@@ -1445,12 +1438,9 @@ class Board(Window):
                     last_history_move = last_history_move.chained_move
                 last_history_move.chained_move = last_move
         # do not pop move from future history because compare_history() will do it for us
-        turn_side = self.turn_side
-        if last_move is not None and last_move.is_edit and not self.edit_mode:
-            self.turn_side = self.turn_side.opponent()
         if (
             last_chain_move is None or last_chain_move.chained_move is None
-            or not self.chain_moves.get(turn_side, {}).get((last_chain_move.pos_from, last_chain_move.pos_to))
+            or not self.chain_moves.get(self.turn_side, {}).get((last_chain_move.pos_from, last_chain_move.pos_to))
         ):
             self.chain_start = None
             if self.promotion_piece is None:
@@ -1570,6 +1560,20 @@ class Board(Window):
                 self.color_scheme["colored_pieces"]
             )
 
+    def update_roll_history(self) -> None:
+        # check if the types and positions of probabilistic pieces have changed
+        # if so, clear the roll history starting from the current move
+        if len(self.roll_history) >= self.ply_count:
+            probabilistic_piece_signature = set()
+            for piece in self.probabilistic_pieces[self.turn_side]:
+                probabilistic_piece_info = type(piece), piece.board_pos
+                if probabilistic_piece_info not in self.probabilistic_piece_history[self.ply_count - 1]:
+                    self.roll_history = self.roll_history[:self.ply_count - 1]
+                    return
+                probabilistic_piece_signature |= {probabilistic_piece_info}
+            if probabilistic_piece_signature != self.probabilistic_piece_history[self.ply_count - 1]:
+                self.roll_history = self.roll_history[:self.ply_count - 1]
+
     def compare_history(self) -> None:
         # check if the last move matches the first future move
         if self.future_move_history and self.move_history:  # if there are any moves to compare that is
@@ -1580,9 +1584,9 @@ class Board(Window):
                 self.future_move_history.pop()  # if it does, the other future moves are still makeable, so we keep them
             else:
                 self.future_move_history = []  # otherwise, we can't redo the future moves anymore, so we clear them
-                self.roll_history = self.roll_history[:self.ply_count - 1]  # and we also clear the roll history
+                self.update_roll_history()  # and we also update the roll history
 
-    def advance_turn(self) -> None:
+    def advance_turn(self, is_undo: bool = False) -> None:
         self.deselect_piece()
         # if we're promoting, we can't advance the turn yet
         if self.promotion_piece:
@@ -1592,10 +1596,10 @@ class Board(Window):
             self.load_pieces()  # loading the new piece positions in order to update the board state
             self.color_pieces()  # reverting the piece colors to normal in case they were changed
             return  # let's not advance the turn while editing the board to hopefully make things easier for everyone
-        if self.move_history and self.move_history[-1] and self.move_history[-1].is_edit:
-            # if the board was edited, reset probabilistic moves because they would need to be recalculated
-            self.roll_history = self.roll_history[:self.ply_count - 1]
-        self.turn_side = self.turn_side.opponent()
+        if self.move_history and self.move_history[-1] and self.move_history[-1].is_edit and not is_undo:
+            # if the board was edited, update roll history because probabilistic moves would need to be recalculated
+            self.update_roll_history()
+        self.turn_side = Side.WHITE if self.ply_count % 2 == 1 else Side.BLACK
         self.load_all_moves()  # this updates the check status as well
         self.show_moves()
         if not sum(self.moves.get(self.turn_side, {}).values(), []):
@@ -1838,9 +1842,12 @@ class Board(Window):
             generate_rolls = len(self.roll_history) < self.ply_count
             while len(self.roll_history) < self.ply_count:
                 self.roll_history.append({})
+            while len(self.probabilistic_piece_history) < self.ply_count:
+                self.probabilistic_piece_history.append(set())
             if turn_side == self.turn_side and probabilistic_pieces[turn_side] and generate_rolls:
                 for piece in probabilistic_pieces[turn_side]:
                     self.roll_history[-1][piece.board_pos] = piece.movement.roll()
+                    self.probabilistic_piece_history[-1] |= {(type(piece), piece.board_pos)}
                 self.moves[turn_side] = {}
                 self.chain_moves[turn_side] = {}
             for piece in movable_pieces[turn_side] if chain_moves is None else [last_chain_move.piece]:
@@ -2177,20 +2184,17 @@ class Board(Window):
                     self.theoretical_moves = {side: {} for side in self.theoretical_moves}
                     self.show_moves()
                 else:
-                    self.turn_side = self.turn_side.opponent()
                     self.compare_history()
                     self.advance_turn()
                     self.show_moves()
         if symbol == key.W:  # White
             if modifiers & key.MOD_ACCEL and not modifiers & key.MOD_SHIFT:  # White is in control
-                if self.turn_side != Side.WHITE:
+                if self.turn_side != Side.WHITE and not self.chain_start:
                     self.move_history.append(None)
                     self.log(f"[Ply {self.ply_count}] Pass: {Side.WHITE}'s turn")
                     self.ply_count += 1
                     self.clear_en_passant()
                     self.compare_history()
-                    if self.edit_mode:
-                        self.turn_side = self.turn_side.opponent()
                     self.advance_turn()
             elif modifiers & key.MOD_SHIFT:  # Shift white piece set
                 d = -1 if modifiers & key.MOD_ACCEL else 1
@@ -2202,14 +2206,12 @@ class Board(Window):
                 self.reset_board(update=True)
         if symbol == key.B:  # Black
             if modifiers & key.MOD_ACCEL and not modifiers & key.MOD_SHIFT:  # Black is in control
-                if self.turn_side != Side.BLACK:
+                if self.turn_side != Side.BLACK and not self.chain_start:
                     self.move_history.append(None)
                     self.log(f"[Ply {self.ply_count}] Pass: {Side.BLACK}'s turn")
                     self.ply_count += 1
                     self.clear_en_passant()
                     self.compare_history()
-                    if self.edit_mode:
-                        self.turn_side = self.turn_side.opponent()
                     self.advance_turn()
             elif modifiers & key.MOD_SHIFT:  # Shift black piece set
                 d = -1 if modifiers & key.MOD_ACCEL else 1
@@ -2220,14 +2222,12 @@ class Board(Window):
                 )
                 self.reset_board(update=True)
         if symbol == key.N:  # Next
-            if modifiers & key.MOD_ACCEL and not modifiers & key.MOD_SHIFT:  # Next player is in control
+            if modifiers & key.MOD_ACCEL and not modifiers & key.MOD_SHIFT and not self.chain_start:  # Next player
                 self.move_history.append(None)
                 self.log(f"[Ply {self.ply_count}] Pass: {self.turn_side.opponent()}'s turn")
                 self.ply_count += 1
                 self.clear_en_passant()
                 self.compare_history()
-                if self.edit_mode:
-                    self.turn_side = self.turn_side.opponent()
                 self.advance_turn()
             elif modifiers & key.MOD_SHIFT:
                 if self.piece_set_ids[Side.WHITE] == self.piece_set_ids[Side.BLACK]:  # Next piece set
@@ -2279,8 +2279,6 @@ class Board(Window):
                 else:
                     self.royal_piece_mode = old_mode
                 self.future_move_history = []  # we don't know if we can redo the future moves anymore, so we clear them
-                self.roll_history = self.roll_history[:self.ply_count - 1]  # and we also have to clear the roll history
-                self.turn_side = self.turn_side.opponent()
                 self.advance_turn()
         if symbol == key.F:
             if modifiers & key.MOD_ACCEL:  # Flip
