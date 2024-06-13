@@ -2529,6 +2529,9 @@ class Board(Window):
             debug_log_data.append(f"ID {i:0{digits}d}: {group['name']}")
         debug_log_data.append(f"ID blocklist: {', '.join(str(i) for i in self.board_config['block_ids']) or 'None'}")
         debug_log_data.append(
+            f"Chaos ID blocklist: {', '.join(str(i) for i in self.board_config['block_ids_chaos']) or 'None'}"
+        )
+        debug_log_data.append(
             f"Game: "
             f"(ID {self.piece_set_ids[Side.WHITE]:0{digits}d}) {self.piece_set_names[Side.WHITE]} vs. "
             f"(ID {self.piece_set_ids[Side.BLACK]:0{digits}d}) {self.piece_set_names[Side.BLACK]}"
