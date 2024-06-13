@@ -1565,6 +1565,12 @@ class Board(Window):
         # if so, clear the roll history starting from the current move
         if len(self.roll_history) >= self.ply_count:
             probabilistic_piece_signature = set()
+            # Very Important Note: The following line works because self.turn_side is updated *after* the function call!
+            # self.probabilistic_pieces[self.turn_side] picks the opponent's pieces iff self.turn_side would be changed.
+            # What this means is that if this function is called during turn advancement, the wrong side will be chosen,
+            # but as of now, it could only happen in Board.compare_history(), and only if a move was undone and replaced
+            # with a different move, in which case we would want to clear the roll history anyway. Point is, this works.
+            # (I don't completely understand how it works, and I don't know if it has any right to, but it does anyway.)
             for piece in self.probabilistic_pieces[self.turn_side]:
                 probabilistic_piece_info = type(piece), piece.board_pos
                 if probabilistic_piece_info not in self.probabilistic_piece_history[self.ply_count - 1]:
