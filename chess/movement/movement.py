@@ -402,7 +402,7 @@ class BentMovement(BaseMultiMovement):
     def moves(self, pos_from: Position, piece: Piece, theoretical: bool = False, index: int = 0):
         if index >= len(self.movements):
             return ()
-        movement = self.movements[index]
+        movement = copy(self.movements[index])  # copy movement because changing it inside the loop completely breaks it
         if isinstance(movement, BaseDirectionalMovement):
             directions = movement.directions
             for direction in directions:
