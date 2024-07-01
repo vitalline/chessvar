@@ -418,7 +418,6 @@ class BentMovement(BaseMultiMovement):
                 ):
                     for bent_move in self.moves(move.pos_to, piece, theoretical, index + 1):
                         yield copy(bent_move).set(pos_from=pos_from)
-            movement.directions = directions
         else:
             return ()
 
