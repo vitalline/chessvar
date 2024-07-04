@@ -5,7 +5,7 @@ from chess.pieces.pieces import Piece
 
 class ElkRdr(Piece):
     name = 'Elkrider'
-    file_name = '(NNl,Rd)'
+    file_name = '(Rb,NNw)'
     asset_folder = 'color'
 
     def __init__(self, board, board_pos, side):
@@ -13,15 +13,15 @@ class ElkRdr(Piece):
             board, board_pos, side,
             movement.ColorMovement(
                 board,
+                dark=[movement.RiderMovement(board, rot([(1, 0)]))],
                 light=[movement.RiderMovement(board, rot([(1, 2), (2, 1)]))],
-                dark=[movement.RiderMovement(board, rot([(1, 0)]))]
             )
         )
 
 
 class CaribRdr(Piece):
     name = 'Caribourider'
-    file_name = '(Rl,NNd)'
+    file_name = '(NNb,Rw)'
     asset_folder = 'color'
 
     def __init__(self, board, board_pos, side):
@@ -29,15 +29,15 @@ class CaribRdr(Piece):
             board, board_pos, side,
             movement.ColorMovement(
                 board,
+                dark=[movement.RiderMovement(board, rot([(1, 2), (2, 1)]))],
                 light=[movement.RiderMovement(board, rot([(1, 0)]))],
-                dark=[movement.RiderMovement(board, rot([(1, 2), (2, 1)]))]
             )
         )
 
 
 class DCannon(Piece):
     name = 'Deuterocannon'
-    file_name = '(mRcpRl,Nd)'
+    file_name = '(Nb,mRcpRw)'
     asset_folder = 'color'
 
     def __init__(self, board, board_pos, side):
@@ -45,19 +45,19 @@ class DCannon(Piece):
             board, board_pos, side,
             movement.ColorMovement(
                 board,
+                dark=[movement.RiderMovement(board, rot([(1, 2, 1), (2, 1, 1)]))],
                 light=[movement.MultiMovement(
                     board,
                     move=[movement.RiderMovement(board, rot([(1, 0)]))],
                     capture=[movement.CannonRiderMovement(board, rot([(1, 0)]))]
                 )],
-                dark=[movement.RiderMovement(board, rot([(1, 2, 1), (2, 1, 1)]))]
             )
         )
 
 
 class Nightlight(Piece):
     name = 'Nightlight'
-    file_name = '(fBbhNl,FW[W-DD]d)'
+    file_name = '(FW[W-DD]b,fBbhNw)'
     asset_folder = 'color'
 
     def __init__(self, board, board_pos, side):
@@ -65,13 +65,13 @@ class Nightlight(Piece):
             board, board_pos, side,
             movement.ColorMovement(
                 board,
-                light=[movement.RiderMovement(board, symv([(-1, 2, 1), (-2, 1, 1), (1, 1)]))],
                 dark=[movement.MultiMovement(board, [movement.RiderMovement(board, rot([(1, 1, 1)]))] + [
                     movement.BentMovement(board, [
                         movement.RiderMovement(board, [(i, j, 1)]),
                         movement.RiderMovement(board, [(2 * i, 2 * j)])
                     ]) for i, j in rot([(1, 0)])
-                ])]
+                ])],
+                light=[movement.RiderMovement(board, symv([(-1, 2, 1), (-2, 1, 1), (1, 1)]))],
             )
         )
 
