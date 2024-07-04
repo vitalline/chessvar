@@ -5,7 +5,7 @@ from arcade import Color
 
 
 def bound_float(x: float) -> float:
-    return min(1.0, max(0.0, x))  # type: ignore
+    return min(1.0, max(0.0, x))
 
 
 def bound_color(color: Color) -> Color:

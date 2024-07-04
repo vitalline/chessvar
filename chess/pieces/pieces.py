@@ -197,20 +197,21 @@ class PromotablePiece(Piece):
                 return
             if not self.promotions:
                 return
+            self.board.update_auto_ranged_pieces(move, self.side.opponent())
+            if move.chained_move:  # if a move was added then the promoting piece was just auto-captured. stop promotion
+                return
             promotion_piece = self.board.promotion_piece
             if move.promotion:
                 self.board.promotion_piece = True
                 self.board.replace(self, move.promotion)
-                self.board.load_pieces()
-                self.board.update_auto_ranged_pieces(move, move.piece.side.opponent())
+                self.board.update_promotion_auto_capture(move)
                 self.board.promotion_piece = promotion_piece
                 return
             if len(self.promotions) == 1:
                 self.board.promotion_piece = True
                 move.set(promotion=self.promotions[0])
                 self.board.replace(self, self.promotions[0])
-                self.board.load_pieces()
-                self.board.update_auto_ranged_pieces(move, move.piece.side.opponent())
+                self.board.update_promotion_auto_capture(move)
                 self.board.promotion_piece = promotion_piece
                 return
             self.board.start_promotion(self, self.promotions)

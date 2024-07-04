@@ -237,28 +237,63 @@ class RangedCaptureRiderMovement(RiderMovement):
 
 
 class RangedAutoCaptureRiderMovement(RiderMovement):
+
+    # Note: This implementation assumes that the pieces that utilize it cannot be blocked by another piece mid-movement.
+    # This is true for the only army that utilizes this movement type, but it may not work correctly in other scenarios.
+
     def __init__(self, board: Board, directions: list[AnyDirection]):
         super().__init__(board, directions)
+
+    def generate_captures(self, move: Move, piece: Piece) -> Move:
+        if not move.is_edit:
+            captures = {}
+            for capture in super().moves(move.pos_to, piece):
+                captured_piece = self.board.get_piece(capture.pos_to)
+                if captured_piece.side == piece.side.opponent():
+                    captures[capture.pos_to] = copy(capture)
+                    captures[capture.pos_to].set(piece=piece, pos_to=move.pos_to, captured_piece=captured_piece)
+            last_chain_move = move
+            while last_chain_move.chained_move:
+                last_chain_move = last_chain_move.chained_move
+            for capture_pos_to in sorted(captures):
+                last_chain_move.chained_move = captures[capture_pos_to]
+                last_chain_move = last_chain_move.chained_move
+        return move
 
     def moves(self, pos_from: Position, piece: Piece, theoretical: bool = False):
         for move in super().moves(pos_from, piece, theoretical):
-            if not theoretical:
-                captures = {}
-                for capture in super().moves(move.pos_to, piece):
-                    captured_piece = self.board.get_piece(capture.pos_to)
-                    if captured_piece.side == piece.side.opponent():
-                        captures[capture.pos_to] = copy(capture)
-                        captures[capture.pos_to].set(piece=piece, pos_to=move.pos_to, captured_piece=captured_piece)
-                last_chain_move = move
-                for capture_pos_to in sorted(captures):
-                    last_chain_move.chained_move = captures[capture_pos_to]
-                    last_chain_move = last_chain_move.chained_move
-            yield move
+            yield move if theoretical else self.generate_captures(move, piece)
 
 
-class AutoRangedCaptureRiderMovement(RiderMovement):
+class AutoRangedAutoCaptureRiderMovement(RangedAutoCaptureRiderMovement):
+
+    # Note: Same as RangedAutoCaptureRiderMovement, this assumes that pieces that use it cannot be blocked mid-movement.
+
     def __init__(self, board: Board, directions: list[AnyDirection]):
         super().__init__(board, directions)
+
+    def mark(self, pos: Position, piece: Piece):
+        for move in self.moves(pos, piece, True):
+            if move.pos_to not in self.board.auto_capture_markers[piece.side]:
+                self.board.auto_capture_markers[piece.side][move.pos_to] = set()
+            self.board.auto_capture_markers[piece.side][move.pos_to].add(pos)
+
+    def unmark(self, pos: Position, piece: Piece):
+        for move in self.moves(pos, piece, True):
+            if move.pos_to in self.board.auto_capture_markers[piece.side]:
+                self.board.auto_capture_markers[piece.side][move.pos_to].discard(pos)
+                if not self.board.auto_capture_markers[piece.side][move.pos_to]:
+                    del self.board.auto_capture_markers[piece.side][move.pos_to]
+
+    def update(self, move: Move, piece: Piece):
+        self.unmark(move.pos_from, piece)
+        self.mark(move.pos_to, piece)
+        super().update(move, piece)
+
+    def undo(self, move: Move, piece: Piece):
+        super().undo(move, piece)
+        self.unmark(move.pos_to, piece)
+        self.mark(move.pos_from, piece)
 
 
 class CastlingMovement(BaseMovement):
@@ -434,6 +469,7 @@ class ChainMovement(BaseMultiMovement):
             return ()
         if index == len(self.movements) - 1:
             for move in self.movements[index].moves(pos_from, piece, theoretical):
+                self.board.update_move(move)
                 yield move
             return ()
         if theoretical:

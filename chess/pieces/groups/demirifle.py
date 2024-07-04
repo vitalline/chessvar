@@ -11,7 +11,7 @@ class Snail(Piece):
     def __init__(self, board, board_pos, side):
         super().__init__(
             board, board_pos, side,
-            movement.AutoRangedCaptureRiderMovement(board, rot([(1, 0, 1)]) + [(2, 0, 1)])
+            movement.AutoRangedAutoCaptureRiderMovement(board, rot([(1, 0, 1)]) + [(2, 0, 1)])
         )
 
 
@@ -23,7 +23,7 @@ class Crab(Piece):
     def __init__(self, board, board_pos, side):
         super().__init__(
             board, board_pos, side,
-            movement.AutoRangedCaptureRiderMovement(board, symv([(2, 1, 1), (-1, 2, 1)]))
+            movement.AutoRangedAutoCaptureRiderMovement(board, symv([(2, 1, 1), (-1, 2, 1)]))
         )
 
 
@@ -35,7 +35,7 @@ class Lobster(Piece):
     def __init__(self, board, board_pos, side):
         super().__init__(
             board, board_pos, side,
-            movement.AutoRangedCaptureRiderMovement(board, symv([(2, 2, 1), (-1, 1, 1)]))
+            movement.AutoRangedAutoCaptureRiderMovement(board, symv([(2, 2, 1), (-1, 1, 1)]))
         )
 
 
@@ -47,5 +47,7 @@ class Crabsnail(Piece):
     def __init__(self, board, board_pos, side):
         super().__init__(
             board, board_pos, side,
-            movement.AutoRangedCaptureRiderMovement(board, symv([(2, 0, 1), (2, 1, 1), (-1, 2, 1)]) + rot([(1, 0, 1)]))
+            movement.AutoRangedAutoCaptureRiderMovement(
+                board, symv([(2, 0, 1), (2, 1, 1), (-1, 2, 1)]) + rot([(1, 0, 1)])
+            )
         )
