@@ -1,2 +1,2 @@
-arcade>2.7.1.dev9
+arcade~=2.6.17
 Pillow~=10.4.0

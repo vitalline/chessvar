@@ -1,9 +1,7 @@
 from colorsys import hls_to_rgb, hsv_to_rgb, rgb_to_hls, rgb_to_hsv
 
 from PIL.ImageColor import getrgb
-
-
-Color = tuple[int, int, int] | tuple[int, int, int, int]
+from arcade import Color
 
 
 def bound_float(x: float) -> float:

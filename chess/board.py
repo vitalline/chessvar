@@ -402,7 +402,9 @@ class Board(Window):
             'anchor_y': 'center',
             'font_name': 'Courier New',
             'font_size': self.square_size / 2,
+            'width': self.square_size / 2,
             'bold': True,
+            'align': 'center',
             'color': self.color_scheme["text_color"],
         }
 
@@ -2529,7 +2531,7 @@ class Board(Window):
             old_position, from_size, from_origin, from_flip_mode
         ))
 
-    def update_sprites(self, width: int, height: int, flip_mode: bool) -> None:
+    def update_sprites(self, width: float, height: float, flip_mode: bool) -> None:
         super().on_resize(width, height)
         old_size = self.square_size
         self.square_size = min(self.width / (self.board_width + 2), self.height / (self.board_height + 2))
@@ -2710,7 +2712,7 @@ class Board(Window):
         debug_log_data.append(f"Chaos set seed: {self.chaos_seed}")
         return debug_log_data
 
-    def on_resize(self, width: int, height: int):
+    def on_resize(self, width: float, height: float):
         self.update_sprites(width, height, self.flip_mode)
 
     def on_deactivate(self):

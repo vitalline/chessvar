@@ -5,9 +5,8 @@ from enum import Enum
 from os.path import isfile
 from typing import TYPE_CHECKING, Type
 
-from arcade import Sprite, load_texture
+from arcade import Color, Sprite, load_texture
 
-from chess.color import Color
 from chess.movement.move import Move
 from chess.movement.util import AnyDirection, Position
 from chess.util import Default
@@ -101,11 +100,9 @@ class Piece(Sprite):
         self.texture_name = self.file_name
         super().__init__(
             self.texture_path(),
+            flipped_horizontally=self.flipped_horizontally,
+            flipped_vertically=self.flipped_vertically,
         )
-        if self.flipped_horizontally:
-            self.texture = self.texture.flip_horizontally()
-        if self.flipped_vertically:
-            self.texture = self.texture.flip_vertically()
         if self.board_pos is not None:
             self.position = self.board.get_screen_position(self.board_pos)
 
@@ -155,13 +152,13 @@ class Piece(Sprite):
             flipped_vertically = self.flipped_vertically
         else:
             self.flipped_vertically = flipped_vertically
-        if self.texture.file_path != texture_path:
+        if self.texture.name != texture_path:
             color = self.color
-            new_texture = load_texture(texture_path)
-            if flipped_horizontally:
-                new_texture = new_texture.flip_horizontally()
-            if flipped_vertically:
-                new_texture = new_texture.flip_vertically()
+            new_texture = load_texture(
+                texture_path,
+                flipped_horizontally=flipped_horizontally,
+                flipped_vertically=flipped_vertically,
+            )
             self.texture = new_texture
             self.color = color
 
