@@ -29,6 +29,7 @@ class Barcfil(Piece):
             movement.RiderMovement(board, symv([(1, 2, 1), (2, 2, 1), (-2, 1, 1), (-2, 2, 1)]))
         )
 
+
 class Bed(Piece):
     name = 'Bed'
     file_name = 'hhBD'

@@ -50,6 +50,7 @@ class Tusker(Piece):
                 )
         super().__init__(board, board_pos, side, movement.MultiMovement(board, movements))
 
+
 class Hierophant(Piece):
     name = 'Hierophant'
     file_name = 'KD2A2[W-D][D-W][F-A][A-F]'
