@@ -543,6 +543,28 @@ class ColorMovement(BaseMultiMovement):
                     yield copy(move)
 
 
+class SideMovement(BaseMultiMovement):
+    def __init__(
+            self,
+            board: Board,
+            left: list[BaseMovement] | None = None,
+            right: list[BaseMovement] | None = None
+    ):
+        self.left = left or []
+        self.right = right or []
+        super().__init__(board, self.left + self.right)
+
+    def moves(self, pos_from: Position, piece: Piece, theoretical: bool = False):
+        if pos_from[1] <= (self.board.board_width - 1) / 2:
+            for movement in self.left:
+                for move in movement.moves(pos_from, piece, theoretical):
+                    yield copy(move)
+        if pos_from[1] >= (self.board.board_width - 1) / 2:
+            for movement in self.right:
+                for move in movement.moves(pos_from, piece, theoretical):
+                    yield copy(move)
+
+
 class ProbabilisticMovement(BaseMultiMovement):
     def __init__(self, board: Board, movements: list[BaseMovement]):
         super().__init__(board, movements)

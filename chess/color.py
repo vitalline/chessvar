@@ -1,7 +1,9 @@
 from colorsys import hls_to_rgb, hsv_to_rgb, rgb_to_hls, rgb_to_hsv
 
 from PIL.ImageColor import getrgb
-from arcade import Color
+
+
+Color = tuple[int, int, int] | tuple[int, int, int, int]
 
 
 def bound_float(x: float) -> float:
@@ -17,37 +19,37 @@ def to_float(color: Color) -> tuple[float, float, float]:
 
 
 def to_color(color: tuple[float, float, float] | Color) -> Color:
-    return bound_color([round(x * 255) for x in color])
+    return bound_color(tuple(round(x * 255) for x in color))  # type: ignore
 
 
 def average(color1: Color, color2: Color) -> Color:
-    return bound_color([round((x1 + x2) / 2) for x1, x2 in zip(color1, color2)])
+    return bound_color(tuple(round((x1 + x2) / 2) for x1, x2 in zip(color1, color2)))  # type: ignore
 
 
 def multiply(color: Color, amount: float) -> Color:
-    return bound_color([round(x * amount) for x in color[:3]]) + color[3:]
+    return bound_color(tuple(round(x * amount) for x in color[:3])) + color[3:]  # type: ignore
 
 
 def lighten(color: Color, amount: float) -> Color:
     h, l, s = rgb_to_hls(*to_float(color))
-    return to_color(hls_to_rgb(h, bound_float(l + amount), s)) + color[3:]
+    return to_color(hls_to_rgb(h, bound_float(l + amount), s)) + color[3:]  # type: ignore
 
 
 def darken(color: Color, amount: float) -> Color:
-    return lighten(color, -amount)
+    return lighten(color, -amount)  # type: ignore
 
 
 def lighten_or_darken(color: Color, amount: float) -> Color:
-    return lighten(color, amount if rgb_to_hls(*to_float(color))[1] < 0.5 else -amount)
+    return lighten(color, amount if rgb_to_hls(*to_float(color))[1] < 0.5 else -amount)  # type: ignore
 
 
 def saturate(color: Color, amount: float) -> Color:
     h, l, s = rgb_to_hls(*to_float(color))
-    return to_color(hls_to_rgb(h, l, bound_float(s + amount))) + color[3:]
+    return to_color(hls_to_rgb(h, l, bound_float(s + amount))) + color[3:]  # type: ignore
 
 
 def desaturate(color: Color, amount: float) -> Color:
-    return saturate(color, -amount)
+    return saturate(color, -amount)  # type: ignore
 
 
 # defaults for colors that are not defined in the color schemes
@@ -135,7 +137,8 @@ colors = [
         # dark squares are shades of gray matching the perceived brightness of the light squares
 
         # cherub: NOT the homestuck cherub colors, instead the colors of the cherub chess set
-        (getrgb('#696969'), getrgb('#252525'), 'cherub'),
+        (getrgb('#696969'), getrgb('#252525'), 'cherub1'),
+        (getrgb('#696969'), getrgb('#252525'), 'cherub2'),
         # the rest of the cherub colors are generated below
     ]
 ]
@@ -144,7 +147,7 @@ colors = [
 for i in range(len(colors)):
     # set the promotion area background color to be a lighter or darker version of the background color
     colors[i]["promotion_area_color"] = lighten_or_darken(colors[i]["background_color"], 0.25)
-    if colors[i]["scheme_type"] in ("troll", "cherub"):
+    if colors[i]["scheme_type"] == "troll" or colors[i]["scheme_type"].startswith("cherub"):
         # make the text, highlight, and selection colors lighter
         colors[i]["text_color"] = to_color(
             # grayscale text that is readable on the background color (30% brightness increase compared to bg)
@@ -179,15 +182,16 @@ for i in range(len(colors)):
         colors[i]["black_win_color"] = multiply(colors[i]["dark_square_color"], 1.75)
         colors[i]["black_draw_color"] = multiply(colors[i]["dark_square_color"], 1.375)
         colors[i]["black_loss_color"] = multiply(colors[i]["dark_square_color"], 1)
-    if colors[i]["scheme_type"] == "cherub":
-        # define the cherub piece colors (white pieces are green, black pieces are red)
+    if colors[i]["scheme_type"].startswith("cherub"):
+        # define the cherub piece colors (white pieces are red in cherub1 and green in cherub2)
+        scheme_id = int(colors[i]["scheme_type"][-1])
         colors[i]["colored_pieces"] = True
-        colors[i]["white_piece_color"] = (0, 255, 0)
-        colors[i]["black_piece_color"] = (255, 0, 0)
-        colors[i]["white_check_color"] = (0, 192, 0)
-        colors[i]["black_check_color"] = (192, 0, 0)
-        colors[i]["white_draw_color"] = (64, 192, 64)
-        colors[i]["black_draw_color"] = (192, 64, 64)
+        colors[i]["white_piece_color"] = (255, 0, 0) if scheme_id == 1 else (0, 255, 0)
+        colors[i]["black_piece_color"] = (255, 0, 0) if scheme_id == 2 else (0, 255, 0)
+        colors[i]["white_check_color"] = (192, 0, 0) if scheme_id == 1 else (0, 192, 0)
+        colors[i]["black_check_color"] = (192, 0, 0) if scheme_id == 2 else (0, 192, 0)
+        colors[i]["white_draw_color"] = (192, 64, 64) if scheme_id == 1 else (64, 192, 64)
+        colors[i]["black_draw_color"] = (192, 64, 64) if scheme_id == 2 else (64, 192, 64)
         colors[i]["win_color"] = None
     # add defaults for required colors that were not previously defined
     for key in default_colors:

@@ -9,6 +9,9 @@ DEFAULT_CONFIG = {
         'white_id': 0,
         'black_id': 0,
         'edit_id': '',
+        'hide_pieces': 0,
+        'hide_moves': '',
+        'royal_mode': 0,
         'set_seed': '',
         'roll_seed': '',
         'chaos_seed': '',
@@ -48,6 +51,11 @@ class Config(dict):
                         self[item] = None
                     else:
                         self[item] = self.base_config.getint(section, item)
+                if item == 'hide_moves':
+                    if self.base_config[section][item].strip() == '':
+                        self[item] = None
+                    else:
+                        self[item] = self.base_config.getboolean(section, item)
 
     def save(self, path: str) -> None:
         for section in self.base_config:
@@ -56,6 +64,9 @@ class Config(dict):
                 if item.startswith('block_'):
                     self.base_config[section][item] = ', '.join(str(s) for s in self[item])
                 if item == 'edit_id' or (item.endswith('_seed') and not item.startswith('update_')):
+                    if self[item] is None:
+                        self.base_config[section][item] = ''
+                if item == 'hide_moves':
                     if self[item] is None:
                         self.base_config[section][item] = ''
         with open(path, 'w') as file:

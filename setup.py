@@ -23,10 +23,10 @@ def gen_data_files(include: Iterable[str], exclude: Iterable[str] = ()):
 
 setup(
     name='chess',
-    version='0.2.5',
+    version='0.3.0',
     options={'build_exe': {
         'build_exe': join('dist', 'chess'),
-        'include_files': gen_data_files(['assets']) + [('readme.txt',) * 2]
+        'include_files': gen_data_files(['assets']) + [(s,) * 2 for s in ('readme.txt', 'cwda_2024.txt')]
     }},
     executables=[
         Executable('main.py', target_name='chess.exe', base='Win32GUI'),

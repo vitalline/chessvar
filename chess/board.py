@@ -20,20 +20,20 @@ from chess.movement.move import Move
 from chess.movement.util import Position, add
 from chess.pieces import pieces as abc
 from chess.pieces.groups import classic as fide
-from chess.pieces.groups import amazon as am, amontillado as ao, avian as av
+from chess.pieces.groups import amazon as am, amontillado as ao, asymmetry as ay, avian as av
 from chess.pieces.groups import backward as bw, beast as bs, breakfast as bk, burn as br, buzz as bz
 from chess.pieces.groups import camel as ca, cannon as cn, color as co, colorbound as cb
 from chess.pieces.groups import crash as cs, crook as cr, cylindrical as cy
 from chess.pieces.groups import demirifle as de, drip as dr
 from chess.pieces.groups import fairy as fa, fizz as fi, fly as fl, forward as fw
-from chess.pieces.groups import horse as hs
+from chess.pieces.groups import hobbit as hb, horse as hs
 from chess.pieces.groups import inadjacent as ia, iron as ir
 from chess.pieces.groups import knight as kn
-from chess.pieces.groups import mash as ms
+from chess.pieces.groups import martian as mr, mash as ms, multimove as mu
 from chess.pieces.groups import narrow as na, nocturnal as no
 from chess.pieces.groups import pawn as pa, perimeter as pe, pizza as pz, probable as pr
 from chess.pieces.groups import rookie as rk
-from chess.pieces.groups import starbound as st, stone as so, switch as sw
+from chess.pieces.groups import splash as sp, starbound as st, stone as so, switch as sw
 from chess.pieces.groups import thrash as th
 from chess.pieces.groups import wide as wd
 from chess.pieces.groups import zebra as zb
@@ -65,6 +65,10 @@ piece_groups: list[dict[str, str | list[Type[abc.Piece]]]] = [
     {
         'name': "Amontillado Arbiters",
         'set': [ao.Hasdrubal, ao.Barcfil, ao.Bed, ao.Hamilcar, fide.King, ao.Bed, ao.Barcfil, ao.Hasdrubal],
+    },
+    {
+        'name': "Asymmetrical Assaulters",
+        'set': [ay.RBiok, ay.Knisher, ay.Blizzard, ay.Archannel, fide.King, ay.Blizzard, ay.Knisher, ay.LBiok],
     },
     {
         'name': "Avian Airforce",
@@ -145,12 +149,24 @@ piece_groups: list[dict[str, str | list[Type[abc.Piece]]]] = [
         'set': [hs.Naysayer, hs.HorseRdr, hs.Tapir, hs.Marauder, fide.King, hs.Tapir, hs.HorseRdr, hs.Naysayer],
     },
     {
+        'name': "Hopping Hobbitses",
+        'set': [hb.Heart, hb.Drake, hb.Barcinal, hb.Hannibal, fide.King, hb.Barcinal, hb.Drake, hb.Heart],
+    },
+    {
         'name': "Inadjacent Intimidators",
         'set': [ia.Bireme, ia.Tigon, ia.Bicycle, ia.Biplane, fide.King, ia.Bicycle, ia.Tigon, ia.Bireme],
     },
     {
         'name': "Irritant Irons",
         'set': [ir.Musth, ir.Officer, ir.SilverRdr, ir.GoldRdr, fide.King, ir.SilverRdr, ir.Officer, ir.Musth],
+    },
+    {
+        'name': "Magnificent Multimovers",
+        'set': [mu.MachineRdr, mu.Allnight, mu.Tusker, mu.Hierophant, fide.King, mu.Tusker, mu.Allnight, mu.MachineRdr],
+    },
+    {
+        'name': "Martian Manglers",
+        'set': [mr.Padwar, mr.Marker, mr.Walker, mr.Chief, fide.King, mr.Walker, mr.Marker, mr.Padwar],
     },
     {
         'name': "Meticulous Mashers",
@@ -191,6 +207,10 @@ piece_groups: list[dict[str, str | list[Type[abc.Piece]]]] = [
     {
         'name': "Stoic Stones",
         'set': [so.Caecilian, so.Brick, so.Stele, so.Caryatid, fide.King, so.Stele, so.Brick, so.Caecilian],
+    },
+    {
+        'name': "Superior Splashers",
+        'set': [sp.Mammoth, sp.Gecko, sp.Deacon, sp.Brigadier, fide.King, sp.Deacon, sp.Gecko, sp.Mammoth],
     },
     {
         'name': "Threeleaping Thrashers",
@@ -303,9 +323,9 @@ class Board(Window):
         self.turn_side = Side.WHITE  # side whose turn it is
         self.check_side = Side.NONE  # side that is currently in check
         self.castling_threats = set()  # squares that are attacked in a way that prevents castling
-        self.royal_piece_mode = 0  # 0: normal, 1: force royal, -1: force quasi-royal
-        self.should_hide_pieces = 0  # 0: don't hide, 1: hide all pieces, 2: penultima mode
-        self.should_hide_moves = None  # whether to hide the move markers; None defaults to should_hide_pieces
+        self.royal_piece_mode = self.board_config['royal_mode'] % 3  # 0: normal, 1: force royal, 2: force quasi-royal
+        self.should_hide_pieces = self.board_config['hide_pieces'] % 3  # 0: don't hide, 1: hide all, 2: penultima mode
+        self.should_hide_moves = self.board_config['hide_moves']  # whether to hide the move markers; None uses above
         self.flip_mode = False  # whether the board is flipped
         self.edit_mode = False  # allows to edit the board position if set to True
         self.game_over = False  # act 6 act 6 intermission 3 (game over)
@@ -382,9 +402,7 @@ class Board(Window):
             'anchor_y': 'center',
             'font_name': 'Courier New',
             'font_size': self.square_size / 2,
-            'width': self.square_size / 2,
             'bold': True,
-            'align': 'center',
             'color': self.color_scheme["text_color"],
         }
 
@@ -1437,7 +1455,7 @@ class Board(Window):
             chained_move = last_move
             while chained_move:
                 self.log(f'''[Ply {self.ply_count}] Redo: {
-                f"{'Edit' if chained_move.is_edit else 'Move'}: " + str(chained_move)
+                    f"{'Edit' if chained_move.is_edit else 'Move'}: " + str(chained_move)
                 }''')
                 chained_move = chained_move.chained_move
                 if chained_move:
@@ -1458,7 +1476,7 @@ class Board(Window):
                 chained_move.piece.move(chained_move)
                 self.update_auto_capture_markers(chained_move)
                 self.log(f'''[Ply {self.ply_count}] Redo: {
-                f"{'Edit' if chained_move.is_edit else 'Move'}: " + str(chained_move)
+                    f"{'Edit' if chained_move.is_edit else 'Move'}: " + str(chained_move)
                 }''')
                 if chained_move.is_edit and chained_move.promotion is not None:
                     if chained_move.promotion is Unset:
@@ -2049,7 +2067,7 @@ class Board(Window):
             for side in (Side.WHITE, Side.BLACK):
                 self.royal_pieces[side].extend(self.quasi_royal_pieces[side])
                 self.quasi_royal_pieces[side].clear()
-        if self.royal_piece_mode == -1:  # Force quasi-royal pieces
+        if self.royal_piece_mode == 2:  # Force quasi-royal pieces
             for side in (Side.WHITE, Side.BLACK):
                 self.quasi_royal_pieces[side].extend(self.royal_pieces[side])
                 self.royal_pieces[side].clear()
@@ -2339,7 +2357,7 @@ class Board(Window):
         if symbol == key.O:  # Royal pieces
             old_mode = self.royal_piece_mode
             if modifiers & key.MOD_SHIFT:  # Force royal mode (Shift: all quasi-royal, Ctrl+Shift: all royal)
-                self.royal_piece_mode = 1 if modifiers & key.MOD_ACCEL else -1
+                self.royal_piece_mode = 1 if modifiers & key.MOD_ACCEL else 2
             elif modifiers & key.MOD_ACCEL:  # Default
                 self.royal_piece_mode = 0
             if old_mode != self.royal_piece_mode:
@@ -2347,7 +2365,7 @@ class Board(Window):
                     self.log(f"[Ply {self.ply_count}] Info: Using default check rule (piece-dependent)")
                 elif self.royal_piece_mode == 1:
                     self.log(f"[Ply {self.ply_count}] Info: Using royal check rule (threaten any royal piece)")
-                elif self.royal_piece_mode == -1:
+                elif self.royal_piece_mode == 2:
                     self.log(f"[Ply {self.ply_count}] Info: Using quasi-royal check rule (threaten last royal piece)")
                 else:
                     self.royal_piece_mode = old_mode
@@ -2364,7 +2382,7 @@ class Board(Window):
                 self.color_index = 0
             elif modifiers & key.MOD_SHIFT:  # Graphics shift
                 self.color_index = (self.color_index + (-1 if modifiers & key.MOD_ACCEL else 1)) % len(colors)
-            if self.color_scheme["scheme_type"] == "cherub" and self.is_trickster_mode():
+            if self.color_scheme["scheme_type"].startswith("cherub") and self.is_trickster_mode():
                 self.trickster_color_index = 0
                 self.reset_trickster_mode()
             else:
@@ -2423,7 +2441,7 @@ class Board(Window):
                 self.select_piece(selected_square)
             self.show_moves()
         if symbol == key.T and modifiers & key.MOD_ACCEL:  # Trickster mode
-            if self.color_scheme["scheme_type"] == "cherub":
+            if self.color_scheme["scheme_type"].startswith("cherub"):
                 self.trickster_color_index = (
                     base_rng.randrange(len(trickster_colors)) + 1 if self.is_trickster_mode(False) else 0
                 )
@@ -2511,7 +2529,7 @@ class Board(Window):
             old_position, from_size, from_origin, from_flip_mode
         ))
 
-    def update_sprites(self, width: float, height: float, flip_mode: bool) -> None:
+    def update_sprites(self, width: int, height: int, flip_mode: bool) -> None:
         super().on_resize(width, height)
         old_size = self.square_size
         self.square_size = min(self.width / (self.board_width + 2), self.height / (self.board_height + 2))
@@ -2578,6 +2596,9 @@ class Board(Window):
         config['white_id'] = self.piece_set_ids[Side.WHITE]
         config['black_id'] = self.piece_set_ids[Side.BLACK]
         config['edit_id'] = self.edit_piece_set_id
+        config['hide_pieces'] = self.should_hide_pieces
+        config['hide_moves'] = self.should_hide_moves
+        config['royal_mode'] = self.royal_piece_mode
         config['set_seed'] = self.set_seed
         config['roll_seed'] = self.roll_seed
         config['chaos_seed'] = self.chaos_seed
@@ -2689,7 +2710,7 @@ class Board(Window):
         debug_log_data.append(f"Chaos set seed: {self.chaos_seed}")
         return debug_log_data
 
-    def on_resize(self, width: float, height: float):
+    def on_resize(self, width: int, height: int):
         self.update_sprites(width, height, self.flip_mode)
 
     def on_deactivate(self):
