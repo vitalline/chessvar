@@ -2146,6 +2146,15 @@ class Board(Window):
         for side in self.auto_capture_markers if side is Side.ANY else (side,):
             self.auto_capture_markers[side].clear()
 
+    def load_chaos_sets(self, mode: int, same: bool) -> None:
+        self.log(f"[Ply {self.ply_count}] Info: Starting new game (with chaotic piece {'set' if same else 'sets'})")
+        self.chaos_mode = mode
+        self.chaos_sets = {}
+        self.chaos_seed = self.chaos_rng.randrange(2 ** 32)
+        self.chaos_rng = Random(self.chaos_seed)
+        self.piece_set_ids = {Side.WHITE: -1, Side.BLACK: -1 if same else -2}
+        self.reset_board(update=True)
+
     def on_key_press(self, symbol, modifiers):
         if self.edit_mode and modifiers & key.MOD_ACCEL:
             if self.held_buttons & MOUSE_BUTTON_LEFT and self.selected_square is not None:
@@ -2219,18 +2228,12 @@ class Board(Window):
                 self.log(f"[Ply {self.ply_count}] Info: Starting new game")
                 self.reset_board()
         if symbol == key.C:
-            if modifiers & (key.MOD_SHIFT | key.MOD_ALT):  # Chaos mode
-                chaotic = "extra chaotic" if modifiers & key.MOD_ALT else "chaotic"
-                sets = "set" if modifiers & key.MOD_ACCEL else "sets"
-                self.log(f"[Ply {self.ply_count}] Info: Starting new game (with {chaotic} piece {sets})")
-                self.chaos_sets = {}
-                self.chaos_mode = 2 if modifiers & key.MOD_ALT else 1
-                self.chaos_seed = self.chaos_rng.randint(0, 2 ** 32 - 1)
-                self.chaos_rng = Random(self.chaos_seed)
-                self.piece_set_ids = {Side.WHITE: -1, Side.BLACK: -1 if modifiers & key.MOD_ACCEL else -2}
-                self.reset_board(update=True)
+            if modifiers & key.MOD_SHIFT:  # Chaos mode
+                self.load_chaos_sets(1, modifiers & key.MOD_ACCEL)
             elif modifiers & key.MOD_ACCEL:  # Config
                 self.save_config()
+        if symbol == key.X and modifiers & key.MOD_SHIFT:  # Extra chaos mode
+            self.load_chaos_sets(2, modifiers & key.MOD_ACCEL)
         if symbol == key.F11:  # Full screen (toggle)
             self.set_fullscreen(not self.fullscreen)
         if symbol == key.MINUS:  # (-) Decrease window size
