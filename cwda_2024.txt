@@ -89,7 +89,7 @@ Claustrophobic Cannoneers: My name-consistent-theme name for the Spacious Cannon
 R (starting on dark) - Mortar (WssRcpR): Like a wazir, spacious rook, or a cannon, as in being able to leap over one piece and capture an enemy along the same line
 R (starting on light) - Howitzer (WssRmpR): Like a mortar but makes a passive bombard leap instead of a cannon leap, i.e. slides passively beyond the piece leapt over
 N - Napoleon (fbNW): Like a wazir or narrow knight, the wazir equivalent of the fibnif
-B - Carronade (ssBpB): Like a spacious bishop, arbalest, or arrow (can leap over a piece on the same line to move or capture beyond like a bishop)
+B - Carronade (ssBpB): Like a spacious bishop or an arbalest (can leap over a piece on the same line to move or capture beyond like a bishop)
 Q - Bertha (WssQpQ): Mortar/howitzer/carronade compound
 
 Pizza Pounders: My name-theme-consistent name for the Pizza Kings, with short-ranged movesets that resemble various pizza toppings
