@@ -196,7 +196,7 @@ Q - Griffon (FyafsF): As a ferz and can then slide orthogonally outward (from Gr
 Starbound Sliders (plasma): These pieces are based on Shougi variant pieces and are all radial-only and non-leaping (the original consort idea was the queen, but they did suggest the turneagle)
 R - Star (sfRbB): As a non-forward rook or backward bishop
 N - Lancer (KfR): Like a guard or lance (forward rook)
-B - Siderider (fFmfafFfafmFmfaqFfaqmFsRbB): Like a ferz forward twice excluding a second capture, a vertical rook, or a backward bishop
+B - Siderider (fFmfafFfafmFmfaqFfaqmFsRbB): Like a ferz forward twice excluding a second capture, a horizontal rook, or a backward bishop
 Q - Turneagle (FmcaFR): Like a rook or twice as a ferz, including possible diagonal double-capture
 
 Armies based on specific ideas of the main variety like the originals: Meaning a relative lack of unusual capture conditions or highly complicated movesets if any
@@ -306,7 +306,7 @@ B - Stewardess (mRcB): Passively as a rook and captures as a bishop, steward-rid
 Q - Dowager (mRcBffbsNN): Stewardess/crabrider compound
 
 Contrarian Crashers: These are based on divergent pieces (like pawns) and their captures are all that prevents them from being color-bound
-R - Merlion (ADcK): Murray Lion, moves like an alibaba but can also capture as a guard (this piece originated from a mistranslation of the movement of thelion from Chuu Shougi, but the name I came up with is a reference to a Singaporean national symbol)
+R - Merlion (ADcK): Murray Lion, moves like an alibaba but can also capture as a guard (this piece originated from a mistranslation of the movement of the lion from Chuu Shougi, but the name I came up with is a reference to a Singaporean national symbol)
 N - Biskni (mBcN): Passively as a bishop and captures as a knight (from Hoppel-Poppel)
 B - Contrastewardess (mBcR): Moves passively as a bishop and captures as a rook, contrasteward-rider (inverse of the stewardess)
 Q - Antipaladess (NmBcR): Knight/contrastewardess compound, moves passively as an archbishop and captures as a chancellor (for context, I would call a compound of a knight and a contrasteward [mFcW] an antipaladin [KmFcW])
