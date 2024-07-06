@@ -193,67 +193,15 @@ N - Rhino (WafsW): As a wazir and then ferz outward, i.e. a compound of a wazir 
 B - Boyscout (zB): As a bishop but crooked along the orthogonals in any of 8 possible paths (also called a crooked bishop)
 Q - Griffon (FyafsF): As a ferz and can then slide orthogonally outward (from Grant Acedrex)
 
-Starbound Sliders (aether): These pieces are based on Shougi variant pieces and are all radial-only and non-leaping (the original consort idea was the queen, but they did suggest the turneagle)
+Starbound Sliders (plasma): These pieces are based on Shougi variant pieces and are all radial-only and non-leaping (the original consort idea was the queen, but they did suggest the turneagle)
 R - Star (sfRbB): As a non-forward rook or backward bishop
 N - Lancer (KfR): Like a guard or lance (forward rook)
 B - Siderider (fFmfafFfafmFmfaqFfaqmFsRbB): Like a ferz forward twice excluding a second capture, a vertical rook, or a backward bishop
 Q - Turneagle (FmcaFR): Like a rook or twice as a ferz, including possible diagonal double-capture
 
-Armies based on unusual conditions or highly unusual movesets:
-
-Breakfast Blasters: Based on bombards and waffles (inspired by a concept by Ralph Betza)
-R - Belwaffle (pRWA): Bombard/waffle compound
-N - Pancake (pNNK): As a guard, or like a nightrider that must leap over another piece to move/capture (thought up by Ralph Betza)
-B - Bacon (pBFD): Arbalest/ferz/dabbaba compound (inverse belwaffle)
-Q - Omelet (pQK): As a bombard, arbalest, or guard, so a guard/quetzal compound
-
-Buzzing Busters: Based on knaves (fbNlrD) and debtors (fbDlrN) and with the names roughly corresponding to their movesets with focus on files, including pieces that ignore adjacent files consistently and are thus each bound to half the files
-R - Mosquito (WvNsDD): Like a horizontal dede, narrow knight, or wazir
-N - Dragonfly (vRsN): Like a vertical rook or wide knight, ignores adjacent files
-B - Locust (vWvDDsNN): Like a vertical wader or wide nightrider, ignores adjacent files
-Q - Mantis (BvNsDmpsafyasW): Like a bishop, narrow knight, or horizontal dabbaba, and can slide vertically as a rook after the dabbaba move
-
-Martian Manglers: Based on the pieces from Jetan and the concept therein, and none of these leap
-R - Padwar (WaaW): Steps exactly thrice as a wazir but can change direction, letting it reach the 1st and 3rd diagonal perimeters (NWH)
-N - Marker (avsK): Steps as a ferz and then must step as a wazir or the other way around and does not go exclusively outward, reaches the same spaces as a marquis (NW), and goes the 1st spaces along the directions a sissa can go (based on one possible interpretation of the Thoat from Jetan)
-B - Walker (FaaF): Steps exactly thrice as a ferz but can change direction, letting it reach the CFG spaces (lame version of the flier [CFG] from Jetan)
-Q - Chief (KnDnNnA): Step up to twice as a guard outward, can deliver mate unaided (the Jetan equivalent is one of the royal pieces and can go up to 3 spaces, the latter is an adjustment for the 8-by-8 board)
-
-Pawnshop Praetorians: Based on pawns and similar pieces, divergent movements and all while also being based mostly on knight/pawn compounds
-R - Paladin (NmWcF): As a knight but can also move passively as a wazir and capture as a ferz, so a knight/steward compound
-N - Guarddog (mfRcfBfsbbNN): As a pawn-rider or barc-rider
-B - Stewardess (mRcB): Passively as a rook and captures as a bishop, steward-rider (like a pawn-rider but not limited to going forward)
-Q - Dowager (mRcBffbsNN): Stewardess/crabrider compound
-
-Contrarian Crashers: These are based on divergent pieces (like pawns) and their captures are all that prevents them from being color-bound
-R - Merlion (ADcK): Murray Lion, moves like an alibaba but can also capture as a guard (this piece originated from a mistranslation of the movement of thelion from Chuu Shougi, but the name I came up with is a reference to a Singaporean national symbol)
-N - Biskni (mBcN): Passively as a bishop and captures as a knight (from Hoppel-Poppel)
-B - Contrastewardess (mBcR): Moves passively as a bishop and captures as a rook, contrasteward-rider (inverse of the stewardess)
-Q - Antipaladess (NmBcR): Knight/contrastewardess compound, moves passively as an archbishop and captures as a chancellor (for context, I would call a compound of a knight and a contrasteward [mFcW] an antipaladin [KmFcW])
-
-Asymmetrical Assaulters: These pieces have moves that aren't symmetrical along the vertical axis, and may move differently depending on which side of the board they're on
-R (left) - Right Biok (sRfrblB): Like a horizontal rook or a forward-right and back-left bishop
-R (right) - Left Biok (sRflbrB): Like a horizontal rook or a forward-left and back-right bishop
-N - Knisher (lBrhNl,rBlhNr): On the left side of the board, a knight on right and a bishop on left, and on the right side of the board, the other way around
-B - Blizzard (FflbrBfrrfbllbCl,FfrblBfllfbrrbCr): On the left side of the board, a bishop forward-left or backward-right and otherwise away from those lines as a wizard, and on the right side of the board, the other way around
-Q - Archannel (RlBrhNl,RrBlhNr): Knisher/rook compound
-
-Colorful Characters: Each of these pieces moves differently depending on what color they're on while not being that much more or less powerful on either color
-R (starting on dark) - Elkrider (Rb,NNw): If on dark, can move as a rook, but if on light, can move as a nightrider (for context, an elk (Rb,Nw) would be like this piece, but it can only go as a knight on light)
-R (starting on light) - Caribourider (NNb,Rw): Space-color inverse of the elkrider (the knight-on-dark inverse of the elk (Nb,Rw) would be what I like to call a caribou)
-N - Deuterocannon (Nb,mRcpRw): Like a knight on dark and a cannon on light
-B - Nightlight (FW[W-DD]b,fBbhNw): As a forward bishop, backward knight on light, and a panda or ferz on dark
-Q - Nanqueen (Qi,NNKo): As a queen on the starting color and a nanking on the other one, so it can move as a guard regardless
-
-Probable Prowlers: These pieces have a 50/50% chance, generally by way of coin toss, of either moving as one piece or another, and are either 'fast' (longer ranged) or 'slow' (shorter ranged), and yes, I've watched VeggieTales
-R - Veteran ({R,KAD}): Like a rook when fast and a guard/alibaba compound when slow
-N - Redpanda ({W[W-DD],N}): Like a panda when fast and a knight when slow
-B - Tempofad ({B,FAD}): Like a bishop when fast and a fad when slow
-Q - Waterbuffalo ({Q,NCZ}): Like a queen when fast and like a buffalo when slow (created for the Water Buffalo Game, which inspired this army)
-
 Armies based on specific ideas of the main variety like the originals: Meaning a relative lack of unusual capture conditions or highly complicated movesets if any
 
-Irritant Irons: Based on the 'metal generals' (gold, silver, copper, platinum)
+Irritant Irons (metal): Based on the 'metal generals' (gold, silver, copper, platinum)
 R - Musth (FAfsW): Platinum general / alfil compound (combines 2 pieces with elephant-based names)
 N - Officer (vNfhKbW): Like a copper general or narrow knight
 B - Silverrider (BfR): Bishop/lance compound
@@ -325,8 +273,60 @@ N - Tigon (nCnZ): Slides exactly 3 spaces radially outward and must make a singl
 B - Bicycle (A[A-B]): Like an alfil and then can go as a bishop outward
 Q - Biplane (D[D-R]A[A-B]): Bireme/bicycle compound
 
+Armies based on unusual conditions or highly unusual movesets:
+
+Breakfast Blasters: Based on bombards and waffles (inspired by a concept by Ralph Betza)
+R - Belwaffle (pRWA): Bombard/waffle compound
+N - Pancake (pNNK): As a guard, or like a nightrider that must leap over another piece to move/capture (thought up by Ralph Betza)
+B - Bacon (pBFD): Arbalest/ferz/dabbaba compound (inverse belwaffle)
+Q - Omelet (pQK): As a bombard, arbalest, or guard, so a guard/quetzal compound
+
+Buzzing Busters: Based on knaves (fbNlrD) and debtors (fbDlrN) and with the names roughly corresponding to their movesets with focus on files, including pieces that ignore adjacent files consistently and are thus each bound to half the files
+R - Mosquito (WvNsDD): Like a horizontal dede, narrow knight, or wazir
+N - Dragonfly (vRsN): Like a vertical rook or wide knight, ignores adjacent files
+B - Locust (vWvDDsNN): Like a vertical wader or wide nightrider, ignores adjacent files
+Q - Mantis (BvNsDmpsafyasW): Like a bishop, narrow knight, or horizontal dabbaba, and can slide vertically as a rook after the dabbaba move
+
 Magnificent Multimovers: Based on pieces from certain Chaturanga/Shatranj modernization-based variants while able to move once or twice as a short-ranged piece and can only go up to 4 spaces
 R - Machinerider (WD2[W-D][D-W]): Like a wazir or dabbaba and either once again in the same direction
 N - Allnight (AN): Knight/alfil compound (combines both leaper pieces from Shatranj and Chaturanga)
 B - Tusker (FA2asmpafFmpafasF): Like a ferz and/or alfil once or twice but must turn 90 degrees when moving both as an alfil and then a ferz or vice versa
 Q - Hierophant (KD2A2[W-D][D-W][F-A][A-F]): Like a guard and/or alibaba and either once again in the same direction, so to a queen as a machinerider is to a rook
+
+Martian Manglers: Based on the pieces from Jetan and the concept therein, and none of these leap
+R - Padwar (WaaW): Steps exactly thrice as a wazir but can change direction, letting it reach the 1st and 3rd diagonal perimeters (NWH)
+N - Marker (avsK): Steps as a ferz and then must step as a wazir or the other way around and does not go exclusively outward, reaches the same spaces as a marquis (NW), and goes the 1st spaces along the directions a sissa can go (based on one possible interpretation of the Thoat from Jetan)
+B - Walker (FaaF): Steps exactly thrice as a ferz but can change direction, letting it reach the CFG spaces (lame version of the flier [CFG] from Jetan)
+Q - Chief (KnDnNnA): Step up to twice as a guard outward, can deliver mate unaided (the Jetan equivalent is one of the royal pieces and can go up to 3 spaces, the latter is an adjustment for the 8-by-8 board)
+
+Pawnshop Praetorians: Based on pawns and similar pieces, divergent movements and all while also being based mostly on knight/pawn compounds
+R - Paladin (NmWcF): As a knight but can also move passively as a wazir and capture as a ferz, so a knight/steward compound
+N - Guarddog (mfRcfBfsbbNN): As a pawn-rider or barc-rider
+B - Stewardess (mRcB): Passively as a rook and captures as a bishop, steward-rider (like a pawn-rider but not limited to going forward)
+Q - Dowager (mRcBffbsNN): Stewardess/crabrider compound
+
+Contrarian Crashers: These are based on divergent pieces (like pawns) and their captures are all that prevents them from being color-bound
+R - Merlion (ADcK): Murray Lion, moves like an alibaba but can also capture as a guard (this piece originated from a mistranslation of the movement of thelion from Chuu Shougi, but the name I came up with is a reference to a Singaporean national symbol)
+N - Biskni (mBcN): Passively as a bishop and captures as a knight (from Hoppel-Poppel)
+B - Contrastewardess (mBcR): Moves passively as a bishop and captures as a rook, contrasteward-rider (inverse of the stewardess)
+Q - Antipaladess (NmBcR): Knight/contrastewardess compound, moves passively as an archbishop and captures as a chancellor (for context, I would call a compound of a knight and a contrasteward [mFcW] an antipaladin [KmFcW])
+
+Asymmetrical Assaulters: These pieces have moves that aren't symmetrical along the vertical axis, and may move differently depending on which side of the board they're on
+R (left) - Right Biok (sRfrblB): Like a horizontal rook or a forward-right and back-left bishop
+R (right) - Left Biok (sRflbrB): Like a horizontal rook or a forward-left and back-right bishop
+N - Knisher (lBrhNl,rBlhNr): On the left side of the board, a knight on right and a bishop on left, and on the right side of the board, the other way around
+B - Blizzard (FflbrBfrrfbllbCl,FfrblBfllfbrrbCr): On the left side of the board, a bishop forward-left or backward-right and otherwise away from those lines as a wizard, and on the right side of the board, the other way around
+Q - Archannel (RlBrhNl,RrBlhNr): Knisher/rook compound
+
+Colorful Characters: Each of these pieces moves differently depending on what color they're on while not being that much more or less powerful on either color
+R (starting on dark) - Elkrider (Rb,NNw): If on dark, can move as a rook, but if on light, can move as a nightrider (for context, an elk (Rb,Nw) would be like this piece, but it can only go as a knight on light)
+R (starting on light) - Caribourider (NNb,Rw): Space-color inverse of the elkrider (the knight-on-dark inverse of the elk (Nb,Rw) would be what I like to call a caribou)
+N - Deuterocannon (Nb,mRcpRw): Like a knight on dark and a cannon on light
+B - Nightlight (FW[W-DD]b,fBbhNw): As a forward bishop, backward knight on light, and a panda or ferz on dark
+Q - Nanqueen (Qi,NNKo): As a queen on the starting color and a nanking on the other one, so it can move as a guard regardless
+
+Probable Prowlers: These pieces have a 50/50% chance, generally by way of coin toss, of either moving as one piece or another, and are either 'fast' (longer ranged) or 'slow' (shorter ranged), and yes, I've watched VeggieTales
+R - Veteran ({R,KAD}): Like a rook when fast and a guard/alibaba compound when slow
+N - Redpanda ({W[W-DD],N}): Like a panda when fast and a knight when slow
+B - Tempofad ({B,FAD}): Like a bishop when fast and a fad when slow
+Q - Waterbuffalo ({Q,NCZ}): Like a queen when fast and like a buffalo when slow (created for the Water Buffalo Game, which inspired this army)
