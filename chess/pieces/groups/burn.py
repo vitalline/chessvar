@@ -31,6 +31,7 @@ class Wizard(Piece):
     name = 'Wizard'
     file_name = 'CF'
     asset_folder = 'burn'
+    colorbound = True
 
     def __init__(self, board, board_pos, side):
         super().__init__(

@@ -31,6 +31,7 @@ class Seagull(Piece):
     name = 'Seagull'
     file_name = 'fFfAsbBcfafF'
     asset_folder = 'backward'
+    colorbound = True
 
     def __init__(self, board, board_pos, side):
         super().__init__(

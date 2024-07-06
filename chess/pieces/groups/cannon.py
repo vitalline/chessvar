@@ -60,6 +60,7 @@ class Carronade(Piece):
     name = 'Carronade'
     file_name = 'ssBpB'
     asset_folder = 'cannon'
+    colorbound = True
 
     def __init__(self, board, board_pos, side):
         super().__init__(

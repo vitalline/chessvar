@@ -38,6 +38,7 @@ class Filescout(Piece):
     name = 'Filescout'
     file_name = 'Fmpsasafq(az)WsD'
     asset_folder = 'narrow'
+    colorbound = True
 
     def __init__(self, board, board_pos, side):
         movements = [movement.RiderMovement(board, symv([(0, 2, 1)]))]

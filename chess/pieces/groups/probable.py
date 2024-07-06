@@ -42,6 +42,7 @@ class Tempofad(Piece):
     name = 'Tempofad'
     file_name = '{B,FAD}'
     asset_folder = 'probable'
+    colorbound = True
 
     def __init__(self, board, board_pos, side):
         super().__init__(

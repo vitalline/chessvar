@@ -19,6 +19,9 @@ class Dragonfly(Piece):
     name = 'Dragonfly'
     file_name = 'vRsN'
     asset_folder = 'buzz'
+    colorbound = True  # ...well yes, but actually no.
+    # this piece is filebound, not colorbound. but it still needs a (0, ±2) step for castling if it's replacing the rook
+    # setting "colorbound = True" will make the piece behave like a colorbound piece for castling and nothing else (yet)
 
     def __init__(self, board, board_pos, side):
         super().__init__(
@@ -31,6 +34,7 @@ class Locust(Piece):
     name = 'Locust'
     file_name = 'vWvDDsNN'
     asset_folder = 'buzz'
+    colorbound = True  # same as the above, the piece is filebound (not colorbound), but needs a (0, ±2) step regardless
 
     def __init__(self, board, board_pos, side):
         super().__init__(

@@ -42,6 +42,7 @@ class Kirin(Piece):
     name = 'Kirin'
     file_name = 'FD'
     asset_folder = 'perimeter'
+    colorbound = True
 
     def __init__(self, board, board_pos, side):
         super().__init__(

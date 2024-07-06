@@ -31,6 +31,7 @@ class Roc(Piece):
     name = 'Roc'
     file_name = 'CA'
     asset_folder = 'beast'
+    colorbound = True
 
     def __init__(self, board, board_pos, side):
         super().__init__(

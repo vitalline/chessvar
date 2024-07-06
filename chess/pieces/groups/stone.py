@@ -31,6 +31,7 @@ class Stele(Piece):
     name = 'Stele'
     file_name = 'FmcaF'
     asset_folder = 'stone'
+    colorbound = True
 
     def __init__(self, board, board_pos, side):
         movements = []

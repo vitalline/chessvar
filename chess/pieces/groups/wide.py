@@ -43,6 +43,7 @@ class Sidewinder(Piece):
     name = 'Sidewinder'
     file_name = 'Fmpvasafq(az)WvD'
     asset_folder = 'wide'
+    colorbound = True
 
     def __init__(self, board, board_pos, side):
         movements = [movement.RiderMovement(board, symh([(2, 0, 1)]))]

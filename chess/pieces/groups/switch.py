@@ -36,6 +36,7 @@ class Bear(Piece):
     name = 'Bear'
     file_name = 'F[F-AA]'
     asset_folder = 'switch'
+    colorbound = True
 
     def __init__(self, board, board_pos, side):
         super().__init__(

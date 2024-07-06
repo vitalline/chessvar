@@ -37,6 +37,7 @@ class Bacon(Piece):
     name = 'Bacon'
     file_name = 'pBFD'
     asset_folder = 'breakfast'
+    colorbound = True
 
     def __init__(self, board, board_pos, side):
         super().__init__(

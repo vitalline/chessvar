@@ -31,6 +31,7 @@ class Hoatzin(Piece):
     name = 'Hoatzin'
     file_name = 'F[F-DD]'
     asset_folder = 'fly'
+    colorbound = True
 
     def __init__(self, board, board_pos, side):
         super().__init__(

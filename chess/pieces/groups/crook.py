@@ -57,6 +57,7 @@ class Boyscout(Piece):
     name = 'Boyscout'
     file_name = 'zB'
     asset_folder = 'crook'
+    colorbound = True
 
     def __init__(self, board, board_pos, side):
         movements = []

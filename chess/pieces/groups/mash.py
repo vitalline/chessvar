@@ -31,6 +31,7 @@ class Bandit(Piece):
     name = 'Bandit'
     file_name = 'B4nD'
     asset_folder = 'mash'
+    colorbound = True
 
     def __init__(self, board, board_pos, side):
         super().__init__(

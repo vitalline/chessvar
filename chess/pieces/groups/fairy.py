@@ -31,6 +31,7 @@ class Elephant(Piece):
     name = 'Elephant'
     file_name = 'FA'
     asset_folder = 'fairy'
+    colorbound = True
 
     def __init__(self, board, board_pos, side):
         super().__init__(

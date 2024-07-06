@@ -37,6 +37,7 @@ class Tusker(Piece):
     name = 'Tusker'
     file_name = 'FA2asmpafFmpafasF'
     asset_folder = 'multimove'
+    colorbound = True
 
     def __init__(self, board, board_pos, side):
         movements = [movement.RiderMovement(board, rot([(2, 2, 2)]))]

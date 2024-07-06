@@ -7,6 +7,7 @@ class Bede(Piece):
     name = 'Bede'
     file_name = 'BD'
     asset_folder = 'colorbound'
+    colorbound = True
 
     def __init__(self, board, board_pos, side):
 
@@ -32,6 +33,8 @@ class Fad(Piece):
     name = 'Fad'
     file_name = 'FAD'
     asset_folder = 'colorbound'
+    colorbound = True
+    colorbound = True
 
     def __init__(self, board, board_pos, side):
         super().__init__(

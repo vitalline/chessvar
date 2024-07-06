@@ -23,6 +23,7 @@ class Camel(Piece):
     name = 'Camel'
     file_name = 'C'
     asset_folder = 'amazon'
+    colorbound = True
 
     def __init__(self, board, board_pos, side):
         super().__init__(

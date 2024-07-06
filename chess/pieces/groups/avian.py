@@ -31,6 +31,7 @@ class Falcon(Piece):
     name = 'Falcon'
     file_name = 'FAA'
     asset_folder = 'avian'
+    colorbound = True
 
     def __init__(self, board, board_pos, side):
         super().__init__(

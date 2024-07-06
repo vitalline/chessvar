@@ -268,6 +268,29 @@ def get_filename(name: str, ext: str, in_dir: str = base_dir, ts_format: str = "
     return join(in_dir, f"{full_name}.{ext}")
 
 
+def get_set_name(piece_set: list[Type[abc.Piece]]) -> str:
+    piece_name_order = [[0, 7], [1, 6], [2, 5], [3]]
+    piece_names = []
+    for group in piece_name_order:
+        name_order = []
+        used_names = set()
+        for pos in group:
+            name = piece_set[pos].name
+            if piece_set[pos].asset_folder == 'cylindrical':
+                name = f"Cylindrical {name}"
+            if name not in used_names:
+                name_order.append(name)
+                used_names.add(name)
+        piece_names.append('/'.join(name_order))
+    piece_set_name = ', '.join(piece_names)
+    return f"({piece_set_name})"
+
+
+def get_set(side: Side, set_id: int) -> list[Type[abc.Piece]]:
+    piece_group = piece_groups[set_id]
+    return piece_group.get(f"set_{side.key()[0]}", piece_group.get('set', empty_row))
+
+
 class Board(Window):
 
     def __init__(self):
@@ -336,7 +359,7 @@ class Board(Window):
         self.piece_set_ids = {Side.WHITE: 0, Side.BLACK: 0}  # ids of piece sets to use for each side
         self.piece_set_names = {Side.WHITE: '', Side.BLACK: ''}  # names of piece sets to use for each side
         self.edit_piece_set_id = None  # id of piece set used when placing pieces in edit mode, None uses current sets
-        self.chaos_mode = self.board_config['chaos_mode']  # 0: normal, 1: randomize pieces, 2: randomize asymmetrically
+        self.chaos_mode = self.board_config['chaos_mode']  # 0: no, 1: random, 2: random asym, 3: random shuffle, 4: 2+3
         self.chaos_sets = {}  # piece sets generated in chaos mode
         self.piece_sets = {Side.WHITE: [], Side.BLACK: []}  # types of pieces each side starts with
         self.promotions = {Side.WHITE: [], Side.BLACK: []}  # types of pieces each side promote to
@@ -474,46 +497,61 @@ class Board(Window):
                 piece_names[side] = chaos_set[1]
             else:
                 piece_group = piece_groups[piece_set_ids[side]]
-                piece_sets[side] = piece_group.get(f"set_{side.key()[0]}", piece_group.get('set', [])).copy()
+                piece_sets[side] = get_set(side, piece_set_ids[side])
                 piece_names[side] = piece_group.get('name', '-')
         return piece_sets, piece_names
 
-    def get_chaos_set(self, side: Side) -> tuple[list[Type[abc.Piece]], str]:
+    def get_random_set(self, side: Side, asymmetrical: bool = False) -> tuple[list[Type[abc.Piece]], str]:
         # random_set_poss: independent random choices
         # random_set_poss[]: unique randomly sampled armies
         # random_set_poss[][]: positions taken by the random army
         # this is important because in mode 2 same-type pieces have to be distinct to ensure there are no piece repeats!
         # also, the king type is determined by the queenside rook type because of colorbound castling. see colorbound.py
-        if self.chaos_mode == 1:
-            random_set_poss = [[[0, 4, 7]], [[1, 6]], [[2, 5]], [[3]]]
-        elif self.chaos_mode == 2:
+        if asymmetrical:
             random_set_poss = [[[0, 4], [7]], [[1], [6]], [[2], [5]], [[3]]]
         else:
-            random_set_poss = []
+            random_set_poss = [[[0, 4, 7]], [[1, 6]], [[2, 5]], [[3]]]
         blocked_ids = set(self.piece_set_ids.values()).union(self.board_config['block_ids_chaos'])
         piece_set_ids = list(i for i in range(len(piece_groups)) if i not in blocked_ids)
         piece_set = empty_row.copy()
         for i, group in enumerate(random_set_poss):
             random_set_ids = self.chaos_rng.sample(piece_set_ids, k=len(group))
             for j, poss in enumerate(group):
-                random_set = piece_groups[random_set_ids[j]]
                 for pos in poss:
-                    piece_set[pos] = random_set.get(f"set_{side.key()[0]}", random_set.get('set', empty_row))[pos]
-        piece_name_order = [[0, 7], [1, 6], [2, 5], [3]]
-        piece_names = []
-        for group in piece_name_order:
-            name_order = []
-            used_names = set()
-            for pos in group:
-                name = piece_set[pos].name
-                if piece_set[pos].asset_folder == 'cylindrical':
-                    name = f"Cylindrical {name}"
-                if name not in used_names:
-                    name_order.append(name)
-                    used_names.add(name)
-            piece_names.append('/'.join(name_order))
-        piece_set_name = ', '.join(piece_names)
-        return piece_set, f"({piece_set_name})"
+                    piece_set[pos] = get_set(side, random_set_ids[j])[pos]
+        return piece_set, get_set_name(piece_set)
+
+    def get_shuffle_set(self, side: Side, asymmetrical: bool = False) -> tuple[list[Type[abc.Piece]], str]:
+        blocked_ids = set(self.piece_set_ids.values()).union(self.board_config['block_ids_chaos'])
+        piece_set_ids = list(i for i in range(len(piece_groups)) if i not in blocked_ids)
+        piece_pos_ids = [i for i in range(4)] + [7]
+        piece_poss = [
+            (i, j) for i in piece_set_ids for j in piece_pos_ids
+            if i < 4 or get_set(side, i)[j] != get_set(side, i)[7 - j]
+        ]
+        random_set_ids = self.chaos_rng.sample(piece_poss, k=7 if asymmetrical else 4)
+        if asymmetrical:
+            random_set_poss = [[i] for i in range(8) if i != 4]
+        else:
+            random_set_poss = [[0, 7], [1, 6], [2, 5], [3]]
+        piece_set = empty_row.copy()
+        for i, group in enumerate(random_set_poss):
+            set_id, set_pos = random_set_ids[i]
+            for j, pos in enumerate(group):
+                random_set = get_set(side, set_id)
+                piece_set[pos] = random_set[set_pos]
+                if self.chaos_mode == 3 and set_pos != 3 and j > 0:
+                    if random_set[set_pos] != random_set[7 - set_pos]:
+                        piece_set[pos] = random_set[7 - set_pos]
+        piece_set[4] = cb.King if piece_set[0].is_colorbound() else fide.King
+        return piece_set, get_set_name(piece_set)
+
+    def get_chaos_set(self, side: Side) -> tuple[list[Type[abc.Piece]], str]:
+        asymmetrical = self.chaos_mode in {2, 4}
+        if self.chaos_mode in {1, 2}:
+            return self.get_random_set(side, asymmetrical)
+        if self.chaos_mode in {3, 4}:
+            return self.get_shuffle_set(side, asymmetrical)
 
     def reset_promotions(self, piece_sets: dict[Side, list[Type[abc.Piece]]] | None = None) -> None:
         if piece_sets is None:
@@ -1796,7 +1834,7 @@ class Board(Window):
             penultima_hide: bool = None,
     ) -> None:
         if penultima_flip is None:
-            penultima_flip = (self.chaos_mode == 2) and (self.piece_set_ids[piece.side] < 0)
+            penultima_flip = (self.chaos_mode in {2, 4}) and (self.piece_set_ids[piece.side] < 0)
         penultima_pieces = self.penultima_pieces.get(piece.side, {})
         if asset_folder is None:
             if piece.is_hidden is False:
@@ -2147,7 +2185,13 @@ class Board(Window):
             self.auto_capture_markers[side].clear()
 
     def load_chaos_sets(self, mode: int, same: bool) -> None:
-        self.log(f"[Ply {self.ply_count}] Info: Starting new game (with chaotic piece {'set' if same else 'sets'})")
+        chaotic = "chaotic"
+        if mode in {2, 4}:
+            chaotic = f"extra {chaotic}"
+        if mode in {3, 4}:
+            chaotic = f"shuffled {chaotic}"
+        sets = "set" if same else "sets"
+        self.log(f"[Ply {self.ply_count}] Info: Starting new game (with {chaotic} piece {sets})")
         self.chaos_mode = mode
         self.chaos_sets = {}
         self.chaos_seed = self.chaos_rng.randrange(2 ** 32)
@@ -2228,12 +2272,12 @@ class Board(Window):
                 self.log(f"[Ply {self.ply_count}] Info: Starting new game")
                 self.reset_board()
         if symbol == key.C:
-            if modifiers & key.MOD_SHIFT:  # Chaos mode
-                self.load_chaos_sets(1, modifiers & key.MOD_ACCEL)
+            if modifiers & (key.MOD_SHIFT | key.MOD_ALT):  # Chaos mode
+                self.load_chaos_sets(1 + bool(modifiers & key.MOD_ALT), modifiers & key.MOD_ACCEL)
             elif modifiers & key.MOD_ACCEL:  # Config
                 self.save_config()
-        if symbol == key.X and modifiers & key.MOD_SHIFT:  # Extra chaos mode
-            self.load_chaos_sets(2, modifiers & key.MOD_ACCEL)
+        if symbol == key.X and modifiers & (key.MOD_SHIFT | key.MOD_ALT):  # Shuffled chaos mode
+            self.load_chaos_sets(3 + bool(modifiers & key.MOD_ALT), modifiers & key.MOD_ACCEL)
         if symbol == key.F11:  # Full screen (toggle)
             self.set_fullscreen(not self.fullscreen)
         if symbol == key.MINUS:  # (-) Decrease window size

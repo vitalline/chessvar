@@ -47,6 +47,7 @@ class Bicycle(Piece):
     name = 'Bicycle'
     file_name = 'A[A-B]'
     asset_folder = 'inadjacent'
+    colorbound = True
 
     def __init__(self, board, board_pos, side):
         super().__init__(

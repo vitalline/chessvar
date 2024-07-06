@@ -34,6 +34,7 @@ class Bed(Piece):
     name = 'Bed'
     file_name = 'hhBD'
     asset_folder = 'amontillado'
+    colorbound = True
 
     def __init__(self, board, board_pos, side):
         super().__init__(

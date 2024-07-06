@@ -7,6 +7,7 @@ class Lobefin(Piece):
     name = 'Lobefin'
     file_name = 'DfAAbB'
     asset_folder = 'drip'
+    colorbound = True
 
     def __init__(self, board, board_pos, side):
         super().__init__(

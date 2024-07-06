@@ -36,6 +36,7 @@ class Cabbage(Piece):
     name = 'Cabbage'
     file_name = 'BC'
     asset_folder = 'camel'
+    colorbound = True
 
     def __init__(self, board, board_pos, side):
         super().__init__(

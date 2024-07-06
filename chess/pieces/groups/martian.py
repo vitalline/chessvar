@@ -46,6 +46,7 @@ class Walker(Piece):
     name = 'Walker'
     file_name = 'FaaF'
     asset_folder = 'martian'
+    colorbound = True
 
     def __init__(self, board, board_pos, side):
         movements = [movement.RiderMovement(board, rot([(1, 1, 1)]))]

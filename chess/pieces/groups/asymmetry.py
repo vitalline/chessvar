@@ -47,6 +47,7 @@ class Blizzard(Piece):
     name = 'Blizzard'
     file_name = '(FflbrBfrrfbllbCl,FfrblBfllfbrrbCr)'
     asset_folder = 'asymmetry'
+    colorbound = True
 
     def __init__(self, board, board_pos, side):
         super().__init__(

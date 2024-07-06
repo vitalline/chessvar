@@ -109,6 +109,10 @@ class Piece(Sprite):
     def is_empty(self):
         return not self.side
 
+    @classmethod
+    def is_colorbound(cls):
+        return getattr(cls, 'colorbound', False)
+
     def move(self, move: Move):
         self.board.move(move)
 

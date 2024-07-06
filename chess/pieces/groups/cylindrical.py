@@ -31,6 +31,7 @@ class Bishop(Piece):
     name = 'Bishop'
     file_name = 'oB'
     asset_folder = 'cylindrical'
+    colorbound = True
 
     def __init__(self, board, board_pos, side):
         super().__init__(
