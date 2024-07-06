@@ -2,7 +2,7 @@
 
 This is not even remotely the first thread like this from me.
 
-This variant, or more specifically the original armies, the Fabulous FIDEs (regular army) and 3 new ones, was created by Ralph Betza and is one of the more well known ones. I'm not sure how the castling was originally meant to work, so the ideas for that are suggestions based on an online CDA ai program and the arrangements are based on such as well. As for how the ideas presented here work, the consorts must be able to go to either color when unobstructed at any point, hence why a manticore (see below) would not make a good consort.
+This variant, or more specifically the original armies, the Fabulous FIDEs (regular army) and 3 new ones, was created by Ralph Betza and is one of the more well known ones. I'm not sure how the castling was originally meant to work, so the ideas for that are suggestions based on an online CDA AI program and the arrangements are based on such as well. As for how the ideas presented here work, the consorts must be able to go to either color when unobstructed at any point, hence why a manticore (see below) would not make a good consort.
 
 R - Castle (Rook position, some have each one being unique and opposite in some manner)
 N - Median (Knight position)
@@ -49,7 +49,7 @@ Wide [oblique piece]: Horizontal-most
 Lame [leaper]: Slides through the intermediate squares instead of leaping over them (meaning it can be blocked)
 Crooked [rider]: Changes direction in a zig-zag pattern along a certain path/direction
 
-Far-leaper limit: Because some pieces can leap over 2 spaces away, the could easily threaten pieces on the back row, so it would be best to have it so that they can only move there if the back row is unobstructed, thus limiting their leaping
+Far-leaper limit: Because some pieces can leap over 2 spaces away, they could easily threaten pieces on the back row, so it would be best to have it so that they can only move there if the back row is unobstructed, thus limiting their leaping
 
 Original armies: The regular army is called the Fabulous Fides
 
@@ -149,7 +149,7 @@ N - Dullahan (NF): Knight-ferz compound, can triangulate
 B - Elephant (FA): Ferz/alfil compound, steps or leaps up to 2 diagonal spaces, diagonal equivalent to the woodrook
 Q - Unicorn (BNN): Bishop-nightrider compound, or dullahan-rider
 
-Beautiful Beasts: Based on the concept of triangulation, or the ability of a piece to go back to the same space in 3 moves, and lameness here is limited to specific paths in the manner of the camel in the Amazonian Armada for the furthest rank if occupied so as to avoid early checkmate
+Beautiful Beasts: Based on the concept of triangulation, or the ability of a piece to go back to the same space in 3 moves, and lameness here is limited to specific paths in the manner of the camel in the Amazonian Armada for the furthest rank if occupied to avoid early checkmate
 R - Ouroboros (ND): Knight/dabbaba compound, can leap to the whole second perimeter from its position except diagonally
 N - Quagga (ZF): Zebra (3,2 leaper) / ferz compound
 B - Roc (CA): Alfil/camel compound, can leap to anywhere except orthogonally a wazir can move to in 4 steps outward
@@ -232,14 +232,14 @@ B - Contrastewardess (mBcR): Moves passively as a bishop and captures as a rook,
 Q - Antipaladess (NmBcR): Knight/contrastewardess compound, moves passively as an archbishop and captures as a chancellor (for context, I would call a compound of a knight and a contrasteward [mFcW] an antipaladin [KmFcW])
 
 Asymmetrical Assaulters: These pieces have moves that aren't symmetrical along the vertical axis, and may move differently depending on which side of the board they're on
-Rl - Right Biok (sRfrblB): Like a horizontal rook or a forward-right and back-left bishop
-Rr - Left Biok (sRflbrB): Like a horizontal rook or a forward-left and back-right bishop
+R (left) - Right Biok (sRfrblB): Like a horizontal rook or a forward-right and back-left bishop
+R (right) - Left Biok (sRflbrB): Like a horizontal rook or a forward-left and back-right bishop
 N - Knisher (lBrhNl,rBlhNr): On the left side of the board, a knight on right and a bishop on left, and on the right side of the board, the other way around
 B - Blizzard (FflbrBfrrfbllbCl,FfrblBfllfbrrbCr): On the left side of the board, a bishop forward-left or backward-right and otherwise away from those lines as a wizard, and on the right side of the board, the other way around
 Q - Archannel (RlBrhNl,RrBlhNr): Knisher/rook compound
 
 Colorful Characters: Each of these pieces moves differently depending on what color they're on while not being that much more or less powerful on either color
-R (starting on dark) - Elkrider (Rb,NNw): If on dark, can move as a rook, but if on light, can move as a nightrider (for context, an elk (Rb,Nw) would be like this piece but it can only go as a knight on light)
+R (starting on dark) - Elkrider (Rb,NNw): If on dark, can move as a rook, but if on light, can move as a nightrider (for context, an elk (Rb,Nw) would be like this piece, but it can only go as a knight on light)
 R (starting on light) - Caribourider (NNb,Rw): Space-color inverse of the elkrider (the knight-on-dark inverse of the elk (Nb,Rw) would be what I like to call a caribou)
 N - Deuterocannon (Nb,mRcpRw): Like a knight on dark and a cannon on light
 B - Nightlight (FW[W-DD]b,fBbhNw): As a forward bishop, backward knight on light, and a panda or ferz on dark
@@ -265,7 +265,7 @@ N - Nipper (NG): Knight/tripper compound
 B - Bullfrog (FAH): Ferz/alfil/trebuchet compound
 Q - Duchess (KAGDH): Like a queen up to 3 spaces but can leap over any intervening piece
 
-Horseback Harassers: Based on the non-leaping short-ranged pieces pieces in Xiangqi, especially the elephants and horses, and like those, these do not leap
+Horseback Harassers: Based on the non-leaping short-ranged pieces in Xiangqi, especially the elephants and horses, and like those, these do not leap
 R - Naysayer (nAAnH): As a lame mahavat or slides exactly 3 spaces as a rook
 N - Horserider (afs(afzafz)W): Horse equivalent to the nightrider
 B - Tapir (afsWnA): As a horse or slides exactly 2 spaces diagonally
