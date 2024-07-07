@@ -405,7 +405,7 @@ class Board(Window):
             if self.board_config['roll_seed'] is not None
             else base_rng.randint(0, max_seed)
         )
-        self.roll_rng = Random(self.roll_seed)
+        self.roll_rng = None  # will be initialized later
         self.set_seed = (
             self.board_config['set_seed']
             if self.board_config['set_seed'] is not None
@@ -663,9 +663,10 @@ class Board(Window):
             self.future_move_history = []
             self.probabilistic_piece_history = []
 
-        if update or update_seed:
-            if self.board_config['update_roll_seed']:
-                self.roll_seed = self.roll_rng.randint(0, 2 ** 32 - 1)
+        if self.roll_rng is not None:
+            if update or update_seed:
+                if self.board_config['update_roll_seed']:
+                    self.roll_seed = self.roll_rng.randint(0, 2 ** 32 - 1)
 
         self.roll_rng = Random(self.roll_seed)
 
