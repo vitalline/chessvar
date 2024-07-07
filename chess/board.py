@@ -2713,11 +2713,13 @@ class Board(Window):
             piece_list = ', '.join(piece.name for piece in self.edit_promotions[side])
             debug_log_data.append(f"{side} replacements: {piece_list if piece_list else 'None'}")
         piece_modes = {0: 'Shown', 1: 'Hidden', 2: 'Penultima'}
-        debug_log_data.append(f"Piece visibility: {piece_modes[self.should_hide_pieces]}")
+        debug_log_data.append(f"Hide pieces: {self.should_hide_pieces} - {piece_modes[self.should_hide_pieces]}")
         move_modes = {None: 'Default', False: 'Shown', True: 'Hidden'}
-        debug_log_data.append(f"Move visibility: {move_modes[self.should_hide_moves]}")
-        royal_modes = {0: 'Default', 1: 'Force royal (Threaten Any)', -1: 'Force quasi-royal (Threaten Last)'}
-        debug_log_data.append(f"Royal mode: {royal_modes[self.royal_piece_mode]}")
+        debug_log_data.append(f"Hide moves: {self.should_hide_moves} - {move_modes[self.should_hide_moves]}")
+        royal_modes = {0: 'Default', 1: 'Force royal (Threaten Any)', 2: 'Force quasi-royal (Threaten Last)'}
+        debug_log_data.append(f"Royal mode: {self.royal_piece_mode} - {royal_modes[self.royal_piece_mode]}")
+        chaos_modes = {0: 'Off', 1: 'Random', 2: 'Random Asymmetrical', 3: 'Shuffled', 4: 'Shuffled Asymmetrical'}
+        debug_log_data.append(f"Chaos mode: {self.chaos_mode} - {chaos_modes[self.chaos_mode]}")
         debug_log_data.append(f"Board mode: {'Edit' if self.edit_mode else 'Play'}")
         debug_log_data.append(f"Turn side: {self.turn_side if self.turn_side else 'None'}")
         debug_log_data.append(f"Current ply: {self.ply_count}")
