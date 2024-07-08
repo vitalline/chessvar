@@ -357,7 +357,7 @@ class Board(Window):
         self.piece_set_ids = {Side.WHITE: 0, Side.BLACK: 0}  # ids of piece sets to use for each side
         self.piece_set_names = {Side.WHITE: '', Side.BLACK: ''}  # names of piece sets to use for each side
         self.edit_piece_set_id = None  # id of piece set used when placing pieces in edit mode, None uses current sets
-        self.chaos_mode = self.board_config['chaos_mode']  # 0: no, 1: random, 2: random asym, 3: random shuffle, 4: 2+3
+        self.chaos_mode = self.board_config['chaos_mode']  # 0: no, 1: match pos, 2: match pos asym, 3: any, 4: any asym
         self.chaos_sets = {}  # piece sets generated in chaos mode
         self.piece_sets = {Side.WHITE: [], Side.BLACK: []}  # types of pieces each side starts with
         self.promotions = {Side.WHITE: [], Side.BLACK: []}  # types of pieces each side promote to
@@ -842,10 +842,10 @@ class Board(Window):
 
     def load_chaos_sets(self, mode: int, same: bool) -> None:
         chaotic = "chaotic"
-        if mode in {2, 4}:
-            chaotic = f"extra {chaotic}"
         if mode in {3, 4}:
-            chaotic = f"shuffled {chaotic}"
+            chaotic = f"extremely {chaotic}"
+        if mode in {2, 4}:
+            chaotic = f"asymmetrical {chaotic}"
         sets = "set" if same else "sets"
         self.log(f"[Ply {self.ply_count}] Info: Starting new game (with {chaotic} piece {sets})")
         self.chaos_mode = mode
@@ -2316,11 +2316,11 @@ class Board(Window):
                 blocked_ids = set(self.piece_set_ids.values()).union(self.board_config['block_ids'])
                 piece_set_ids = list(i for i in range(len(piece_groups)) if i not in blocked_ids)
                 if modifiers & key.MOD_ACCEL:  # Randomize piece sets (same for both sides)
-                    self.log(f"[Ply {self.ply_count}] Info: Starting new game (with random piece set)")
+                    self.log(f"[Ply {self.ply_count}] Info: Starting new game (with a preset army)")
                     piece_set_ids = self.set_rng.sample(piece_set_ids, k=1)
                     self.piece_set_ids = {side: piece_set_ids[0] for side in self.piece_set_ids}
                 else:  # Randomize piece sets (different for each side)
-                    self.log(f"[Ply {self.ply_count}] Info: Starting new game (with random piece sets)")
+                    self.log(f"[Ply {self.ply_count}] Info: Starting new game (with preset armies)")
                     piece_set_ids = self.set_rng.sample(piece_set_ids, k=len(self.piece_set_ids))
                     self.piece_set_ids = {side: set_id for side, set_id in zip(self.piece_set_ids, piece_set_ids)}
                 self.chaos_mode = 0
@@ -2723,7 +2723,13 @@ class Board(Window):
         debug_log_data.append(f"Hide moves: {self.should_hide_moves} - {move_modes[self.should_hide_moves]}")
         royal_modes = {0: 'Default', 1: 'Force royal (Threaten Any)', 2: 'Force quasi-royal (Threaten Last)'}
         debug_log_data.append(f"Royal mode: {self.royal_piece_mode} - {royal_modes[self.royal_piece_mode]}")
-        chaos_modes = {0: 'Off', 1: 'Random', 2: 'Random Asymmetrical', 3: 'Shuffled', 4: 'Shuffled Asymmetrical'}
+        chaos_modes = {
+            0: 'Off',
+            1: 'Chaos (Matching Pieces)',
+            2: 'Chaos (Matching Pieces), Asymmetrical',
+            3: 'Extreme Chaos (Any Pieces)',
+            4: 'Extreme Chaos (Any Pieces), Asymmetrical'
+        }
         debug_log_data.append(f"Chaos mode: {self.chaos_mode} - {chaos_modes[self.chaos_mode]}")
         debug_log_data.append(f"Board mode: {'Edit' if self.edit_mode else 'Play'}")
         debug_log_data.append(f"Turn side: {self.turn_side if self.turn_side else 'None'}")
