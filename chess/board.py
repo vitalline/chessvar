@@ -276,8 +276,6 @@ def get_set_name(piece_set: list[Type[abc.Piece]]) -> str:
         used_names = set()
         for pos in group:
             name = piece_set[pos].name
-            if piece_set[pos].asset_folder == 'cylindrical':
-                name = f"Cylindrical {name}"
             if name not in used_names:
                 name_order.append(name)
                 used_names.add(name)

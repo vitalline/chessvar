@@ -4,7 +4,7 @@ from chess.pieces.pieces import Piece
 
 
 class Waffle(Piece):
-    name = 'Waffle'
+    name = 'Cylindrical Waffle'
     file_name = 'oWoA'
     asset_folder = 'cylindrical'
 
@@ -16,7 +16,7 @@ class Waffle(Piece):
 
 
 class Knight(Piece):
-    name = 'Knight'
+    name = 'Cylindrical Knight'
     file_name = 'oN'
     asset_folder = 'cylindrical'
 
@@ -28,7 +28,7 @@ class Knight(Piece):
 
 
 class Bishop(Piece):
-    name = 'Bishop'
+    name = 'Cylindrical Bishop'
     file_name = 'oB'
     asset_folder = 'cylindrical'
     colorbound = True
@@ -41,7 +41,7 @@ class Bishop(Piece):
 
 
 class Chancellor(Piece):
-    name = 'Chancellor'
+    name = 'Cylindrical Chancellor'
     file_name = 'oRoN'
     asset_folder = 'cylindrical'
 
