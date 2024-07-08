@@ -1327,7 +1327,7 @@ class Board(Window):
                 self.piece_sprite_list.remove(self.pieces[move.pos_to[0]][move.pos_to[1]])
             if move.pos_to is None or move.promotion is not None:
                 # existing piece was removed from the board (possibly promoted to a different piece type)
-                if self.is_trickster_mode(False):  # reset_trickster_mode() does not reset removed pieces
+                if not self.is_trickster_mode():  # reset_trickster_mode() does not reset removed pieces
                     move.piece.angle = 0           # so instead we have to do it manually as a workaround
             if move.pos_from is not None:
                 # existing piece was moved, restore it on the square it was moved from
@@ -1341,7 +1341,7 @@ class Board(Window):
                 # empty the square it was captured on (it was not emptied earlier because it was not the one moved to)
                 self.piece_sprite_list.remove(self.pieces[capture_pos[0]][capture_pos[1]])
             self.reset_position(move.captured_piece)
-            if self.is_trickster_mode(False):  # reset_trickster_mode() does not reset removed pieces
+            if not self.is_trickster_mode():  # reset_trickster_mode() does not reset removed pieces
                 move.captured_piece.angle = 0  # so instead we have to do it manually as a workaround
             # removed pieces don't get updated by update_hide_mode() either so we also do it manually
             self.update_piece(move.captured_piece)
@@ -1876,11 +1876,11 @@ class Board(Window):
                 else:
                     piece.reload(is_hidden=False, flipped_horizontally=False)
 
-    def is_trickster_mode(self, value: bool = True) -> bool:
-        return value == (self.trickster_color_index != 0)
+    def is_trickster_mode(self) -> bool:
+        return self.trickster_color_index != 0
 
     def update_trickster_mode(self) -> None:
-        if self.is_trickster_mode(False):
+        if not self.is_trickster_mode():
             self.trickster_color_delta = 0
             return  # trickster mode is disabled
         if self.trickster_color_delta > 1 / 11:
@@ -2425,15 +2425,11 @@ class Board(Window):
             elif modifiers & key.MOD_SHIFT:  # Fast-forward
                 while self.future_move_history:
                     self.redo_last_move()
-        if symbol == key.G:  # Graphics
+        if symbol == key.G and not self.is_trickster_mode():  # Graphics
             if modifiers & key.MOD_ACCEL and not modifiers & key.MOD_SHIFT:  # Graphics reset
                 self.color_index = 0
             elif modifiers & key.MOD_SHIFT:  # Graphics shift
                 self.color_index = (self.color_index + (-1 if modifiers & key.MOD_ACCEL else 1)) % len(colors)
-            if self.color_scheme["scheme_type"] == "cherub" and self.is_trickster_mode():
-                self.trickster_color_index = 0
-                self.reset_trickster_mode()
-            else:
                 self.update_colors()
         if symbol == key.H:  # Hide
             old_should_hide_pieces = self.should_hide_pieces
@@ -2491,7 +2487,7 @@ class Board(Window):
         if symbol == key.T and modifiers & key.MOD_ACCEL:  # Trickster mode
             if self.color_scheme["scheme_type"] == "cherub":
                 self.trickster_color_index = (
-                    base_rng.randrange(len(trickster_colors)) + 1 if self.is_trickster_mode(False) else 0
+                    0 if self.is_trickster_mode() else base_rng.randrange(len(trickster_colors)) + 1
                 )
                 self.reset_trickster_mode()
         if symbol == key.Z and modifiers & key.MOD_ACCEL:  # Undo
