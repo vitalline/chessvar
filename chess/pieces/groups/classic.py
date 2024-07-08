@@ -8,10 +8,11 @@ class Rook(Piece):
     file_name = 'R'
     asset_folder = 'classic'
 
-    def __init__(self, board, board_pos, side):
+    def __init__(self, board, board_pos, side, **kwargs):
         super().__init__(
             board, board_pos, side,
-            movement.RiderMovement(board, rot([(1, 0)]))
+            movement.RiderMovement(board, rot([(1, 0)])),
+            **kwargs
         )
 
 
@@ -20,10 +21,11 @@ class Knight(Piece):
     file_name = 'N'
     asset_folder = 'classic'
 
-    def __init__(self, board, board_pos, side):
+    def __init__(self, board, board_pos, side, **kwargs):
         super().__init__(
             board, board_pos, side,
-            movement.RiderMovement(board, rot([(1, 2, 1), (2, 1, 1)]))
+            movement.RiderMovement(board, rot([(1, 2, 1), (2, 1, 1)])),
+            **kwargs
         )
 
 
@@ -33,10 +35,11 @@ class Bishop(Piece):
     asset_folder = 'classic'
     colorbound = True
 
-    def __init__(self, board, board_pos, side):
+    def __init__(self, board, board_pos, side, **kwargs):
         super().__init__(
             board, board_pos, side,
-            movement.RiderMovement(board, rot([(1, 1)]))
+            movement.RiderMovement(board, rot([(1, 1)])),
+            **kwargs
         )
 
 
@@ -45,10 +48,11 @@ class Queen(Piece):
     file_name = 'Q'
     asset_folder = 'classic'
 
-    def __init__(self, board, board_pos, side):
+    def __init__(self, board, board_pos, side, **kwargs):
         super().__init__(
             board, board_pos, side,
-            movement.RiderMovement(board, rot([(1, 0), (1, 1)]))
+            movement.RiderMovement(board, rot([(1, 0), (1, 1)])),
+            **kwargs
         )
 
 
@@ -57,7 +61,7 @@ class King(RoyalPiece):
     file_name = 'K'
     asset_folder = 'classic'
 
-    def __init__(self, board, board_pos, side):
+    def __init__(self, board, board_pos, side, **kwargs):
         super().__init__(
             board, board_pos, side,
             movement.MultiMovement(
@@ -66,7 +70,8 @@ class King(RoyalPiece):
                     movement.CastlingMovement(board, (0, 2), (0, 3), (0, -2), [(0, 1), (0, 2)]),
                     movement.CastlingMovement(board, (0, -2), (0, -4), (0, 3), [(0, -1), (0, -2), (0, -3)])
                 ]
-            )
+            ),
+            **kwargs
         )
 
 
@@ -75,7 +80,7 @@ class Pawn(PromotablePiece):
     file_name = 'P'
     asset_folder = 'classic'
 
-    def __init__(self, board, board_pos, side, promotions=None, promotion_squares=None):
+    def __init__(self, board, board_pos, side, promotions=None, promotion_squares=None, **kwargs):
         super().__init__(
             board, board_pos, side,
             movement.MultiMovement(
@@ -92,5 +97,6 @@ class Pawn(PromotablePiece):
                 ]
             ),
             promotions,
-            promotion_squares
+            promotion_squares,
+            **kwargs
         )

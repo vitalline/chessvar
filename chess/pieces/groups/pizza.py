@@ -8,10 +8,11 @@ class Pepperoni(Piece):
     file_name = 'sDfAvWF'
     asset_folder = 'pizza'
 
-    def __init__(self, board, board_pos, side):
+    def __init__(self, board, board_pos, side, **kwargs):
         super().__init__(
             board, board_pos, side,
-            movement.RiderMovement(board, symv([(2, 2, 1)]) + sym([(0, 2, 1), (1, 1, 1), (1, 0, 1)]))
+            movement.RiderMovement(board, symv([(2, 2, 1)]) + sym([(0, 2, 1), (1, 1, 1), (1, 0, 1)])),
+            **kwargs
         )
 
 
@@ -20,10 +21,11 @@ class Mushroom(Piece):
     file_name = 'vNfsCbF'
     asset_folder = 'pizza'
 
-    def __init__(self, board, board_pos, side):
+    def __init__(self, board, board_pos, side, **kwargs):
         super().__init__(
             board, board_pos, side,
-            movement.RiderMovement(board, symv([(2, 1, 1), (1, 3, 1), (-1, 1, 1), (-2, 1, 1)]))
+            movement.RiderMovement(board, symv([(2, 1, 1), (1, 3, 1), (-1, 1, 1), (-2, 1, 1)])),
+            **kwargs
         )
 
 
@@ -32,10 +34,11 @@ class Sausage(Piece):
     file_name = 'sWFvNvH'
     asset_folder = 'pizza'
 
-    def __init__(self, board, board_pos, side):
+    def __init__(self, board, board_pos, side, **kwargs):
         super().__init__(
             board, board_pos, side,
-            movement.RiderMovement(board, sym([(3, 0, 1), (2, 1, 1), (1, 1, 1), (0, 1, 1)]))
+            movement.RiderMovement(board, sym([(3, 0, 1), (2, 1, 1), (1, 1, 1), (0, 1, 1)])),
+            **kwargs
         )
 
 
@@ -44,8 +47,9 @@ class Meatball(Piece):
     file_name = 'FWADfN'
     asset_folder = 'pizza'
 
-    def __init__(self, board, board_pos, side):
+    def __init__(self, board, board_pos, side, **kwargs):
         super().__init__(
             board, board_pos, side,
-            movement.RiderMovement(board, symv([(2, 1, 1)]) + rot([(1, 0, 1), (1, 1, 1), (2, 0, 1), (2, 2, 1)]))
+            movement.RiderMovement(board, symv([(2, 1, 1)]) + rot([(1, 0, 1), (1, 1, 1), (2, 0, 1), (2, 2, 1)])),
+            **kwargs
         )

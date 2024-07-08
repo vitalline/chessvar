@@ -8,10 +8,11 @@ class LBiok(Piece):
     file_name = 'sRflbrB'
     asset_folder = 'asymmetry'
 
-    def __init__(self, board, board_pos, side):
+    def __init__(self, board, board_pos, side, **kwargs):
         super().__init__(
             board, board_pos, side,
-            movement.RiderMovement(board, rot2([(0, -1), (1, -1)]))
+            movement.RiderMovement(board, rot2([(0, -1), (1, -1)])),
+            **kwargs
         )
 
 
@@ -20,10 +21,11 @@ class RBiok(Piece):
     file_name = 'sRfrblB'
     asset_folder = 'asymmetry'
 
-    def __init__(self, board, board_pos, side):
+    def __init__(self, board, board_pos, side, **kwargs):
         super().__init__(
             board, board_pos, side,
-            movement.RiderMovement(board, rot2([(0, 1), (1, 1)]))
+            movement.RiderMovement(board, rot2([(0, 1), (1, 1)])),
+            **kwargs
         )
 
 
@@ -32,14 +34,15 @@ class Knisher(Piece):
     file_name = '(lBrhNl,rBlhNr)'
     asset_folder = 'asymmetry'
 
-    def __init__(self, board, board_pos, side):
+    def __init__(self, board, board_pos, side, **kwargs):
         super().__init__(
             board, board_pos, side,
             movement.SideMovement(
                 board,
                 left=[movement.RiderMovement(board, symh([(1, -1), (1, 2, 1), (2, 1, 1)]))],
                 right=[movement.RiderMovement(board, symh([(1, 1), (1, -2, 1), (2, -1, 1)]))],
-            )
+            ),
+            **kwargs
         )
 
 
@@ -49,14 +52,15 @@ class Blizzard(Piece):
     asset_folder = 'asymmetry'
     colorbound = True
 
-    def __init__(self, board, board_pos, side):
+    def __init__(self, board, board_pos, side, **kwargs):
         super().__init__(
             board, board_pos, side,
             movement.SideMovement(
                 board,
                 left=[movement.RiderMovement(board, rot2([(1, -1), (1, 1, 1), (1, 3, 1), (3, 1, 1)]))],
                 right=[movement.RiderMovement(board, rot2([(1, 1), (1, -1, 1), (1, -3, 1), (3, -1, 1)]))],
-            )
+            ),
+            **kwargs
         )
 
 
@@ -65,12 +69,13 @@ class Archannel(Piece):
     file_name = '(RlBrhNl,RrBlhNr)'
     asset_folder = 'asymmetry'
 
-    def __init__(self, board, board_pos, side):
+    def __init__(self, board, board_pos, side, **kwargs):
         super().__init__(
             board, board_pos, side,
             movement.SideMovement(
                 board,
                 left=[movement.RiderMovement(board, rot([(1, 0)]) + symh([(1, -1), (1, 2, 1), (2, 1, 1)]))],
                 right=[movement.RiderMovement(board, rot([(1, 0)]) + symh([(1, 1), (1, -2, 1), (2, -1, 1)]))],
-            )
+            ),
+            **kwargs
         )

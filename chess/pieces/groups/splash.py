@@ -8,10 +8,11 @@ class Mammoth(Piece):
     file_name = 'R4nA'
     asset_folder = 'splash'
 
-    def __init__(self, board, board_pos, side):
+    def __init__(self, board, board_pos, side, **kwargs):
         super().__init__(
             board, board_pos, side,
-            movement.RiderMovement(board, rot([(1, 0, 4), (1, 1, 2, 2)]))
+            movement.RiderMovement(board, rot([(1, 0, 4), (1, 1, 2, 2)])),
+            **kwargs
         )
 
 
@@ -20,10 +21,11 @@ class Gecko(Piece):
     file_name = 'GK'
     asset_folder = 'splash'
 
-    def __init__(self, board, board_pos, side):
+    def __init__(self, board, board_pos, side, **kwargs):
         super().__init__(
             board, board_pos, side,
-            movement.RiderMovement(board, rot([(1, 0, 1), (1, 1, 1), (3, 3, 1)]))
+            movement.RiderMovement(board, rot([(1, 0, 1), (1, 1, 1), (3, 3, 1)])),
+            **kwargs
         )
 
 
@@ -32,10 +34,11 @@ class Deacon(Piece):
     file_name = 'B4W'
     asset_folder = 'splash'
 
-    def __init__(self, board, board_pos, side):
+    def __init__(self, board, board_pos, side, **kwargs):
         super().__init__(
             board, board_pos, side,
-            movement.RiderMovement(board, rot([(1, 0, 1), (1, 1, 4)]))
+            movement.RiderMovement(board, rot([(1, 0, 1), (1, 1, 4)])),
+            **kwargs
         )
 
 
@@ -44,8 +47,9 @@ class Brigadier(Piece):
     file_name = 'R4FN'
     asset_folder = 'splash'
 
-    def __init__(self, board, board_pos, side):
+    def __init__(self, board, board_pos, side, **kwargs):
         super().__init__(
             board, board_pos, side,
-            movement.RiderMovement(board, rot([(1, 0, 4), (1, 1, 1), (1, 2, 1), (2, 1, 1)]))
+            movement.RiderMovement(board, rot([(1, 0, 4), (1, 1, 1), (1, 2, 1), (2, 1, 1)])),
+            **kwargs
         )

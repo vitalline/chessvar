@@ -10,7 +10,7 @@ class LRhino(Piece):
     file_name = 'KaflK'
     asset_folder = 'fizz'
 
-    def __init__(self, board, board_pos, side):
+    def __init__(self, board, board_pos, side, **kwargs):
         super().__init__(
             board, board_pos, side,
             movement.MultiMovement(board, [
@@ -21,7 +21,8 @@ class LRhino(Piece):
                     [(1, 1), (0, 1), (-1, 1), (-1, 0), (-1, -1), (0, -1), (1, -1), (1, 0)],
                     [(1, 0), (1, 1), (0, 1), (-1, 1), (-1, 0), (-1, -1), (0, -1), (1, -1)]
                 )
-            ])
+            ]),
+            **kwargs
         )
 
 
@@ -30,7 +31,7 @@ class RRhino(Piece):
     file_name = 'KafrK'
     asset_folder = 'fizz'
 
-    def __init__(self, board, board_pos, side):
+    def __init__(self, board, board_pos, side, **kwargs):
         super().__init__(
             board, board_pos, side,
             movement.MultiMovement(board, [
@@ -41,7 +42,8 @@ class RRhino(Piece):
                     [(1, 1), (0, 1), (-1, 1), (-1, 0), (-1, -1), (0, -1), (1, -1), (1, 0)],
                     [(0, 1), (-1, 1), (-1, 0), (-1, -1), (0, -1), (1, -1), (1, 0), (1, 1)]
                 )
-            ])
+            ]),
+            **kwargs
         )
 
 
@@ -50,7 +52,7 @@ class Wyvern(Piece):
     file_name = 'WhhyafsW'
     asset_folder = 'fizz'
 
-    def __init__(self, board, board_pos, side):
+    def __init__(self, board, board_pos, side, **kwargs):
         super().__init__(
             board, board_pos, side,
             movement.MultiMovement(board, [
@@ -58,7 +60,8 @@ class Wyvern(Piece):
                     movement.RiderMovement(board, [(i, j, 1)]),
                     movement.HalflingRiderMovement(board, [(i or k, j or k)], 1)
                 ]) for i, j in rot([(1, 0)]) for k in (1, -1)
-            ])
+            ]),
+            **kwargs
         )
 
 
@@ -67,13 +70,14 @@ class Crabinal(Piece):
     file_name = 'ffbsNhhB'
     asset_folder = 'fizz'
 
-    def __init__(self, board, board_pos, side):
+    def __init__(self, board, board_pos, side, **kwargs):
         super().__init__(
             board, board_pos, side,
             movement.MultiMovement(board, [
                 movement.RiderMovement(board, symv([(2, 1, 1), (-1, 2, 1)])),
                 movement.HalflingRiderMovement(board, rot([(1, 1)]))
-            ])
+            ]),
+            **kwargs
         )
 
 
@@ -82,7 +86,7 @@ class EagleScout(Piece):
     file_name = 'WzB'
     asset_folder = 'fizz'
 
-    def __init__(self, board, board_pos, side):
+    def __init__(self, board, board_pos, side, **kwargs):
         movements = []
         for i, j in rot([(1, 1)]):
             for k, l in [(-i, j), (i, -j)]:
@@ -93,5 +97,6 @@ class EagleScout(Piece):
                 movements.append(movement.BentMovement(board, rider_movements))
         super().__init__(
             board, board_pos, side,
-            movement.MultiMovement(board, [movement.RiderMovement(board, rot([(1, 0, 1)]))] + movements)
+            movement.MultiMovement(board, [movement.RiderMovement(board, rot([(1, 0, 1)]))] + movements),
+            **kwargs
         )

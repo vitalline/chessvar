@@ -8,10 +8,11 @@ class Frog(Piece):
     file_name = 'FH'
     asset_folder = 'fairy'
 
-    def __init__(self, board, board_pos, side):
+    def __init__(self, board, board_pos, side, **kwargs):
         super().__init__(
             board, board_pos, side,
-            movement.RiderMovement(board, rot([(1, 1, 1), (3, 0, 1)]))
+            movement.RiderMovement(board, rot([(1, 1, 1), (3, 0, 1)])),
+            **kwargs
         )
 
 
@@ -20,10 +21,11 @@ class Dullahan(Piece):
     file_name = 'NF'
     asset_folder = 'fairy'
 
-    def __init__(self, board, board_pos, side):
+    def __init__(self, board, board_pos, side, **kwargs):
         super().__init__(
             board, board_pos, side,
-            movement.RiderMovement(board, rot([(1, 1, 1), (1, 2, 1), (2, 1, 1)]))
+            movement.RiderMovement(board, rot([(1, 1, 1), (1, 2, 1), (2, 1, 1)])),
+            **kwargs
         )
 
 
@@ -33,10 +35,11 @@ class Elephant(Piece):
     asset_folder = 'fairy'
     colorbound = True
 
-    def __init__(self, board, board_pos, side):
+    def __init__(self, board, board_pos, side, **kwargs):
         super().__init__(
             board, board_pos, side,
-            movement.RiderMovement(board, rot([(1, 1, 1), (2, 2, 1)]))
+            movement.RiderMovement(board, rot([(1, 1, 1), (2, 2, 1)])),
+            **kwargs
         )
 
 
@@ -45,8 +48,9 @@ class Unicorn(Piece):
     file_name = 'BNN'
     asset_folder = 'fairy'
 
-    def __init__(self, board, board_pos, side):
+    def __init__(self, board, board_pos, side, **kwargs):
         super().__init__(
             board, board_pos, side,
-            movement.RiderMovement(board, rot([(1, 1), (1, 2), (2, 1)]))
+            movement.RiderMovement(board, rot([(1, 1), (1, 2), (2, 1)])),
+            **kwargs
         )

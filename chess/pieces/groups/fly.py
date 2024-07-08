@@ -8,10 +8,11 @@ class Quetzal(Piece):
     file_name = 'pQ'
     asset_folder = 'fly'
 
-    def __init__(self, board, board_pos, side):
+    def __init__(self, board, board_pos, side, **kwargs):
         super().__init__(
             board, board_pos, side,
-            movement.CannonRiderMovement(board, rot([(1, 0), (1, 1)]))
+            movement.CannonRiderMovement(board, rot([(1, 0), (1, 1)])),
+            **kwargs
         )
 
 
@@ -20,10 +21,11 @@ class Owl(Piece):
     file_name = 'WAA'
     asset_folder = 'fly'
 
-    def __init__(self, board, board_pos, side):
+    def __init__(self, board, board_pos, side, **kwargs):
         super().__init__(
             board, board_pos, side,
-            movement.RiderMovement(board, rot([(1, 0, 1), (2, 2)]))
+            movement.RiderMovement(board, rot([(1, 0, 1), (2, 2)])),
+            **kwargs
         )
 
 
@@ -33,7 +35,7 @@ class Hoatzin(Piece):
     asset_folder = 'fly'
     colorbound = True
 
-    def __init__(self, board, board_pos, side):
+    def __init__(self, board, board_pos, side, **kwargs):
         super().__init__(
             board, board_pos, side,
             movement.MultiMovement(board, [
@@ -41,7 +43,8 @@ class Hoatzin(Piece):
                     movement.RiderMovement(board, [(i or k, j or k, 1)]),
                     movement.RiderMovement(board, [(i * 2, j * 2)])
                 ]) for i, j in rot([(1, 0)]) for k in (1, -1)
-            ])
+            ]),
+            **kwargs
         )
 
 
@@ -50,7 +53,7 @@ class Eagle(Piece):
     file_name = 'RbBfFfAcfafF'
     asset_folder = 'fly'
 
-    def __init__(self, board, board_pos, side):
+    def __init__(self, board, board_pos, side, **kwargs):
         super().__init__(
             board, board_pos, side,
             movement.MultiMovement(board, [
@@ -64,5 +67,6 @@ class Eagle(Piece):
                         movement.RiderMovement(board, [(i, j, 1), (0, 0)])
                     ])
                 ]) for i, j in symv([(1, 1)])
-            ])
+            ]),
+            **kwargs
         )

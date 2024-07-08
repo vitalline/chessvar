@@ -10,7 +10,7 @@ class LionCub(Piece):
     file_name = 'WmaWamW'
     asset_folder = 'crook'
 
-    def __init__(self, board, board_pos, side):
+    def __init__(self, board, board_pos, side, **kwargs):
         movements = []
         for i, j in rot([(1, 0)]):
             movements.append(
@@ -33,7 +33,11 @@ class LionCub(Piece):
                     ])
                 ])
             )
-        super().__init__(board, board_pos, side, movement.MultiMovement(board, movements))
+        super().__init__(
+            board, board_pos, side,
+            movement.MultiMovement(board, movements),
+            **kwargs
+        )
 
 
 class Rhino(Piece):
@@ -41,7 +45,7 @@ class Rhino(Piece):
     file_name = 'WafsW'
     asset_folder = 'crook'
 
-    def __init__(self, board, board_pos, side):
+    def __init__(self, board, board_pos, side, **kwargs):
         super().__init__(
             board, board_pos, side,
             movement.MultiMovement(board, [
@@ -49,7 +53,8 @@ class Rhino(Piece):
                     movement.RiderMovement(board, [(i, j, 1)]),
                     movement.RiderMovement(board, [(i or k, j or k, 1)])
                 ]) for i, j in rot([(1, 0)]) for k in (1, -1)
-            ])
+            ]),
+            **kwargs
         )
 
 
@@ -59,7 +64,7 @@ class Boyscout(Piece):
     asset_folder = 'crook'
     colorbound = True
 
-    def __init__(self, board, board_pos, side):
+    def __init__(self, board, board_pos, side, **kwargs):
         movements = []
         for i, j in rot([(1, 1)]):
             for k, l in [(-i, j), (i, -j)]:
@@ -70,7 +75,8 @@ class Boyscout(Piece):
                 movements.append(movement.BentMovement(board, rider_movements))
         super().__init__(
             board, board_pos, side,
-            movement.MultiMovement(board, movements)
+            movement.MultiMovement(board, movements),
+            **kwargs
         )
 
 
@@ -79,7 +85,7 @@ class Griffon(Piece):
     file_name = 'FyafsF'
     asset_folder = 'crook'
 
-    def __init__(self, board, board_pos, side):
+    def __init__(self, board, board_pos, side, **kwargs):
         super().__init__(
             board, board_pos, side,
             movement.MultiMovement(board, [
@@ -87,5 +93,6 @@ class Griffon(Piece):
                     movement.RiderMovement(board, [(i or k, j or k, 1)]),
                     movement.RiderMovement(board, [(i, j)])
                 ]) for i, j in rot([(1, 0)]) for k in (1, -1)
-            ])
+            ]),
+            **kwargs
         )

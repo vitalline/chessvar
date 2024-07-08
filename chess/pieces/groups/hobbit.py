@@ -8,13 +8,14 @@ class Heart(Piece):
     file_name = 'hhRA'
     asset_folder = 'hobbit'
 
-    def __init__(self, board, board_pos, side):
+    def __init__(self, board, board_pos, side, **kwargs):
         super().__init__(
             board, board_pos, side,
             movement.MultiMovement(board, [
                 movement.RiderMovement(board, rot([(2, 2, 1)])),
                 movement.HalflingRiderMovement(board, rot([(1, 0)]))
-            ])
+            ]),
+            **kwargs
         )
 
 
@@ -23,7 +24,7 @@ class Drake(Piece):
     file_name = 'FhhyafsF'
     asset_folder = 'hobbit'
 
-    def __init__(self, board, board_pos, side):
+    def __init__(self, board, board_pos, side, **kwargs):
         super().__init__(
             board, board_pos, side,
             movement.MultiMovement(board, [
@@ -31,7 +32,8 @@ class Drake(Piece):
                     movement.RiderMovement(board, [(i or k, j or k, 1)]),
                     movement.HalflingRiderMovement(board, [(i, j)], 1)
                 ]) for i, j in rot([(1, 0)]) for k in (1, -1)
-            ])
+            ]),
+            **kwargs
         )
 
 
@@ -40,13 +42,14 @@ class Barcinal(Piece):
     file_name = 'fsbbNhhB'
     asset_folder = 'hobbit'
 
-    def __init__(self, board, board_pos, side):
+    def __init__(self, board, board_pos, side, **kwargs):
         super().__init__(
             board, board_pos, side,
             movement.MultiMovement(board, [
                 movement.RiderMovement(board, symv([(1, 2, 1), (-2, 1, 1)])),
                 movement.HalflingRiderMovement(board, rot([(1, 1)]))
-            ])
+            ]),
+            **kwargs
         )
 
 
@@ -55,8 +58,9 @@ class Hannibal(Piece):
     file_name = 'hhNNhhQ'
     asset_folder = 'hobbit'
 
-    def __init__(self, board, board_pos, side):
+    def __init__(self, board, board_pos, side, **kwargs):
         super().__init__(
             board, board_pos, side,
-            movement.HalflingRiderMovement(board, rot([(1, 0), (1, 1), (1, 2), (2, 1)]))
+            movement.HalflingRiderMovement(board, rot([(1, 0), (1, 1), (1, 2), (2, 1)])),
+            **kwargs
         )

@@ -8,10 +8,11 @@ class Champion(Piece):
     file_name = 'WAD'
     asset_folder = 'burn'
 
-    def __init__(self, board, board_pos, side):
+    def __init__(self, board, board_pos, side, **kwargs):
         super().__init__(
             board, board_pos, side,
-            movement.RiderMovement(board, rot([(1, 0, 1), (2, 0, 1), (2, 2, 1)]))
+            movement.RiderMovement(board, rot([(1, 0, 1), (2, 0, 1), (2, 2, 1)])),
+            **kwargs
         )
 
 
@@ -20,10 +21,11 @@ class DraHorse(Piece):
     file_name = 'BW'
     asset_folder = 'burn'
 
-    def __init__(self, board, board_pos, side):
+    def __init__(self, board, board_pos, side, **kwargs):
         super().__init__(
             board, board_pos, side,
-            movement.RiderMovement(board, rot([(1, 0, 1), (1, 1)]))
+            movement.RiderMovement(board, rot([(1, 0, 1), (1, 1)])),
+            **kwargs
         )
 
 
@@ -33,10 +35,11 @@ class Wizard(Piece):
     asset_folder = 'burn'
     colorbound = True
 
-    def __init__(self, board, board_pos, side):
+    def __init__(self, board, board_pos, side, **kwargs):
         super().__init__(
             board, board_pos, side,
-            movement.RiderMovement(board, rot([(1, 1, 1), (1, 3, 1), (3, 1, 1)]))
+            movement.RiderMovement(board, rot([(1, 1, 1), (1, 3, 1), (3, 1, 1)])),
+            **kwargs
         )
 
 
@@ -45,8 +48,9 @@ class DraKing(Piece):
     file_name = 'RF'
     asset_folder = 'burn'
 
-    def __init__(self, board, board_pos, side):
+    def __init__(self, board, board_pos, side, **kwargs):
         super().__init__(
             board, board_pos, side,
-            movement.RiderMovement(board, rot([(1, 0), (1, 1, 1)]))
+            movement.RiderMovement(board, rot([(1, 0), (1, 1, 1)])),
+            **kwargs
         )

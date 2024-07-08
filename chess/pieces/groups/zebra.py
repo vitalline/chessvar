@@ -10,7 +10,7 @@ class Eliphas(Piece):
     file_name = 'WafsWafsafW'
     asset_folder = 'zebra'
 
-    def __init__(self, board, board_pos, side):
+    def __init__(self, board, board_pos, side, **kwargs):
         super().__init__(
             board, board_pos, side,
             movement.MultiMovement(board, [
@@ -18,7 +18,8 @@ class Eliphas(Piece):
                     movement.RiderMovement(board, [(i, j, 1)]),
                     movement.RiderMovement(board, [(i or k, j or k, 2)])
                 ]) for i, j in rot([(1, 0)]) for k in (1, -1)
-            ])
+            ]),
+            **kwargs
         )
 
 
@@ -27,10 +28,11 @@ class Sorcerer(Piece):
     file_name = 'ZW'
     asset_folder = 'zebra'
 
-    def __init__(self, board, board_pos, side):
+    def __init__(self, board, board_pos, side, **kwargs):
         super().__init__(
             board, board_pos, side,
-            movement.RiderMovement(board, rot([(1, 0, 1), (2, 3, 1), (3, 2, 1)]))
+            movement.RiderMovement(board, rot([(1, 0, 1), (2, 3, 1), (3, 2, 1)])),
+            **kwargs
         )
 
 
@@ -39,10 +41,11 @@ class Adze(Piece):
     file_name = 'ZA'
     asset_folder = 'zebra'
 
-    def __init__(self, board, board_pos, side):
+    def __init__(self, board, board_pos, side, **kwargs):
         super().__init__(
             board, board_pos, side,
-            movement.RiderMovement(board, rot([(2, 2, 1), (2, 3, 1), (3, 2, 1)]))
+            movement.RiderMovement(board, rot([(2, 2, 1), (2, 3, 1), (3, 2, 1)])),
+            **kwargs
         )
 
 
@@ -51,7 +54,7 @@ class IMarauder(Piece):
     file_name = 'Fafs(afz)F'
     asset_folder = 'zebra'
 
-    def __init__(self, board, board_pos, side):
+    def __init__(self, board, board_pos, side, **kwargs):
         movements = []
         for i, j in rot([(1, 0)]):
             for k in (1, -1):
@@ -62,5 +65,6 @@ class IMarauder(Piece):
                 movements.append(movement.BentMovement(board, rider_movements))
         super().__init__(
             board, board_pos, side,
-            movement.MultiMovement(board, movements)
+            movement.MultiMovement(board, movements),
+            **kwargs
         )

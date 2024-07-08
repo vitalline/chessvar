@@ -10,10 +10,11 @@ class Deerfly(Piece):
     file_name = 'vRK'
     asset_folder = 'narrow'
 
-    def __init__(self, board, board_pos, side):
+    def __init__(self, board, board_pos, side, **kwargs):
         super().__init__(
             board, board_pos, side,
-            movement.RiderMovement(board, rot([(1, 0, 1), (1, 1, 1)]) + symh([(1, 0)]))
+            movement.RiderMovement(board, rot([(1, 0, 1), (1, 1, 1)]) + symh([(1, 0)])),
+            **kwargs
         )
 
 
@@ -22,7 +23,7 @@ class Ship(Piece):
     file_name = 'mpsyasW'
     asset_folder = 'narrow'
 
-    def __init__(self, board, board_pos, side):
+    def __init__(self, board, board_pos, side, **kwargs):
         super().__init__(
             board, board_pos, side,
             movement.MultiMovement(board, [
@@ -30,7 +31,8 @@ class Ship(Piece):
                     movement.RiderMovement(board, [(i or k, j or k, 1)]),
                     movement.RiderMovement(board, [(i, j)])
                 ]) for i, j in symh([(1, 0)]) for k in (1, -1)
-            ])
+            ]),
+            **kwargs
         )
 
 
@@ -40,7 +42,7 @@ class Filescout(Piece):
     asset_folder = 'narrow'
     colorbound = True
 
-    def __init__(self, board, board_pos, side):
+    def __init__(self, board, board_pos, side, **kwargs):
         movements = [movement.RiderMovement(board, symv([(0, 2, 1)]))]
         for i, j in rot([(1, 1)]):
             rider_movements = []
@@ -50,7 +52,8 @@ class Filescout(Piece):
             movements.append(movement.BentMovement(board, rider_movements))
         super().__init__(
             board, board_pos, side,
-            movement.MultiMovement(board, movements)
+            movement.MultiMovement(board, movements),
+            **kwargs
         )
 
 
@@ -59,8 +62,9 @@ class Horsefly(Piece):
     file_name = 'vRNK'
     asset_folder = 'narrow'
 
-    def __init__(self, board, board_pos, side):
+    def __init__(self, board, board_pos, side, **kwargs):
         super().__init__(
             board, board_pos, side,
-            movement.RiderMovement(board, rot([(1, 0, 1), (1, 1, 1), (1, 2, 1), (2, 1, 1)]) + symh([(1, 0)]))
+            movement.RiderMovement(board, rot([(1, 0, 1), (1, 1, 1), (1, 2, 1), (2, 1, 1)]) + symh([(1, 0)])),
+            **kwargs
         )

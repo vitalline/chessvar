@@ -78,22 +78,20 @@ class Piece(Sprite):
     asset_folder = 'util'
 
     def __init__(
-            self,
-            board: Board,
-            board_pos: Position | None = None,
-            side: Side = Side.NONE,
-            movement: BaseMovement | None = None,
-            flipped_horizontally: bool = False,
-            flipped_vertically: bool = False,
-            is_hidden: bool | None = None
+        self,
+        board: Board,
+        board_pos: Position | None = None,
+        side: Side = Side.NONE,
+        movement: BaseMovement | None = None,
+        **kwargs
     ):
         self.board = board
         self.board_pos = board_pos
         self.side = side
         self.movement = movement if movement is not None else BaseMovement(board)
-        self.flipped_horizontally = flipped_horizontally
-        self.flipped_vertically = flipped_vertically
-        self.is_hidden = is_hidden
+        self.flipped_horizontally = False
+        self.flipped_vertically = False
+        self.is_hidden = None
         self.is_colored = False
         self.texture_folder = self.asset_folder
         self.texture_side = self.side
@@ -182,15 +180,16 @@ class Piece(Sprite):
 
 class PromotablePiece(Piece):
     def __init__(
-            self,
-            board: Board,
-            board_pos: Position | None = None,
-            side: Side = Side.NONE,
-            movement: BaseMovement | None = None,
-            promotions: list[Type[Piece]] | None = None,
-            promotion_squares: set[Position] | None = None
+        self,
+        board: Board,
+        board_pos: Position | None = None,
+        side: Side = Side.NONE,
+        movement: BaseMovement | None = None,
+        promotions: list[Type[Piece]] | None = None,
+        promotion_squares: set[Position] | None = None,
+        **kwargs
     ):
-        super().__init__(board, board_pos, side, movement)
+        super().__init__(board, board_pos, side, movement, **kwargs)
         self.promotions = promotions or []
         self.promotion_squares = promotion_squares or set()
 
@@ -237,21 +236,23 @@ class PromotablePiece(Piece):
 
 class QuasiRoyalPiece(Piece):
     def __init__(
-            self,
-            board: Board,
-            board_pos: Position | None = None,
-            side: Side = Side.NONE,
-            movement: BaseMovement | None = None
+        self,
+        board: Board,
+        board_pos: Position | None = None,
+        side: Side = Side.NONE,
+        movement: BaseMovement | None = None,
+        **kwargs
     ):
-        super().__init__(board, board_pos, side, movement)
+        super().__init__(board, board_pos, side, movement, **kwargs)
 
 
 class RoyalPiece(QuasiRoyalPiece):
     def __init__(
-            self,
-            board: Board,
-            board_pos: Position | None = None,
-            side: Side = Side.NONE,
-            movement: BaseMovement | None = None
+        self,
+        board: Board,
+        board_pos: Position | None = None,
+        side: Side = Side.NONE,
+        movement: BaseMovement | None = None,
+        **kwargs
     ):
-        super().__init__(board, board_pos, side, movement)
+        super().__init__(board, board_pos, side, movement, **kwargs)

@@ -8,10 +8,11 @@ class Ouroboros(Piece):
     file_name = 'ND'
     asset_folder = 'beast'
 
-    def __init__(self, board, board_pos, side):
+    def __init__(self, board, board_pos, side, **kwargs):
         super().__init__(
             board, board_pos, side,
-            movement.RiderMovement(board, rot([(1, 2, 1), (2, 0, 1), (2, 1, 1)]))
+            movement.RiderMovement(board, rot([(1, 2, 1), (2, 0, 1), (2, 1, 1)])),
+            **kwargs
         )
 
 
@@ -20,10 +21,11 @@ class Quagga(Piece):
     file_name = 'ZF'
     asset_folder = 'beast'
 
-    def __init__(self, board, board_pos, side):
+    def __init__(self, board, board_pos, side, **kwargs):
         super().__init__(
             board, board_pos, side,
-            movement.RiderMovement(board, rot([(1, 1, 1), (2, 3, 1), (3, 2, 1)]))
+            movement.RiderMovement(board, rot([(1, 1, 1), (2, 3, 1), (3, 2, 1)])),
+            **kwargs
         )
 
 
@@ -33,10 +35,11 @@ class Roc(Piece):
     asset_folder = 'beast'
     colorbound = True
 
-    def __init__(self, board, board_pos, side):
+    def __init__(self, board, board_pos, side, **kwargs):
         super().__init__(
             board, board_pos, side,
-            movement.RiderMovement(board, rot([(1, 3, 1), (2, 2, 1), (3, 1, 1)]))
+            movement.RiderMovement(board, rot([(1, 3, 1), (2, 2, 1), (3, 1, 1)])),
+            **kwargs
         )
 
 
@@ -45,8 +48,9 @@ class Buffalo(Piece):
     file_name = 'NCZ'
     asset_folder = 'beast'
 
-    def __init__(self, board, board_pos, side):
+    def __init__(self, board, board_pos, side, **kwargs):
         super().__init__(
             board, board_pos, side,
-            movement.RiderMovement(board, rot([(1, 2, 1), (1, 3, 1), (2, 1, 1), (2, 3, 1), (3, 1, 1), (3, 2, 1)]))
+            movement.RiderMovement(board, rot([(1, 2, 1), (1, 3, 1), (2, 1, 1), (2, 3, 1), (3, 1, 1), (3, 2, 1)])),
+            **kwargs
         )

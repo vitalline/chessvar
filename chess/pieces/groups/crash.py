@@ -8,14 +8,15 @@ class Merlion(Piece):
     file_name = 'ADcK'
     asset_folder = 'crash'
 
-    def __init__(self, board, board_pos, side):
+    def __init__(self, board, board_pos, side, **kwargs):
         super().__init__(
             board, board_pos, side,
             movement.MultiMovement(
                 board,
                 move_or_capture=[movement.RiderMovement(board, rot([(2, 0, 1), (2, 2, 1)]))],
                 capture=[movement.RiderMovement(board, rot([(1, 0, 1), (1, 1, 1)]))]
-            )
+            ),
+            **kwargs
         )
 
 
@@ -24,14 +25,15 @@ class Biskni(Piece):
     file_name = 'mBcN'
     asset_folder = 'crash'
 
-    def __init__(self, board, board_pos, side):
+    def __init__(self, board, board_pos, side, **kwargs):
         super().__init__(
             board, board_pos, side,
             movement.MultiMovement(
                 board,
                 move=[movement.RiderMovement(board, rot([(1, 1)]))],
                 capture=[movement.RiderMovement(board, rot([(1, 2, 1), (2, 1, 1)]))]
-            )
+            ),
+            **kwargs
         )
 
 
@@ -40,14 +42,15 @@ class IStewardess(Piece):
     file_name = 'mBcR'
     asset_folder = 'crash'
 
-    def __init__(self, board, board_pos, side):
+    def __init__(self, board, board_pos, side, **kwargs):
         super().__init__(
             board, board_pos, side,
             movement.MultiMovement(
                 board,
                 move=[movement.RiderMovement(board, rot([(1, 1)]))],
                 capture=[movement.RiderMovement(board, rot([(1, 0)]))]
-            )
+            ),
+            **kwargs
         )
 
 
@@ -56,7 +59,7 @@ class IPaladess(Piece):
     file_name = 'NmBcR'
     asset_folder = 'crash'
 
-    def __init__(self, board, board_pos, side):
+    def __init__(self, board, board_pos, side, **kwargs):
         super().__init__(
             board, board_pos, side,
             movement.MultiMovement(
@@ -64,5 +67,6 @@ class IPaladess(Piece):
                 move_or_capture=[movement.RiderMovement(board, symv([(1, 2, 1), (2, 1, 1)]))],
                 move=[movement.RiderMovement(board, rot([(1, 1)]))],
                 capture=[movement.RiderMovement(board, rot([(1, 0)]))]
-            )
+            ),
+            **kwargs
         )

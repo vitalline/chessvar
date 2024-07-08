@@ -11,10 +11,11 @@ class Bard(Piece):
     file_name = 'DfsbbNN'
     asset_folder = 'nocturnal'
 
-    def __init__(self, board, board_pos, side):
+    def __init__(self, board, board_pos, side, **kwargs):
         super().__init__(
             board, board_pos, side,
             movement.RiderMovement(board, rot([(2, 0, 1)]) + symv([(1, 2), (-2, 1)])),
+            **kwargs
         )
 
 
@@ -23,7 +24,7 @@ class Nightsling(Piece):
     file_name = 'NmNNcpNN'
     asset_folder = 'nocturnal'
 
-    def __init__(self, board, board_pos, side):
+    def __init__(self, board, board_pos, side, **kwargs):
         super().__init__(
             board, board_pos, side,
             movement.MultiMovement(
@@ -35,7 +36,8 @@ class Nightsling(Piece):
                     movement.RiderMovement(board, rot([(1, 2, 1), (2, 1, 1)])),
                     movement.CannonRiderMovement(board, rot([(1, 2), (2, 1)]))
                 ]
-            )
+            ),
+            **kwargs
         )
 
 
@@ -44,7 +46,7 @@ class MoaRdr(Piece):
     file_name = 'afs(afzafz)F'
     asset_folder = 'nocturnal'
 
-    def __init__(self, board, board_pos, side):
+    def __init__(self, board, board_pos, side, **kwargs):
         movements = []
         for i, j in rot([(1, 0)]):
             for k in (1, -1):
@@ -55,7 +57,8 @@ class MoaRdr(Piece):
                     movements.append(movement.BentMovement(board, deepcopy(rider_movements), m * 2 + 1))
         super().__init__(
             board, board_pos, side,
-            movement.MultiMovement(board, movements)
+            movement.MultiMovement(board, movements),
+            **kwargs
         )
 
 
@@ -64,8 +67,9 @@ class Nanking(Piece):
     file_name = 'NNK'
     asset_folder = 'nocturnal'
 
-    def __init__(self, board, board_pos, side):
+    def __init__(self, board, board_pos, side, **kwargs):
         super().__init__(
             board, board_pos, side,
-            movement.RiderMovement(board, rot([(1, 0, 1), (1, 1, 1), (1, 2), (2, 1)]))
+            movement.RiderMovement(board, rot([(1, 0, 1), (1, 1, 1), (1, 2), (2, 1)])),
+            **kwargs
         )

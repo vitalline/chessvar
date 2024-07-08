@@ -8,10 +8,11 @@ class Caecilian(Piece):
     file_name = 'HA'
     asset_folder = 'stone'
 
-    def __init__(self, board, board_pos, side):
+    def __init__(self, board, board_pos, side, **kwargs):
         super().__init__(
             board, board_pos, side,
-            movement.RiderMovement(board, rot([(2, 2, 1), (3, 0, 1)]))
+            movement.RiderMovement(board, rot([(2, 2, 1), (3, 0, 1)])),
+            **kwargs
         )
 
 
@@ -20,10 +21,11 @@ class Brick(Piece):
     file_name = 'WDG'
     asset_folder = 'stone'
 
-    def __init__(self, board, board_pos, side):
+    def __init__(self, board, board_pos, side, **kwargs):
         super().__init__(
             board, board_pos, side,
-            movement.RiderMovement(board, rot([(1, 0, 1), (2, 0, 1), (3, 3, 1)]))
+            movement.RiderMovement(board, rot([(1, 0, 1), (2, 0, 1), (3, 3, 1)])),
+            **kwargs
         )
 
 
@@ -33,7 +35,7 @@ class Stele(Piece):
     asset_folder = 'stone'
     colorbound = True
 
-    def __init__(self, board, board_pos, side):
+    def __init__(self, board, board_pos, side, **kwargs):
         movements = []
         for i, j in rot([(1, 1)]):
             movements.append(
@@ -56,7 +58,11 @@ class Stele(Piece):
                     ])
                 ])
             )
-        super().__init__(board, board_pos, side, movement.MultiMovement(board, movements))
+        super().__init__(
+            board, board_pos, side,
+            movement.MultiMovement(board, movements),
+            **kwargs
+        )
 
 
 class Caryatid(Piece):
@@ -64,7 +70,7 @@ class Caryatid(Piece):
     file_name = 'WmcaW'
     asset_folder = 'stone'
 
-    def __init__(self, board, board_pos, side):
+    def __init__(self, board, board_pos, side, **kwargs):
         movements = []
         for i, j in rot([(1, 0)]):
             movements.append(
@@ -87,4 +93,8 @@ class Caryatid(Piece):
                     ])
                 ])
             )
-        super().__init__(board, board_pos, side, movement.MultiMovement(board, movements))
+        super().__init__(
+            board, board_pos, side,
+            movement.MultiMovement(board, movements),
+            **kwargs
+        )

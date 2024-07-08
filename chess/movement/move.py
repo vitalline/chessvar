@@ -15,17 +15,17 @@ class Move(object):
             self,
             pos_from: Position | None = None,
             pos_to: Position | None = None,
-            movement: BaseMovement | None = None,
+            movement_type: Type[BaseMovement] | None = None,
             piece: Piece | None = None,
             captured_piece: Piece | None = None,
             swapped_piece: Piece | None = None,
-            promotion: Type[Piece] | bool | None = None,
-            chained_move: Move | bool | None = False,
+            promotion: Type[Piece] | frozenset | None = None,
+            chained_move: Move | frozenset | None = None,
             is_edit: bool = False
     ):
         self.pos_from = pos_from
         self.pos_to = pos_to
-        self.movement = movement
+        self.movement_type = movement_type
         self.piece = piece
         self.captured_piece = captured_piece
         self.swapped_piece = swapped_piece
@@ -37,18 +37,18 @@ class Move(object):
             self,
             pos_from: Position | None = None,
             pos_to: Position | None = None,
-            movement: BaseMovement | None = None,
+            movement_type: Type[BaseMovement] | None = None,
             piece: Piece | None = None,
             captured_piece: Piece | None = None,
             swapped_piece: Piece | None = None,
-            promotion: Type[Piece] | bool | None = None,
-            chained_move: Move | bool | None = None,
+            promotion: Type[Piece] | frozenset | None = None,
+            chained_move: Move | frozenset | None = None,
             is_edit: bool | None = None
     ) -> Move:
         self.pos_from = pos_from or self.pos_from
         self.pos_to = pos_to or self.pos_to
         self.piece = piece or self.piece
-        self.movement = movement or self.movement
+        self.movement_type = movement_type or self.movement_type
         self.captured_piece = captured_piece or self.captured_piece
         self.swapped_piece = swapped_piece or self.swapped_piece
         self.promotion = (
@@ -62,11 +62,29 @@ class Move(object):
         self.is_edit = is_edit if is_edit is not None else self.is_edit
         return self
 
+    def matches(self, other: Move) -> bool:
+        return (
+            not not other
+            and self.pos_from == other.pos_from
+            and self.pos_to == other.pos_to
+            and self.movement_type == other.movement_type
+            and type(self.piece) is type(other.piece)
+            and type(self.captured_piece) is type(other.captured_piece)
+            and type(self.swapped_piece) is type(other.swapped_piece)
+            and self.promotion == other.promotion
+            and (
+                self.chained_move.matches(other.chained_move)
+                if isinstance(self.chained_move, Move) else
+                self.chained_move == other.chained_move
+            )
+            and self.is_edit == other.is_edit
+        )
+
     def __copy__(self):
         return Move(
             self.pos_from,
             self.pos_to,
-            self.movement,
+            self.movement_type,
             self.piece,
             self.captured_piece,
             self.swapped_piece,
@@ -79,45 +97,13 @@ class Move(object):
         return Move(
             self.pos_from,
             self.pos_to,
-            self.movement.__copy__() if isinstance(self.movement, BaseMovement) else self.movement,
+            self.movement_type,
             self.piece.__copy__() if isinstance(self.piece, Piece) else self.piece,
             self.captured_piece.__copy__() if isinstance(self.captured_piece, Piece) else self.captured_piece,
             self.swapped_piece.__copy__() if isinstance(self.swapped_piece, Piece) else self.swapped_piece,
             self.promotion,
             self.chained_move.__deepcopy__(memo) if isinstance(self.chained_move, Move) else self.chained_move,
             self.is_edit
-        )
-
-    def __eq__(self, other: Move) -> bool:
-        return (
-            not not other
-            and self.pos_from == other.pos_from
-            and self.pos_to == other.pos_to
-            and self.movement == other.movement
-            and self.piece == other.piece
-            and self.captured_piece == other.captured_piece
-            and self.swapped_piece == other.swapped_piece
-            and self.promotion == other.promotion
-            and self.chained_move == other.chained_move
-            and self.is_edit == other.is_edit
-        )
-
-    def matches(self, other: Move) -> bool:
-        return (
-            not not other
-            and self.pos_from == other.pos_from
-            and self.pos_to == other.pos_to
-            # ignore movement check for the time being
-            and type(self.piece) is type(other.piece)
-            and type(self.captured_piece) is type(other.captured_piece)
-            and type(self.swapped_piece) is type(other.swapped_piece)
-            and self.promotion == other.promotion
-            and (
-                self.chained_move.matches(other.chained_move)
-                if isinstance(self.chained_move, Move) else
-                self.chained_move == other.chained_move
-            )
-            and self.is_edit == other.is_edit
         )
 
     def __str__(self) -> str:

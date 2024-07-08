@@ -8,10 +8,11 @@ class Snail(Piece):
     file_name = 'mccWmccfD'
     asset_folder = 'demirifle'
 
-    def __init__(self, board, board_pos, side):
+    def __init__(self, board, board_pos, side, **kwargs):
         super().__init__(
             board, board_pos, side,
-            movement.AutoRangedAutoCaptureRiderMovement(board, rot([(1, 0, 1)]) + [(2, 0, 1)])
+            movement.AutoRangedAutoCaptureRiderMovement(board, rot([(1, 0, 1)]) + [(2, 0, 1)]),
+            **kwargs
         )
 
 
@@ -20,10 +21,11 @@ class Crab(Piece):
     file_name = 'mccffbsN'
     asset_folder = 'demirifle'
 
-    def __init__(self, board, board_pos, side):
+    def __init__(self, board, board_pos, side, **kwargs):
         super().__init__(
             board, board_pos, side,
-            movement.AutoRangedAutoCaptureRiderMovement(board, symv([(2, 1, 1), (-1, 2, 1)]))
+            movement.AutoRangedAutoCaptureRiderMovement(board, symv([(2, 1, 1), (-1, 2, 1)])),
+            **kwargs
         )
 
 
@@ -33,10 +35,11 @@ class Lobster(Piece):
     asset_folder = 'demirifle'
     colorbound = True
 
-    def __init__(self, board, board_pos, side):
+    def __init__(self, board, board_pos, side, **kwargs):
         super().__init__(
             board, board_pos, side,
-            movement.AutoRangedAutoCaptureRiderMovement(board, symv([(2, 2, 1), (-1, 1, 1)]))
+            movement.AutoRangedAutoCaptureRiderMovement(board, symv([(2, 2, 1), (-1, 1, 1)])),
+            **kwargs
         )
 
 
@@ -45,10 +48,11 @@ class Crabsnail(Piece):
     file_name = 'mccWmccfDmccffbsN'
     asset_folder = 'demirifle'
 
-    def __init__(self, board, board_pos, side):
+    def __init__(self, board, board_pos, side, **kwargs):
         super().__init__(
             board, board_pos, side,
             movement.AutoRangedAutoCaptureRiderMovement(
                 board, symv([(2, 0, 1), (2, 1, 1), (-1, 2, 1)]) + rot([(1, 0, 1)])
-            )
+            ),
+            **kwargs
         )

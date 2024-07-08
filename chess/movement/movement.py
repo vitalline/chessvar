@@ -31,6 +31,9 @@ class BaseMovement(object):
         self.undo(move, piece)
         self.update(move, piece)
 
+    def set_moves(self, count: int):
+        self.total_moves = count
+
     def __copy_args__(self):
         return self.board,
 
@@ -70,20 +73,20 @@ class BaseDirectionalMovement(BaseMovement):
         while direction_id < len(self.directions):
             direction = piece.side.direction(self.directions[direction_id])
             if direction[:2] == (0, 0):
-                yield Move(pos_from, self.transform(pos_from), self)
+                yield Move(pos_from, self.transform(pos_from), type(self))
                 direction_id += 1
                 continue
             self.initialize_direction(direction, pos_from, piece)
             current_pos = pos_from
             distance = 0
-            move = Move(pos_from, self.transform(current_pos), self)
+            move = Move(pos_from, self.transform(current_pos), type(self))
             while not self.board.not_on_board(self.transform(current_pos)):
                 if self.stop_condition(move, direction, piece, theoretical):
                     direction_id += 1
                     break
                 current_pos = add(current_pos, direction[:2])
                 distance += 1
-                move = Move(pos_from, self.transform(current_pos), self)
+                move = Move(pos_from, self.transform(current_pos), type(self))
                 self.advance_direction(move, direction, pos_from, piece)
                 if self.skip_condition(move, direction, piece, theoretical):
                     continue
@@ -276,6 +279,7 @@ class AutoRangedAutoCaptureRiderMovement(RangedAutoCaptureRiderMovement):
         for move in self.moves(pos, piece, True):
             if move.pos_to not in self.board.auto_capture_markers[piece.side]:
                 self.board.auto_capture_markers[piece.side][move.pos_to] = set()
+            # noinspection PyTestUnpassedFixture
             self.board.auto_capture_markers[piece.side][move.pos_to].add(pos)
 
     def unmark(self, pos: Position, piece: Piece):
@@ -331,9 +335,9 @@ class CastlingMovement(BaseMovement):
                     return ()
                 if pos in self.board.castling_threats:
                     return ()
-        self_move = Move(pos_from, add(pos_from, piece.side.direction(self.direction)), self)
+        self_move = Move(pos_from, add(pos_from, piece.side.direction(self.direction)), type(self))
         other_piece_pos_to = add(other_piece_pos, piece.side.direction(self.other_direction))
-        other_move = Move(other_piece_pos, other_piece_pos_to, self, other_piece)
+        other_move = Move(other_piece_pos, other_piece_pos_to, type(self), other_piece)
         return self_move.set(chained_move=other_move),
 
     def __copy_args__(self):
@@ -403,6 +407,11 @@ class BaseMultiMovement(BaseMovement):
         for movement in self.movements:
             movement.reload(move, piece)
         super().update(move, piece)
+
+    def set_moves(self, count: int):
+        for movement in self.movements:
+            movement.set_moves(count)
+        super().set_moves(count)
 
     def __copy_args__(self):
         return self.board, deepcopy(self.movements)

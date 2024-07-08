@@ -8,7 +8,7 @@ class Llama(Piece):
     file_name = 'R2afafsW'
     asset_folder = 'camel'
 
-    def __init__(self, board, board_pos, side):
+    def __init__(self, board, board_pos, side, **kwargs):
         super().__init__(
             board, board_pos, side,
             movement.MultiMovement(board, [
@@ -16,7 +16,8 @@ class Llama(Piece):
                     movement.RiderMovement(board, [(i, j, 2)]),
                     movement.RiderMovement(board, [(i or k, j or k, 1)])
                 ]) for i, j in rot([(1, 0)]) for k in (1, -1)
-            ])
+            ]),
+            **kwargs
         )
 
 
@@ -25,10 +26,11 @@ class Cashier(Piece):
     file_name = 'CW'
     asset_folder = 'camel'
 
-    def __init__(self, board, board_pos, side):
+    def __init__(self, board, board_pos, side, **kwargs):
         super().__init__(
             board, board_pos, side,
-            movement.RiderMovement(board, rot([(1, 0, 1), (1, 3, 1), (3, 1, 1)]))
+            movement.RiderMovement(board, rot([(1, 0, 1), (1, 3, 1), (3, 1, 1)])),
+            **kwargs
         )
 
 
@@ -38,10 +40,11 @@ class Cabbage(Piece):
     asset_folder = 'camel'
     colorbound = True
 
-    def __init__(self, board, board_pos, side):
+    def __init__(self, board, board_pos, side, **kwargs):
         super().__init__(
             board, board_pos, side,
-            movement.RiderMovement(board, rot([(1, 1), (1, 3, 1), (3, 1, 1)]))
+            movement.RiderMovement(board, rot([(1, 1), (1, 3, 1), (3, 1, 1)])),
+            **kwargs
         )
 
 
@@ -50,8 +53,9 @@ class Warlock(Piece):
     file_name = 'RCF'
     asset_folder = 'camel'
 
-    def __init__(self, board, board_pos, side):
+    def __init__(self, board, board_pos, side, **kwargs):
         super().__init__(
             board, board_pos, side,
-            movement.RiderMovement(board, rot([(1, 0), (1, 1, 1), (1, 3, 1), (3, 1, 1)]))
+            movement.RiderMovement(board, rot([(1, 0), (1, 1, 1), (1, 3, 1), (3, 1, 1)])),
+            **kwargs
         )

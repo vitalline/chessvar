@@ -8,13 +8,14 @@ class Hasdrubal(Piece):
     file_name = 'fsbbNNhhR'
     asset_folder = 'amontillado'
 
-    def __init__(self, board, board_pos, side):
+    def __init__(self, board, board_pos, side, **kwargs):
         super().__init__(
             board, board_pos, side,
             movement.MultiMovement(board, [
                 movement.RiderMovement(board, symv([(1, 2), (-2, 1)])),
                 movement.HalflingRiderMovement(board, rot([(1, 0)]))
-            ])
+            ]),
+            **kwargs
         )
 
 
@@ -23,10 +24,11 @@ class Barcfil(Piece):
     file_name = 'AfsbbN'
     asset_folder = 'amontillado'
 
-    def __init__(self, board, board_pos, side):
+    def __init__(self, board, board_pos, side, **kwargs):
         super().__init__(
             board, board_pos, side,
-            movement.RiderMovement(board, symv([(1, 2, 1), (2, 2, 1), (-2, 1, 1), (-2, 2, 1)]))
+            movement.RiderMovement(board, symv([(1, 2, 1), (2, 2, 1), (-2, 1, 1), (-2, 2, 1)])),
+            **kwargs
         )
 
 
@@ -36,13 +38,14 @@ class Bed(Piece):
     asset_folder = 'amontillado'
     colorbound = True
 
-    def __init__(self, board, board_pos, side):
+    def __init__(self, board, board_pos, side, **kwargs):
         super().__init__(
             board, board_pos, side,
             movement.MultiMovement(board, [
                 movement.RiderMovement(board, rot([(2, 0, 1)])),
                 movement.HalflingRiderMovement(board, rot([(1, 1)]))
-            ])
+            ]),
+            **kwargs
         )
 
 
@@ -51,11 +54,12 @@ class Hamilcar(Piece):
     file_name = 'fsbbNNffbsNhhQ'
     asset_folder = 'amontillado'
 
-    def __init__(self, board, board_pos, side):
+    def __init__(self, board, board_pos, side, **kwargs):
         super().__init__(
             board, board_pos, side,
             movement.MultiMovement(board, [
                 movement.RiderMovement(board, symv([(1, 2), (-2, 1), (2, 1, 1), (-1, 2, 1)])),
                 movement.HalflingRiderMovement(board, rot([(1, 0), (1, 1)]))
-            ])
+            ]),
+            **kwargs
         )

@@ -8,7 +8,7 @@ class Bireme(Piece):
     file_name = 'D[D-R]'
     asset_folder = 'inadjacent'
 
-    def __init__(self, board, board_pos, side):
+    def __init__(self, board, board_pos, side, **kwargs):
         super().__init__(
             board, board_pos, side,
             movement.MultiMovement(board, [
@@ -16,7 +16,8 @@ class Bireme(Piece):
                     movement.RiderMovement(board, [(2 * i, 2 * j, 1)]),
                     movement.RiderMovement(board, [(i, j)])
                 ]) for i, j in rot([(1, 0)])
-            ])
+            ]),
+            **kwargs
         )
 
 
@@ -25,7 +26,7 @@ class Tigon(Piece):
     file_name = 'nCnZ'
     asset_folder = 'inadjacent'
 
-    def __init__(self, board, board_pos, side):
+    def __init__(self, board, board_pos, side, **kwargs):
         movements = []
         for i, j in rot([(1, 0)]):
             for k in (1, -1):
@@ -39,7 +40,8 @@ class Tigon(Piece):
                     ])
         super().__init__(
             board, board_pos, side,
-            movement.MultiMovement(board, movements)
+            movement.MultiMovement(board, movements),
+            **kwargs
         )
 
 
@@ -49,7 +51,7 @@ class Bicycle(Piece):
     asset_folder = 'inadjacent'
     colorbound = True
 
-    def __init__(self, board, board_pos, side):
+    def __init__(self, board, board_pos, side, **kwargs):
         super().__init__(
             board, board_pos, side,
             movement.MultiMovement(board, [
@@ -57,7 +59,8 @@ class Bicycle(Piece):
                     movement.RiderMovement(board, [(2 * i, 2 * j, 1)]),
                     movement.RiderMovement(board, [(i, j)])
                 ]) for i, j in rot([(1, 1)])
-            ])
+            ]),
+            **kwargs
         )
 
 
@@ -66,7 +69,7 @@ class Biplane(Piece):
     file_name = 'D[D-R]A[A-B]'
     asset_folder = 'inadjacent'
 
-    def __init__(self, board, board_pos, side):
+    def __init__(self, board, board_pos, side, **kwargs):
         super().__init__(
             board, board_pos, side,
             movement.MultiMovement(board, [
@@ -74,5 +77,6 @@ class Biplane(Piece):
                     movement.RiderMovement(board, [(2 * i, 2 * j, 1)]),
                     movement.RiderMovement(board, [(i, j)])
                 ]) for i, j in rot([(1, 0), (1, 1)])
-            ])
+            ]),
+            **kwargs
         )

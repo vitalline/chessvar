@@ -8,10 +8,11 @@ class Star(Piece):
     file_name = 'sfRbB'
     asset_folder = 'starbound'
 
-    def __init__(self, board, board_pos, side):
+    def __init__(self, board, board_pos, side, **kwargs):
         super().__init__(
             board, board_pos, side,
-            movement.RiderMovement(board, symv([(1, 0), (0, 1), (-1, 1)]))
+            movement.RiderMovement(board, symv([(1, 0), (0, 1), (-1, 1)])),
+            **kwargs
         )
 
 
@@ -20,10 +21,11 @@ class Lancer(Piece):
     file_name = 'KfR'
     asset_folder = 'starbound'
 
-    def __init__(self, board, board_pos, side):
+    def __init__(self, board, board_pos, side, **kwargs):
         super().__init__(
             board, board_pos, side,
-            movement.RiderMovement(board, symv([(1, 0), (1, 1, 1), (0, 1, 1), (-1, 1, 1), (-1, 0, 1)]))
+            movement.RiderMovement(board, symv([(1, 0), (1, 1, 1), (0, 1, 1), (-1, 1, 1), (-1, 0, 1)])),
+            **kwargs
         )
 
 
@@ -32,7 +34,7 @@ class SineRdr(Piece):
     file_name = 'fFmfafFfafmFmfaqFfaqmFsRbB'
     asset_folder = 'starbound'
 
-    def __init__(self, board, board_pos, side):
+    def __init__(self, board, board_pos, side, **kwargs):
         movements = [movement.RiderMovement(board, symv([(0, 1), (-1, 1)]))]
         for i, j in rot([(1, 1)]):
             movements.append(
@@ -51,7 +53,11 @@ class SineRdr(Piece):
                     ])
                 ])
             )
-        super().__init__(board, board_pos, side, movement.MultiMovement(board, movements))
+        super().__init__(
+            board, board_pos, side,
+            movement.MultiMovement(board, movements),
+            **kwargs
+        )
 
 
 class Turneagle(Piece):
@@ -59,7 +65,7 @@ class Turneagle(Piece):
     file_name = 'FmcaFR'
     asset_folder = 'starbound'
 
-    def __init__(self, board, board_pos, side):
+    def __init__(self, board, board_pos, side, **kwargs):
         movements = [movement.RiderMovement(board, rot([(1, 0)]))]
         for i, j in rot([(1, 1)]):
             movements.append(
@@ -82,4 +88,8 @@ class Turneagle(Piece):
                     ])
                 ])
             )
-        super().__init__(board, board_pos, side, movement.MultiMovement(board, movements))
+        super().__init__(
+            board, board_pos, side,
+            movement.MultiMovement(board, movements),
+            **kwargs
+        )

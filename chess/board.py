@@ -1,10 +1,13 @@
 from copy import copy, deepcopy
 from datetime import datetime
 from itertools import product, zip_longest
+from json import dump, load
 from math import ceil, sqrt
 from os import curdir, name as os_name, system
 from os.path import abspath, isfile, join
 from random import Random
+from sys import argv
+from traceback import print_exc
 from typing import Type
 
 from PIL.ImageColor import getrgb
@@ -17,7 +20,7 @@ from chess.color import average, darken, desaturate, lighten, saturate
 from chess.config import Config
 from chess.movement import movement
 from chess.movement.move import Move
-from chess.movement.util import Position, add
+from chess.movement.util import Position, add, to_alpha as toa, from_alpha as fra
 from chess.pieces import pieces as abc
 from chess.pieces.groups import classic as fide
 from chess.pieces.groups import amazon as am, amontillado as ao, asymmetry as ay, avian as av
@@ -39,6 +42,7 @@ from chess.pieces.groups import wide as wd
 from chess.pieces.groups import zebra as zb
 from chess.pieces.groups.util import NoPiece
 from chess.pieces.pieces import Side
+from chess.save import load_move, load_piece, load_rng, load_type, save_move, save_piece, save_rng, save_type
 from chess.util import Default, Unset
 
 piece_groups: list[dict[str, str | list[Type[abc.Piece]]]] = [
@@ -360,7 +364,8 @@ class Board(Window):
         self.chaos_mode = self.board_config['chaos_mode']  # 0: no, 1: match pos, 2: match pos asym, 3: any, 4: any asym
         self.chaos_sets = {}  # piece sets generated in chaos mode
         self.piece_sets = {Side.WHITE: [], Side.BLACK: []}  # types of pieces each side starts with
-        self.promotions = {Side.WHITE: [], Side.BLACK: []}  # types of pieces each side promote to
+        self.promotions = {Side.WHITE: [], Side.BLACK: []}  # types of pieces each side promotes to
+        self.promotion_squares = promotion_squares  # squares where pawns can promote for each side
         self.edit_promotions = {Side.WHITE: [], Side.BLACK: []}  # types of pieces each side can promote to in edit mode
         self.movable_pieces = {Side.WHITE: [], Side.BLACK: []}  # pieces that can be moved by each side
         self.royal_pieces = {Side.WHITE: [], Side.BLACK: []}  # these have to stay on the board and should be protected
@@ -450,7 +455,15 @@ class Board(Window):
             self.board_sprite_list.append(sprite)
 
         # set up pieces on the board
-        self.reset_board(update=True)
+        loaded = False
+        if len(argv) > 1 and isfile(argv[1]):
+            try:
+                self.load_board(argv[1])
+                loaded = True
+            except Exception:
+                print_exc()
+        if not loaded:
+            self.reset_board(update=True)
 
     def get_board_position(
             self,
@@ -637,12 +650,8 @@ class Board(Window):
             self.pieces[row].append(
                 piece_type(
                     self, (row, col), piece_side,
-                    promotions=self.promotions[piece_side],
-                    promotion_squares=promotion_squares[piece_side],
-                )
-                if issubclass(piece_type, abc.PromotablePiece) else
-                piece_type(
-                    self, (row, col), piece_side
+                    promotions=self.promotions.get(piece_side, None),
+                    promotion_squares=self.promotion_squares.get(piece_side, None),
                 )
             )
             if not self.pieces[row][col].is_empty():
@@ -659,6 +668,182 @@ class Board(Window):
 
         self.load_moves()
         self.show_moves()
+
+    def save_board(self) -> None:
+        data = {
+            'board_size': [self.board_width, self.board_height],
+            'window_size': [self.width, self.height],
+            'square_size': self.square_size,
+            'flip_mode': self.flip_mode,
+            'color_index': self.color_index,
+            'color_scheme': {k: list(v) if isinstance(v, tuple) else v for k, v in colors[self.color_index].items()},
+            'set_blocklist': self.board_config['block_ids'],
+            'chaos_blocklist': self.board_config['block_ids_chaos'],
+            'set_ids': {side.value: piece_set_id for side, piece_set_id in self.piece_set_ids.items()},
+            'sets': {side.value: [save_type(t) for t in piece_set] for side, piece_set in self.piece_sets.items()},
+            'pieces': {toa(p.board_pos): save_piece(p) for pieces in self.movable_pieces.values() for p in pieces},
+            'moves': [save_move(m) for m in self.move_history],
+            'future': [save_move(m) for m in self.future_move_history],
+            'rolls': {n: {toa(pos): d[pos] for pos in sorted(d)} for n, d in enumerate(self.roll_history) if d},
+            'roll_piece_history': {
+                n: {toa(p[1]): save_type(p[0]) for p in sorted(d, key=lambda k: k[1])}
+                for n, d in enumerate(self.probabilistic_piece_history) if d
+            },
+            'auto_captures': {
+                side.value: {toa(on): [toa(of) for of in sorted(ofs)] for on, ofs in d.items()}
+                for side, d in self.auto_capture_markers.items() if d
+            },
+            'promotion': (
+                toa(self.promotion_piece.board_pos) if isinstance(self.promotion_piece, abc.Piece)
+                else self.promotion_piece
+            ),
+            'chain_start': save_move(self.chain_start),
+            'chain_moves': [
+                save_move(m) for m in self.moves[self.chain_start.piece.side][self.chain_start.piece.board_pos]
+            ] if self.chain_start else [],
+            'ply': self.ply_count,
+            'turn': self.turn_side.value,
+            'edit': self.edit_mode,
+            'hide_pieces': self.should_hide_pieces,
+            'hide_moves': self.should_hide_moves,
+            'royal_mode': self.royal_piece_mode,
+            'chaos_mode': self.chaos_mode,
+            'set_seed': self.set_seed,
+            'set_state': save_rng(self.set_rng),
+            'roll_seed': self.roll_seed,
+            'roll_state': save_rng(self.roll_rng),
+            'roll_update': self.board_config['update_roll_seed'],
+            'chaos_seed': self.chaos_seed,
+            'chaos_state': save_rng(self.chaos_rng),
+        }
+        with open(get_filename('save', 'json'), 'w') as file:
+            dump(data, file, indent=2)
+
+    def load_board(self, path: str) -> None:
+        self.deselect_piece()
+        self.clear_en_passant()
+        self.clear_auto_capture_markers()
+
+        for sprite_list in self.piece_sprite_list, self.promotion_piece_sprite_list, self.promotion_area_sprite_list:
+            sprite_list.clear()
+            for sprite in sprite_list:
+                sprite_list.remove(sprite)
+
+        with open(path) as file:
+            data = load(file)
+
+        # might have to add more error checking to saving/loading, even if at the cost of slight redundancy.
+        # who knows when someone decides to introduce a breaking change and absolutely destroy all the saves
+        if (self.board_width, self.board_height) != tuple(data['board_size']):
+            print(
+                f"Warning: Board size does not match (was {tuple(data['board_size'])}, "
+                f"is {(self.board_width, self.board_height)})"
+            )
+
+        self.update_sprites(*data['window_size'], data['flip_mode'])
+        if self.square_size != data['square_size']:
+            print(f"Warning: Square size does not match (was {data['square_size']}, is {self.square_size})")
+
+        self.color_index = data['color_index']
+        self.color_scheme = colors[self.color_index]
+        for k, v in self.color_scheme.items():
+            if v != (tuple(data['color_scheme'][k]) if isinstance(v, tuple) else data['color_scheme'][k]):
+                print(f"Warning: Color scheme does not match ({k} was {tuple(data['color_scheme'][k])}, is {v})")
+
+        self.board_config['block_ids'] = data['set_blocklist']
+        self.board_config['block_ids_chaos'] = data['chaos_blocklist']
+
+        self.should_hide_pieces = data['hide_pieces']
+        self.should_hide_moves = data['hide_moves']
+        self.royal_piece_mode = data['royal_mode']
+        self.chaos_mode = data['chaos_mode']
+        self.edit_mode = data['edit']
+
+        self.set_seed = data['set_seed']
+        self.roll_seed = data['roll_seed']
+        self.chaos_seed = data['chaos_seed']
+        self.board_config['update_roll_seed'] = data['roll_update']
+
+        self.piece_set_ids = {Side(int(k)): v for k, v in data['set_ids'].items()}
+        self.piece_sets, self.piece_set_names = self.get_piece_sets()
+        save_piece_sets = {Side(int(v)): [load_type(t) for t in d] for v, d in data['sets'].items()}
+        update_sets = False
+        for side in self.piece_sets:
+            for i, pair in enumerate(zip(save_piece_sets, self.piece_sets)):
+                if pair[0] != pair[1]:
+                    print(
+                        f"Warning: Piece set does not match ({side}: {toa(((0 if side == Side.WHITE else 7), i))} "
+                        f"was {pair[0].name}, is {pair[1].name})"
+                    )
+                    update_sets = True
+        if update_sets:
+            self.piece_sets = {side: save_piece_sets[side] for side in self.piece_sets}
+            self.piece_set_names = {side: get_set_name(self.piece_sets[side]) for side in self.piece_sets}
+
+        self.reset_promotions()
+        self.reset_edit_promotions()
+        self.reset_penultima_pieces()
+
+        self.ply_count = data['ply']
+        self.turn_side = Side(data['turn'])
+        self.move_history = [load_move(d, self) for d in data['moves']]
+        self.future_move_history = [load_move(d, self) for d in data['future']]
+
+        rolls = data['rolls']
+        self.roll_history = [
+            ({fra(s): v for s, v in rolls[str(n)].items()} if str(n) in rolls else {}) for n in range(self.ply_count)
+        ]
+        rph = data['roll_piece_history']
+        self.probabilistic_piece_history = [
+            ({(load_type(v), fra(k)) for k, v in rph[str(n)].items()} if str(n) in rph else set())
+            for n in range(self.ply_count)
+        ]
+        ac = data['auto_captures']
+        self.auto_capture_markers = {
+            side: {fra(on): {fra(of) for of in ofs} for on, ofs in ac[str(side.value)].items()}
+            if str(side.value) in ac else {} for side in self.auto_capture_markers
+        }
+
+        self.chain_start = load_move(data['chain_start'], self)
+        if self.move_history[-1].matches(self.chain_start):
+            self.chain_start = self.move_history[-1]
+        cm = data['chain_moves']
+        self.chain_moves = {
+            self.chain_start.piece.side: {
+                (self.chain_start.pos_from, self.chain_start.pos_to): [load_move(m, self) for m in cm]
+            }, self.chain_start.piece.side.opponent(): {}
+        } if self.chain_start else {}
+
+        self.set_rng = load_rng(data['set_state'])
+        self.roll_rng = load_rng(data['roll_state'])
+        self.chaos_rng = load_rng(data['chaos_state'])
+
+        self.pieces = []
+
+        for row in range(self.board_height):
+            self.pieces += [[]]
+
+        for row, col in product(range(self.board_height), range(self.board_width)):
+            piece_data = data['pieces'].get(toa((row, col)), None)
+            self.pieces[row].append(
+                NoPiece(self, (row, col)) if piece_data is None else load_piece(piece_data, self)
+            )
+            self.pieces[row][col].scale = self.square_size / self.pieces[row][col].texture.width
+            self.piece_sprite_list.append(self.pieces[row][col])
+
+        self.promotion_piece = (
+            self.get_piece(fra(data['promotion'])) if isinstance(data['promotion'], str) else data['promotion']
+        )
+
+        last_move = self.move_history[-1]
+        last_move.piece.movement.update(last_move, last_move.piece)
+
+        self.load_pieces()
+        self.update_colors()
+        if self.promotion_piece:
+            self.start_promotion(self.promotion_piece, self.promotions[self.promotion_piece.side])
+        else:
+            self.update_status()
 
     def empty_board(self) -> None:
         self.deselect_piece()
@@ -895,13 +1080,10 @@ class Board(Window):
         self.check_side = Side.NONE
         self.castling_threats = set()
         for royal in self.royal_pieces[self.turn_side]:
-            castle_moves = [
-                move for move in royal.moves() if isinstance(
-                    move.movement,
-                    movement.CastlingMovement
-                )
-            ]
-            castle_movements = set(move.movement for move in castle_moves)
+            movement_list = (
+                royal.movement.movements if isinstance(royal.movement, movement.BaseMultiMovement) else [royal.movement]
+            )
+            castle_movements = set(m for m in movement_list if isinstance(m, movement.CastlingMovement))
             castle_squares = set(
                 add(royal.board_pos, offset)
                 for castling in castle_movements
@@ -1102,8 +1284,8 @@ class Board(Window):
                     move = copy(move)
                     if (
                         (move.chained_move or self.chain_moves.get(turn_side, {}).get((move.pos_from, move.pos_to)))
-                        and not isinstance(
-                            move.movement,
+                        and not issubclass(
+                            move.movement_type,
                             movement.CastlingMovement |
                             movement.RangedAutoCaptureRiderMovement
                         )
@@ -1153,7 +1335,7 @@ class Board(Window):
                 pos_from, pos_to = move.pos_from, move.pos_to
                 last_move = move
                 captures = []
-                if not isinstance(move.movement, movement.CastlingMovement):
+                if not issubclass(move.movement_type, movement.CastlingMovement):
                     while last_move.chained_move:
                         if last_move.captured_piece:
                             captures.append(last_move.captured_piece.board_pos)
@@ -1252,7 +1434,7 @@ class Board(Window):
             if piece.side == side and move.piece.side == side.opponent():
                 chained_move = Move(
                     piece=piece,
-                    movement=piece.movement,
+                    movement_type=type(piece.movement),
                     pos_from=piece_pos,
                     pos_to=piece_pos,
                     captured_piece=move.piece,
@@ -1386,7 +1568,7 @@ class Board(Window):
             self.piece_sprite_list.append(move.piece)
         if not move.is_edit or (move.pos_from == move.pos_to and move.promotion is None):
             # call movement.update() to update movement state after the move (e.g. pawn double move, castling rights)
-            (move.piece or move).movement.update(move, move.piece)
+            move.piece.movement.update(move, move.piece)
 
     def undo(self, move: Move) -> None:
         if move.pos_from != move.pos_to or move.promotion is not None:
@@ -1434,7 +1616,7 @@ class Board(Window):
                 self.pieces[move.pos_to[0]][move.pos_to[1]] = move.swapped_piece
         if not move.is_edit or (move.pos_from == move.pos_to and move.promotion is None):
             # call movement.undo() to restore movement state before the move (e.g. pawn double move, castling rights)
-            (move.piece or move).movement.undo(move, move.piece)
+            move.piece.movement.undo(move, move.piece)
 
     def undo_last_move(self) -> None:
         self.deselect_piece()
@@ -1485,7 +1667,7 @@ class Board(Window):
         if self.move_history:
             move = self.move_history[-1]
             if move is not None and (not move.is_edit or (move.pos_from == move.pos_to and move.promotion is None)):
-                (move.piece or move).movement.reload(move, move.piece)
+                move.piece.movement.reload(move, move.piece)
         future_move_history = self.future_move_history.copy()
         if self.chain_start is None:
             self.advance_turn(is_undo=True)
@@ -1652,6 +1834,9 @@ class Board(Window):
             # if the board was edited, update roll history because probabilistic moves would need to be recalculated
             self.update_roll_history()
         self.turn_side = Side.WHITE if self.ply_count % 2 == 1 else Side.BLACK
+        self.update_status()
+
+    def update_status(self) -> None:
         self.load_moves()  # this updates the check status as well
         self.show_moves()
         if not sum(self.moves.get(self.turn_side, {}).values(), []):
@@ -1743,9 +1928,9 @@ class Board(Window):
         self.piece_sprite_list.remove(piece)
         self.pieces[pos[0]][pos[1]] = new_type(
             self, pos, new_side,
-            promotions=self.promotions[new_side],
-            promotion_squares=promotion_squares[new_side],
-        ) if issubclass(new_type, abc.PromotablePiece) else new_type(self, pos, new_side)
+            promotions=self.promotions.get(new_side, None),
+            promotion_squares=self.promotion_squares.get(new_side, None),
+        )
         self.update_piece(self.pieces[pos[0]][pos[1]], penultima_hide=is_hidden)
         self.pieces[pos[0]][pos[1]].set_color(
             self.color_scheme.get(
@@ -2218,8 +2403,8 @@ class Board(Window):
                     move.promotion = Unset  # do not auto-promote because we are selecting promotion type manually
                 if (
                     (move.chained_move or self.chain_moves.get(self.turn_side, {}).get((move.pos_from, move.pos_to)))
-                    and not isinstance(
-                        move.movement,
+                    and not issubclass(
+                        move.movement_type,
                         movement.CastlingMovement |
                         movement.RangedAutoCaptureRiderMovement
                     )
@@ -2311,6 +2496,8 @@ class Board(Window):
                         return
         if self.held_buttons:
             return
+        if symbol == key.S:  # Save
+            self.save_board()
         if symbol == key.R:  # Restart
             if modifiers & key.MOD_SHIFT:  # Randomize piece sets
                 blocked_ids = set(self.piece_set_ids.values()).union(self.board_config['block_ids'])
@@ -2662,6 +2849,8 @@ class Board(Window):
     def debug_info(self) -> list[str]:
         debug_log_data = []  # noqa
         debug_log_data.append(f"Board size: {self.board_width}x{self.board_height}")
+        debug_log_data.append(f"Window size: {self.width}x{self.height}")
+        debug_log_data.append(f"Square size: {self.square_size}")
         debug_log_data.append(f"Color scheme ID: {self.color_index}")
         debug_log_data.append("Color scheme:")
         color_scheme = deepcopy(self.color_scheme)  # just in case trickster mode messes with the color scheme RIGHT NOW

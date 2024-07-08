@@ -8,10 +8,11 @@ class Wader(Piece):
     file_name = 'WDD'
     asset_folder = 'avian'
 
-    def __init__(self, board, board_pos, side):
+    def __init__(self, board, board_pos, side, **kwargs):
         super().__init__(
             board, board_pos, side,
-            movement.RiderMovement(board, rot([(1, 0, 1), (2, 0)]))
+            movement.RiderMovement(board, rot([(1, 0, 1), (2, 0)])),
+            **kwargs
         )
 
 
@@ -20,10 +21,11 @@ class Darter(Piece):
     file_name = 'fNWbAA'
     asset_folder = 'avian'
 
-    def __init__(self, board, board_pos, side):
+    def __init__(self, board, board_pos, side, **kwargs):
         super().__init__(
             board, board_pos, side,
-            movement.RiderMovement(board, rot([(1, 0, 1)]) + symv([(2, 1, 1), (-2, 2)]))
+            movement.RiderMovement(board, rot([(1, 0, 1)]) + symv([(2, 1, 1), (-2, 2)])),
+            **kwargs
         )
 
 
@@ -33,10 +35,11 @@ class Falcon(Piece):
     asset_folder = 'avian'
     colorbound = True
 
-    def __init__(self, board, board_pos, side):
+    def __init__(self, board, board_pos, side, **kwargs):
         super().__init__(
             board, board_pos, side,
-            movement.RiderMovement(board, rot([(1, 1, 1), (2, 2)]))
+            movement.RiderMovement(board, rot([(1, 1, 1), (2, 2)])),
+            **kwargs
         )
 
 
@@ -45,8 +48,9 @@ class Kingfisher(Piece):
     file_name = 'KAADD'
     asset_folder = 'avian'
 
-    def __init__(self, board, board_pos, side):
+    def __init__(self, board, board_pos, side, **kwargs):
         super().__init__(
             board, board_pos, side,
-            movement.RiderMovement(board, rot([(1, 0, 1), (1, 1, 1), (2, 0), (2, 2)]))
+            movement.RiderMovement(board, rot([(1, 0, 1), (1, 1, 1), (2, 0), (2, 2)])),
+            **kwargs
         )

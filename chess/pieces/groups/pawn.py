@@ -8,7 +8,7 @@ class Paladin(Piece):
     file_name = 'NmWcF'
     asset_folder = 'pawn'
 
-    def __init__(self, board, board_pos, side):
+    def __init__(self, board, board_pos, side, **kwargs):
         super().__init__(
             board, board_pos, side,
             movement.MultiMovement(
@@ -16,7 +16,8 @@ class Paladin(Piece):
                 move_or_capture=[movement.RiderMovement(board, rot([(1, 2, 1), (2, 1, 1)]))],
                 move=[movement.RiderMovement(board, rot([(1, 0, 1)]))],
                 capture=[movement.RiderMovement(board, rot([(1, 1, 1)]))]
-            )
+            ),
+            **kwargs
         )
 
 
@@ -25,7 +26,7 @@ class Guarddog(Piece):
     file_name = 'mfRcfBfsbbNN'
     asset_folder = 'pawn'
 
-    def __init__(self, board, board_pos, side):
+    def __init__(self, board, board_pos, side, **kwargs):
         super().__init__(
             board, board_pos, side,
             movement.MultiMovement(
@@ -33,7 +34,8 @@ class Guarddog(Piece):
                 move_or_capture=[movement.RiderMovement(board, symv([(1, 2), (-2, 1)]))],
                 move=[movement.RiderMovement(board, [(1, 0)])],
                 capture=[movement.RiderMovement(board, symv([(1, 1)]))]
-            )
+            ),
+            **kwargs
         )
 
 
@@ -42,14 +44,15 @@ class Stewardess(Piece):
     file_name = 'mRcB'
     asset_folder = 'pawn'
 
-    def __init__(self, board, board_pos, side):
+    def __init__(self, board, board_pos, side, **kwargs):
         super().__init__(
             board, board_pos, side,
             movement.MultiMovement(
                 board,
                 move=[movement.RiderMovement(board, rot([(1, 0)]))],
                 capture=[movement.RiderMovement(board, rot([(1, 1)]))]
-            )
+            ),
+            **kwargs
         )
 
 
@@ -58,7 +61,7 @@ class Dowager(Piece):
     file_name = 'mRcBffbsNN'
     asset_folder = 'pawn'
 
-    def __init__(self, board, board_pos, side):
+    def __init__(self, board, board_pos, side, **kwargs):
         super().__init__(
             board, board_pos, side,
             movement.MultiMovement(
@@ -66,5 +69,6 @@ class Dowager(Piece):
                 move_or_capture=[movement.RiderMovement(board, symv([(2, 1), (-1, 2)]))],
                 move=[movement.RiderMovement(board, rot([(1, 0)]))],
                 capture=[movement.RiderMovement(board, rot([(1, 1)]))]
-            )
+            ),
+            **kwargs
         )

@@ -8,7 +8,7 @@ class Howitzer(Piece):
     file_name = 'WssRmpR'
     asset_folder = 'cannon'
 
-    def __init__(self, board, board_pos, side):
+    def __init__(self, board, board_pos, side, **kwargs):
         super().__init__(
             board, board_pos, side,
             movement.MultiMovement(
@@ -19,7 +19,8 @@ class Howitzer(Piece):
                 ], move=[
                     movement.CannonRiderMovement(board, rot([(1, 0)]))
                 ]
-            )
+            ),
+            **kwargs
         )
 
 
@@ -28,7 +29,7 @@ class Mortar(Piece):
     file_name = 'WssRcpR'
     asset_folder = 'cannon'
 
-    def __init__(self, board, board_pos, side):
+    def __init__(self, board, board_pos, side, **kwargs):
         super().__init__(
             board, board_pos, side,
             movement.MultiMovement(
@@ -40,7 +41,8 @@ class Mortar(Piece):
                 capture=[
                     movement.CannonRiderMovement(board, rot([(1, 0)]))
                 ]
-            )
+            ),
+            **kwargs
         )
 
 
@@ -49,10 +51,11 @@ class Napoleon(Piece):
     file_name = 'fbNW'
     asset_folder = 'cannon'
 
-    def __init__(self, board, board_pos, side):
+    def __init__(self, board, board_pos, side, **kwargs):
         super().__init__(
             board, board_pos, side,
-            movement.RiderMovement(board, rot([(1, 0, 1)]) + sym([(2, 1, 1)]))
+            movement.RiderMovement(board, rot([(1, 0, 1)]) + sym([(2, 1, 1)])),
+            **kwargs
         )
 
 
@@ -62,14 +65,15 @@ class Carronade(Piece):
     asset_folder = 'cannon'
     colorbound = True
 
-    def __init__(self, board, board_pos, side):
+    def __init__(self, board, board_pos, side, **kwargs):
         super().__init__(
             board, board_pos, side,
             movement.MultiMovement(board, [
                 # movement.RiderMovement(board, rot([(1, 1, 1)])),
                 movement.SpaciousRiderMovement(board, rot([(1, 1)])),
                 movement.CannonRiderMovement(board, rot([(1, 1)]))
-            ])
+            ]),
+            **kwargs
         )
 
 
@@ -78,7 +82,7 @@ class Bertha(Piece):
     file_name = 'WssQpQ'
     asset_folder = 'cannon'
 
-    def __init__(self, board, board_pos, side):
+    def __init__(self, board, board_pos, side, **kwargs):
         super().__init__(
             board, board_pos, side,
             movement.MultiMovement(board, [
@@ -88,6 +92,7 @@ class Bertha(Piece):
                 movement.SpaciousRiderMovement(board, rot([(1, 1)])),
                 movement.CannonRiderMovement(board, rot([(1, 0)])),
                 movement.CannonRiderMovement(board, rot([(1, 1)]))
-            ])
+            ]),
+            **kwargs
         )
 

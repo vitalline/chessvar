@@ -8,10 +8,11 @@ class IvoryRook(Piece):
     file_name = 'vRsWsD'
     asset_folder = 'forward'
 
-    def __init__(self, board, board_pos, side):
+    def __init__(self, board, board_pos, side, **kwargs):
         super().__init__(
             board, board_pos, side,
-            movement.RiderMovement(board, rot2([(1, 0), (0, 1, 1), (0, 2, 1)]))
+            movement.RiderMovement(board, rot2([(1, 0), (0, 1, 1), (0, 2, 1)])),
+            **kwargs
         )
 
 
@@ -20,10 +21,11 @@ class Knishop(Piece):
     file_name = 'fhNbB'
     asset_folder = 'forward'
 
-    def __init__(self, board, board_pos, side):
+    def __init__(self, board, board_pos, side, **kwargs):
         super().__init__(
             board, board_pos, side,
-            movement.RiderMovement(board, symv([(1, 2, 1), (2, 1, 1), (-1, 1)]))
+            movement.RiderMovement(board, symv([(1, 2, 1), (2, 1, 1), (-1, 1)])),
+            **kwargs
         )
 
 
@@ -32,10 +34,11 @@ class Bishight(Piece):
     file_name = 'fBbhN'
     asset_folder = 'forward'
 
-    def __init__(self, board, board_pos, side):
+    def __init__(self, board, board_pos, side, **kwargs):
         super().__init__(
             board, board_pos, side,
-            movement.RiderMovement(board, symv([(-1, 2, 1), (-2, 1, 1), (1, 1)]))
+            movement.RiderMovement(board, symv([(-1, 2, 1), (-2, 1, 1), (1, 1)])),
+            **kwargs
         )
 
 
@@ -44,10 +47,11 @@ class Forequeen(Piece):
     file_name = 'fhQsQbhNK'
     asset_folder = 'forward'
 
-    def __init__(self, board, board_pos, side):
+    def __init__(self, board, board_pos, side, **kwargs):
         super().__init__(
             board, board_pos, side,
             movement.RiderMovement(
                 board, symv([(1, 0), (1, 1), (0, 1), (-1, 0, 1), (-1, 1, 1), (-1, 2, 1), (-2, 1, 1)])
-            )
+            ),
+            **kwargs
         )

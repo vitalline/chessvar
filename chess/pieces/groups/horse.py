@@ -11,7 +11,7 @@ class Naysayer(Piece):
     file_name = 'nAAnH'
     asset_folder = 'horse'
 
-    def __init__(self, board, board_pos, side):
+    def __init__(self, board, board_pos, side, **kwargs):
         movements = []
         for i, j in rot([(1, 1)]):
             rider_movements = []
@@ -20,7 +20,8 @@ class Naysayer(Piece):
             movements.append(movement.BentMovement(board, rider_movements))
         super().__init__(
             board, board_pos, side,
-            movement.MultiMovement(board, [movement.RiderMovement(board, rot([(1, 0, 3, 3)]))] + movements)
+            movement.MultiMovement(board, [movement.RiderMovement(board, rot([(1, 0, 3, 3)]))] + movements),
+            **kwargs
         )
 
 
@@ -29,7 +30,7 @@ class HorseRdr(Piece):
     file_name = 'afs(afzafz)W'
     asset_folder = 'horse'
 
-    def __init__(self, board, board_pos, side):
+    def __init__(self, board, board_pos, side, **kwargs):
         movements = []
         for i, j in rot([(1, 0)]):
             for k in (1, -1):
@@ -40,7 +41,8 @@ class HorseRdr(Piece):
                     movements.append(movement.BentMovement(board, deepcopy(rider_movements), m * 2 + 1))
         super().__init__(
             board, board_pos, side,
-            movement.MultiMovement(board, movements)
+            movement.MultiMovement(board, movements),
+            **kwargs
         )
 
 
@@ -49,7 +51,7 @@ class Tapir(Piece):
     file_name = 'afsWnA'
     asset_folder = 'horse'
 
-    def __init__(self, board, board_pos, side):
+    def __init__(self, board, board_pos, side, **kwargs):
         super().__init__(
             board, board_pos, side,
             movement.MultiMovement(board, [movement.RiderMovement(board, rot([(1, 1, 2, 2)]))] + [
@@ -57,7 +59,8 @@ class Tapir(Piece):
                     movement.RiderMovement(board, [(i, j, 1)]),
                     movement.RiderMovement(board, [(i or k, j or k, 1)])
                 ]) for i, j in rot([(1, 0)]) for k in (1, -1)
-            ])
+            ]),
+            **kwargs
         )
 
 
@@ -66,7 +69,7 @@ class Marauder(Piece):
     file_name = 'Wafs(afz)W'
     asset_folder = 'horse'
 
-    def __init__(self, board, board_pos, side):
+    def __init__(self, board, board_pos, side, **kwargs):
         movements = []
         for i, j in rot([(1, 0)]):
             for k in (1, -1):
@@ -77,5 +80,6 @@ class Marauder(Piece):
                 movements.append(movement.BentMovement(board, rider_movements))
         super().__init__(
             board, board_pos, side,
-            movement.MultiMovement(board, movements)
+            movement.MultiMovement(board, movements),
+            **kwargs
         )
