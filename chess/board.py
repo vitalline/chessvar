@@ -457,6 +457,7 @@ class Board(Window):
         # set up pieces on the board
         loaded = False
         if len(argv) > 1 and isfile(argv[1]):
+            # noinspection PyBroadException
             try:
                 self.load_board(argv[1])
                 loaded = True
@@ -677,6 +678,7 @@ class Board(Window):
             'flip_mode': self.flip_mode,
             'color_index': self.color_index,
             'color_scheme': {k: list(v) if isinstance(v, tuple) else v for k, v in colors[self.color_index].items()},
+            'selection': toa(self.selected_square) if self.selected_square else None,
             'set_blocklist': self.board_config['block_ids'],
             'chaos_blocklist': self.board_config['block_ids_chaos'],
             'set_ids': {side.value: piece_set_id for side, piece_set_id in self.piece_set_ids.items()},
@@ -737,18 +739,18 @@ class Board(Window):
         if (self.board_width, self.board_height) != tuple(data['board_size']):
             print(
                 f"Warning: Board size does not match (was {tuple(data['board_size'])}, "
-                f"is {(self.board_width, self.board_height)})"
+                f"but is {(self.board_width, self.board_height)})"
             )
 
         self.update_sprites(*data['window_size'], data['flip_mode'])
         if self.square_size != data['square_size']:
-            print(f"Warning: Square size does not match (was {data['square_size']}, is {self.square_size})")
+            print(f"Warning: Square size does not match (was {data['square_size']}, but is {self.square_size})")
 
         self.color_index = data['color_index']
         self.color_scheme = colors[self.color_index]
         for k, v in self.color_scheme.items():
             if v != (tuple(data['color_scheme'][k]) if isinstance(v, tuple) else data['color_scheme'][k]):
-                print(f"Warning: Color scheme does not match ({k} was {tuple(data['color_scheme'][k])}, is {v})")
+                print(f"Warning: Color scheme does not match ({k} was {tuple(data['color_scheme'][k])}, but is {v})")
 
         self.board_config['block_ids'] = data['set_blocklist']
         self.board_config['block_ids_chaos'] = data['chaos_blocklist']
@@ -760,8 +762,11 @@ class Board(Window):
         self.edit_mode = data['edit']
 
         self.set_seed = data['set_seed']
+        self.set_rng = Random(self.set_seed)
         self.roll_seed = data['roll_seed']
+        self.roll_rng = Random(self.roll_seed)
         self.chaos_seed = data['chaos_seed']
+        self.chaos_rng = Random(self.chaos_seed)
         self.board_config['update_roll_seed'] = data['roll_update']
 
         self.piece_set_ids = {Side(int(k)): v for k, v in data['set_ids'].items()}
@@ -769,11 +774,11 @@ class Board(Window):
         save_piece_sets = {Side(int(v)): [load_type(t) for t in d] for v, d in data['sets'].items()}
         update_sets = False
         for side in self.piece_sets:
-            for i, pair in enumerate(zip(save_piece_sets, self.piece_sets)):
+            for i, pair in enumerate(zip(save_piece_sets[side], self.piece_sets[side])):
                 if pair[0] != pair[1]:
                     print(
                         f"Warning: Piece set does not match ({side}: {toa(((0 if side == Side.WHITE else 7), i))} "
-                        f"was {pair[0].name}, is {pair[1].name})"
+                        f"was {pair[0].name}, but is {pair[1].name})"
                     )
                     update_sets = True
         if update_sets:
@@ -805,7 +810,7 @@ class Board(Window):
         }
 
         self.chain_start = load_move(data['chain_start'], self)
-        if self.move_history[-1].matches(self.chain_start):
+        if self.move_history and self.move_history[-1].matches(self.chain_start):
             self.chain_start = self.move_history[-1]
         cm = data['chain_moves']
         self.chain_moves = {
@@ -835,15 +840,47 @@ class Board(Window):
             self.get_piece(fra(data['promotion'])) if isinstance(data['promotion'], str) else data['promotion']
         )
 
-        last_move = self.move_history[-1]
-        last_move.piece.movement.update(last_move, last_move.piece)
+        if self.move_history:
+            last_move = self.move_history[-1]
+            last_move.piece.movement.update(last_move, last_move.piece)
 
         self.load_pieces()
         self.update_colors()
+
+        self.log(f"[Ply {self.ply_count}] Info: Game loaded from {path}")
+        if self.should_hide_pieces == 1:
+            self.log(f"[Ply {self.ply_count}] Info: Pieces hidden")
+        if self.should_hide_pieces == 2:
+            self.log(f"[Ply {self.ply_count}] Info: Penultima mode activated!")
+        if self.royal_piece_mode == 1:
+            self.log(f"[Ply {self.ply_count}] Info: Using royal check rule (threaten any royal piece)")
+        if self.royal_piece_mode == 2:
+            self.log(f"[Ply {self.ply_count}] Info: Using quasi-royal check rule (threaten last royal piece)")
+        some = 'regular' if not self.chaos_mode else 'chaotic'
+        same = self.piece_set_ids[Side.WHITE] == self.piece_set_ids[Side.BLACK]
+        if self.chaos_mode in {3, 4}:
+            some = f"extremely {some}"
+        if self.chaos_mode in {2, 4}:
+            some = f"asymmetrical {some}"
+        if same:
+            some = f"a{'' if self.chaos_mode in {0, 1} else 'n'} {some}"
+        sets = "set" if same else "sets"
+        self.log(f"[Ply {self.ply_count}] Info: Resuming saved game (with {some} piece {sets})")
+        self.log(
+            f"[Ply {self.ply_count}] Game: "
+            f"{self.piece_set_names[Side.WHITE] if not self.should_hide_pieces else '???'} vs. "
+            f"{self.piece_set_names[Side.BLACK] if not self.should_hide_pieces else '???'}"
+        )
+        self.log(f"[Ply {self.ply_count}] Mode: {'EDIT' if self.edit_mode else 'PLAY'}")
+        self.log(f"[Ply {self.ply_count}] {self.turn_side}'s turn")
+
         if self.promotion_piece:
             self.start_promotion(self.promotion_piece, self.promotions[self.promotion_piece.side])
         else:
-            self.update_status()
+            if not self.edit_mode:
+                self.update_status()
+            if data['selection']:
+                self.select_piece(fra(data['selection']))
 
     def empty_board(self) -> None:
         self.deselect_piece()
@@ -1031,6 +1068,8 @@ class Board(Window):
             chaotic = f"extremely {chaotic}"
         if mode in {2, 4}:
             chaotic = f"asymmetrical {chaotic}"
+        if same:
+            chaotic = f"a{'' if mode == 1 else 'n'} {chaotic}"
         sets = "set" if same else "sets"
         self.log(f"[Ply {self.ply_count}] Info: Starting new game (with {chaotic} piece {sets})")
         self.chaos_mode = mode
@@ -2503,11 +2542,11 @@ class Board(Window):
                 blocked_ids = set(self.piece_set_ids.values()).union(self.board_config['block_ids'])
                 piece_set_ids = list(i for i in range(len(piece_groups)) if i not in blocked_ids)
                 if modifiers & key.MOD_ACCEL:  # Randomize piece sets (same for both sides)
-                    self.log(f"[Ply {self.ply_count}] Info: Starting new game (with a preset army)")
+                    self.log(f"[Ply {self.ply_count}] Info: Starting new game (with a random piece set)")
                     piece_set_ids = self.set_rng.sample(piece_set_ids, k=1)
                     self.piece_set_ids = {side: piece_set_ids[0] for side in self.piece_set_ids}
                 else:  # Randomize piece sets (different for each side)
-                    self.log(f"[Ply {self.ply_count}] Info: Starting new game (with preset armies)")
+                    self.log(f"[Ply {self.ply_count}] Info: Starting new game (with random piece sets)")
                     piece_set_ids = self.set_rng.sample(piece_set_ids, k=len(self.piece_set_ids))
                     self.piece_set_ids = {side: set_id for side, set_id in zip(self.piece_set_ids, piece_set_ids)}
                 self.chaos_mode = 0
