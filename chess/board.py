@@ -2430,7 +2430,7 @@ class Board(Window):
                 self.color_index = 0
             elif modifiers & key.MOD_SHIFT:  # Graphics shift
                 self.color_index = (self.color_index + (-1 if modifiers & key.MOD_ACCEL else 1)) % len(colors)
-            if self.color_scheme["scheme_type"].startswith("cherub") and self.is_trickster_mode():
+            if self.color_scheme["scheme_type"] == "cherub" and self.is_trickster_mode():
                 self.trickster_color_index = 0
                 self.reset_trickster_mode()
             else:
@@ -2489,7 +2489,7 @@ class Board(Window):
                 self.select_piece(selected_square)
             self.show_moves()
         if symbol == key.T and modifiers & key.MOD_ACCEL:  # Trickster mode
-            if self.color_scheme["scheme_type"].startswith("cherub"):
+            if self.color_scheme["scheme_type"] == "cherub":
                 self.trickster_color_index = (
                     base_rng.randrange(len(trickster_colors)) + 1 if self.is_trickster_mode(False) else 0
                 )

@@ -183,6 +183,7 @@ for i in range(len(colors)):
     if colors[i]["scheme_type"].startswith("cherub"):
         # define the cherub piece colors (white pieces are red in cherub1 and green in cherub2)
         scheme_id = int(colors[i]["scheme_type"][-1])
+        colors[i]["scheme_type"] = "cherub"
         colors[i]["colored_pieces"] = True
         colors[i]["white_piece_color"] = (255, 0, 0) if scheme_id == 1 else (0, 255, 0)
         colors[i]["black_piece_color"] = (255, 0, 0) if scheme_id == 2 else (0, 255, 0)
