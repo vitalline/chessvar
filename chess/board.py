@@ -562,7 +562,7 @@ class Board(Window):
     def reset_board(self, update: bool = False) -> None:
         self.deselect_piece()
         self.clear_en_passant()
-        self.clear_auto_captures()
+        self.clear_auto_capture_markers()
 
         self.turn_side = Side.WHITE
         self.game_over = False
@@ -657,13 +657,13 @@ class Board(Window):
             self.pieces[row][col].scale = self.square_size / self.pieces[row][col].texture.width
             self.piece_sprite_list.append(self.pieces[row][col])
 
-        self.load_all_moves()
+        self.load_moves()
         self.show_moves()
 
     def empty_board(self) -> None:
         self.deselect_piece()
         self.clear_en_passant()
-        self.clear_auto_captures()
+        self.clear_auto_capture_markers()
 
         self.turn_side = Side.WHITE
         self.game_over = False
@@ -707,7 +707,7 @@ class Board(Window):
             self.pieces[row][col].scale = self.square_size / self.pieces[row][col].texture.width
             self.piece_sprite_list.append(self.pieces[row][col])
 
-        self.load_all_moves()
+        self.load_moves()
         self.show_moves()
 
     def reset_promotions(self, piece_sets: dict[Side, list[Type[abc.Piece]]] | None = None) -> None:
@@ -808,7 +808,7 @@ class Board(Window):
                     piece_set[pos] = get_set(side, random_set_ids[j])[pos]
         return piece_set, get_set_name(piece_set)
 
-    def get_shuffle_set(self, side: Side, asymmetrical: bool = False) -> tuple[list[Type[abc.Piece]], str]:
+    def get_extremely_random_set(self, side: Side, asymmetrical: bool = False) -> tuple[list[Type[abc.Piece]], str]:
         blocked_ids = set(self.piece_set_ids.values()).union(self.board_config['block_ids_chaos'])
         piece_set_ids = list(i for i in range(len(piece_groups)) if i not in blocked_ids)
         piece_pos_ids = [i for i in range(4)] + [7]
@@ -838,7 +838,7 @@ class Board(Window):
         if self.chaos_mode in {1, 2}:
             return self.get_random_set(side, asymmetrical)
         if self.chaos_mode in {3, 4}:
-            return self.get_shuffle_set(side, asymmetrical)
+            return self.get_extremely_random_set(side, asymmetrical)
 
     def load_chaos_sets(self, mode: int, same: bool) -> None:
         chaotic = "chaotic"
@@ -888,7 +888,7 @@ class Board(Window):
         if self.ply_count == 1:
             for side in self.auto_ranged_pieces:
                 if self.auto_ranged_pieces[side] and not self.auto_capture_markers[side]:
-                    self.load_auto_captures(side)
+                    self.load_auto_capture_markers(side)
 
     def load_check(self):
         self.load_pieces()
@@ -917,8 +917,8 @@ class Board(Window):
                     if last_move.promotion and not last_move.is_edit:
                         new_piece = last_move.promotion(self, last_move.pos_to, last_move.piece.side)
                         last_move.piece = new_piece
-                        self.update_promotion_auto_capture(last_move)
-                    self.update_auto_ranged_pieces(last_move, self.turn_side)
+                        self.update_promotion_auto_captures(last_move)
+                    self.update_auto_captures(last_move, self.turn_side)
                     while last_move:
                         if last_move.pos_to == royal.board_pos or last_move.captured_piece == royal:
                             self.check_side = self.turn_side
@@ -934,7 +934,7 @@ class Board(Window):
             if self.check_side:
                 break
 
-    def load_all_moves(
+    def load_moves(
             self,
             force_reload: bool = True,
             moves_for: Side | None = None,
@@ -992,13 +992,13 @@ class Board(Window):
                 for move in list(piece.moves()) if chain_moves is None else chain_moves:
                     self.update_move(move)
                     self.update_auto_capture_markers(move)
-                    self.update_auto_ranged_pieces(move, turn_side.opponent())
+                    self.update_auto_captures(move, turn_side.opponent())
                     self.move(move)
                     if move.promotion:
                         self.promotion_piece = True
                         self.replace(move.piece, move.promotion)
                         self.update_auto_capture_markers(move)
-                        self.update_promotion_auto_capture(move)
+                        self.update_promotion_auto_captures(move)
                         self.promotion_piece = None
                     move_chain = [move]
                     chained_move = move.chained_move
@@ -1009,7 +1009,7 @@ class Board(Window):
                             self.promotion_piece = True
                             self.replace(chained_move.piece, chained_move.promotion)
                             self.update_auto_capture_markers(chained_move)
-                            self.update_promotion_auto_capture(chained_move)
+                            self.update_promotion_auto_captures(chained_move)
                             self.promotion_piece = None
                         else:
                             self.update_auto_capture_markers(chained_move)
@@ -1075,7 +1075,7 @@ class Board(Window):
             side = self.turn_side
         display_moves = copy(self.display_moves)
         display_theoretical_moves = copy(self.display_theoretical_moves)
-        self.load_all_moves(False, moves_for=side)
+        self.load_moves(False, moves_for=side)
         self.display_moves = display_moves
         self.display_theoretical_moves = display_theoretical_moves
         if side == Side.ANY:
@@ -1240,12 +1240,7 @@ class Board(Window):
         self.en_passant_target = None
         self.en_passant_markers = set()
 
-    def update_promotion_auto_capture(self, move: Move) -> None:
-        piece = self.get_piece(move.pos_to)
-        if isinstance(piece.movement, movement.RangedAutoCaptureRiderMovement):
-            piece.movement.generate_captures(move, piece)
-
-    def update_auto_ranged_pieces(self, move: Move, side: Side) -> None:
+    def update_auto_captures(self, move: Move, side: Side) -> None:
         if move.is_edit:
             return
         while move.chained_move:
@@ -1264,13 +1259,18 @@ class Board(Window):
                 )
                 move.chained_move = chained_move
 
-    def load_auto_captures(self, side: Side = Side.ANY) -> None:
+    def update_promotion_auto_captures(self, move: Move) -> None:
+        piece = self.get_piece(move.pos_to)
+        if isinstance(piece.movement, movement.RangedAutoCaptureRiderMovement):
+            piece.movement.generate_captures(move, piece)
+
+    def load_auto_capture_markers(self, side: Side = Side.ANY) -> None:
         for side in self.auto_ranged_pieces if side is Side.ANY else (side,):
             for piece in self.auto_ranged_pieces[side]:
                 if isinstance(piece.movement, movement.AutoRangedAutoCaptureRiderMovement):
                     piece.movement.mark(piece.board_pos, piece)
 
-    def clear_auto_captures(self, side: Side = Side.ANY) -> None:
+    def clear_auto_capture_markers(self, side: Side = Side.ANY) -> None:
         for side in self.auto_capture_markers if side is Side.ANY else (side,):
             self.auto_capture_markers[side].clear()
 
@@ -1491,7 +1491,7 @@ class Board(Window):
             self.advance_turn(is_undo=True)
         else:
             self.chain_start = None
-            self.load_all_moves()
+            self.load_moves()
         self.chain_start = None
         self.future_move_history = future_move_history
         if self.future_move_history:
@@ -1524,7 +1524,7 @@ class Board(Window):
                     hide_piece = False if hide_piece is False else None
                     self.replace(self.promotion_piece, future.promotion, is_hidden=hide_piece)
                     self.update_auto_capture_markers(self.move_history[-1])
-                    self.update_promotion_auto_capture(self.move_history[-1])
+                    self.update_promotion_auto_captures(self.move_history[-1])
                     self.end_promotion()
                 else:
                     return
@@ -1577,7 +1577,7 @@ class Board(Window):
             if last_move.pos_from is not None:
                 self.update_move(last_move)
                 self.update_auto_capture_markers(last_move)
-                self.update_auto_ranged_pieces(last_move, self.turn_side.opponent())
+                self.update_auto_captures(last_move, self.turn_side.opponent())
                 side = self.get_side(last_move.pos_from)
                 if not side:
                     side = Side.WHITE if last_move.pos_from[0] < self.board_height / 2 else Side.BLACK
@@ -1599,7 +1599,7 @@ class Board(Window):
                         hide_piece = False if hide_piece is False else None
                         self.replace(chained_move.piece, chained_move.promotion, is_hidden=hide_piece)
                         self.update_auto_capture_markers(chained_move)
-                        self.update_promotion_auto_capture(chained_move)
+                        self.update_promotion_auto_captures(chained_move)
                         self.promotion_piece = None
                 last_chain_move = chained_move
                 chained_move = chained_move.chained_move
@@ -1624,7 +1624,7 @@ class Board(Window):
                 self.compare_history()
             self.advance_turn()
         elif last_chain_move.chained_move is Unset:
-            self.load_all_moves()
+            self.load_moves()
             self.select_piece(last_chain_move.pos_to)
             self.show_moves()
 
@@ -1652,7 +1652,7 @@ class Board(Window):
             # if the board was edited, update roll history because probabilistic moves would need to be recalculated
             self.update_roll_history()
         self.turn_side = Side.WHITE if self.ply_count % 2 == 1 else Side.BLACK
-        self.load_all_moves()  # this updates the check status as well
+        self.load_moves()  # this updates the check status as well
         self.show_moves()
         if not sum(self.moves.get(self.turn_side, {}).values(), []):
             self.game_over = True
@@ -2042,7 +2042,7 @@ class Board(Window):
                     hide_piece = False if hide_piece is False else None
                     self.replace(self.promotion_piece, self.promotion_area[pos], is_hidden=hide_piece)
                     self.update_auto_capture_markers(self.move_history[-1])
-                    self.update_promotion_auto_capture(self.move_history[-1])
+                    self.update_promotion_auto_captures(self.move_history[-1])
                     self.end_promotion()
                     chained_move = self.move_history[-1]
                     while chained_move:
@@ -2226,7 +2226,7 @@ class Board(Window):
                 ):
                     move.chained_move = Unset  # do not chain moves because we are selecting chained move manually
                 self.update_auto_capture_markers(move)
-                self.update_auto_ranged_pieces(move, self.turn_side.opponent())
+                self.update_auto_captures(move, self.turn_side.opponent())
                 chained_move = move
                 while chained_move:
                     chained_move.piece.move(chained_move)
@@ -2243,7 +2243,7 @@ class Board(Window):
                         last_move = last_move.chained_move
                     last_move.chained_move = move
                 if move.chained_move is Unset and not self.promotion_piece:
-                    self.load_all_moves()
+                    self.load_moves()
                     self.select_piece(move.pos_to)
                 else:
                     self.chain_start = None
@@ -2534,11 +2534,11 @@ class Board(Window):
         if symbol == key.K:  # Move markers
             selected_square = self.selected_square
             if modifiers & key.MOD_ACCEL and modifiers & key.MOD_SHIFT:  # Default
-                self.load_all_moves(False)
+                self.load_moves(False)
             elif modifiers & key.MOD_ACCEL:  # Valid moves
-                self.load_all_moves(False, Side.ANY, Side.NONE)
+                self.load_moves(False, Side.ANY, Side.NONE)
             elif modifiers & key.MOD_SHIFT:  # Theoretical moves
-                self.load_all_moves(False, Side.NONE, Side.ANY)
+                self.load_moves(False, Side.NONE, Side.ANY)
             if selected_square:
                 self.select_piece(selected_square)
             self.show_moves()
@@ -2586,7 +2586,7 @@ class Board(Window):
                 if choices:
                     move = base_rng.choice(choices)
                     self.update_auto_capture_markers(move)
-                    self.update_auto_ranged_pieces(move, self.turn_side.opponent())
+                    self.update_auto_captures(move, self.turn_side.opponent())
                     chained_move = move
                     while chained_move:
                         chained_move.piece.move(chained_move)
@@ -2603,7 +2603,7 @@ class Board(Window):
                             last_move = last_move.chained_move
                         last_move.chained_move = move
                     if move.chained_move is Unset and not self.promotion_piece:
-                        self.load_all_moves()
+                        self.load_moves()
                         self.select_piece(move.pos_to)
                     else:
                         self.chain_start = None
