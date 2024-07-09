@@ -7,14 +7,13 @@ from typing import TYPE_CHECKING, Type
 
 from arcade import Color, Sprite, load_texture
 
-from chess.movement.move import Move
 from chess.movement.util import AnyDirection, Position
 from chess.util import Default
 
 if TYPE_CHECKING:
     from chess.board import Board
-
-from chess.movement.movement import BaseMovement
+    from chess.movement.move import Move
+    from chess.movement.movement import BaseMovement
 
 
 class Side(Enum):
@@ -88,7 +87,7 @@ class Piece(Sprite):
         self.board = board
         self.board_pos = board_pos
         self.side = side
-        self.movement = movement if movement is not None else BaseMovement(board)
+        self.movement = movement
         self.flipped_horizontally = False
         self.flipped_vertically = False
         self.is_hidden = None
@@ -211,8 +210,12 @@ class PromotablePiece(Piece):
                 return
             if len(self.promotions) == 1:
                 self.board.promotion_piece = True
-                move.set(promotion=self.promotions[0])
-                self.board.replace(self, self.promotions[0])
+                move.set(promotion=self.promotions[0](
+                    self.board, self.board_pos, self.side,
+                    promotions=self.board.promotions.get(self.side),
+                    promotion_squares=self.board.promotion_squares.get(self.side),
+                ))
+                self.board.replace(self, move.promotion)
                 self.board.update_promotion_auto_captures(move)
                 self.board.promotion_piece = promotion_piece
                 return
@@ -222,7 +225,11 @@ class PromotablePiece(Piece):
         for move in super().moves(theoretical):
             if self.promotions and move.pos_to in self.promotion_squares:
                 for promotion in self.promotions:
-                    yield copy(move).set(promotion=promotion)
+                    yield copy(move).set(promotion=promotion(
+                        self.board, self.board_pos, self.side,
+                        promotions=self.board.promotions.get(self.side),
+                        promotion_squares=self.board.promotion_squares.get(self.side),
+                    ))
             else:
                 yield move
 

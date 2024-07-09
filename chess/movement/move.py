@@ -19,7 +19,7 @@ class Move(object):
             piece: Piece | None = None,
             captured_piece: Piece | None = None,
             swapped_piece: Piece | None = None,
-            promotion: Type[Piece] | frozenset | None = None,
+            promotion: Piece | frozenset | None = None,
             chained_move: Move | frozenset | None = None,
             is_edit: bool = False
     ):
@@ -41,7 +41,7 @@ class Move(object):
             piece: Piece | None = None,
             captured_piece: Piece | None = None,
             swapped_piece: Piece | None = None,
-            promotion: Type[Piece] | frozenset | None = None,
+            promotion: Piece | frozenset | None = None,
             chained_move: Move | frozenset | None = None,
             is_edit: bool | None = None
     ) -> Move:
@@ -71,7 +71,8 @@ class Move(object):
             and type(self.piece) is type(other.piece)
             and type(self.captured_piece) is type(other.captured_piece)
             and type(self.swapped_piece) is type(other.swapped_piece)
-            and self.promotion == other.promotion
+            and type(self.promotion) is type(other.promotion)
+            and (not self.promotion or self.promotion.is_hidden == other.promotion.is_hidden)
             and (
                 self.chained_move.matches(other.chained_move)
                 if isinstance(self.chained_move, Move) else
@@ -101,7 +102,7 @@ class Move(object):
             self.piece.__copy__() if isinstance(self.piece, Piece) else self.piece,
             self.captured_piece.__copy__() if isinstance(self.captured_piece, Piece) else self.captured_piece,
             self.swapped_piece.__copy__() if isinstance(self.swapped_piece, Piece) else self.swapped_piece,
-            self.promotion,
+            self.promotion.__copy__() if isinstance(self.promotion, Piece) else self.promotion,
             self.chained_move.__deepcopy__(memo) if isinstance(self.chained_move, Move) else self.chained_move,
             self.is_edit
         )
@@ -126,19 +127,23 @@ class Move(object):
         else:
             string = "does something very mysterious"
         if self.piece:
+            side = self.piece.side
             if self.piece.is_empty() and not (self.promotion and not moved):
-                string = f"{self.piece.side} {string}"
+                side = board.get_promotion_side(self.piece)
+                string = f"{side} {string}"
             elif self.piece.is_empty() and not board.should_hide_pieces:
-                string = f"{self.piece.side} {self.promotion.name} {string}"
+                side = self.promotion.side
+                string = f"{side} {self.promotion.name} {string}"
             elif self.piece.is_empty():
-                if board.get_piece(self.pos_to).texture_name == self.promotion.file_name:
-                    string = f"{self.piece.side} {self.promotion.name} {string}"
+                side = self.promotion.side
+                if not self.promotion.is_hidden:
+                    string = f"{side} {self.promotion.name} {string}"
                 else:
-                    string = f"{self.piece.side} ??? {string}"
+                    string = f"{side} ??? {string}"
             elif not self.piece.is_hidden:
-                string = f"{self.piece.side} {self.piece.name} {string}"
+                string = f"{side} {self.piece.name} {string}"
             else:
-                string = f"{self.piece.side} ??? {string}"
+                string = f"{side} ??? {string}"
         else:
             string = f"Piece {string}"
         if self.captured_piece:
@@ -157,7 +162,7 @@ class Move(object):
             if self.promotion is Unset:
                 string += f", tries to promote"
             elif self.promotion:
-                if board.should_hide_pieces:
+                if self.promotion.is_hidden:
                     string += ", promotes to ???"
                 else:
                     string += f", promotes to {self.promotion.name}"
