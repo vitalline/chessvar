@@ -685,7 +685,7 @@ class Board(Window):
             'sets': {side.value: [save_type(t) for t in piece_set] for side, piece_set in self.piece_sets.items()},
             'pieces': {toa(p.board_pos): save_piece(p) for pieces in self.movable_pieces.values() for p in pieces},
             'moves': [save_move(m) for m in self.move_history],
-            'future': [save_move(m) for m in self.future_move_history],
+            'future': [save_move(m) for m in self.future_move_history[::-1]],
             'rolls': {n: {toa(pos): d[pos] for pos in sorted(d)} for n, d in enumerate(self.roll_history) if d},
             'roll_piece_history': {
                 n: {toa(p[1]): save_type(p[0]) for p in sorted(d, key=lambda k: k[1])}
@@ -800,7 +800,7 @@ class Board(Window):
         self.ply_count = data['ply']
         self.turn_side = Side(data['turn'])
         self.move_history = [load_move(d, self) for d in data['moves']]
-        self.future_move_history = [load_move(d, self) for d in data['future']]
+        self.future_move_history = [load_move(d, self) for d in data['future'][::-1]]
 
         rolls = data['rolls']
         self.roll_history = [
