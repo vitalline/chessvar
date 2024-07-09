@@ -5,7 +5,8 @@ RMB, Backspace: deselect piece
 Tab: select next piece or square
 F11: toggle full screen
 Escape: exit application
-Ctrl + S: save game state
+Ctrl + S: save game state (compact)
+Ctrl + Shift + S: save game state (readable)
 Ctrl + R: start game with current armies
 Shift + R: start game with new random armies (different for each player)
 Ctrl + Shift + R: start game with a new random army (same for both players)

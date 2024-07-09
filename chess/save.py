@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-import importlib
+from importlib import import_module
 from random import Random
 from typing import TYPE_CHECKING, Type
 
@@ -32,7 +32,7 @@ def load_type(data: dict | str | None) -> Type[abc.Piece] | frozenset | None:
         return None
     if data == UNSET_STRING:
         return Unset
-    return getattr(importlib.import_module(f"chess.pieces.groups.{data['module']}"), data['class'])
+    return getattr(import_module(f"chess.pieces.groups.{data['module']}"), data['class'])
 
 
 def save_piece(piece: abc.Piece | None) -> dict | None:
@@ -40,7 +40,7 @@ def save_piece(piece: abc.Piece | None) -> dict | None:
         return None
     return {k: v for k, v in {
         **save_type(type(piece)),
-        'pos': toa(piece.board_pos),
+        'pos': toa(piece.board_pos) if piece.board_pos else None,
         'side': piece.side.value,
         'moves': piece.movement.total_moves,
     }.items() if v}
@@ -49,10 +49,10 @@ def save_piece(piece: abc.Piece | None) -> dict | None:
 def load_piece(data: dict | None, board: Board) -> abc.Piece | None:
     if data is None:
         return None
-    side = abc.Side(data['side'])
+    side = abc.Side(data.get('side', 0))
     piece = load_type(data)(
         board=board,
-        board_pos=fra(data['pos']),  # type: ignore
+        board_pos=fra(data['pos']) if 'pos' in data else None,  # type: ignore
         side=side,
         promotions=board.promotions.get(side, None),
         promotion_squares=board.promotion_squares.get(side, None),
@@ -89,9 +89,7 @@ def load_move(data: dict | str | None, board: Board) -> Move | frozenset | None:
     return Move(
         pos_from=fra(data['from']) if 'from' in data else None,  # type: ignore
         pos_to=fra(data['to']) if 'to' in data else None,  # type: ignore
-        movement_type=getattr(
-            importlib.import_module('chess.movement.movement'), data['type']
-        ) if 'type' in data else None,
+        movement_type=getattr(import_module('chess.movement.movement'), data['type']) if 'type' in data else None,
         piece=load_piece(data.get('piece', None), board),
         captured_piece=load_piece(data.get('captured', None), board),
         swapped_piece=load_piece(data.get('swapped', None), board),

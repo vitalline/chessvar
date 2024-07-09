@@ -670,7 +670,7 @@ class Board(Window):
         self.load_moves()
         self.show_moves()
 
-    def save_board(self) -> None:
+    def save_board(self, indent: int = None) -> None:
         data = {
             'board_size': [self.board_width, self.board_height],
             'window_size': [self.width, self.height],
@@ -719,7 +719,10 @@ class Board(Window):
             'chaos_state': save_rng(self.chaos_rng),
         }
         with open(get_filename('save', 'json'), 'w') as file:
-            dump(data, file, indent=2)
+            if indent is None:
+                dump(data, file, separators=(',', ':'))
+            else:
+                dump(data, file, indent=indent)
 
     def load_board(self, path: str) -> None:
         self.deselect_piece()
@@ -749,8 +752,11 @@ class Board(Window):
         self.color_index = data['color_index']
         self.color_scheme = colors[self.color_index]
         for k, v in self.color_scheme.items():
-            if v != (tuple(data['color_scheme'][k]) if isinstance(v, tuple) else data['color_scheme'][k]):
-                print(f"Warning: Color scheme does not match ({k} was {tuple(data['color_scheme'][k])}, but is {v})")
+            old = (tuple(data['color_scheme'][k]) if isinstance(v, tuple) else data['color_scheme'][k])
+            if v != old:
+                print(f"Warning: Color scheme does not match ({k} was {old}, but is {v})")
+                self.color_scheme[k] = old  # first time when we might have enough information to fully restore old data
+                # in all cases before we had to pick one or the other, but here we can try to reload the save faithfully
 
         self.board_config['block_ids'] = data['set_blocklist']
         self.board_config['block_ids_chaos'] = data['chaos_blocklist']
@@ -776,6 +782,8 @@ class Board(Window):
         for side in self.piece_sets:
             for i, pair in enumerate(zip(save_piece_sets[side], self.piece_sets[side])):
                 if pair[0] != pair[1]:
+                    # this can mean a few things, namely the RNG implementation changing or new sets/pieces being added.
+                    # either way, we should at least try to load the old pieces defined in the save to recreate the game
                     print(
                         f"Warning: Piece set does not match ({side}: {toa(((0 if side == Side.WHITE else 7), i))} "
                         f"was {pair[0].name}, but is {pair[1].name})"
@@ -872,7 +880,7 @@ class Board(Window):
             f"{self.piece_set_names[Side.BLACK] if not self.should_hide_pieces else '???'}"
         )
         self.log(f"[Ply {self.ply_count}] Mode: {'EDIT' if self.edit_mode else 'PLAY'}")
-        self.log(f"[Ply {self.ply_count}] {self.turn_side}'s turn")
+        self.log(f"[Ply {self.ply_count}] Info: {self.turn_side}'s turn")
 
         if self.promotion_piece:
             self.start_promotion(self.promotion_piece, self.promotions[self.promotion_piece.side])
@@ -2535,8 +2543,8 @@ class Board(Window):
                         return
         if self.held_buttons:
             return
-        if symbol == key.S:  # Save
-            self.save_board()
+        if symbol == key.S and modifiers & key.MOD_ACCEL:  # Save
+            self.save_board(2 if modifiers & key.MOD_SHIFT else None)
         if symbol == key.R:  # Restart
             if modifiers & key.MOD_SHIFT:  # Randomize piece sets
                 blocked_ids = set(self.piece_set_ids.values()).union(self.board_config['block_ids'])

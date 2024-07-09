@@ -119,4 +119,4 @@ def to_alpha(pos: Position | None) -> str:
 
 
 def from_alpha(pos: str) -> Position | None:
-    return None if str == UNKNOWN_COORDINATE_STRING else int(pos[1:]) - 1, ord(pos[0]) - 97
+    return None if str == UNKNOWN_COORDINATE_STRING else (int(pos[1:]) - 1, ord(pos[0]) - 97)

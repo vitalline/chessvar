@@ -8,6 +8,6 @@
 /*.bak/
 /**/debug_*.txt
 /**/log_*.txt
-/**/save_*.txt
+/**/save_*.json
 *.ini
 *.spec
