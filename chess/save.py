@@ -43,6 +43,7 @@ def save_piece(piece: abc.Piece | None) -> dict | None:
         'pos': toa(piece.board_pos) if piece.board_pos else None,
         'side': piece.side.value,
         'moves': piece.movement.total_moves,
+        'show': True if piece.is_hidden is False else None,
     }.items() if v}
 
 
@@ -54,12 +55,14 @@ def load_piece(data: dict | None, board: Board) -> abc.Piece | None:
         board=board,
         board_pos=fra(data['pos']) if 'pos' in data else None,  # type: ignore
         side=side,
-        promotions=board.promotions.get(side, None),
-        promotion_squares=board.promotion_squares.get(side, None),
+        promotions=board.promotions.get(side),
+        promotion_squares=board.promotion_squares.get(side),
     )
+    piece.is_hidden = False if data.get('show') is True else None
     piece.movement.set_moves(data.get('moves', 0))
     piece.scale = board.square_size / piece.texture.width
-    board.update_piece(piece)
+    if not piece.is_empty():
+        board.update_piece(piece)
     return piece
 
 
@@ -90,11 +93,11 @@ def load_move(data: dict | str | None, board: Board) -> Move | frozenset | None:
         pos_from=fra(data['from']) if 'from' in data else None,  # type: ignore
         pos_to=fra(data['to']) if 'to' in data else None,  # type: ignore
         movement_type=getattr(import_module('chess.movement.movement'), data['type']) if 'type' in data else None,
-        piece=load_piece(data.get('piece', None), board),
-        captured_piece=load_piece(data.get('captured', None), board),
-        swapped_piece=load_piece(data.get('swapped', None), board),
-        promotion=load_type(data.get('promotion', None)),
-        chained_move=load_move(data.get('chain', None), board),
+        piece=load_piece(data.get('piece'), board),
+        captured_piece=load_piece(data.get('captured'), board),
+        swapped_piece=load_piece(data.get('swapped'), board),
+        promotion=load_type(data.get('promotion')),
+        chained_move=load_move(data.get('chain'), board),
         is_edit=data.get('edit', False),
     )
 

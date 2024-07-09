@@ -651,8 +651,8 @@ class Board(Window):
             self.pieces[row].append(
                 piece_type(
                     self, (row, col), piece_side,
-                    promotions=self.promotions.get(piece_side, None),
-                    promotion_squares=self.promotion_squares.get(piece_side, None),
+                    promotions=self.promotions.get(piece_side),
+                    promotion_squares=self.promotion_squares.get(piece_side),
                 )
             )
             if not self.pieces[row][col].is_empty():
@@ -706,6 +706,7 @@ class Board(Window):
             'ply': self.ply_count,
             'turn': self.turn_side.value,
             'edit': self.edit_mode,
+            'edit_promotion': self.edit_piece_set_id,
             'hide_pieces': self.should_hide_pieces,
             'hide_moves': self.should_hide_moves,
             'royal_mode': self.royal_piece_mode,
@@ -766,6 +767,7 @@ class Board(Window):
         self.royal_piece_mode = data['royal_mode']
         self.chaos_mode = data['chaos_mode']
         self.edit_mode = data['edit']
+        self.edit_piece_set_id = data['edit_promotion']
 
         self.set_seed = data['set_seed']
         self.set_rng = Random(self.set_seed)
@@ -837,7 +839,7 @@ class Board(Window):
             self.pieces += [[]]
 
         for row, col in product(range(self.board_height), range(self.board_width)):
-            piece_data = data['pieces'].get(toa((row, col)), None)
+            piece_data = data['pieces'].get(toa((row, col)))
             self.pieces[row].append(
                 NoPiece(self, (row, col)) if piece_data is None else load_piece(piece_data, self)
             )
@@ -1201,7 +1203,7 @@ class Board(Window):
             if self.moves_queried.get(turn_side, False):
                 continue
             chain_moves = (
-                self.chain_moves.get(turn_side, {}).get((last_chain_move.pos_from, last_chain_move.pos_to), None)
+                self.chain_moves.get(turn_side, {}).get((last_chain_move.pos_from, last_chain_move.pos_to))
                 if last_chain_move is not None else None
             )
             self.moves[turn_side] = {}
@@ -1975,10 +1977,11 @@ class Board(Window):
         self.piece_sprite_list.remove(piece)
         self.pieces[pos[0]][pos[1]] = new_type(
             self, pos, new_side,
-            promotions=self.promotions.get(new_side, None),
-            promotion_squares=self.promotion_squares.get(new_side, None),
+            promotions=self.promotions.get(new_side),
+            promotion_squares=self.promotion_squares.get(new_side),
         )
-        self.update_piece(self.pieces[pos[0]][pos[1]], penultima_hide=is_hidden)
+        self.pieces[pos[0]][pos[1]].is_hidden = is_hidden
+        self.update_piece(self.pieces[pos[0]][pos[1]])
         self.pieces[pos[0]][pos[1]].set_color(
             self.color_scheme.get(
                 f"{new_side.key()}piece_color",

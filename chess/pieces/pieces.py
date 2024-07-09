@@ -92,7 +92,6 @@ class Piece(Sprite):
         self.flipped_horizontally = False
         self.flipped_vertically = False
         self.is_hidden = None
-        self.is_colored = False
         self.texture_folder = self.asset_folder
         self.texture_side = self.side
         self.texture_name = self.file_name
