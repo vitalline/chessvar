@@ -17,23 +17,21 @@ if TYPE_CHECKING:
 UNSET_STRING = '*'
 
 
-def save_type(piece_type: Type[abc.Piece] | frozenset | None) -> dict | str | None:
+def save_type(piece_type: Type[abc.Piece] | frozenset | None) -> str | None:
     if piece_type is None:
         return None
     if piece_type is Unset:
         return UNSET_STRING
-    return {
-        'module': piece_type.__module__.rsplit('.', 1)[-1],
-        'class': piece_type.__name__,
-    }
+    return f"{piece_type.__module__.rsplit('.', 1)[-1]}.{piece_type.__name__}"
 
 
-def load_type(data: dict | str | None) -> Type[abc.Piece] | frozenset | None:
+def load_type(data: str | None) -> Type[abc.Piece] | frozenset | None:
     if data is None:
         return None
     if data == UNSET_STRING:
         return Unset
-    return getattr(import_module(f"chess.pieces.groups.{data['module']}"), data['class'])
+    mod, cls = data.split('.', 1)
+    return getattr(import_module(f"chess.pieces.groups.{mod}"), cls)
 
 
 def save_piece(piece: abc.Piece | frozenset | None) -> dict | str | None:
@@ -44,7 +42,7 @@ def save_piece(piece: abc.Piece | frozenset | None) -> dict | str | None:
     if isinstance(piece, NoPiece):
         return toa(piece.board_pos) if piece.board_pos else None
     return {k: v for k, v in {
-        **save_type(type(piece)),
+        'cls': save_type(type(piece)),
         'pos': toa(piece.board_pos) if piece.board_pos else None,
         'side': piece.side.value,
         'moves': piece.movement.total_moves,
@@ -60,7 +58,8 @@ def load_piece(data: dict | str | None, board: Board) -> abc.Piece | frozenset |
     if isinstance(data, str):
         return NoPiece(board, fra(data))
     side = abc.Side(data.get('side', 0))
-    piece = load_type(data)(
+    piece_type = load_type(data.get('cls')) or NoPiece
+    piece = piece_type(
         board=board,
         board_pos=fra(data['pos']) if 'pos' in data else None,  # type: ignore
         side=side,

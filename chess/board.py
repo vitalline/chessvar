@@ -693,7 +693,7 @@ class Board(Window):
             'future': [save_move(m) for m in self.future_move_history[::-1]],
             'rolls': {n: {toa(pos): d[pos] for pos in sorted(d)} for n, d in enumerate(self.roll_history) if d},
             'roll_piece_history': {
-                n: {toa(p[1]): save_type(p[0]) for p in sorted(d, key=lambda x: x[1])}
+                n: {toa(pos): save_type(t) for pos, t in sorted(d, key=lambda x: x[0])}
                 for n, d in enumerate(self.probabilistic_piece_history) if d
             },
             'auto_captures': {
@@ -812,7 +812,7 @@ class Board(Window):
         ]
         rph = data['roll_piece_history']
         self.probabilistic_piece_history = [
-            ({(load_type(v), fra(k)) for k, v in rph[str(n)].items()} if str(n) in rph else set())
+            ({(fra(k), load_type(v)) for k, v in rph[str(n)].items()} if str(n) in rph else set())
             for n in range(self.ply_count)
         ]
         ac = data['auto_captures']
@@ -1222,7 +1222,7 @@ class Board(Window):
             if turn_side == self.turn_side and probabilistic_pieces[turn_side] and generate_rolls:
                 for piece in probabilistic_pieces[turn_side]:
                     self.roll_history[-1][piece.board_pos] = piece.movement.roll()
-                    self.probabilistic_piece_history[-1] |= {(type(piece), piece.board_pos)}
+                    self.probabilistic_piece_history[-1] |= {(piece.board_pos, type(piece))}
                 self.moves[turn_side] = {}
                 self.chain_moves[turn_side] = {}
             for piece in movable_pieces[turn_side] if chain_moves is None else [last_chain_move.piece]:
@@ -1568,7 +1568,7 @@ class Board(Window):
             # with a different move, in which case we would want to clear the roll history anyway. Point is, this works.
             # (I don't completely understand how it works, and I don't know if it has any right to, but it does anyway.)
             for piece in self.probabilistic_pieces[self.turn_side]:
-                probabilistic_piece_info = type(piece), piece.board_pos
+                probabilistic_piece_info = piece.board_pos, type(piece)
                 if probabilistic_piece_info not in self.probabilistic_piece_history[self.ply_count - 1]:
                     self.roll_history = self.roll_history[:self.ply_count - 1]
                     self.probabilistic_piece_history = self.probabilistic_piece_history[:self.ply_count - 1]
@@ -3003,7 +3003,7 @@ class Board(Window):
         debug_log_data.append("Probabilistic piece history:")
         for i, pieces in enumerate(self.probabilistic_piece_history):
             debug_log_data.append(f"  Ply {i + 1}:")
-            for piece, pos in sorted(pieces, key=lambda x: x[1]):
+            for pos, piece in sorted(pieces, key=lambda x: x[0]):
                 debug_log_data.append(f"    {pos}: {piece.name}")
             if not pieces:
                 debug_log_data[-1] += " None"
