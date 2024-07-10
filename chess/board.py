@@ -706,7 +706,7 @@ class Board(Window):
                 save_move(m) for m in self.moves[self.chain_start.piece.side][self.chain_start.piece.board_pos]
             ] if self.chain_start else [],
             'ply': self.ply_count,
-            'turn': self.turn_side.value,
+            'side': self.turn_side.value,
             'edit': self.edit_mode,
             'edit_promotion': self.edit_piece_set_id,
             'hide_pieces': self.should_hide_pieces,
@@ -802,7 +802,7 @@ class Board(Window):
         self.reset_penultima_pieces()
 
         self.ply_count = data['ply']
-        self.turn_side = Side(data['turn'])
+        self.turn_side = Side(data['side'])
         self.move_history = [load_move(d, self) for d in data['moves']]
         self.future_move_history = [load_move(d, self) for d in data['future'][::-1]]
 
