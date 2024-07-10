@@ -45,10 +45,14 @@ class Side(Enum):
 
     def __str__(self):
         match self:
+            case Side.NONE:
+                return "Empty"  # "Blank" is technically more accurate, but much easier to confuse with "Black"
             case Side.WHITE:
                 return "White"
             case Side.BLACK:
                 return "Black"
+            case Side.ANY:
+                return "Universal"
             case _:
                 return ""
 
@@ -113,7 +117,9 @@ class Piece(Sprite):
         self.board.move(move)
 
     def moves(self, theoretical: bool = False):
-        yield from self.movement.moves(self.board_pos, self, theoretical)
+        if self.movement:
+            yield from self.movement.moves(self.board_pos, self, theoretical)
+        return ()
 
     def __copy__(self):
         clone = type(self)(self.board, self.board_pos, self.side)
