@@ -12,16 +12,16 @@ if TYPE_CHECKING:
 
 class Move(object):
     def __init__(
-            self,
-            pos_from: Position | None = None,
-            pos_to: Position | None = None,
-            movement_type: Type[BaseMovement] | None = None,
-            piece: Piece | None = None,
-            captured_piece: Piece | None = None,
-            swapped_piece: Piece | None = None,
-            promotion: Piece | frozenset | None = None,
-            chained_move: Move | frozenset | None = None,
-            is_edit: bool = False
+        self,
+        pos_from: Position | None = None,
+        pos_to: Position | None = None,
+        movement_type: Type[BaseMovement] | None = None,
+        piece: Piece | None = None,
+        captured_piece: Piece | None = None,
+        swapped_piece: Piece | None = None,
+        promotion: Piece | frozenset | None = None,
+        chained_move: Move | frozenset | None = None,
+        is_edit: bool = False
     ):
         self.pos_from = pos_from
         self.pos_to = pos_to
@@ -34,16 +34,16 @@ class Move(object):
         self.is_edit = is_edit
 
     def set(
-            self,
-            pos_from: Position | None = None,
-            pos_to: Position | None = None,
-            movement_type: Type[BaseMovement] | None = None,
-            piece: Piece | None = None,
-            captured_piece: Piece | None = None,
-            swapped_piece: Piece | None = None,
-            promotion: Piece | frozenset | None = None,
-            chained_move: Move | frozenset | None = None,
-            is_edit: bool | None = None
+        self,
+        pos_from: Position | None = None,
+        pos_to: Position | None = None,
+        movement_type: Type[BaseMovement] | None = None,
+        piece: Piece | None = None,
+        captured_piece: Piece | None = None,
+        swapped_piece: Piece | None = None,
+        promotion: Piece | frozenset | None = None,
+        chained_move: Move | frozenset | None = None,
+        is_edit: bool | None = None
     ) -> Move:
         self.pos_from = pos_from or self.pos_from
         self.pos_to = pos_to or self.pos_to

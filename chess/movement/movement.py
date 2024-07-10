@@ -302,12 +302,12 @@ class AutoRangedAutoCaptureRiderMovement(RangedAutoCaptureRiderMovement):
 
 class CastlingMovement(BaseMovement):
     def __init__(
-            self,
-            board: Board,
-            direction: Direction,
-            other_piece: Direction,
-            other_direction: Direction,
-            gap: list[Direction] | None = None
+        self,
+        board: Board,
+        direction: Direction,
+        other_piece: Direction,
+        other_direction: Direction,
+        gap: list[Direction] | None = None
     ):
         super().__init__(board)
         self.direction = direction
@@ -419,10 +419,10 @@ class BaseMultiMovement(BaseMovement):
 
 class FirstMoveMovement(BaseMultiMovement):
     def __init__(
-            self,
-            board: Board,
-            movements: list[BaseMovement] | None = None,
-            first_move_movements: list[BaseMovement] | None = None
+        self,
+        board: Board,
+        movements: list[BaseMovement] | None = None,
+        first_move_movements: list[BaseMovement] | None = None
     ):
         self.base_movements = movements or []
         self.first_move_movements = first_move_movements or []
@@ -498,11 +498,11 @@ class ChainMovement(BaseMultiMovement):
 
 class MultiMovement(BaseMultiMovement):
     def __init__(
-            self,
-            board: Board,
-            move_or_capture: list[BaseMovement] | None = None,
-            move: list[BaseMovement] | None = None,
-            capture: list[BaseMovement] | None = None
+        self,
+        board: Board,
+        move_or_capture: list[BaseMovement] | None = None,
+        move: list[BaseMovement] | None = None,
+        capture: list[BaseMovement] | None = None
     ):
         self.move_or_capture = move_or_capture or []
         self.move = move or []
@@ -532,10 +532,10 @@ class MultiMovement(BaseMultiMovement):
 
 class ColorMovement(BaseMultiMovement):
     def __init__(
-            self,
-            board: Board,
-            light: list[BaseMovement] | None = None,
-            dark: list[BaseMovement] | None = None
+        self,
+        board: Board,
+        light: list[BaseMovement] | None = None,
+        dark: list[BaseMovement] | None = None
     ):
         self.light = light or []
         self.dark = dark or []
@@ -554,10 +554,10 @@ class ColorMovement(BaseMultiMovement):
 
 class SideMovement(BaseMultiMovement):
     def __init__(
-            self,
-            board: Board,
-            left: list[BaseMovement] | None = None,
-            right: list[BaseMovement] | None = None
+        self,
+        board: Board,
+        left: list[BaseMovement] | None = None,
+        right: list[BaseMovement] | None = None
     ):
         self.left = left or []
         self.right = right or []

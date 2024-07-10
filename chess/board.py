@@ -467,11 +467,11 @@ class Board(Window):
             self.reset_board(update=True)
 
     def get_board_position(
-            self,
-            pos: tuple[float, float],
-            size: float = 0,
-            origin: tuple[float, float] | None = None,
-            flip: bool | None = None
+        self,
+        pos: tuple[float, float],
+        size: float = 0,
+        origin: tuple[float, float] | None = None,
+        flip: bool | None = None
     ) -> Position:
         x, y = pos
         size = size or self.square_size
@@ -486,11 +486,11 @@ class Board(Window):
         return row, col
 
     def get_screen_position(
-            self,
-            pos: tuple[float, float],
-            size: float = 0,
-            origin: tuple[float, float] | None = None,
-            flip: bool | None = None
+        self,
+        pos: tuple[float, float],
+        size: float = 0,
+        origin: tuple[float, float] | None = None,
+        flip: bool | None = None
     ) -> tuple[float, float]:
         row, col = pos
         size = size or self.square_size
@@ -1172,10 +1172,10 @@ class Board(Window):
                 break
 
     def load_moves(
-            self,
-            force_reload: bool = True,
-            moves_for: Side | None = None,
-            theoretical_moves_for:  Side | None = None
+        self,
+        force_reload: bool = True,
+        moves_for: Side | None = None,
+        theoretical_moves_for:  Side | None = None
     ) -> None:
         if force_reload:
             self.moves_queried = {side: False for side in self.moves_queried}
@@ -1582,8 +1582,8 @@ class Board(Window):
         # check if the last move matches the first future move
         if self.future_move_history and self.move_history:  # if there are any moves to compare that is
             if (
-                    (self.move_history[-1] is None) == (self.future_move_history[-1] is None)
-                    and (self.move_history[-1] is None or self.move_history[-1].matches(self.future_move_history[-1]))
+                (self.move_history[-1] is None) == (self.future_move_history[-1] is None)
+                and (self.move_history[-1] is None or self.move_history[-1].matches(self.future_move_history[-1]))
             ):
                 self.future_move_history.pop()  # if it does, the other future moves are still makeable, so we keep them
             else:
@@ -2094,12 +2094,12 @@ class Board(Window):
         self.show_moves()
 
     def update_piece(
-            self,
-            piece: abc.Piece,
-            asset_folder: str | None = None,
-            file_name: str | None = None,
-            penultima_flip: bool = None,
-            penultima_hide: bool = None,
+        self,
+        piece: abc.Piece,
+        asset_folder: str | None = None,
+        file_name: str | None = None,
+        penultima_flip: bool = None,
+        penultima_hide: bool = None,
     ) -> None:
         if penultima_flip is None:
             penultima_flip = (self.chaos_mode in {2, 4}) and (self.piece_set_ids[piece.side] < 0)
@@ -2146,7 +2146,7 @@ class Board(Window):
                     piece.reload(is_hidden=False, flipped_horizontally=False)
 
     def update_sprite(
-            self, sprite: Sprite, from_size: float, from_origin: tuple[float, float], from_flip_mode: bool
+        self, sprite: Sprite, from_size: float, from_origin: tuple[float, float], from_flip_mode: bool
     ) -> None:
         old_position = sprite.position
         sprite.scale = self.square_size / sprite.texture.width
@@ -2207,8 +2207,8 @@ class Board(Window):
         for sprite_list in (self.piece_sprite_list, self.promotion_piece_sprite_list, [self.active_piece]):
             for sprite in sprite_list:
                 if (
-                        isinstance(sprite, abc.Piece) and not sprite.is_empty()
-                        and not (self.game_over and not self.edit_mode and sprite.side == self.check_side)
+                    isinstance(sprite, abc.Piece) and not sprite.is_empty()
+                    and not (self.game_over and not self.edit_mode and sprite.side == self.check_side)
                 ):
                     direction = 1 if self.is_light_square(sprite.board_pos) else -1
                     sprite.angle += self.trickster_angle_delta / 11 * 360 * direction

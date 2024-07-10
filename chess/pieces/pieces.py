@@ -136,13 +136,13 @@ class Piece(Sprite):
         return path if isfile(path) else fallback_path
 
     def reload(
-            self,
-            asset_folder: str = None,
-            side: Side = None,
-            file_name: str = None,
-            is_hidden: bool = None,
-            flipped_horizontally: bool = None,
-            flipped_vertically: bool = None,
+        self,
+        asset_folder: str = None,
+        side: Side = None,
+        file_name: str = None,
+        is_hidden: bool = None,
+        flipped_horizontally: bool = None,
+        flipped_vertically: bool = None,
     ):
         if is_hidden is not None:
             self.is_hidden = None if is_hidden is Default else is_hidden
