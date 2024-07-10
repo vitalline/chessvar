@@ -822,7 +822,7 @@ class Board(Window):
         }
 
         self.chain_start = load_move(data['chain_start'], self)
-        if self.move_history and self.move_history[-1].matches(self.chain_start):
+        if self.move_history and self.move_history[-1] and self.move_history[-1].matches(self.chain_start):
             self.chain_start = self.move_history[-1]
         cm = data['chain_moves']
         self.chain_moves = {
