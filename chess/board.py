@@ -852,7 +852,7 @@ class Board(Window):
 
         if self.move_history:
             last_move = self.move_history[-1]
-            if not last_move.is_edit:
+            if last_move and not last_move.is_edit:
                 last_move.piece.movement.update(last_move, last_move.piece)
 
         self.load_pieces()
