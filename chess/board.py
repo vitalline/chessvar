@@ -693,7 +693,7 @@ class Board(Window):
             'future': [save_move(m) for m in self.future_move_history[::-1]],
             'rolls': {n: {toa(pos): d[pos] for pos in sorted(d)} for n, d in enumerate(self.roll_history) if d},
             'roll_piece_history': {
-                n: {toa(p[1]): save_type(p[0]) for p in sorted(d, key=lambda k: k[1])}
+                n: {toa(p[1]): save_type(p[0]) for p in sorted(d, key=lambda x: x[1])}
                 for n, d in enumerate(self.probabilistic_piece_history) if d
             },
             'auto_captures': {
@@ -1571,10 +1571,12 @@ class Board(Window):
                 probabilistic_piece_info = type(piece), piece.board_pos
                 if probabilistic_piece_info not in self.probabilistic_piece_history[self.ply_count - 1]:
                     self.roll_history = self.roll_history[:self.ply_count - 1]
+                    self.probabilistic_piece_history = self.probabilistic_piece_history[:self.ply_count - 1]
                     return
                 probabilistic_piece_signature |= {probabilistic_piece_info}
             if probabilistic_piece_signature != self.probabilistic_piece_history[self.ply_count - 1]:
                 self.roll_history = self.roll_history[:self.ply_count - 1]
+                self.probabilistic_piece_history = self.probabilistic_piece_history[:self.ply_count - 1]
 
     def compare_history(self) -> None:
         # check if the last move matches the first future move
@@ -2387,6 +2389,7 @@ class Board(Window):
                     piece = self.get_piece(pos)
                     if isinstance(piece.movement, movement.ProbabilisticMovement):
                         self.roll_history = self.roll_history[:self.ply_count - 1]
+                        self.probabilistic_piece_history = self.probabilistic_piece_history[:self.ply_count - 1]
                     move.set(pos_from=pos, pos_to=pos, piece=piece)
                 elif modifiers & key.MOD_SHIFT:
                     move.set(pos_from=pos, pos_to=pos, piece=self.get_piece(pos))
@@ -2996,6 +2999,15 @@ class Board(Window):
             if not roll:
                 debug_log_data[-1] += " None"
         if not self.roll_history:
+            debug_log_data[-1] += " None"
+        debug_log_data.append("Probabilistic piece history:")
+        for i, pieces in enumerate(self.probabilistic_piece_history):
+            debug_log_data.append(f"  Ply {i + 1}:")
+            for piece, pos in sorted(pieces, key=lambda x: x[1]):
+                debug_log_data.append(f"    {pos}: {piece.name}")
+            if not pieces:
+                debug_log_data[-1] += " None"
+        if not self.probabilistic_piece_history:
             debug_log_data[-1] += " None"
         debug_log_data.append(f"Roll seed: {self.roll_seed} (update: {self.board_config['update_roll_seed']})")
         debug_log_data.append(f"Piece set seed: {self.set_seed}")
