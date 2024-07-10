@@ -7,7 +7,8 @@ class NoPiece(Piece):
     asset_folder = 'util'
 
     def __init__(self, board, board_pos, **kwargs):
-        super().__init__(board, board_pos, Side.NONE, **kwargs)
+        kwargs['side'] = Side.NONE
+        super().__init__(board, board_pos, **kwargs)
 
     def is_empty(self):
         return True

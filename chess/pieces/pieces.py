@@ -217,7 +217,9 @@ class PromotablePiece(Piece):
             if len(self.promotions) == 1:
                 self.board.promotion_piece = True
                 move.set(promotion=self.promotions[0](
-                    self.board, self.board_pos, self.side,
+                    board=self.board,
+                    board_pos=self.board_pos,
+                    side=self.side,
                     promotions=self.board.promotions.get(self.side),
                     promotion_squares=self.board.promotion_squares.get(self.side),
                 ))
@@ -232,7 +234,9 @@ class PromotablePiece(Piece):
             if self.promotions and move.pos_to in self.promotion_squares:
                 for promotion in self.promotions:
                     yield copy(move).set(promotion=promotion(
-                        self.board, self.board_pos, self.side,
+                        board=self.board,
+                        board_pos=self.board_pos,
+                        side=self.side,
                         promotions=self.board.promotions.get(self.side),
                         promotion_squares=self.board.promotion_squares.get(self.side),
                     ))

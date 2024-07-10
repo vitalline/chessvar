@@ -653,7 +653,9 @@ class Board(Window):
                 piece_type = self.piece_sets[piece_side][col]
             self.pieces[row].append(
                 piece_type(
-                    self, (row, col), piece_side,
+                    board=self,
+                    board_pos=(row, col),
+                    side=piece_side,
                     promotions=self.promotions.get(piece_side),
                     promotion_squares=self.promotion_squares.get(piece_side),
                 )
@@ -2391,7 +2393,9 @@ class Board(Window):
                     side = self.get_promotion_side(move.piece)
                     if len(self.edit_promotions[side]) == 1:
                         move.set(promotion=self.edit_promotions[side][0](
-                            self, move.pos_to, side,
+                            board=self,
+                            board_pos=move.pos_to,
+                            side=side,
                             promotions=self.promotions.get(side),
                             promotion_squares=self.promotion_squares.get(side),
                         ))
