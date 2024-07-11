@@ -8,6 +8,7 @@ class NoPiece(Piece):
 
     def __init__(self, board, board_pos, **kwargs):
         kwargs['side'] = Side.NONE
+        kwargs['movement'] = None
         super().__init__(board, board_pos, **kwargs)
 
     def is_empty(self):
