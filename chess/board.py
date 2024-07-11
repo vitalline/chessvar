@@ -456,11 +456,13 @@ class Board(Window):
 
         # set up pieces on the board
         loaded = False
-        if len(argv) > 1 and isfile(argv[1]):
+        if len(argv) > 1:
             # noinspection PyBroadException
             try:
-                self.load_board(argv[1])
-                loaded = True
+                save_path = join(base_dir, argv[1])
+                if isfile(save_path):
+                    self.load_board(save_path)
+                    loaded = True
             except Exception:
                 print_exc()
         if not loaded:
