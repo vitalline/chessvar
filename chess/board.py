@@ -1801,7 +1801,7 @@ class Board(Window):
         if self.future_move_history[-1] is None:
             self.log(f"[Ply {self.ply_count}] Redo: Pass: {self.turn_side.opponent()}'s turn")
             self.clear_en_passant()
-            self.move_history.append(last_move)
+            self.move_history.append(deepcopy(last_move))
         elif piece_was_moved:
             chained_move = last_move
             while chained_move:
@@ -1841,7 +1841,7 @@ class Board(Window):
                     self.update_move(chained_move)
             if self.chain_start is None:
                 self.chain_start = last_move
-                self.move_history.append(last_move)
+                self.move_history.append(deepcopy(last_move))
             else:
                 last_history_move = self.chain_start
                 while last_history_move.chained_move:
@@ -2410,7 +2410,7 @@ class Board(Window):
                         move.set(promotion=Unset)
                         move.piece.move(move)
                         self.update_auto_capture_markers(move)
-                        self.move_history.append(move)
+                        self.move_history.append(deepcopy(move))
                         self.start_promotion(move.piece, self.edit_promotions[side])
                         return
                 else:
@@ -2422,7 +2422,7 @@ class Board(Window):
                 return
             move.piece.move(move)
             self.update_auto_capture_markers(move)
-            self.move_history.append(move)
+            self.move_history.append(deepcopy(move))
             if not self.promotion_piece:
                 self.log(f"[Ply {self.ply_count}] Edit: {self.move_history[-1]}")
                 self.compare_history()
@@ -2470,7 +2470,7 @@ class Board(Window):
                     chained_move = chained_move.chained_move
                 if self.chain_start is None:
                     self.chain_start = move
-                    self.move_history.append(self.chain_start)
+                    self.move_history.append(deepcopy(self.chain_start))
                 else:
                     last_move = self.chain_start
                     while last_move.chained_move:
@@ -2834,7 +2834,7 @@ class Board(Window):
                         chained_move = chained_move.chained_move
                     if self.chain_start is None:
                         self.chain_start = move
-                        self.move_history.append(self.chain_start)
+                        self.move_history.append(deepcopy(self.chain_start))
                     else:
                         last_move = self.chain_start
                         while last_move.chained_move:

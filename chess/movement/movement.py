@@ -421,10 +421,10 @@ class FirstMoveMovement(BaseMultiMovement):
     def __init__(
         self,
         board: Board,
-        movements: list[BaseMovement] | None = None,
+        base_movements: list[BaseMovement] | None = None,
         first_move_movements: list[BaseMovement] | None = None
     ):
-        self.base_movements = movements or []
+        self.base_movements = base_movements or []
         self.first_move_movements = first_move_movements or []
         super().__init__(board, self.base_movements + self.first_move_movements)
 
@@ -435,7 +435,7 @@ class FirstMoveMovement(BaseMultiMovement):
                 yield copy(move)
 
     def __copy_args__(self):
-        return self.board, copy(self.movements), copy(self.first_move_movements)
+        return self.board, copy(self.base_movements), copy(self.first_move_movements)
 
 
 class BentMovement(BaseMultiMovement):
@@ -551,6 +551,9 @@ class ColorMovement(BaseMultiMovement):
                 for move in movement.moves(pos_from, piece, theoretical):
                     yield copy(move)
 
+    def __copy_args__(self):
+        return self.board, deepcopy(self.light), deepcopy(self.dark)
+
 
 class SideMovement(BaseMultiMovement):
     def __init__(
@@ -572,6 +575,9 @@ class SideMovement(BaseMultiMovement):
             for movement in self.right:
                 for move in movement.moves(pos_from, piece, theoretical):
                     yield copy(move)
+
+    def __copy_args__(self):
+        return self.board, deepcopy(self.left), deepcopy(self.right)
 
 
 class ProbabilisticMovement(BaseMultiMovement):

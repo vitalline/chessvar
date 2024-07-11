@@ -99,11 +99,11 @@ class Move(object):
             self.pos_from,
             self.pos_to,
             self.movement_type,
-            self.piece.__copy__() if isinstance(self.piece, Piece) else self.piece,
-            self.captured_piece.__copy__() if isinstance(self.captured_piece, Piece) else self.captured_piece,
-            self.swapped_piece.__copy__() if isinstance(self.swapped_piece, Piece) else self.swapped_piece,
-            self.promotion.__copy__() if isinstance(self.promotion, Piece) else self.promotion,
-            self.chained_move.__deepcopy__(memo) if isinstance(self.chained_move, Move) else self.chained_move,
+            self.piece.__copy__() if self.piece else self.piece,
+            self.captured_piece.__copy__() if self.captured_piece else self.captured_piece,
+            self.swapped_piece.__copy__() if self.swapped_piece else self.swapped_piece,
+            self.promotion.__copy__() if self.promotion else self.promotion,
+            self.chained_move.__deepcopy__(memo) if self.chained_move else self.chained_move,
             self.is_edit
         )
 
