@@ -1973,6 +1973,8 @@ class Board(Window):
         piece: abc.Piece,
         new_piece: abc.Piece
     ) -> None:
+        new_piece.board_pos = None
+        new_piece = copy(new_piece)
         pos = piece.board_pos
         self.piece_sprite_list.remove(self.pieces[pos[0]][pos[1]])
         self.pieces[pos[0]][pos[1]] = new_piece

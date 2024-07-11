@@ -122,7 +122,11 @@ class Piece(Sprite):
         return ()
 
     def __copy__(self):
-        clone = type(self)(self.board, self.board_pos, self.side)
+        clone = type(self)(
+            board=self.board,
+            board_pos=self.board_pos,
+            side=self.side,
+        )
         clone.movement = copy(self.movement)
         clone.scale = self.scale
         clone.flipped_horizontally = self.flipped_horizontally
