@@ -15,6 +15,7 @@ Shift + C: start game with new chaotic armies (different for each player)
 Ctrl + Shift + C: start game with a new chaotic army (same for both players)
 Alt + C: start game with new asymmetrical chaotic armies (different for each player)
 Ctrl + Alt + C: start game with a new asymmetrical chaotic army (same for both players)
+Ctrl + X: update probabilistic pieces
 Shift + X: start game with new extremely chaotic armies (different for each player)
 Ctrl + Shift + X: start game with a new extremely chaotic army (same for both players)
 Alt + X: start game with new asymmetrical extremely chaotic armies (different for each player)

@@ -2565,8 +2565,14 @@ class Board(Window):
                 self.load_chaos_sets(1 + bool(modifiers & key.MOD_ALT), modifiers & key.MOD_ACCEL)
             elif modifiers & key.MOD_ACCEL:  # Config
                 self.save_config()
-        if symbol == key.X and modifiers & (key.MOD_SHIFT | key.MOD_ALT):  # Shuffled chaos mode
-            self.load_chaos_sets(3 + bool(modifiers & key.MOD_ALT), modifiers & key.MOD_ACCEL)
+        if symbol == key.X:
+            if modifiers & (key.MOD_SHIFT | key.MOD_ALT):  # Extreme chaos mode
+                self.load_chaos_sets(3 + bool(modifiers & key.MOD_ALT), modifiers & key.MOD_ACCEL)
+            elif modifiers & key.MOD_ACCEL:  # Extra roll (update probabilistic pieces)
+                self.roll_history = self.roll_history[:self.ply_count - 1]
+                self.probabilistic_piece_history = self.probabilistic_piece_history[:self.ply_count - 1]
+                self.log(f"[Ply {self.ply_count}] Info: Probabilistic pieces updated")
+                self.advance_turn()
         if symbol == key.F11:  # Full screen (toggle)
             self.set_fullscreen(not self.fullscreen)
         if symbol == key.MINUS:  # (-) Decrease window size
@@ -2605,14 +2611,11 @@ class Board(Window):
                 self.log(f"[Ply {self.ply_count}] Mode: {'EDIT' if self.edit_mode else 'PLAY'}")
                 self.deselect_piece()
                 self.hide_moves()
+                self.advance_turn()
                 if self.edit_mode:
-                    self.advance_turn()
                     self.moves = {side: {} for side in self.moves}
                     self.chain_moves = {side: {} for side in self.chain_moves}
                     self.theoretical_moves = {side: {} for side in self.theoretical_moves}
-                    self.show_moves()
-                else:
-                    self.advance_turn()
                     self.show_moves()
         if symbol == key.W:  # White
             if modifiers & key.MOD_ACCEL and not modifiers & key.MOD_SHIFT:  # White is in control
