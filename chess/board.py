@@ -466,6 +466,14 @@ class Board(Window):
             except Exception:
                 print_exc()
         if not loaded:
+            if self.should_hide_pieces == 1:
+                self.log(f"[Ply {self.ply_count}] Info: Pieces hidden")
+            if self.should_hide_pieces == 2:
+                self.log(f"[Ply {self.ply_count}] Info: Penultima mode activated!")
+            if self.royal_piece_mode == 1:
+                self.log(f"[Ply {self.ply_count}] Info: Using royal check rule (threaten any royal piece)")
+            if self.royal_piece_mode == 2:
+                self.log(f"[Ply {self.ply_count}] Info: Using quasi-royal check rule (threaten last royal piece)")
             self.reset_board(update=True)
 
     def get_board_position(
@@ -1216,17 +1224,29 @@ class Board(Window):
             )
             self.moves[turn_side] = {}
             self.chain_moves[turn_side] = {}
-            generate_rolls = len(self.roll_history) < self.ply_count
             while len(self.roll_history) < self.ply_count:
                 self.roll_history.append({})
             while len(self.probabilistic_piece_history) < self.ply_count:
                 self.probabilistic_piece_history.append(set())
-            if turn_side == self.turn_side and probabilistic_pieces[turn_side] and generate_rolls:
+            if turn_side == self.turn_side and probabilistic_pieces[turn_side]:
+                signature = set()
                 for piece in probabilistic_pieces[turn_side]:
-                    self.roll_history[-1][piece.board_pos] = piece.movement.roll()
-                    self.probabilistic_piece_history[-1] |= {(piece.board_pos, type(piece))}
-                self.moves[turn_side] = {}
-                self.chain_moves[turn_side] = {}
+                    signature |= {(piece.board_pos, type(piece))}
+                old_signature = self.probabilistic_piece_history[self.ply_count - 1]
+                if signature != old_signature:
+                    self.roll_history = self.roll_history[:self.ply_count]
+                    self.probabilistic_piece_history = self.probabilistic_piece_history[:self.ply_count]
+                    removed = old_signature.difference(signature)
+                    for pos, piece_type in sorted(removed, key=lambda x: x[0]):
+                        if pos in self.roll_history[self.ply_count - 1]:
+                            del self.roll_history[self.ply_count - 1][pos]
+                    added = signature.difference(old_signature)
+                    for pos, piece_type in sorted(added, key=lambda x: x[0]):
+                        if pos not in self.roll_history[self.ply_count - 1]:
+                            piece = self.get_piece(pos)
+                            if isinstance(piece.movement, movement.ProbabilisticMovement):
+                                self.roll_history[self.ply_count - 1][pos] = piece.movement.roll()
+                    self.probabilistic_piece_history[self.ply_count - 1] = signature
             for piece in movable_pieces[turn_side] if chain_moves is None else [last_chain_move.piece]:
                 for move in list(piece.moves()) if chain_moves is None else chain_moves:
                     self.update_move(move)
@@ -1558,28 +1578,6 @@ class Board(Window):
                         move.swapped_piece.movement.unmark(move.pos_from, move.swapped_piece)
                         move.swapped_piece.movement.mark(move.pos_to, move.swapped_piece)
 
-    def update_roll_history(self) -> None:
-        # check if the types and positions of probabilistic pieces have changed
-        # if so, clear the roll history starting from the current move
-        if len(self.roll_history) >= self.ply_count:
-            probabilistic_piece_signature = set()
-            # Very Important Note: The following line works because self.turn_side is updated *after* the function call!
-            # self.probabilistic_pieces[self.turn_side] picks the opponent's pieces iff self.turn_side would be changed.
-            # What this means is that if this function is called during turn advancement, the wrong side will be chosen,
-            # but as of now, it could only happen in Board.compare_history(), and only if a move was undone and replaced
-            # with a different move, in which case we would want to clear the roll history anyway. Point is, this works.
-            # (I don't completely understand how it works, and I don't know if it has any right to, but it does anyway.)
-            for piece in self.probabilistic_pieces[self.turn_side]:
-                probabilistic_piece_info = piece.board_pos, type(piece)
-                if probabilistic_piece_info not in self.probabilistic_piece_history[self.ply_count - 1]:
-                    self.roll_history = self.roll_history[:self.ply_count - 1]
-                    self.probabilistic_piece_history = self.probabilistic_piece_history[:self.ply_count - 1]
-                    return
-                probabilistic_piece_signature |= {probabilistic_piece_info}
-            if probabilistic_piece_signature != self.probabilistic_piece_history[self.ply_count - 1]:
-                self.roll_history = self.roll_history[:self.ply_count - 1]
-                self.probabilistic_piece_history = self.probabilistic_piece_history[:self.ply_count - 1]
-
     def compare_history(self) -> None:
         # check if the last move matches the first future move
         if self.future_move_history and self.move_history:  # if there are any moves to compare that is
@@ -1590,7 +1588,8 @@ class Board(Window):
                 self.future_move_history.pop()  # if it does, the other future moves are still makeable, so we keep them
             else:
                 self.future_move_history = []  # otherwise, we can't redo the future moves anymore, so we clear them
-                self.update_roll_history()  # and we also update the roll history
+                self.roll_history = self.roll_history[:self.ply_count - 1]  # and we also clear the roll history
+                self.probabilistic_piece_history = self.probabilistic_piece_history[:self.ply_count - 1]
 
     def move(self, move: Move) -> None:
         self.deselect_piece()
@@ -1729,7 +1728,7 @@ class Board(Window):
                 move.piece.movement.reload(move, move.piece)
         future_move_history = self.future_move_history.copy()
         if self.chain_start is None:
-            self.advance_turn(is_undo=True)
+            self.advance_turn()
         else:
             self.chain_start = None
             self.load_moves()
@@ -1872,7 +1871,7 @@ class Board(Window):
             self.redo_last_move()
         self.redo_last_move()
 
-    def advance_turn(self, is_undo: bool = False) -> None:
+    def advance_turn(self) -> None:
         self.deselect_piece()
         # if we're promoting, we can't advance the turn yet
         if self.promotion_piece:
@@ -1882,9 +1881,6 @@ class Board(Window):
             self.load_pieces()  # loading the new piece positions in order to update the board state
             self.color_pieces()  # reverting the piece colors to normal in case they were changed
             return  # let's not advance the turn while editing the board to hopefully make things easier for everyone
-        if self.move_history and self.move_history[-1] and self.move_history[-1].is_edit and not is_undo:
-            # if the board was edited, update roll history because probabilistic moves would need to be recalculated
-            self.update_roll_history()
         self.turn_side = Side.WHITE if self.ply_count % 2 == 1 else Side.BLACK
         self.update_status()
 
@@ -2390,11 +2386,7 @@ class Board(Window):
                     if self.not_a_piece(pos):
                         self.deselect_piece()
                         return
-                    piece = self.get_piece(pos)
-                    if isinstance(piece.movement, movement.ProbabilisticMovement):
-                        self.roll_history = self.roll_history[:self.ply_count - 1]
-                        self.probabilistic_piece_history = self.probabilistic_piece_history[:self.ply_count - 1]
-                    move.set(pos_from=pos, pos_to=pos, piece=piece)
+                    move.set(pos_from=pos, pos_to=pos, piece=self.get_piece(pos))
                 elif modifiers & key.MOD_SHIFT:
                     move.set(pos_from=pos, pos_to=pos, piece=self.get_piece(pos))
                     side = self.get_promotion_side(move.piece)
@@ -2573,10 +2565,18 @@ class Board(Window):
             if modifiers & (key.MOD_SHIFT | key.MOD_ALT):  # Extreme chaos mode
                 self.load_chaos_sets(3 + bool(modifiers & key.MOD_ALT), modifiers & key.MOD_ACCEL)
             elif modifiers & key.MOD_ACCEL:  # Extra roll (update probabilistic pieces)
-                self.roll_history = self.roll_history[:self.ply_count - 1]
-                self.probabilistic_piece_history = self.probabilistic_piece_history[:self.ply_count - 1]
-                self.log(f"[Ply {self.ply_count}] Info: Probabilistic pieces updated")
-                self.advance_turn()
+                if self.selected_square:  # Only update selected piece (if it is probabilistic)
+                    piece = self.get_piece(self.selected_square)
+                    if isinstance(piece.movement, movement.ProbabilisticMovement):
+                        del self.roll_history[self.ply_count - 1][piece.board_pos]
+                        self.probabilistic_piece_history[self.ply_count - 1].discard((piece.board_pos, type(piece)))
+                        self.log(f"[Ply {self.ply_count}] Info: Probabilistic piece on {toa(piece.board_pos)} updated")
+                        self.advance_turn()
+                else:  # Update all probabilistic pieces
+                    self.roll_history = self.roll_history[:self.ply_count - 1]
+                    self.probabilistic_piece_history = self.probabilistic_piece_history[:self.ply_count - 1]
+                    self.log(f"[Ply {self.ply_count}] Info: Probabilistic pieces updated")
+                    self.advance_turn()
         if symbol == key.F11:  # Full screen (toggle)
             self.set_fullscreen(not self.fullscreen)
         if symbol == key.MINUS:  # (-) Decrease window size
@@ -2907,13 +2907,19 @@ class Board(Window):
         color_scheme = deepcopy(self.color_scheme)  # just in case trickster mode messes with the color scheme RIGHT NOW
         for k, v in color_scheme.items():
             debug_log_data.append(f"  {k} = {v}")
-        debug_log_data.append(f"Armies defined: {len(piece_groups)}")
+        debug_log_data.append(f"Piece sets ({len(piece_groups)}):")
         digits = len(str(len(piece_groups)))
         for i, group in enumerate(piece_groups):
-            debug_log_data.append(f"ID {i:0{digits}d}: {group['name']}")
-        debug_log_data.append(f"ID blocklist: {', '.join(str(i) for i in self.board_config['block_ids']) or 'None'}")
+            debug_log_data.append(f"  ID {i:0{digits}d}: {group['name']}")
+        for i in sorted(self.chaos_sets):
+            debug_log_data.append(f"  ID {-(i+1):0{digits}d}: {self.chaos_sets[i]['name']}")
         debug_log_data.append(
-            f"Chaos ID blocklist: {', '.join(str(i) for i in self.board_config['block_ids_chaos']) or 'None'}"
+            f"ID blocklist ({len(self.board_config['block_ids'])}): "
+            f"{', '.join(str(i) for i in self.board_config['block_ids']) or 'None'}"
+        )
+        debug_log_data.append(
+            f"Chaos ID blocklist ({len(self.board_config['block_ids_chaos'])}): "
+            f"{', '.join(str(i) for i in self.board_config['block_ids_chaos']) or 'None'}"
         )
         debug_log_data.append(
             f"Game: "
@@ -2922,41 +2928,47 @@ class Board(Window):
         )
         for side in self.piece_set_ids:
             debug_log_data.append(f"{side} setup: {', '.join(piece.name for piece in self.piece_sets[side])}")
-            debug_log_data.append(f"{side} pieces:")
+            debug_log_data.append(f"{side} pieces ({len(self.movable_pieces[side])}):")
             for piece in self.movable_pieces[side]:
-                debug_log_data.append(f'  {piece.board_pos}: {piece.name}')
+                debug_log_data.append(f'  {toa(piece.board_pos)} {piece.board_pos}: {piece.name}')
             if not self.movable_pieces[side]:
                 debug_log_data[-1] += " None"
-            debug_log_data.append(f"{side} royal pieces:")
+            debug_log_data.append(f"{side} royal pieces ({len(self.royal_pieces[side])}):")
             for piece in self.royal_pieces[side]:
-                debug_log_data.append(f'  {piece.board_pos}: {piece.name}')
+                debug_log_data.append(f'  {toa(piece.board_pos)} {piece.board_pos}: {piece.name}')
             if not self.royal_pieces[side]:
                 debug_log_data[-1] += " None"
-            debug_log_data.append(f"{side} quasiroyal pieces:")
+            debug_log_data.append(f"{side} quasiroyal pieces ({len(self.quasi_royal_pieces[side])}):")
             for piece in self.quasi_royal_pieces[side]:
-                debug_log_data.append(f'  {piece.board_pos}: {piece.name}')
+                debug_log_data.append(f'  {toa(piece.board_pos)} {piece.board_pos}: {piece.name}')
             if not self.quasi_royal_pieces[side]:
                 debug_log_data[-1] += " None"
-            debug_log_data.append(f"{side} probabilistic pieces:")
+            debug_log_data.append(f"{side} probabilistic pieces ({len(self.probabilistic_pieces[side])}):")
             for piece in self.probabilistic_pieces[side]:
-                debug_log_data.append(f'  {piece.board_pos}: {piece.name}')
+                debug_log_data.append(f'  {toa(piece.board_pos)} {piece.board_pos}: {piece.name}')
             if not self.probabilistic_pieces[side]:
                 debug_log_data[-1] += " None"
-            debug_log_data.append(f"{side} auto-ranged pieces:")
+            debug_log_data.append(f"{side} auto-ranged pieces ({len(self.auto_ranged_pieces[side])}):")
             for piece in self.auto_ranged_pieces[side]:
-                debug_log_data.append(f'  {piece.board_pos}: {piece.name}')
+                debug_log_data.append(f'  {toa(piece.board_pos)} {piece.board_pos}: {piece.name}')
             if not self.auto_ranged_pieces[side]:
                 debug_log_data[-1] += " None"
-            debug_log_data.append(f"{side} auto-capture squares:")
-            for pos in sorted(self.auto_capture_markers[side].keys()):
+            debug_log_data.append(f"{side} auto-capture squares ({len(self.auto_capture_markers[side])}):")
+            for pos in sorted(self.auto_capture_markers[side]):
                 piece_poss = self.auto_capture_markers[side][pos]
-                debug_log_data.append(f"  {pos}: From {', '.join(str(xy) for xy in sorted(list(piece_poss)))}")
-            if not self.auto_ranged_pieces[side]:
+                debug_log_data.append(f"""  {toa(pos)} {pos}: (From {len(piece_poss)}) {
+                    ', '.join(f'{toa(xy)} {xy}' for xy in sorted(piece_poss))
+                }""")
+            if not self.auto_capture_markers[side]:
                 debug_log_data[-1] += " None"
             piece_list = ', '.join(piece.name for piece in self.promotions[side])
-            debug_log_data.append(f"{side} promotions: {piece_list if piece_list else 'None'}")
+            debug_log_data.append(
+                f"{side} promotions ({len(self.promotions[side])}): {piece_list if piece_list else 'None'}"
+            )
             piece_list = ', '.join(piece.name for piece in self.edit_promotions[side])
-            debug_log_data.append(f"{side} replacements: {piece_list if piece_list else 'None'}")
+            debug_log_data.append(
+                f"{side} replacements ({len(self.edit_promotions[side])}): {piece_list if piece_list else 'None'}"
+            )
         piece_modes = {0: 'Shown', 1: 'Hidden', 2: 'Penultima'}
         debug_log_data.append(f"Hide pieces: {self.should_hide_pieces} - {piece_modes[self.should_hide_pieces]}")
         move_modes = {None: 'Default', False: 'Shown', True: 'Hidden'}
@@ -2974,47 +2986,55 @@ class Board(Window):
         debug_log_data.append(f"Board mode: {'Edit' if self.edit_mode else 'Play'}")
         debug_log_data.append(f"Turn side: {self.turn_side if self.turn_side else 'None'}")
         debug_log_data.append(f"Current ply: {self.ply_count}")
-        debug_log_data.append(f"Actions made: {len(self.move_history)}")
-        debug_log_data.append(f"Future actions: {len(self.future_move_history)}")
         debug_log_data.append(f"Moves possible: {len(sum(self.moves[self.turn_side].values(), []))}")
         debug_log_data.append(f"Unique moves: {sum(len(i) for i in self.unique_moves()[self.turn_side].values())}")
         debug_log_data.append(f"Check side: {self.check_side if self.check_side else 'None'}")
         debug_log_data.append(f"Game over: {self.game_over}")
-        debug_log_data.append("Action history:")
-        for move in self.move_history:
+        debug_log_data.append(f"Action history ({len(self.move_history)}):")
+        for i, move in enumerate(self.move_history):
             if not move:
-                debug_log_data.append("  (Pass) None")
-            while move:
-                debug_log_data.append(f"  ({'Edit' if move.is_edit else 'Move'}) {move}")
-                move = move.chained_move
+                debug_log_data.append(f"  {i}: (Pass) None")
+            else:
+                debug_log_data.append(f"  {i}: ({'Edit' if move.is_edit else 'Move'}) {move}")
+                j = 0
+                while move.chained_move:
+                    move = move.chained_move
+                    j += 1
+                    debug_log_data.append(f"  {i}.{j}: ({'Edit' if move.is_edit else 'Move'}) {move}")
         if not self.move_history:
             debug_log_data[-1] += " None"
-        debug_log_data.append("Future action history:")
-        for move in self.future_move_history[::-1]:
+        debug_log_data.append(f"Future action history ({len(self.future_move_history)}):")
+        for i, move in enumerate(self.future_move_history[::-1], len(self.move_history)):
             if not move:
-                debug_log_data.append("  (Pass) None")
-            while move:
-                debug_log_data.append(f"  ({'Edit' if move.is_edit else 'Move'}) {move}")
-                move = move.chained_move
+                debug_log_data.append(f"  {i}: (Pass) None")
+            else:
+                debug_log_data.append(f"  {i}: ({'Edit' if move.is_edit else 'Move'}) {move}")
+                j = 0
+                while move.chained_move:
+                    move = move.chained_move
+                    j += 1
+                    debug_log_data.append(f"  {i}.{j}: ({'Edit' if move.is_edit else 'Move'}) {move}")
         if not self.future_move_history:
             debug_log_data[-1] += " None"
-        debug_log_data.append("Roll history:")
+        empty = True
+        debug_log_data.append(f"Roll history ({len(self.roll_history)}):")
         for i, roll in enumerate(self.roll_history):
-            debug_log_data.append(f"  Roll {i + 1}:")
-            for pos, value in roll.items():
-                debug_log_data.append(f"    {pos}: {value}")
-            if not roll:
-                debug_log_data[-1] += " None"
-        if not self.roll_history:
+            if roll:
+                empty = False
+                debug_log_data.append(f"  Roll {i + 1}:")
+                for pos, value in roll.items():
+                    debug_log_data.append(f"    {toa(pos)} {pos}: {value}")
+        if empty:
             debug_log_data[-1] += " None"
-        debug_log_data.append("Probabilistic piece history:")
+        empty = True
+        debug_log_data.append(f"Probabilistic piece history ({len(self.probabilistic_piece_history)}):")
         for i, pieces in enumerate(self.probabilistic_piece_history):
-            debug_log_data.append(f"  Ply {i + 1}:")
-            for pos, piece in sorted(pieces, key=lambda x: x[0]):
-                debug_log_data.append(f"    {pos}: {piece.name}")
-            if not pieces:
-                debug_log_data[-1] += " None"
-        if not self.probabilistic_piece_history:
+            if pieces:
+                empty = False
+                debug_log_data.append(f"  Ply {i + 1}:")
+                for pos, piece in sorted(pieces, key=lambda x: x[0]):
+                    debug_log_data.append(f"    {toa(pos)} {pos}: {piece.name}")
+        if empty:
             debug_log_data[-1] += " None"
         debug_log_data.append(f"Roll seed: {self.roll_seed} (update: {self.board_config['update_roll_seed']})")
         debug_log_data.append(f"Piece set seed: {self.set_seed}")
