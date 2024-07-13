@@ -324,6 +324,7 @@ class Board(Window):
         self.color_scheme = colors[self.color_index]  # current color scheme
         self.background_color = self.color_scheme["background_color"]  # background color
         self.log_data = []  # list of presently logged strings
+        self.skip_mouse_move = False  # setting this to True skips one mouse movement offset
         self.hovered_square = None  # square we are currently hovering over
         self.clicked_square = None  # square we clicked on
         self.selected_square = None  # square selected for moving
@@ -758,9 +759,10 @@ class Board(Window):
                 f"but is {(self.board_width, self.board_height)})"
             )
 
-        self.update_sprites(*data['window_size'], data['flip_mode'])
+        self.resize(*data['window_size'])
         if self.square_size != data['square_size']:
             print(f"Warning: Square size does not match (was {data['square_size']}, but is {self.square_size})")
+        self.update_sprites(data['flip_mode'])
 
         self.color_index = data['color_index']
         self.color_scheme = colors[self.color_index]
@@ -2154,8 +2156,7 @@ class Board(Window):
             old_position, from_size, from_origin, from_flip_mode
         ))
 
-    def update_sprites(self, width: float, height: float, flip_mode: bool) -> None:
-        super().on_resize(width, height)
+    def update_sprites(self, flip_mode: bool) -> None:
         old_size = self.square_size
         self.square_size = min(self.width / (self.board_width + 2), self.height / (self.board_height + 2))
         old_origin = self.origin
@@ -2189,9 +2190,10 @@ class Board(Window):
         else:
             self.update_highlight(self.get_board_position(self.highlight.position, old_size, old_origin))
             self.hovered_square = None
+        self.skip_mouse_move = True
 
     def flip_board(self) -> None:
-        self.update_sprites(self.width, self.height, not self.flip_mode)
+        self.update_sprites(not self.flip_mode)
 
     def is_trickster_mode(self) -> bool:
         return self.trickster_color_index != 0
@@ -2223,6 +2225,10 @@ class Board(Window):
                 if isinstance(sprite, abc.Piece) and not sprite.is_empty():
                     sprite.angle = 0
 
+    def resize(self, width: int, height: int):
+        min_width, min_height = (self.board_width + 2) * min_size, (self.board_height + 2) * min_size
+        self.set_size(max(width, min_width), max(height, min_height))
+
     def on_draw(self):
         self.update_trickster_mode()
         start_render()
@@ -2247,7 +2253,8 @@ class Board(Window):
             self.trickster_angle_delta += delta_time
 
     def on_resize(self, width: float, height: float):
-        self.update_sprites(width, height, self.flip_mode)
+        super().on_resize(width, height)
+        self.update_sprites(self.flip_mode)
 
     def on_deactivate(self):
         self.hovered_square = None
@@ -2323,6 +2330,8 @@ class Board(Window):
 
     def on_mouse_motion(self, x, y, dx, dy) -> None:
         if not self.held_buttons:
+            if self.skip_mouse_move:
+                dx, dy = 0, 0
             pos = self.get_board_position((x + dx, y + dy))
             self.update_highlight(pos)
 
@@ -2581,32 +2590,32 @@ class Board(Window):
             self.set_fullscreen(not self.fullscreen)
         if symbol == key.MINUS:  # (-) Decrease window size
             if modifiers & key.MOD_ACCEL and modifiers & key.MOD_SHIFT:
-                self.set_size((self.board_width + 2) * min_size, (self.board_height + 2) * min_size)
+                self.resize((self.board_width + 2) * min_size, (self.board_height + 2) * min_size)
             elif modifiers & key.MOD_ACCEL:
                 width, height = self.get_size()
-                self.set_size(
+                self.resize(
                     width - (self.board_width + 2) * size_step,
                     height - (self.board_height + 2) * size_step
                 )
             elif modifiers & key.MOD_SHIFT:
                 width, height = self.get_size()
                 size = min(round(width / (self.board_width + 2)), round(height / (self.board_height + 2)))
-                self.set_size((self.board_width + 2) * size, (self.board_height + 2) * size)
+                self.resize((self.board_width + 2) * size, (self.board_height + 2) * size)
         if symbol == key.EQUAL:  # (+) Increase window size
             if modifiers & key.MOD_ACCEL and modifiers & key.MOD_SHIFT:
-                self.set_size((self.board_width + 2) * max_size, (self.board_height + 2) * max_size)
+                self.resize((self.board_width + 2) * max_size, (self.board_height + 2) * max_size)
             elif modifiers & key.MOD_ACCEL:
                 width, height = self.get_size()
-                self.set_size(
+                self.resize(
                     width + (self.board_width + 2) * size_step,
                     height + (self.board_height + 2) * size_step
                 )
             elif modifiers & key.MOD_SHIFT:
                 width, height = self.get_size()
                 size = max(round(width / (self.board_width + 2)), round(height / (self.board_height + 2)))
-                self.set_size((self.board_width + 2) * size, (self.board_height + 2) * size)
+                self.resize((self.board_width + 2) * size, (self.board_height + 2) * size)
         if symbol == key.KEY_0 and modifiers & key.MOD_ACCEL:  # Reset window size
-            self.set_size((self.board_width + 2) * default_size, (self.board_height + 2) * default_size)
+            self.resize((self.board_width + 2) * default_size, (self.board_height + 2) * default_size)
         if symbol == key.E:
             if modifiers & key.MOD_SHIFT:  # Empty board
                 self.empty_board()
