@@ -2921,7 +2921,7 @@ class Board(Window):
         for i, group in enumerate(piece_groups):
             debug_log_data.append(f"  ID {i:0{digits}d}: {group['name']}")
         for i in sorted(self.chaos_sets):
-            debug_log_data.append(f"  ID {-(i+1):0{digits}d}: {self.chaos_sets[i]['name']}")
+            debug_log_data.append(f"  ID {-i:0{digits}d}: {self.chaos_sets[i][1]}")
         debug_log_data.append(
             f"ID blocklist ({len(self.board_config['block_ids'])}): "
             f"{', '.join(str(i) for i in self.board_config['block_ids']) or 'None'}"
