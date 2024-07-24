@@ -2,13 +2,12 @@ from __future__ import annotations
 
 from copy import copy
 from enum import Enum
-from os.path import isfile
 from typing import TYPE_CHECKING, Type
 
 from arcade import Color, Sprite, load_texture
 
 from chess.movement.util import AnyDirection, Position
-from chess.util import Default
+from chess.util import Default, get_texture_path
 
 if TYPE_CHECKING:
     from chess.board import Board
@@ -99,7 +98,7 @@ class Piece(Sprite):
         self.texture_side = self.side
         self.texture_name = self.file_name
         super().__init__(
-            self.texture_path(),
+            get_texture_path(self.texture_path),
             flipped_horizontally=self.flipped_horizontally,
             flipped_vertically=self.flipped_vertically,
         )
@@ -134,10 +133,9 @@ class Piece(Sprite):
         clone.is_hidden = self.is_hidden
         return clone
 
+    @property
     def texture_path(self) -> str:
-        path = f"assets/{self.texture_folder}/{self.texture_side.file_prefix()}{self.texture_name}.png"
-        fallback_path = f"assets/{self.texture_folder}/{self.texture_name}.png"
-        return path if isfile(path) else fallback_path
+        return f"assets/{self.texture_folder}/{self.texture_side.file_prefix()}{self.texture_name}.png"
 
     def reload(
         self,
@@ -153,7 +151,7 @@ class Piece(Sprite):
         self.texture_folder = asset_folder or self.texture_folder
         self.texture_side = side or self.texture_side
         self.texture_name = file_name or self.texture_name
-        texture_path = self.texture_path()
+        texture_path = get_texture_path(self.texture_path)
         if flipped_horizontally is None:
             flipped_horizontally = self.flipped_horizontally
         else:

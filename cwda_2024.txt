@@ -312,11 +312,11 @@ B - Contrastewardess (mBcR): Moves passively as a bishop and captures as a rook,
 Q - Antipaladess (NmBcR): Knight/contrastewardess compound, moves passively as an archbishop and captures as a chancellor (for context, I would call a compound of a knight and a contrasteward [mFcW] an antipaladin [KmFcW])
 
 Asymmetrical Assaulters: These pieces have moves that aren't symmetrical along the vertical axis, and may move differently depending on which side of the board they're on
-R (left) - Right Biok (sRfrblB): Like a horizontal rook or a forward-right and back-left bishop
-R (right) - Left Biok (sRflbrB): Like a horizontal rook or a forward-left and back-right bishop
-N - Knisher (lBrhNl,rBlhNr): On the left side of the board, a knight on right and a bishop on left, and on the right side of the board, the other way around
+R (left) - Right Que (sRfrblB): Like a horizontal rook or a forward-right and back-left bishop
+R (right) - Left Que (sRflbrB): Like a horizontal rook or a forward-left and back-right bishop
+N - Knish (lBrhNl,rBlhNr): On the left side of the board, a knight on right and a bishop on left, and on the right side of the board, the other way around
 B - Blizzard (FflbrBfrrfbllbCl,FfrblBfllfbrrbCr): On the left side of the board, a bishop forward-left or backward-right and otherwise away from those lines as a wizard, and on the right side of the board, the other way around
-Q - Archannel (RlBrhNl,RrBlhNr): Knisher/rook compound
+Q - Chanqueen (RlBrhNl,RrBlhNr): Knish/rook compound
 
 Colorful Characters: Each of these pieces moves differently depending on what color they're on while not being that much more or less powerful on either color
 R (starting on dark) - Elkrider (Rb,NNw): If on dark, can move as a rook, but if on light, can move as a nightrider (for context, an elk (Rb,Nw) would be like this piece, but it can only go as a knight on light)

@@ -3,8 +3,8 @@ from chess.movement.util import rot, rot2, symh
 from chess.pieces.pieces import Piece
 
 
-class LBiok(Piece):
-    name = 'Left Biok'
+class LQue(Piece):
+    name = 'Left Que'
     file_name = 'sRflbrB'
     asset_folder = 'asymmetry'
 
@@ -16,8 +16,8 @@ class LBiok(Piece):
         )
 
 
-class RBiok(Piece):
-    name = 'Right Biok'
+class RQue(Piece):
+    name = 'Right Que'
     file_name = 'sRfrblB'
     asset_folder = 'asymmetry'
 
@@ -29,8 +29,8 @@ class RBiok(Piece):
         )
 
 
-class Knisher(Piece):
-    name = 'Knisher'
+class Knish(Piece):
+    name = 'Knish'
     file_name = '(lBrhNl,rBlhNr)'
     asset_folder = 'asymmetry'
 
@@ -64,8 +64,8 @@ class Blizzard(Piece):
         )
 
 
-class Archannel(Piece):
-    name = 'Archannel'
+class Chanqueen(Piece):
+    name = 'Chanqueen'
     file_name = '(RlBrhNl,RrBlhNr)'
     asset_folder = 'asymmetry'
 

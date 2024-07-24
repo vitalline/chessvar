@@ -3,8 +3,8 @@ from datetime import datetime
 from itertools import product, zip_longest
 from json import dump, load
 from math import ceil, sqrt
-from os import curdir, name as os_name, system
-from os.path import abspath, isfile, join
+from os import name as os_name, system
+from os.path import isfile, join
 from random import Random
 from sys import argv
 from traceback import print_exc
@@ -43,7 +43,7 @@ from chess.pieces.groups import zebra as zb
 from chess.pieces.groups.util import NoPiece
 from chess.pieces.pieces import Side
 from chess.save import load_move, load_piece, load_rng, load_type, save_move, save_piece, save_rng, save_type
-from chess.util import Default, Unset
+from chess.util import Default, Unset, base_dir
 
 piece_groups: list[dict[str, str | list[Type[abc.Piece]]]] = [
     {
@@ -72,7 +72,7 @@ piece_groups: list[dict[str, str | list[Type[abc.Piece]]]] = [
     },
     {
         'name': "Asymmetrical Assaulters",
-        'set': [ay.RBiok, ay.Knisher, ay.Blizzard, ay.Archannel, fide.King, ay.Blizzard, ay.Knisher, ay.LBiok],
+        'set': [ay.RQue, ay.Knish, ay.Blizzard, ay.Chanqueen, fide.King, ay.Blizzard, ay.Knish, ay.LQue],
     },
     {
         'name': "Avian Airforce",
@@ -259,7 +259,6 @@ max_seed = 2 ** 32 - 1
 
 movements = []
 
-base_dir = abspath(curdir)
 config_path = join(base_dir, 'config.ini')
 
 invalid_chars = ':<>|"?*'
