@@ -759,9 +759,9 @@ class Board(Window):
             )
 
         self.resize(*data['window_size'])
+        self.update_sprites(data['flip_mode'])
         if self.square_size != data['square_size']:
             print(f"Warning: Square size does not match (was {data['square_size']}, but is {self.square_size})")
-        self.update_sprites(data['flip_mode'])
 
         self.color_index = data['color_index']
         self.color_scheme = colors[self.color_index]
@@ -1503,7 +1503,11 @@ class Board(Window):
     def update_auto_captures(self, move: Move, side: Side) -> None:
         if move.is_edit:
             return
-        while move.chained_move:
+        first_move = move
+        while move.chained_move and not issubclass(
+            move.chained_move.movement_type,
+            movement.AutoRangedAutoCaptureRiderMovement
+        ):
             move = move.chained_move
         if move.pos_to in self.auto_capture_markers[side]:
             piece_poss = self.auto_capture_markers[side][move.pos_to]
@@ -1518,6 +1522,8 @@ class Board(Window):
                     captured_piece=move.piece,
                 )
                 move.chained_move = chained_move
+                if first_move.promotion is not None:
+                    first_move.promotion = None
 
     def update_promotion_auto_captures(self, move: Move) -> None:
         piece = self.get_piece(move.pos_to)
@@ -1810,8 +1816,9 @@ class Board(Window):
                 }''')
                 chained_move = chained_move.chained_move
                 if chained_move:
-                    self.move(chained_move)
+                    chained_move.piece.move(chained_move)
                     self.update_auto_capture_markers(chained_move)
+                    chained_move.set(piece=copy(chained_move.piece))
         else:
             if last_move.pos_from is not None:
                 self.update_move(last_move)
@@ -1819,9 +1826,9 @@ class Board(Window):
                 self.update_auto_captures(last_move, self.turn_side.opponent())
             chained_move = last_move
             while chained_move:
-                chained_move = copy(chained_move)
                 chained_move.piece.move(chained_move)
                 self.update_auto_capture_markers(chained_move)
+                chained_move.set(piece=copy(chained_move.piece))
                 self.log(f'''[Ply {self.ply_count}] Redo: {
                     f"{'Edit' if chained_move.is_edit else 'Move'}: " + str(chained_move)
                 }''')
@@ -1840,13 +1847,13 @@ class Board(Window):
                 if chained_move:
                     self.update_move(chained_move)
             if self.chain_start is None:
-                self.chain_start = last_move
-                self.move_history.append(deepcopy(last_move))
+                self.chain_start = deepcopy(last_move)
+                self.move_history.append(self.chain_start)
             else:
                 last_history_move = self.chain_start
                 while last_history_move.chained_move:
                     last_history_move = last_history_move.chained_move
-                last_history_move.chained_move = last_move
+                last_history_move.chained_move = deepcopy(last_move)
         # do not pop move from future history because compare_history() will do it for us
         if (
             last_chain_move is None or last_chain_move.chained_move is None
@@ -2285,8 +2292,9 @@ class Board(Window):
                         )
                         chained_move = chained_move.chained_move
                         if chained_move:
-                            self.move(chained_move)
+                            chained_move.piece.move(chained_move)
                             self.update_auto_capture_markers(chained_move)
+                            chained_move.set(piece=copy(chained_move.piece))
                     self.ply_count += not self.move_history[-1].is_edit
                     self.compare_history()
                     self.advance_turn()
@@ -2465,17 +2473,18 @@ class Board(Window):
                 while chained_move:
                     chained_move.piece.move(chained_move)
                     self.update_auto_capture_markers(chained_move)
+                    chained_move.set(piece=copy(chained_move.piece))
                     if self.promotion_piece is None:
                         self.log(f"[Ply {self.ply_count}] Move: {chained_move}")
                     chained_move = chained_move.chained_move
                 if self.chain_start is None:
-                    self.chain_start = move
-                    self.move_history.append(deepcopy(self.chain_start))
+                    self.chain_start = deepcopy(move)
+                    self.move_history.append(self.chain_start)
                 else:
                     last_move = self.chain_start
                     while last_move.chained_move:
                         last_move = last_move.chained_move
-                    last_move.chained_move = move
+                    last_move.chained_move = deepcopy(move)
                 if move.chained_move is Unset and not self.promotion_piece:
                     self.load_moves()
                     self.select_piece(move.pos_to)
@@ -2837,6 +2846,7 @@ class Board(Window):
                     while chained_move:
                         chained_move.piece.move(chained_move)
                         self.update_auto_capture_markers(chained_move)
+                        chained_move.set(piece=copy(chained_move.piece))
                         if self.promotion_piece is None:
                             self.log(f"[Ply {self.ply_count}] Move: {chained_move}")
                         chained_move = chained_move.chained_move
