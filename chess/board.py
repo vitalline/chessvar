@@ -1047,7 +1047,7 @@ class Board(Window):
             random_set_poss = [[[0, 4], [7]], [[1], [6]], [[2], [5]], [[3]]]
         else:
             random_set_poss = [[[0, 4, 7]], [[1, 6]], [[2, 5]], [[3]]]
-        blocked_ids = set(self.piece_set_ids.values()).union(self.board_config['block_ids_chaos'])
+        blocked_ids = set(self.board_config['block_ids_chaos'])
         piece_set_ids = list(i for i in range(len(piece_groups)) if i not in blocked_ids)
         piece_set = empty_row.copy()
         for i, group in enumerate(random_set_poss):
@@ -1058,7 +1058,7 @@ class Board(Window):
         return piece_set, get_set_name(piece_set)
 
     def get_extremely_random_set(self, side: Side, asymmetrical: bool = False) -> tuple[list[Type[abc.Piece]], str]:
-        blocked_ids = set(self.piece_set_ids.values()).union(self.board_config['block_ids_chaos'])
+        blocked_ids = set(self.board_config['block_ids_chaos'])
         piece_set_ids = list(i for i in range(len(piece_groups)) if i not in blocked_ids)
         piece_pos_ids = [i for i in range(4)] + [7]
         piece_poss = [
@@ -2558,7 +2558,7 @@ class Board(Window):
             self.save_board(2 if modifiers & key.MOD_SHIFT else None)
         if symbol == key.R:  # Restart
             if modifiers & key.MOD_SHIFT:  # Randomize piece sets
-                blocked_ids = set(self.piece_set_ids.values()).union(self.board_config['block_ids'])
+                blocked_ids = set(self.board_config['block_ids'])
                 piece_set_ids = list(i for i in range(len(piece_groups)) if i not in blocked_ids)
                 if modifiers & key.MOD_ACCEL:  # Randomize piece sets (same for both sides)
                     self.log(f"[Ply {self.ply_count}] Info: Starting new game (with a random piece set)")
