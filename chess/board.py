@@ -2705,7 +2705,10 @@ class Board(Window):
                 self.compare_history()
                 self.advance_turn()
             elif modifiers & key.MOD_SHIFT:
-                if self.piece_set_ids[Side.WHITE] == self.piece_set_ids[Side.BLACK]:  # Next piece set
+                if (
+                    self.piece_set_ids[Side.WHITE] == self.piece_set_ids[Side.BLACK]
+                    and None not in self.piece_set_ids.values()
+                ):  # Next piece set
                     d = -1 if modifiers & key.MOD_ACCEL else 1
                     self.piece_set_ids[Side.WHITE] = (
                         (self.piece_set_ids[Side.WHITE] + len(self.chaos_sets) + d)
