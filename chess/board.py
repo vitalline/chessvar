@@ -801,7 +801,7 @@ class Board(Window):
         save_piece_sets = {Side(int(v)): [load_type(t) for t in d] for v, d in data['sets'].items()}
         update_sets = False
         for side in self.piece_sets:
-            if self.piece_sets[side] is None:
+            if self.piece_set_ids[side] is None:
                 self.piece_sets[side] = save_piece_sets[side]
                 self.piece_set_names[side] = get_set_name(self.piece_sets[side])
                 continue
