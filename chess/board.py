@@ -795,6 +795,10 @@ class Board(Window):
         save_piece_sets = {Side(int(v)): [load_type(t) for t in d] for v, d in data['sets'].items()}
         update_sets = False
         for side in self.piece_sets:
+            if self.piece_sets[side] is None:
+                self.piece_sets[side] = save_piece_sets[side]
+                self.piece_set_names[side] = get_set_name(self.piece_sets[side])
+                continue
             for i, pair in enumerate(zip(save_piece_sets[side], self.piece_sets[side])):
                 if pair[0] != pair[1]:
                     # this can mean a few things, namely the RNG implementation changing or new sets/pieces being added.
@@ -878,16 +882,19 @@ class Board(Window):
             self.log(f"[Ply {self.ply_count}] Info: Using royal check rule (threaten any royal piece)")
         if self.royal_piece_mode == 2:
             self.log(f"[Ply {self.ply_count}] Info: Using quasi-royal check rule (threaten last royal piece)")
-        some = 'regular' if not self.chaos_mode else 'chaotic'
-        same = self.piece_set_ids[Side.WHITE] == self.piece_set_ids[Side.BLACK]
-        if self.chaos_mode in {3, 4}:
-            some = f"extremely {some}"
-        if self.chaos_mode in {2, 4}:
-            some = f"asymmetrical {some}"
-        if same:
-            some = f"a{'' if self.chaos_mode in {0, 1} else 'n'} {some}"
-        sets = "set" if same else "sets"
-        self.log(f"[Ply {self.ply_count}] Info: Resuming saved game (with {some} piece {sets})")
+        if None in self.piece_set_ids.values():
+            self.log(f"[Ply {self.ply_count}] Info: Resuming saved game (with custom piece sets)")
+        else:
+            some = 'regular' if not self.chaos_mode else 'chaotic'
+            same = self.piece_set_ids[Side.WHITE] == self.piece_set_ids[Side.BLACK]
+            if self.chaos_mode in {3, 4}:
+                some = f"extremely {some}"
+            if self.chaos_mode in {2, 4}:
+                some = f"asymmetrical {some}"
+            if same:
+                some = f"a{'' if self.chaos_mode in {0, 1} else 'n'} {some}"
+            sets = "set" if same else "sets"
+            self.log(f"[Ply {self.ply_count}] Info: Resuming saved game (with {some} piece {sets})")
         self.log(
             f"[Ply {self.ply_count}] Game: "
             f"{self.piece_set_names[Side.WHITE] if not self.should_hide_pieces else '???'} vs. "
@@ -1024,7 +1031,10 @@ class Board(Window):
         piece_sets = {Side.WHITE: [], Side.BLACK: []}
         piece_names = {Side.WHITE: [], Side.BLACK: []}
         for side in piece_set_ids:
-            if piece_set_ids[side] < 0:
+            if piece_set_ids[side] is None:
+                piece_sets[side] = self.piece_sets[side].copy()
+                piece_names[side] = self.piece_set_names[side]
+            elif piece_set_ids[side] < 0:
                 for i in range(-piece_set_ids[side]):
                     if i + 1 not in self.chaos_sets:
                         self.chaos_sets[i + 1] = self.get_chaos_set(side)
@@ -2110,7 +2120,8 @@ class Board(Window):
         penultima_hide: bool = None,
     ) -> None:
         if penultima_flip is None:
-            penultima_flip = (self.chaos_mode in {2, 4}) and (self.piece_set_ids[piece.side] < 0)
+            set_id = self.piece_set_ids[piece.side]
+            penultima_flip = (self.chaos_mode in {2, 4}) and (set_id is None or set_id < 0)
         penultima_pieces = self.penultima_pieces.get(piece.side, {})
         if asset_folder is None:
             if piece.is_hidden is False:
@@ -2653,7 +2664,7 @@ class Board(Window):
                     (self.piece_set_ids[Side.WHITE] + len(self.chaos_sets) + d)
                     % (len(piece_groups) + len(self.chaos_sets))
                     - len(self.chaos_sets)
-                )
+                ) if self.piece_set_ids[Side.WHITE] is not None else 0
                 self.reset_board(update=True)
         if symbol == key.B:  # Black
             if modifiers & key.MOD_ACCEL and not modifiers & key.MOD_SHIFT:  # Black is in control
@@ -2670,7 +2681,7 @@ class Board(Window):
                     (self.piece_set_ids[Side.BLACK] + len(self.chaos_sets) + d)
                     % (len(piece_groups) + len(self.chaos_sets))
                     - len(self.chaos_sets)
-                )
+                ) if self.piece_set_ids[Side.BLACK] is not None else 0
                 self.reset_board(update=True)
         if symbol == key.N:  # Next
             if modifiers & key.MOD_ACCEL and not modifiers & key.MOD_SHIFT and not self.chain_start:  # Next player
@@ -2687,15 +2698,15 @@ class Board(Window):
                         (self.piece_set_ids[Side.WHITE] + len(self.chaos_sets) + d)
                         % (len(piece_groups) + len(self.chaos_sets))
                         - len(self.chaos_sets)
-                    )
+                    ) if self.piece_set_ids[Side.WHITE] is not None else 0
                     self.piece_set_ids[Side.BLACK] = (
                         (self.piece_set_ids[Side.BLACK] + len(self.chaos_sets) + d)
                         % (len(piece_groups) + len(self.chaos_sets))
                         - len(self.chaos_sets)
-                    )
+                    ) if self.piece_set_ids[Side.BLACK] is not None else 0
                 else:  # Next player goes first
-                    piece_set_ids = self.piece_set_ids[Side.WHITE], self.piece_set_ids[Side.BLACK]
-                    self.piece_set_ids[Side.BLACK], self.piece_set_ids[Side.WHITE] = piece_set_ids
+                    for data in (self.piece_sets, self.piece_set_ids, self.piece_set_names):
+                        data[Side.WHITE], data[Side.BLACK] = data[Side.BLACK], data[Side.WHITE]
                 self.reset_board(update=True)
         if symbol == key.P:  # Promotion
             if self.edit_mode:
@@ -2939,10 +2950,14 @@ class Board(Window):
             f"Chaos ID blocklist ({len(self.board_config['block_ids_chaos'])}): "
             f"{', '.join(str(i) for i in self.board_config['block_ids_chaos']) or 'None'}"
         )
+        side_id_strings = {
+            side: '-' * digits if set_id is None else f"{set_id:0{digits}d}"
+            for side, set_id in self.piece_set_ids.items()
+        }
         debug_log_data.append(
             f"Game: "
-            f"(ID {self.piece_set_ids[Side.WHITE]:0{digits}d}) {self.piece_set_names[Side.WHITE]} vs. "
-            f"(ID {self.piece_set_ids[Side.BLACK]:0{digits}d}) {self.piece_set_names[Side.BLACK]}"
+            f"(ID {side_id_strings[Side.WHITE]}) {self.piece_set_names[Side.WHITE]} vs. "
+            f"(ID {side_id_strings[Side.BLACK]}) {self.piece_set_names[Side.BLACK]}"
         )
         for side in self.piece_set_ids:
             debug_log_data.append(f"{side} setup: {', '.join(piece.name for piece in self.piece_sets[side])}")
