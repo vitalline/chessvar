@@ -1081,7 +1081,6 @@ class Board(Window):
             (i, j) for i in piece_set_ids for j in piece_pos_ids
             if j < 4 or get_set(side, i)[j] != get_set(side, i)[7 - j]
         ]
-        print(len(piece_poss))
         random_set_ids = self.chaos_rng.sample(piece_poss, k=7 if asymmetrical else 4)
         if asymmetrical:
             random_set_poss = [[i] for i in range(8) if i != 4]
