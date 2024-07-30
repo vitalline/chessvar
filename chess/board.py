@@ -1569,13 +1569,13 @@ class Board(Window):
                     moved_piece.movement.unmark(move.pos_from, moved_piece)
                 if move.pos_from is None or move.is_edit or move.promotion:
                     moved_piece.movement.mark(move.pos_to, moved_piece)
-                if move.captured_piece is not None:
-                    if isinstance(move.captured_piece.movement, movement.AutoRangedAutoCaptureRiderMovement):
-                        move.captured_piece.movement.unmark(move.captured_piece.board_pos, move.captured_piece)
-                if move.swapped_piece is not None:
-                    if isinstance(move.swapped_piece.movement, movement.AutoRangedAutoCaptureRiderMovement):
-                        move.swapped_piece.movement.unmark(move.pos_to, move.swapped_piece)
-                        move.swapped_piece.movement.mark(move.pos_from, move.swapped_piece)
+            if move.captured_piece is not None:
+                if isinstance(move.captured_piece.movement, movement.AutoRangedAutoCaptureRiderMovement):
+                    move.captured_piece.movement.unmark(move.captured_piece.board_pos, move.captured_piece)
+            if move.swapped_piece is not None:
+                if isinstance(move.swapped_piece.movement, movement.AutoRangedAutoCaptureRiderMovement):
+                    move.swapped_piece.movement.unmark(move.pos_to, move.swapped_piece)
+                    move.swapped_piece.movement.mark(move.pos_from, move.swapped_piece)
             move = move.chained_move
 
     def revert_auto_capture_markers(self, move: Move) -> None:
@@ -1594,13 +1594,13 @@ class Board(Window):
                     moved_piece.movement.unmark(move.pos_to, moved_piece)
                 if move.pos_to is None or move.is_edit or move.promotion:
                     moved_piece.movement.mark(move.pos_from, moved_piece)
-                if move.captured_piece is not None:
-                    if isinstance(move.captured_piece.movement, movement.AutoRangedAutoCaptureRiderMovement):
-                        move.captured_piece.movement.mark(move.captured_piece.board_pos, move.captured_piece)
-                if move.swapped_piece is not None:
-                    if isinstance(move.swapped_piece.movement, movement.AutoRangedAutoCaptureRiderMovement):
-                        move.swapped_piece.movement.unmark(move.pos_from, move.swapped_piece)
-                        move.swapped_piece.movement.mark(move.pos_to, move.swapped_piece)
+            if move.captured_piece is not None:
+                if isinstance(move.captured_piece.movement, movement.AutoRangedAutoCaptureRiderMovement):
+                    move.captured_piece.movement.mark(move.captured_piece.board_pos, move.captured_piece)
+            if move.swapped_piece is not None:
+                if isinstance(move.swapped_piece.movement, movement.AutoRangedAutoCaptureRiderMovement):
+                    move.swapped_piece.movement.unmark(move.pos_from, move.swapped_piece)
+                    move.swapped_piece.movement.mark(move.pos_to, move.swapped_piece)
 
     def compare_history(self) -> None:
         # check if the last move matches the first future move
