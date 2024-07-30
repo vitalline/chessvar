@@ -2974,7 +2974,7 @@ class Board(Window):
             f"{', '.join(str(i) for i in self.board_config['block_ids_chaos']) or 'None'}"
         )
         side_id_strings = {
-            side: '-' * digits if set_id is None else f"{set_id:0{digits}d}"
+            side: '-' if set_id is None else f"{set_id:0{digits}d}"
             for side, set_id in self.piece_set_ids.items()
         }
         debug_log_data.append(
