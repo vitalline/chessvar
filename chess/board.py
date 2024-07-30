@@ -319,7 +319,7 @@ class Board(Window):
             self.board_config['color_id'] %= len(colors)
             self.board_config.save(config_path)
 
-        self.color_index = self.board_config['color_id']  # index of the current color scheme
+        self.color_index = self.board_config['color_id'] or 0  # index of the current color scheme
         self.color_scheme = colors[self.color_index]  # current color scheme
         self.background_color = self.color_scheme["background_color"]  # background color
         self.log_data = []  # list of presently logged strings
@@ -399,7 +399,8 @@ class Board(Window):
         self.promotion_piece_sprite_list = SpriteList()  # sprites for the possible promotion pieces
 
         # load piece set ids from the config
-        self.piece_set_ids = {side: self.board_config[f'{side.key()}id'] for side in self.piece_set_ids}
+        for side in self.piece_set_ids:
+            self.piece_set_ids[side] = self.board_config[f'{side.key()}id'] or self.piece_set_ids[side]
         self.edit_piece_set_id = self.board_config['edit_id']
 
         # initialize random number seeds and generators
@@ -692,7 +693,10 @@ class Board(Window):
             'square_size': self.square_size,
             'flip_mode': self.flip_mode,
             'color_index': self.color_index,
-            'color_scheme': {k: list(v) if isinstance(v, tuple) else v for k, v in colors[self.color_index].items()},
+            'color_scheme': {
+                k: list(v) if isinstance(v, tuple) else v
+                for k, v in (colors[self.color_index] if self.color_index is not None else self.color_scheme).items()
+            },
             'selection': toa(self.selected_square) if self.selected_square else None,
             'set_blocklist': self.board_config['block_ids'],
             'chaos_blocklist': self.board_config['block_ids_chaos'],
@@ -764,13 +768,15 @@ class Board(Window):
             print(f"Warning: Square size does not match (was {data['square_size']}, but is {self.square_size})")
 
         self.color_index = data['color_index']
-        self.color_scheme = colors[self.color_index]
+        if self.color_index is not None:  # None here means we're using a custom color scheme as defined in the savefile
+            self.color_scheme = colors[self.color_index]
         for k, v in self.color_scheme.items():
             old = (tuple(data['color_scheme'][k]) if isinstance(v, tuple) else data['color_scheme'][k])
             if v != old:
-                print(f"Warning: Color scheme does not match ({k} was {old}, but is {v})")
                 self.color_scheme[k] = old  # first time when we might have enough information to fully restore old data
                 # in all cases before we had to pick one or the other, but here we can try to reload the save faithfully
+                if self.color_index is not None:  # warning if there's an explicitly defined color scheme and it doesn't
+                    print(f"Warning: Color scheme does not match ({k} was {old}, but is {v})")  # match the saved scheme
 
         self.board_config['block_ids'] = data['set_blocklist']
         self.board_config['block_ids_chaos'] = data['chaos_blocklist']
@@ -2063,7 +2069,6 @@ class Board(Window):
                 self.color_pieces()
 
     def update_colors(self) -> None:
-        self.color_scheme = colors[self.color_index]
         if self.is_trickster_mode():
             self.color_scheme = copy(self.color_scheme)
             new_colors = (
@@ -2236,6 +2241,14 @@ class Board(Window):
     def reset_trickster_mode(self) -> None:
         if self.is_trickster_mode():
             return  # trickster mode is enabled
+        if self.color_index is None:
+            self.color_index = 0
+            while colors[self.color_index]["scheme_type"] != "cherub":
+                self.color_index += 1
+                if self.color_index >= len(colors):
+                    self.color_index = 0
+                    break
+        self.color_scheme = colors[self.color_index]
         self.update_colors()
         for sprite_list in (self.piece_sprite_list, self.promotion_piece_sprite_list, [self.active_piece]):
             for sprite in sprite_list:
@@ -2750,10 +2763,16 @@ class Board(Window):
                 while self.future_move_history:
                     self.redo_last_move()
         if symbol == key.G and not self.is_trickster_mode():  # Graphics
+            old_color_index = self.color_index
             if modifiers & key.MOD_ACCEL and not modifiers & key.MOD_SHIFT:  # Graphics reset
                 self.color_index = 0
             elif modifiers & key.MOD_SHIFT:  # Graphics shift
-                self.color_index = (self.color_index + (-1 if modifiers & key.MOD_ACCEL else 1)) % len(colors)
+                if self.color_index is None:
+                    self.color_index = 0
+                else:
+                    self.color_index = (self.color_index + (-1 if modifiers & key.MOD_ACCEL else 1)) % len(colors)
+            if old_color_index != self.color_index:
+                self.color_scheme = colors[self.color_index]
                 self.update_colors()
         if symbol == key.H:  # Hide
             old_should_hide_pieces = self.should_hide_pieces
@@ -2931,7 +2950,7 @@ class Board(Window):
         debug_log_data.append(f"Board size: {self.board_width}x{self.board_height}")
         debug_log_data.append(f"Window size: {self.width}x{self.height}")
         debug_log_data.append(f"Square size: {self.square_size}")
-        debug_log_data.append(f"Color scheme ID: {self.color_index}")
+        debug_log_data.append(f"Color scheme ID: {'-' if self.color_index is None else self.color_index}")
         debug_log_data.append("Color scheme:")
         color_scheme = deepcopy(self.color_scheme)  # just in case trickster mode messes with the color scheme RIGHT NOW
         for k, v in color_scheme.items():
