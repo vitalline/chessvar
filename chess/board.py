@@ -2710,9 +2710,9 @@ class Board(Window):
                     self.edit_piece_set_id = None
                 if old_id != self.edit_piece_set_id:
                     self.reset_edit_promotions()
-                    promotion_piece = self.promotion_piece
-                    promotion_side = self.get_promotion_side(self.promotion_piece)
-                    if promotion_piece:
+                    if self.promotion_piece:
+                        promotion_piece = self.promotion_piece
+                        promotion_side = self.get_promotion_side(promotion_piece)
                         self.end_promotion()
                         self.start_promotion(promotion_piece, self.edit_promotions[promotion_side])
         if symbol == key.O:  # Royal pieces
