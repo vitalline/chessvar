@@ -5,6 +5,7 @@ from random import Random
 from typing import TYPE_CHECKING, Type
 
 from chess.movement.move import Move
+from chess.movement.movement import BaseMovement
 from chess.movement.util import to_alpha as toa, from_alpha as fra
 from chess.pieces import pieces as abc
 from chess.pieces.groups.util import NoPiece
@@ -32,6 +33,24 @@ def load_type(data: str | None) -> Type[abc.Piece] | frozenset | None:
         return Unset
     mod, cls = data.split('.', 1)
     return getattr(import_module(f"chess.pieces.groups.{mod}"), cls)
+
+
+def save_movement(movement_type: Type[BaseMovement] | frozenset | None) -> str | None:
+    if movement_type is None:
+        return None
+    if movement_type is Unset:
+        return UNSET_STRING
+    return movement_type.__name__.removesuffix('Movement')
+
+
+def load_movement(data: str | None) -> Type[BaseMovement] | frozenset | None:
+    if data is None:
+        return None
+    if data == UNSET_STRING:
+        return Unset
+    if not data.endswith('Movement'):
+        data += 'Movement'
+    return getattr(import_module('chess.movement.movement'), data)
 
 
 def save_piece(piece: abc.Piece | frozenset | None) -> dict | str | None:
@@ -82,7 +101,7 @@ def save_move(move: Move | frozenset | None) -> dict | str | None:
     return {k: v for k, v in {
         'from': toa(move.pos_from) if move.pos_from else None,
         'to': toa(move.pos_to) if move.pos_to else None,
-        'type': move.movement_type.__name__ if move.movement_type is not None else None,
+        'type': save_movement(move.movement_type),
         'piece': save_piece(move.piece),
         'captured': save_piece(move.captured_piece),
         'swapped': save_piece(move.swapped_piece),
@@ -100,7 +119,7 @@ def load_move(data: dict | str | None, board: Board) -> Move | frozenset | None:
     return Move(
         pos_from=fra(data['from']) if 'from' in data else None,  # type: ignore
         pos_to=fra(data['to']) if 'to' in data else None,  # type: ignore
-        movement_type=getattr(import_module('chess.movement.movement'), data['type']) if 'type' in data else None,
+        movement_type=load_movement(data.get('type')),
         piece=load_piece(data.get('piece'), board),
         captured_piece=load_piece(data.get('captured'), board),
         swapped_piece=load_piece(data.get('swapped'), board),
