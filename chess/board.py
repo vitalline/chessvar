@@ -669,9 +669,6 @@ class Board(Window):
         else:
             self.future_move_history += self.move_history[::-1]
 
-        if not self.board_config['update_roll_seed']:
-            self.roll_history = []
-
         update_rolls = not self.move_history and self.roll_history
 
         if update_rolls:
