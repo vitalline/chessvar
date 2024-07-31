@@ -6,9 +6,9 @@ from math import ceil, sqrt
 from os import name as os_name, system
 from os.path import isfile, join
 from random import Random
-from sys import argv
+from sys import argv, stdout
 from traceback import print_exc
-from typing import Type
+from typing import Type, TextIO
 
 from PIL.ImageColor import getrgb
 from arcade import key, MOUSE_BUTTON_LEFT, MOUSE_BUTTON_RIGHT, Text
@@ -257,8 +257,6 @@ size_step = 5
 base_rng = Random()
 max_seed = 2 ** 32 - 1
 
-movements = []
-
 config_path = join(base_dir, 'config.ini')
 
 invalid_chars = ':<>|"?*'
@@ -269,6 +267,15 @@ def get_filename(name: str, ext: str, in_dir: str = base_dir, ts_format: str = "
     name_args = [name, datetime.now().strftime(ts_format)]
     full_name = '_'.join(s for s in name_args if s).translate(invalid_chars_trans_table)
     return join(in_dir, f"{full_name}.{ext}")
+
+
+def get_piece_types(side: Side = Side.WHITE) -> dict[Type[abc.Piece], str]:
+    piece_types = {
+        get_set(side, i)[j]
+        for i in range(len(piece_groups)) for j in [i for i in range(4)] + [7]
+        if j < 4 or get_set(side, i)[j] != get_set(side, i)[7 - j]
+    } | {fide.Pawn, fide.King, cb.King}
+    return {t: t.name + (' (CB)' if t.is_colorbound() or t == cb.King else '') for t in piece_types}
 
 
 def get_set(side: Side, set_id: int) -> list[Type[abc.Piece]]:
@@ -290,6 +297,35 @@ def get_set_name(piece_set: list[Type[abc.Piece]]) -> str:
         piece_names.append('/'.join(name_order))
     piece_set_name = ', '.join(piece_names)
     return f"({piece_set_name})"
+
+
+def print_piece_sets(fp: TextIO = stdout) -> None:
+    piece_types = get_piece_types()
+    digits = len(str(len(piece_groups)))
+    for i, group in enumerate(piece_groups):
+        for side, piece_set in (
+            [(Side.NONE, group['set'])] if 'set' in group else
+            [(side, group[f"set_{side.key()[0]}"]) for side in (Side.WHITE, Side.BLACK)]
+        ):
+            name = group['name'] + (f" - {side}" if side else '')
+            fp.write(f"ID {i:0{digits}d}{side.key()[:1]}: {name} {get_set_name(piece_set)}\n")
+            fp.write(f"  [{', '.join(piece_types[piece] for piece in piece_set)}]\n")
+            fp.write(f"  <{', '.join(save_type(piece) for piece in piece_set)}>\n")
+
+
+def print_piece_types(fp: TextIO = stdout, side: Side = Side.WHITE) -> None:
+    for name, path in sorted((n, save_type(t)) for t, n in get_piece_types(side).items()):
+        fp.write(f"{name}: {path}\n")
+
+
+def save_piece_sets(file_path: str = None) -> None:
+    with open(file_path or get_filename('debug_piece_sets', 'txt', ts_format=''), 'w') as fp:
+        print_piece_sets(fp)
+
+
+def save_piece_types(file_path: str = None, side: Side = Side.WHITE) -> None:
+    with open(file_path or get_filename('debug_piece_types', 'txt', ts_format=''), 'w') as fp:
+        print_piece_types(fp, side)
 
 
 class Board(Window):
@@ -1035,7 +1071,7 @@ class Board(Window):
         elif isinstance(piece_set_ids, int):
             piece_set_ids = {side: piece_set_ids for side in self.piece_set_ids}  # type: ignore
         piece_sets = {Side.WHITE: [], Side.BLACK: []}
-        piece_names = {Side.WHITE: [], Side.BLACK: []}
+        piece_names = {Side.WHITE: '-', Side.BLACK: '-'}
         for side in piece_set_ids:
             if piece_set_ids[side] is None:
                 piece_sets[side] = self.piece_sets[side].copy()
@@ -1044,13 +1080,16 @@ class Board(Window):
                 for i in range(-piece_set_ids[side]):
                     if i + 1 not in self.chaos_sets:
                         self.chaos_sets[i + 1] = self.get_chaos_set(side)
-                chaos_set = self.chaos_sets.get(-piece_set_ids[side], [[], '-'])
+                chaos_set = self.chaos_sets.get(-piece_set_ids[side], [empty_row, '-'])
                 piece_sets[side] = chaos_set[0].copy()
                 piece_names[side] = chaos_set[1]
             else:
                 piece_group = piece_groups[piece_set_ids[side]]
-                piece_sets[side] = get_set(side, piece_set_ids[side])
+                piece_sets[side] = get_set(side, piece_set_ids[side]).copy()
                 piece_names[side] = piece_group.get('name', '-')
+            if not piece_sets[side]:
+                piece_sets[side] = empty_row.copy()
+                piece_names[side] = '-'
         return piece_sets, piece_names
 
     def get_random_set(self, side: Side, asymmetrical: bool = False) -> tuple[list[Type[abc.Piece]], str]:
@@ -2850,11 +2889,14 @@ class Board(Window):
                 self.clear_log()
         if symbol == key.D:  # Debug
             debug_log_data = self.debug_info()
-            if modifiers & key.MOD_ACCEL:  # Save debug info
+            if modifiers & key.MOD_ACCEL:  # Save debug log
                 self.save_log(debug_log_data, "debug")
-            if modifiers & key.MOD_SHIFT:  # Print debug info
+            if modifiers & key.MOD_SHIFT:  # Print debug log
                 for string in debug_log_data:
                     print(f"[Debug] {string}")
+            if modifiers & key.MOD_ALT:  # Save debug listings
+                save_piece_sets()
+                save_piece_types()
         if symbol == key.SLASH:  # (?) Random
             if self.edit_mode:
                 return
