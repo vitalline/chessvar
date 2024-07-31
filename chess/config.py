@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from configparser import ConfigParser
 from os.path import isfile
 from typing import Any
@@ -24,7 +26,7 @@ DEFAULT_CONFIG = {
 
 
 class Config(dict):
-    def __init__(self, path: str):
+    def __init__(self, path: str = ''):
         super().__init__()
         self.base_config = None
         self.load(path)
@@ -72,5 +74,26 @@ class Config(dict):
         with open(path, 'w') as file:
             self.base_config.write(file)
 
+    def __copy__(self) -> Config:
+        copy = Config()
+        for section in self.base_config:
+            for item in self.base_config[section]:
+                copy.base_config[section][item] = self.base_config[section][item]
+        for item in self:
+            copy[item] = self[item]
+        return copy
+
+    def __deepcopy__(self, memo) -> Config:
+        copy = Config()
+        for section in self.base_config:
+            for item in self.base_config[section]:
+                copy.base_config[section][item] = self.base_config[section][item].__deepcopy__(memo)
+        for item in self:
+            copy[item] = self[item].__deepcopy__(memo)
+        return copy
+
     def __getitem__(self, key: str) -> Any:
-        return self.get(key.lower())
+        return super().get(key.lower())
+
+    def __setitem__(self, key: str, value: Any) -> None:
+        super().__setitem__(key.lower(), value)

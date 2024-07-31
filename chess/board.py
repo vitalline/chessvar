@@ -834,14 +834,14 @@ class Board(Window):
 
         self.piece_set_ids = {Side(int(k)): v for k, v in data['set_ids'].items()}
         self.piece_sets, self.piece_set_names = self.get_piece_sets()
-        save_piece_sets = {Side(int(v)): [load_type(t) for t in d] for v, d in data['sets'].items()}
+        saved_piece_sets = {Side(int(v)): [load_type(t) for t in d] for v, d in data['sets'].items()}
         update_sets = False
         for side in self.piece_sets:
             if self.piece_set_ids[side] is None:
-                self.piece_sets[side] = save_piece_sets[side]
+                self.piece_sets[side] = saved_piece_sets[side]
                 self.piece_set_names[side] = get_set_name(self.piece_sets[side])
                 continue
-            for i, pair in enumerate(zip(save_piece_sets[side], self.piece_sets[side])):
+            for i, pair in enumerate(zip(saved_piece_sets[side], self.piece_sets[side])):
                 if pair[0] != pair[1]:
                     # this can mean a few things, namely the RNG implementation changing or new sets/pieces being added.
                     # either way, we should at least try to load the old pieces defined in the save to recreate the game
@@ -851,7 +851,7 @@ class Board(Window):
                     )
                     update_sets = True
         if update_sets:
-            self.piece_sets = {side: save_piece_sets[side] for side in self.piece_sets}
+            self.piece_sets = {side: saved_piece_sets[side] for side in self.piece_sets}
             self.piece_set_names = {side: get_set_name(self.piece_sets[side]) for side in self.piece_sets}
 
         self.reset_promotions()
@@ -2976,7 +2976,7 @@ class Board(Window):
             system("cls" if os_name == "nt" else "clear")
 
     def save_config(self) -> None:
-        config = Config(config_path)
+        config = copy(self.board_config)
         config['color_id'] = self.color_index
         config['white_id'] = self.piece_set_ids[Side.WHITE]
         config['black_id'] = self.piece_set_ids[Side.BLACK]
