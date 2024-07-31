@@ -1,6 +1,6 @@
 from chess.movement import movement
 from chess.movement.util import rot, symv
-from chess.pieces.pieces import Piece
+from chess.pieces.pieces import Piece, Side
 
 
 class ElkRdr(Piece):
@@ -92,8 +92,8 @@ class Nanqueen(Piece):
             board, board_pos, side,
             movement.ColorMovement(
                 board,
-                light=[starting_movement if board.is_light_square(board_pos) else opposite_movement],
-                dark=[starting_movement if board.is_dark_square(board_pos) else opposite_movement]
+                light=[starting_movement if side == Side.WHITE else opposite_movement],
+                dark=[starting_movement if side == Side.BLACK else opposite_movement]
             ),
             **kwargs
         )
