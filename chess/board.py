@@ -672,19 +672,19 @@ class Board(Window):
         if not self.board_config['update_roll_seed']:
             self.roll_history = []
 
-        update_seed = not self.move_history and self.roll_history
+        update_rolls = not self.move_history and self.roll_history
 
-        if update_seed:
+        if update_rolls:
             self.roll_history = []
             self.future_move_history = []
             self.probabilistic_piece_history = []
 
-        if self.roll_rng is not None:
-            if update or update_seed:
-                if self.board_config['update_roll_seed']:
-                    self.roll_seed = self.roll_rng.randint(0, 2 ** 32 - 1)
-
-        self.roll_rng = Random(self.roll_seed)
+        if self.roll_rng is None:
+            self.roll_rng = Random(self.roll_seed)
+        elif update or update_rolls:
+            if self.board_config['update_roll_seed']:
+                self.roll_seed = self.roll_rng.randint(0, max_seed)
+            self.roll_rng = Random(self.roll_seed)
 
         self.move_history = []
 
@@ -989,8 +989,7 @@ class Board(Window):
         self.reset_penultima_pieces()
 
         if self.board_config['update_roll_seed']:
-            self.roll_seed = self.roll_rng.randint(0, 2 ** 32 - 1)
-
+            self.roll_seed = self.roll_rng.randint(0, max_seed)
         self.roll_rng = Random(self.roll_seed)
 
         self.move_history = []
@@ -1156,7 +1155,7 @@ class Board(Window):
         self.log(f"[Ply {self.ply_count}] Info: Starting new game (with {chaotic} piece {sets})")
         self.chaos_mode = mode
         self.chaos_sets = {}
-        self.chaos_seed = self.chaos_rng.randrange(2 ** 32)
+        self.chaos_seed = self.chaos_rng.randint(0, max_seed)
         self.chaos_rng = Random(self.chaos_seed)
         self.piece_set_ids = {Side.WHITE: -1, Side.BLACK: -1 if same else -2}
         self.reset_board(update=True)
