@@ -765,13 +765,13 @@ class Board(Window):
             'use_check': self.use_check,
             'royal_mode': self.royal_piece_mode,
             'chaos_mode': self.chaos_mode,
-            'set_seed': self.set_seed,
-            'set_state': save_rng(self.set_rng),
-            'roll_seed': self.roll_seed,
-            'roll_state': save_rng(self.roll_rng),
-            'roll_update': self.board_config['update_roll_seed'],
             'chaos_seed': self.chaos_seed,
+            'set_seed': self.set_seed,
+            'roll_seed': self.roll_seed,
+            'roll_update': self.board_config['update_roll_seed'],
             'chaos_state': save_rng(self.chaos_rng),
+            'set_state': save_rng(self.set_rng),
+            'roll_state': save_rng(self.roll_rng),
         }
         with open(get_filename('save', 'json'), 'w') as file:
             if indent is None:
@@ -832,6 +832,10 @@ class Board(Window):
         self.edit_mode = data.get('edit', self.edit_mode)
         self.edit_piece_set_id = data.get('edit_promotion', self.edit_piece_set_id)
 
+        chaos_seed = data.get('chaos_seed')
+        if chaos_seed is not None:
+            self.chaos_seed = chaos_seed
+            self.chaos_rng = Random(self.chaos_seed)
         set_seed = data.get('set_seed')
         if set_seed is not None:
             self.set_seed = set_seed
@@ -840,10 +844,6 @@ class Board(Window):
         if roll_seed is not None:
             self.roll_seed = roll_seed
             self.roll_rng = Random(self.roll_seed)
-        chaos_seed = data.get('chaos_seed')
-        if chaos_seed is not None:
-            self.chaos_seed = chaos_seed
-            self.chaos_rng = Random(self.chaos_seed)
         self.board_config['update_roll_seed'] = data.get('roll_update', self.board_config['update_roll_seed'])
 
         piece_set_ids = {Side(int(k)): v for k, v in data.get('set_ids', {}).items()}
@@ -903,12 +903,12 @@ class Board(Window):
             }, self.chain_start.piece.side.opponent(): {}
         } if self.chain_start else {}
 
+        if 'chaos_state' in data:
+            self.chaos_rng = load_rng(data['chaos_state'])
         if 'set_state' in data:
             self.set_rng = load_rng(data['set_state'])
         if 'roll_state' in data:
             self.roll_rng = load_rng(data['roll_state'])
-        if 'chaos_state' in data:
-            self.chaos_rng = load_rng(data['chaos_state'])
 
         pieces = data.get('pieces', {})
         self.pieces = []
@@ -2833,7 +2833,7 @@ class Board(Window):
                 self.use_check = not self.use_check
             elif modifiers & key.MOD_SHIFT:  # Force royal mode (Shift: all quasi-royal, Ctrl+Shift: all royal)
                 self.royal_piece_mode = 1 if modifiers & key.MOD_ACCEL else 2
-            elif modifiers & key.MOD_ACCEL:  # Default
+            elif modifiers & key.MOD_ACCEL:  # Default royal mode (depends on piece superclass)
                 self.royal_piece_mode = 0
             if old_mode != self.royal_piece_mode:
                 if self.royal_piece_mode == 0:
