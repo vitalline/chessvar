@@ -13,6 +13,7 @@ DEFAULT_CONFIG = {
         'edit_id': '',
         'hide_pieces': 0,
         'hide_moves': '',
+        'use_check': True,
         'royal_mode': 0,
         'set_seed': '',
         'roll_seed': '',

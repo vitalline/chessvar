@@ -6,13 +6,13 @@ from typing import TYPE_CHECKING, Type
 
 from arcade import Color, Sprite, load_texture
 
+from chess.movement.move import Move
+from chess.movement.movement import BaseMovement, CastlingEnPassantMovement
 from chess.movement.util import AnyDirection, Position
 from chess.util import Default, get_texture_path
 
 if TYPE_CHECKING:
     from chess.board import Board
-    from chess.movement.move import Move
-    from chess.movement.movement import BaseMovement
 
 
 class Side(Enum):
@@ -117,7 +117,14 @@ class Piece(Sprite):
 
     def moves(self, theoretical: bool = False):
         if self.movement:
-            yield from self.movement.moves(self.board_pos, self, theoretical)
+            for move in self.movement.moves(self.board_pos, self, theoretical):
+                if move.pos_to in self.board.castling_ep_markers:
+                    yield Move(
+                        pos_from=self.board_pos,
+                        pos_to=self.board.castling_ep_target.board_pos,
+                        movement_type=CastlingEnPassantMovement,
+                    )
+                yield move
         return ()
 
     def __copy__(self):

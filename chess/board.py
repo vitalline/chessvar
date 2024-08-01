@@ -368,6 +368,8 @@ class Board(Window):
         self.held_buttons = 0  # mouse button that was pressed
         self.en_passant_target = None  # piece that can be captured en passant
         self.en_passant_markers = set()  # squares where it can be captured
+        self.castling_ep_target = None  # piece that can be captured en passant after castling
+        self.castling_ep_markers = set()  # squares where it can be captured that way
         self.promotion_piece = None  # piece that is currently being promoted
         self.promotion_area = {}  # squares to draw possible promotions on
         self.ply_count = 0  # current half-move number
@@ -383,7 +385,7 @@ class Board(Window):
         self.set_rng = None  # random number generator for piece set selection
         self.turn_side = Side.WHITE  # side whose turn it is
         self.check_side = Side.NONE  # side that is currently in check
-        self.castling_threats = set()  # squares that are attacked in a way that prevents castling
+        self.use_check = self.board_config['use_check']  # whether to check for check after each move
         self.royal_piece_mode = self.board_config['royal_mode'] % 3  # 0: normal, 1: force royal, 2: force quasi-royal
         self.should_hide_pieces = self.board_config['hide_pieces'] % 3  # 0: don't hide, 1: hide all, 2: penultima mode
         self.should_hide_moves = self.board_config['hide_moves']  # whether to hide the move markers; None uses above
@@ -511,6 +513,8 @@ class Board(Window):
                 self.log(f"[Ply {self.ply_count}] Info: Using royal check rule (threaten any royal piece)")
             if self.royal_piece_mode == 2:
                 self.log(f"[Ply {self.ply_count}] Info: Using quasi-royal check rule (threaten last royal piece)")
+            if not self.use_check:
+                self.log(f"[Ply {self.ply_count}] Info: Checks disabled (capture the royal piece to win)")
             self.reset_board(update=True)
 
     def get_board_position(
@@ -758,6 +762,7 @@ class Board(Window):
             'edit_promotion': self.edit_piece_set_id,
             'hide_pieces': self.should_hide_pieces,
             'hide_moves': self.should_hide_moves,
+            'use_check': self.use_check,
             'royal_mode': self.royal_piece_mode,
             'chaos_mode': self.chaos_mode,
             'set_seed': self.set_seed,
@@ -789,49 +794,62 @@ class Board(Window):
 
         # might have to add more error checking to saving/loading, even if at the cost of slight redundancy.
         # who knows when someone decides to introduce a breaking change and absolutely destroy all the saves
-        if (self.board_width, self.board_height) != tuple(data['board_size']):
+        board_size = tuple(data.get('board_size', (self.board_width, self.board_height)))
+        if (self.board_width, self.board_height) != board_size:
             print(
-                f"Warning: Board size does not match (was {tuple(data['board_size'])}, "
+                f"Warning: Board size does not match (was {board_size}, "
                 f"but is {(self.board_width, self.board_height)})"
             )
 
-        self.resize(*data['window_size'])
-        self.update_sprites(data['flip_mode'])
-        if self.square_size != data['square_size']:
-            print(f"Warning: Square size does not match (was {data['square_size']}, but is {self.square_size})")
+        window_size = data.get('window_size')
+        if window_size is not None:
+            self.resize(*window_size)
+        self.update_sprites(data.get('flip_mode', self.flip_mode))
+        square_size = data.get('square_size', self.square_size)
+        if self.square_size != square_size:
+            print(f"Warning: Square size does not match (was {square_size}, but is {self.square_size})")
 
-        self.color_index = data['color_index']
+        self.color_index = data.get('color_index', self.color_index)
         if self.color_index is not None:  # None here means we're using a custom color scheme as defined in the savefile
             self.color_scheme = colors[self.color_index]
         for k, v in self.color_scheme.items():
-            old = (tuple(data['color_scheme'][k]) if isinstance(v, tuple) else data['color_scheme'][k])
+            color_scheme = data.get('color_scheme', self.color_scheme)
+            old = (tuple(color_scheme[k]) if isinstance(v, tuple) else color_scheme[k])
             if v != old:
                 self.color_scheme[k] = old  # first time when we might have enough information to fully restore old data
                 # in all cases before we had to pick one or the other, but here we can try to reload the save faithfully
                 if self.color_index is not None:  # warning if there's an explicitly defined color scheme and it doesn't
                     print(f"Warning: Color scheme does not match ({k} was {old}, but is {v})")  # match the saved scheme
 
-        self.board_config['block_ids'] = data['set_blocklist']
-        self.board_config['block_ids_chaos'] = data['chaos_blocklist']
+        self.board_config['block_ids'] = data.get('set_blocklist', self.board_config['block_ids'])
+        self.board_config['block_ids_chaos'] = data.get('chaos_blocklist', self.board_config['block_ids_chaos'])
 
-        self.should_hide_pieces = data['hide_pieces']
-        self.should_hide_moves = data['hide_moves']
-        self.royal_piece_mode = data['royal_mode']
-        self.chaos_mode = data['chaos_mode']
-        self.edit_mode = data['edit']
-        self.edit_piece_set_id = data['edit_promotion']
+        self.should_hide_pieces = data.get('hide_pieces', self.should_hide_pieces)
+        self.should_hide_moves = data.get('hide_moves', self.should_hide_moves)
+        self.use_check = data.get('use_check', self.use_check)
+        self.royal_piece_mode = data.get('royal_mode', self.royal_piece_mode)
+        self.chaos_mode = data.get('chaos_mode', self.chaos_mode)
+        self.edit_mode = data.get('edit', self.edit_mode)
+        self.edit_piece_set_id = data.get('edit_promotion', self.edit_piece_set_id)
 
-        self.set_seed = data['set_seed']
-        self.set_rng = Random(self.set_seed)
-        self.roll_seed = data['roll_seed']
-        self.roll_rng = Random(self.roll_seed)
-        self.chaos_seed = data['chaos_seed']
-        self.chaos_rng = Random(self.chaos_seed)
-        self.board_config['update_roll_seed'] = data['roll_update']
+        set_seed = data.get('set_seed')
+        if set_seed is not None:
+            self.set_seed = set_seed
+            self.set_rng = Random(self.set_seed)
+        roll_seed = data.get('roll_seed')
+        if roll_seed is not None:
+            self.roll_seed = roll_seed
+            self.roll_rng = Random(self.roll_seed)
+        chaos_seed = data.get('chaos_seed')
+        if chaos_seed is not None:
+            self.chaos_seed = chaos_seed
+            self.chaos_rng = Random(self.chaos_seed)
+        self.board_config['update_roll_seed'] = data.get('roll_update', self.board_config['update_roll_seed'])
 
-        self.piece_set_ids = {Side(int(k)): v for k, v in data['set_ids'].items()}
+        piece_set_ids = {Side(int(k)): v for k, v in data.get('set_ids', {}).items()}
+        self.piece_set_ids |= piece_set_ids
         self.piece_sets, self.piece_set_names = self.get_piece_sets()
-        saved_piece_sets = {Side(int(v)): [load_type(t) for t in d] for v, d in data['sets'].items()}
+        saved_piece_sets = {Side(int(v)): [load_type(t) for t in d] for v, d in data.get('sets', {}).items()}
         update_sets = False
         for side in self.piece_sets:
             if self.piece_set_ids[side] is None:
@@ -855,54 +873,58 @@ class Board(Window):
         self.reset_edit_promotions()
         self.reset_penultima_pieces()
 
-        self.ply_count = data['ply']
-        self.turn_side = Side(data['side'])
-        self.move_history = [load_move(d, self) for d in data['moves']]
-        self.future_move_history = [load_move(d, self) for d in data['future'][::-1]]
+        self.ply_count = data.get('ply', self.ply_count)
+        self.turn_side = Side(data.get('side', self.turn_side))
+        self.move_history = [load_move(d, self) for d in data.get('moves', [])]
+        self.future_move_history = [load_move(d, self) for d in data.get('future', [])[::-1]]
 
-        rolls = data['rolls']
+        rolls = data.get('rolls', {})
         self.roll_history = [
             ({fra(s): v for s, v in rolls[str(n)].items()} if str(n) in rolls else {}) for n in range(self.ply_count)
         ]
-        rph = data['roll_piece_history']
+        rph = data.get('roll_piece_history', {})
         self.probabilistic_piece_history = [
             ({(fra(k), load_type(v)) for k, v in rph[str(n)].items()} if str(n) in rph else set())
             for n in range(self.ply_count)
         ]
-        ac = data['auto_captures']
+        ac = data.get('auto_captures', {})
         self.auto_capture_markers = {
             side: {fra(on): {fra(of) for of in ofs} for on, ofs in ac[str(side.value)].items()}
             if str(side.value) in ac else {} for side in self.auto_capture_markers
         }
 
-        self.chain_start = load_move(data['chain_start'], self)
+        self.chain_start = load_move(data.get('chain_start'), self)
         if self.move_history and self.move_history[-1] and self.move_history[-1].matches(self.chain_start):
             self.chain_start = self.move_history[-1]
-        cm = data['chain_moves']
+        cm = data.get('chain_moves', [])
         self.chain_moves = {
             self.chain_start.piece.side: {
                 (self.chain_start.pos_from, self.chain_start.pos_to): [load_move(m, self) for m in cm]
             }, self.chain_start.piece.side.opponent(): {}
         } if self.chain_start else {}
 
-        self.set_rng = load_rng(data['set_state'])
-        self.roll_rng = load_rng(data['roll_state'])
-        self.chaos_rng = load_rng(data['chaos_state'])
+        if 'set_state' in data:
+            self.set_rng = load_rng(data['set_state'])
+        if 'roll_state' in data:
+            self.roll_rng = load_rng(data['roll_state'])
+        if 'chaos_state' in data:
+            self.chaos_rng = load_rng(data['chaos_state'])
 
+        pieces = data.get('pieces', {})
         self.pieces = []
 
         for row in range(self.board_height):
             self.pieces += [[]]
 
         for row, col in product(range(self.board_height), range(self.board_width)):
-            piece_data = data['pieces'].get(toa((row, col)))
+            piece_data = pieces.get(toa((row, col)))
             self.pieces[row].append(
                 NoPiece(self, (row, col)) if piece_data is None else load_piece(piece_data, self)
             )
             self.pieces[row][col].scale = self.square_size / self.pieces[row][col].texture.width
             self.piece_sprite_list.append(self.pieces[row][col])
 
-        self.promotion_piece = load_piece(data['promotion'], self)
+        self.promotion_piece = load_piece(data.get('promotion'), self)
 
         if self.move_history:
             last_move = self.move_history[-1]
@@ -921,6 +943,8 @@ class Board(Window):
             self.log(f"[Ply {self.ply_count}] Info: Using royal check rule (threaten any royal piece)")
         if self.royal_piece_mode == 2:
             self.log(f"[Ply {self.ply_count}] Info: Using quasi-royal check rule (threaten last royal piece)")
+        if not self.use_check:
+            self.log(f"[Ply {self.ply_count}] Info: Checks disabled (capture the royal piece to win)")
         if None in self.piece_set_ids.values():
             self.log(f"[Ply {self.ply_count}] Info: Resuming saved game (with custom piece sets)")
         else:
@@ -952,8 +976,9 @@ class Board(Window):
         else:
             if not self.edit_mode:
                 self.update_status()
-            if data['selection']:
-                self.select_piece(fra(data['selection']))
+            selection = data.get('selection')
+            if selection:
+                self.select_piece(fra(selection))
 
     def empty_board(self) -> None:
         self.deselect_piece()
@@ -1192,22 +1217,16 @@ class Board(Window):
                 if self.auto_ranged_pieces[side] and not self.auto_capture_markers[side]:
                     self.load_auto_capture_markers(side)
 
-    def load_check(self):
+    def load_check(self, side: Side = None) -> bool:
+        if side is None:
+            side = self.turn_side
         self.load_pieces()
         self.check_side = Side.NONE
-        self.castling_threats = set()
-        for royal in self.royal_pieces[self.turn_side]:
-            movement_list = (
-                royal.movement.movements if isinstance(royal.movement, movement.BaseMultiMovement) else [royal.movement]
-            )
-            castle_movements = set(m for m in movement_list if isinstance(m, movement.CastlingMovement))
-            castle_squares = set(
-                add(royal.board_pos, offset)
-                for castling in castle_movements
-                for offset in castling.gap + [castling.direction]
-            )
+        if not self.use_check:
+            return False
+        for royal in self.royal_pieces[side]:
             self.ply_simulation += 1
-            for piece in self.movable_pieces[self.turn_side.opponent()]:
+            for piece in self.movable_pieces[side.opponent()]:
                 if isinstance(piece.movement, movement.ProbabilisticMovement):
                     continue
                 for move in piece.moves():
@@ -1217,13 +1236,11 @@ class Board(Window):
                         new_piece = last_move.promotion
                         last_move.piece = new_piece
                         self.update_promotion_auto_captures(last_move)
-                    self.update_auto_captures(last_move, self.turn_side)
+                    self.update_auto_captures(last_move, side)
                     while last_move:
                         if last_move.pos_to == royal.board_pos or last_move.captured_piece == royal:
-                            self.check_side = self.turn_side
-                            self.castling_threats = castle_squares
-                        if last_move.pos_to in castle_squares:
-                            self.castling_threats.add(last_move.pos_to)
+                            self.check_side = side
+                            break
                         last_move = last_move.chained_move
                     if self.check_side:
                         break
@@ -1250,9 +1267,10 @@ class Board(Window):
         auto_ranged_pieces = {side: self.auto_ranged_pieces[side].copy() for side in self.auto_ranged_pieces}
         auto_capture_markers = deepcopy(self.auto_capture_markers)
         check_side = self.check_side
-        castling_threats = self.castling_threats.copy()
         en_passant_target = self.en_passant_target
         en_passant_markers = self.en_passant_markers.copy()
+        castling_ep_target = self.castling_ep_target
+        castling_ep_markers = self.castling_ep_markers.copy()
         last_chain_move = self.chain_start
         if last_chain_move:
             while last_chain_move.chained_move:
@@ -1299,8 +1317,30 @@ class Board(Window):
                             if isinstance(piece.movement, movement.ProbabilisticMovement):
                                 self.roll_history[self.ply_count - 1][pos] = piece.movement.roll()
                     self.probabilistic_piece_history[self.ply_count - 1] = signature
+            if not self.use_check and self.move_history:
+                royal_capture = False
+                chained_move = self.move_history[-1]
+                while chained_move:
+                    capture = chained_move.captured_piece
+                    if capture and capture.side == turn_side:
+                        is_royal = isinstance(capture, abc.RoyalPiece)
+                        is_quasi_royal = isinstance(capture, abc.QuasiRoyalPiece)
+                        if self.royal_piece_mode == 1 and is_quasi_royal:
+                            is_quasi_royal = False
+                            is_royal = True
+                        elif self.royal_piece_mode == 2 and is_royal:
+                            is_royal = False
+                            is_quasi_royal = True
+                        if is_royal or (is_quasi_royal and not self.royal_pieces[turn_side]):
+                            royal_capture = True
+                            break
+                    chained_move = chained_move.chained_move
+                if royal_capture:
+                    check_side = self.turn_side
+                    self.game_over = True
+                    continue
             for piece in movable_pieces[turn_side] if chain_moves is None else [last_chain_move.piece]:
-                for move in list(piece.moves()) if chain_moves is None else chain_moves:
+                for move in piece.moves() if chain_moves is None else chain_moves:
                     self.update_move(move)
                     self.update_auto_capture_markers(move)
                     self.update_auto_captures(move, turn_side.opponent())
@@ -1326,15 +1366,14 @@ class Board(Window):
                             self.update_auto_capture_markers(chained_move)
                         move_chain.append(chained_move)
                         chained_move = chained_move.chained_move
-                    self.ply_simulation += 1
-                    self.load_check()
-                    self.ply_simulation -= 1
-                    for chained_move in move_chain:
-                        if chained_move.captured_piece in royal_pieces[turn_side]:
-                            self.check_side = turn_side
-                        if chained_move.captured_piece in royal_pieces[turn_side.opponent()]:
-                            check_side = self.turn_side.opponent()
-                            self.game_over = True
+                    self.load_check(turn_side)
+                    if self.use_check:
+                        for chained_move in move_chain:
+                            if chained_move.captured_piece in royal_pieces[turn_side]:
+                                self.check_side = turn_side
+                            if chained_move.captured_piece in royal_pieces[self.turn_side.opponent()]:
+                                check_side = self.turn_side.opponent()
+                                self.game_over = True
                     if self.check_side != turn_side:
                         self.moves[turn_side].setdefault(move.pos_from, []).append(move)
                         if move.chained_move:
@@ -1347,12 +1386,14 @@ class Board(Window):
                         self.undo(chained_move)
                         self.revert_auto_capture_markers(chained_move)
                     self.check_side = check_side
-                    self.castling_threats = castling_threats.copy()
                     if en_passant_target is not None:
-                        self.en_passant_target = en_passant_target
-                        self.en_passant_markers = en_passant_markers.copy()
-                        for marker in self.en_passant_markers:
-                            self.mark_en_passant(self.en_passant_target.board_pos, marker)
+                        self.clear_en_passant()
+                        for marker in en_passant_markers:
+                            self.mark_en_passant(en_passant_target.board_pos, marker)
+                    if castling_ep_target is not None:
+                        self.clear_castling_ep()
+                        for marker in castling_ep_markers:
+                            self.mark_castling_ep(castling_ep_target.board_pos, marker)
             self.moves_queried[turn_side] = True
         if theoretical_moves_for is None:
             theoretical_moves_for = self.turn_side.opponent()
@@ -1379,7 +1420,6 @@ class Board(Window):
         self.auto_ranged_pieces = auto_ranged_pieces
         self.auto_capture_markers = auto_capture_markers
         self.check_side = check_side
-        self.castling_threats = castling_threats
 
     def unique_moves(self, side: Side | None = None) -> dict[Side, dict[Position, list[Move]]]:
         if side is None:
@@ -1530,6 +1570,8 @@ class Board(Window):
     def update_board(self, move: Move) -> None:
         if self.en_passant_target is not None and move.piece.side == self.en_passant_target.side.opponent():
             self.clear_en_passant()
+        if self.castling_ep_target is not None and move.piece.side == self.castling_ep_target.side.opponent():
+            self.clear_castling_ep()
 
     def update_move(self, move: Move) -> None:
         move.set(piece=self.get_piece(move.pos_from))
@@ -1550,6 +1592,16 @@ class Board(Window):
     def clear_en_passant(self) -> None:
         self.en_passant_target = None
         self.en_passant_markers = set()
+
+    def mark_castling_ep(self, piece_pos: Position, marker_pos: Position) -> None:
+        if self.castling_ep_target is not None and self.castling_ep_target.board_pos != piece_pos:
+            return
+        self.castling_ep_target = self.get_piece(piece_pos)
+        self.castling_ep_markers.add(marker_pos)
+
+    def clear_castling_ep(self) -> None:
+        self.castling_ep_target = None
+        self.castling_ep_markers = set()
 
     def update_auto_captures(self, move: Move, side: Side) -> None:
         if move.is_edit:
@@ -1752,8 +1804,6 @@ class Board(Window):
                     and future.promotion is not None
                 ):
                     past.promotion = future.promotion
-            if self.promotion_piece.board_pos in self.en_passant_markers:
-                self.mark_en_passant(self.en_passant_target, self.promotion_piece.board_pos)
             self.end_promotion()
         else:
             last_move = self.move_history[-1]
@@ -2779,7 +2829,10 @@ class Board(Window):
                         self.start_promotion(promotion_piece, self.edit_promotions[promotion_side])
         if symbol == key.O:  # Royal pieces
             old_mode = self.royal_piece_mode
-            if modifiers & key.MOD_SHIFT:  # Force royal mode (Shift: all quasi-royal, Ctrl+Shift: all royal)
+            old_check = self.use_check
+            if modifiers & key.MOD_ALT:  # Toggle checks
+                self.use_check = not self.use_check
+            elif modifiers & key.MOD_SHIFT:  # Force royal mode (Shift: all quasi-royal, Ctrl+Shift: all royal)
                 self.royal_piece_mode = 1 if modifiers & key.MOD_ACCEL else 2
             elif modifiers & key.MOD_ACCEL:  # Default
                 self.royal_piece_mode = 0
@@ -2792,6 +2845,12 @@ class Board(Window):
                     self.log(f"[Ply {self.ply_count}] Info: Using quasi-royal check rule (threaten last royal piece)")
                 else:
                     self.royal_piece_mode = old_mode
+            if old_check != self.use_check:
+                if self.use_check:
+                    self.log(f"[Ply {self.ply_count}] Info: Checks enabled (checkmate the royal piece to win)")
+                else:
+                    self.log(f"[Ply {self.ply_count}] Info: Checks disabled (capture the royal piece to win)")
+            if old_mode != self.royal_piece_mode or old_check != self.use_check:
                 self.future_move_history = []  # we don't know if we can redo the future moves anymore, so we clear them
                 self.advance_turn()
         if symbol == key.F:
@@ -3062,10 +3121,20 @@ class Board(Window):
             debug_log_data.append(
                 f"{side} replacements ({len(self.edit_promotions[side])}): {piece_list if piece_list else 'None'}"
             )
+        en_passant_pos = toa(self.en_passant_target.board_pos) if self.en_passant_target else 'None'
+        debug_log_data.append(f"En passant target: {en_passant_pos}")
+        en_passant_squares = ', '.join(toa(xy) for xy in sorted(self.en_passant_markers)) or 'None'
+        debug_log_data.append(f"En passant squares ({len(self.en_passant_markers)}): {en_passant_squares}")
+        castling_ep_pos = toa(self.castling_ep_target.board_pos) if self.castling_ep_target else 'None'
+        debug_log_data.append(f"Castling EP target: {castling_ep_pos}")
+        castling_ep_squares = ', '.join(toa(xy) for xy in sorted(self.castling_ep_markers)) or 'None'
+        debug_log_data.append(f"Castling EP squares ({len(self.castling_ep_markers)}): {castling_ep_squares}")
         piece_modes = {0: 'Shown', 1: 'Hidden', 2: 'Penultima'}
         debug_log_data.append(f"Hide pieces: {self.should_hide_pieces} - {piece_modes[self.should_hide_pieces]}")
         move_modes = {None: 'Default', False: 'Shown', True: 'Hidden'}
         debug_log_data.append(f"Hide moves: {self.should_hide_moves} - {move_modes[self.should_hide_moves]}")
+        check_modes = {False: 'Capture the royal piece to win', True: 'Checkmate the royal piece to win'}
+        debug_log_data.append(f"Use check: {self.use_check} - {check_modes[self.use_check]}")
         royal_modes = {0: 'Default', 1: 'Force royal (Threaten Any)', 2: 'Force quasi-royal (Threaten Last)'}
         debug_log_data.append(f"Royal mode: {self.royal_piece_mode} - {royal_modes[self.royal_piece_mode]}")
         chaos_modes = {

@@ -310,13 +310,15 @@ class CastlingMovement(BaseMovement):
         direction: Direction,
         other_piece: Direction,
         other_direction: Direction,
-        gap: list[Direction] | None = None
+        movement_gap: list[Direction] | None = None,
+        en_passant_gap: list[Direction] | None = None
     ):
         super().__init__(board)
         self.direction = direction
         self.other_piece = other_piece
         self.other_direction = other_direction
-        self.gap = gap or []
+        self.movement_gap = movement_gap or []
+        self.en_passant_gap = en_passant_gap or []
 
     def moves(self, pos_from: Position, piece: Piece, theoretical: bool = False):
         if self.total_moves:
@@ -332,19 +334,38 @@ class CastlingMovement(BaseMovement):
         if other_piece.movement.total_moves:
             return ()
         if not theoretical:
-            for offset in self.gap:
-                pos = add(pos_from, offset)
+            for gap_offset in self.movement_gap:
+                pos = add(pos_from, gap_offset)
                 if not self.board.not_a_piece(pos):
-                    return ()
-                if pos in self.board.castling_threats:
                     return ()
         self_move = Move(pos_from, add(pos_from, piece.side.direction(self.direction)), type(self))
         other_piece_pos_to = add(other_piece_pos, piece.side.direction(self.other_direction))
         other_move = Move(other_piece_pos, other_piece_pos_to, type(self), other_piece)
         return self_move.set(chained_move=other_move),
 
+    def update(self, move: Move, piece: Piece):
+        direction = piece.side.direction(self.direction)
+        offset = sub(move.pos_to, move.pos_from)
+        if offset == direction:
+            for gap_offset in self.en_passant_gap:
+                pos = add(move.pos_from, gap_offset)
+                self.board.mark_castling_ep(move.pos_to, pos)
+        super().update(move, piece)
+
+    def undo(self, move: Move, piece: Piece):
+        super().undo(move, piece)
+        self.board.clear_castling_ep()
+
     def __copy_args__(self):
-        return self.board, self.direction, self.other_piece, self.other_direction, copy(self.gap)
+        return (
+            self.board, self.direction, self.other_piece, self.other_direction,
+            copy(self.movement_gap), copy(self.en_passant_gap)
+        )
+
+
+class CastlingEnPassantMovement(BaseMovement):
+    # used to mark en passant captures of a king had that just castled (Move.movement_type == CastlingEnPassantMovement)
+    pass
 
 
 class EnPassantTargetRiderMovement(RiderMovement):
