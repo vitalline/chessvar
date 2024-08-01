@@ -1318,21 +1318,20 @@ class Board(Window):
                                 self.roll_history[self.ply_count - 1][pos] = piece.movement.roll()
                     self.probabilistic_piece_history[self.ply_count - 1] = signature
             if not self.use_check and self.move_history:
-                royal_capture = False
-                chained_move = self.move_history[-1]
-                while chained_move:
+                # not self.use_check means check/mate detection is replaced by capture detection
+                # we need to check if there's a move in the move history that could be a capture
+                royal_capture = False  # of one of the opposing pieces that are treated as royal
+                chained_move = self.move_history[-1]  # checking the last move's sufficient here
+                while chained_move:  # NB: could be None but if it is the loop is skipped anyway
                     capture = chained_move.captured_piece
                     if capture and capture.side == turn_side:
-                        is_royal = isinstance(capture, abc.RoyalPiece)
-                        is_quasi_royal = isinstance(capture, abc.QuasiRoyalPiece)
-                        if self.royal_piece_mode == 1 and is_quasi_royal:
-                            is_quasi_royal = False
-                            is_royal = True
-                        elif self.royal_piece_mode == 2 and is_royal:
-                            is_royal = False
-                            is_quasi_royal = True
-                        if is_royal or (is_quasi_royal and not self.royal_pieces[turn_side]):
+                        royal_capture = isinstance(capture, abc.RoyalPiece)  # NB: quasi-royal pieces are treated as
+                        quasi_royal_capture = isinstance(capture, abc.QuasiRoyalPiece)  # royal if only one remains!
+                        if self.royal_piece_mode == 1 and quasi_royal_capture:  # treat as royal capture (game over)
                             royal_capture = True
+                        elif self.royal_piece_mode == 2:  # only treat as royal capture iff no other royalty exists!
+                            royal_capture = not self.royal_pieces[turn_side] and not self.quasi_royal_pieces[turn_side]
+                        if royal_capture:
                             break
                     chained_move = chained_move.chained_move
                 if royal_capture:
