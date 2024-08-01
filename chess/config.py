@@ -20,6 +20,7 @@ DEFAULT_CONFIG = {
         'chaos_seed': '',
         'chaos_mode': 0,
         'update_roll_seed': True,
+        'update_saves': False,
         'block_ids': '',
         'block_ids_chaos': '',
     },

@@ -501,6 +501,8 @@ class Board(Window):
                 save_path = join(base_dir, argv[1])
                 if isfile(save_path):
                     self.load_board(save_path)
+                    if self.board_config['update_saves']:
+                        self.save_board(save_path)
                     loaded = True
             except Exception:
                 print_exc()
@@ -723,7 +725,9 @@ class Board(Window):
         self.load_moves()
         self.show_moves()
 
-    def save_board(self, indent: int = None) -> None:
+    def save_board(self, path: str | None = None, indent: int | None = None) -> None:
+        if path is None:
+            path = get_filename('save', 'json')
         data = {
             'board_size': [self.board_width, self.board_height],
             'window_size': [self.width, self.height],
@@ -773,7 +777,7 @@ class Board(Window):
             'set_state': save_rng(self.set_rng),
             'roll_state': save_rng(self.roll_rng),
         }
-        with open(get_filename('save', 'json'), 'w') as file:
+        with open(path, 'w') as file:
             if indent is None:
                 dump(data, file, separators=(',', ':'))
             else:
@@ -2663,7 +2667,7 @@ class Board(Window):
         if self.held_buttons:
             return
         if symbol == key.S and modifiers & key.MOD_ACCEL:  # Save
-            self.save_board(2 if modifiers & key.MOD_SHIFT else None)
+            self.save_board(indent=2 if modifiers & key.MOD_SHIFT else None)
         if symbol == key.R:  # Restart
             if modifiers & key.MOD_SHIFT:  # Randomize piece sets
                 blocked_ids = set(self.board_config['block_ids'])
