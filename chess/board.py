@@ -476,13 +476,13 @@ class Board(Window):
         for row in range(self.board_height):
             self.label_list.extend([
                 Text(str(row + 1), *self.get_screen_position((row, -1)), **label_kwargs),
-                Text(str(row + 1), *self.get_screen_position((row, board_width)), **label_kwargs)
+                Text(str(row + 1), *self.get_screen_position((row, self.board_width)), **label_kwargs)
             ])
 
         for col in range(self.board_width):
             self.label_list.extend([
                 Text(chr(col + ord('a')), *self.get_screen_position((-1, col)), **label_kwargs),
-                Text(chr(col + ord('a')), *self.get_screen_position((board_height, col)), **label_kwargs),
+                Text(chr(col + ord('a')), *self.get_screen_position((self.board_height, col)), **label_kwargs),
             ])
 
         # initialize board sprites
@@ -575,7 +575,7 @@ class Board(Window):
     def get_side(self, pos: Position | None) -> Side:
         return self.get_piece(pos).side
 
-    def get_promotion_side(self, piece: abc.Piece | None):
+    def get_promotion_side(self, piece: abc.Piece):
         return piece.side or (Side.WHITE if piece.board_pos[0] < self.board_height / 2 else Side.BLACK)
 
     def set_position(self, piece: abc.Piece, pos: Position) -> None:
@@ -1735,7 +1735,8 @@ class Board(Window):
             self.pieces[capture_pos[0]][capture_pos[1]] = NoPiece(self, capture_pos)
             self.piece_sprite_list.append(self.pieces[capture_pos[0]][capture_pos[1]])
         if move.piece is not None and move.pos_from is None:
-            # piece was added to the board, add it to the sprite list
+            # piece was added to the board, update it and add it to the sprite list
+            self.update_piece(move.piece)
             self.piece_sprite_list.append(move.piece)
         if not move.is_edit or (move.pos_from == move.pos_to and move.promotion is None):
             # call movement.update() to update movement state after the move (e.g. pawn double move, castling rights)
@@ -1755,9 +1756,9 @@ class Board(Window):
                 # existing piece was removed from the board (possibly promoted to a different piece type)
                 if not self.is_trickster_mode():  # reset_trickster_mode() does not reset removed pieces
                     move.piece.angle = 0           # so instead we have to do it manually as a workaround
-                # removed pieces don't get updated by update_hide_mode() either so we also do it manually
-                if not move.piece.is_empty():
-                    self.update_piece(move.piece)
+            if not move.piece.is_empty():
+                # update the piece sprite to reflect current piece hiding mode
+                self.update_piece(move.piece)
             if move.pos_from is not None:
                 # existing piece was moved, restore it on the square it was moved from
                 self.pieces[move.pos_from[0]][move.pos_from[1]] = move.piece
@@ -1772,8 +1773,7 @@ class Board(Window):
             self.reset_position(move.captured_piece)
             if not self.is_trickster_mode():  # reset_trickster_mode() does not reset removed pieces
                 move.captured_piece.angle = 0  # so instead we have to do it manually as a workaround
-            # removed pieces don't get updated by update_hide_mode() either so we also do it manually
-            self.update_piece(move.captured_piece)
+            self.update_piece(move.captured_piece)  # update the piece sprite to reflect current piece hiding mode
             self.pieces[capture_pos[0]][capture_pos[1]] = move.captured_piece
             self.piece_sprite_list.append(move.captured_piece)
         if move.pos_to is not None and move.pos_from != move.pos_to:
@@ -1786,8 +1786,9 @@ class Board(Window):
             if move.swapped_piece is not None:
                 # piece was swapped with another piece, move the swapped piece to the square that was moved to
                 self.set_position(move.swapped_piece, move.pos_to)
-                self.piece_sprite_list.append(move.swapped_piece)
+                self.update_piece(move.swapped_piece)  # update the piece sprite to reflect current piece hiding mode
                 self.pieces[move.pos_to[0]][move.pos_to[1]] = move.swapped_piece
+                self.piece_sprite_list.append(move.swapped_piece)
         if not move.is_edit or (move.pos_from == move.pos_to and move.promotion is None):
             # call movement.undo() to restore movement state before the move (e.g. pawn double move, castling rights)
             move.piece.movement.undo(move, move.piece)
@@ -2022,19 +2023,19 @@ class Board(Window):
         self.hide_moves()
         self.promotion_piece = piece
         piece_pos = piece.board_pos
-        side = self.get_promotion_side(piece)
+        direction = (Side.WHITE if piece_pos[0] < self.board_height / 2 else Side.BLACK).direction
         area = len(promotions)
-        area_height = max(4, ceil(sqrt(area)))
+        area_height = max(self.board_height // 2, ceil(sqrt(area)))
         area_width = ceil(area / area_height)
         area_origin = piece_pos
-        while self.not_on_board((area_origin[0] + side.direction(area_height - 1), area_origin[1])):
-            area_origin = add(area_origin, side.direction((-1, 0)))
-        area_origin = add(area_origin, side.direction((area_height - 1, 0)))
+        while self.not_on_board((area_origin[0] + direction(area_height - 1), area_origin[1])):
+            area_origin = add(area_origin, direction((-1, 0)))
+        area_origin = add(area_origin, direction((area_height - 1, 0)))
         area_squares = []
         col_increment = 0
-        aim_left = area_origin[1] >= board_width / 2
+        aim_left = area_origin[1] >= self.board_width / 2
         for col, row in product(range(area_width), range(area_height)):
-            current_row = area_origin[0] + side.direction(-row)
+            current_row = area_origin[0] + direction(-row)
             new_col = col + col_increment
             current_col = area_origin[1] + ((new_col + 1) // 2 * ((aim_left + new_col) % 2 * 2 - 1))
             while self.not_on_board((current_row, current_col)):
@@ -2042,6 +2043,7 @@ class Board(Window):
                 new_col = col + col_increment
                 current_col = area_origin[1] + ((new_col + 1) // 2 * ((aim_left + new_col) % 2 * 2 - 1))
             area_squares.append((current_row, current_col))
+        side = self.get_promotion_side(piece)
         for promotion, pos in zip_longest(promotions, area_squares):
             background_sprite = Sprite("assets/util/square.png")
             background_sprite.color = self.color_scheme["promotion_area_color"]
