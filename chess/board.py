@@ -502,6 +502,7 @@ class Board(Window):
                 if isfile(save_path):
                     self.load_board(save_path)
                     if self.board_config['update_saves']:
+                        self.reload_history()
                         self.save_board(save_path)
                     loaded = True
             except Exception:
@@ -632,6 +633,7 @@ class Board(Window):
     def reset_board(self, update: bool = False) -> None:
         self.deselect_piece()
         self.clear_en_passant()
+        self.clear_castling_ep()
         self.clear_auto_capture_markers()
 
         self.turn_side = Side.WHITE
@@ -786,6 +788,7 @@ class Board(Window):
     def load_board(self, path: str) -> None:
         self.deselect_piece()
         self.clear_en_passant()
+        self.clear_castling_ep()
         self.clear_auto_capture_markers()
 
         for sprite_list in self.piece_sprite_list, self.promotion_piece_sprite_list, self.promotion_area_sprite_list:
@@ -987,6 +990,7 @@ class Board(Window):
     def empty_board(self) -> None:
         self.deselect_piece()
         self.clear_en_passant()
+        self.clear_castling_ep()
         self.clear_auto_capture_markers()
 
         self.turn_side = Side.WHITE
@@ -1701,6 +1705,100 @@ class Board(Window):
                 self.roll_history = self.roll_history[:self.ply_count - 1]  # and we also clear the roll history
                 self.probabilistic_piece_history = self.probabilistic_piece_history[:self.ply_count - 1]
 
+    def reload_history(self) -> bool:
+        self.log(f"[Ply {self.ply_count}] Info: Starting new game")
+        self.reset_board()
+        if not self.future_move_history:
+            return True
+        future_move_history = self.future_move_history
+        self.future_move_history = []
+        finished = False
+        next_move = future_move_history.pop()
+        while True:
+            chained = False
+            if next_move is None:
+                self.move_history.append(None)
+                self.log(f"[Ply {self.ply_count}] Pass: {self.turn_side.opponent()}'s turn")
+                self.ply_count += 1
+                self.clear_en_passant()
+                self.clear_castling_ep()
+            if next_move.is_edit:
+                next_move.piece.move(next_move)
+                self.update_auto_capture_markers(next_move)
+                self.move_history.append(deepcopy(next_move))
+                if next_move.promotion is not None:
+                    if next_move.promotion is Unset:
+                        promotion_side = self.get_promotion_side(next_move.piece)
+                        self.start_promotion(next_move.piece, self.edit_promotions[promotion_side])
+                        finished = True
+                        break
+                    else:
+                        self.promotion_piece = True
+                        self.replace(next_move.piece, next_move.promotion)
+                        self.update_auto_capture_markers(next_move)
+                        self.update_promotion_auto_captures(next_move)
+                        self.promotion_piece = None
+                        self.log(f"[Ply {self.ply_count}] Edit: {self.move_history[-1]}")
+            else:
+                move = self.find_move(next_move.pos_from, next_move.pos_to)
+                if move is None:
+                    self.deselect_piece()
+                    finished = False
+                    break
+                self.update_move(move)
+                if next_move.promotion is not None:
+                    move.promotion = next_move.promotion
+                if (
+                    (move.chained_move or self.chain_moves.get(self.turn_side, {}).get((move.pos_from, move.pos_to)))
+                    and not issubclass(move.movement_type, movement.CastlingMovement)
+                    and not isinstance(move.piece.movement, movement.RangedAutoCaptureRiderMovement)
+                ):
+                    move.chained_move = Unset  # do not chain moves because we are updating every move separately
+                self.update_auto_capture_markers(move)
+                self.update_auto_captures(move, self.turn_side.opponent())
+                chained_move = move
+                while chained_move:
+                    chained_move.piece.move(chained_move)
+                    self.update_auto_capture_markers(chained_move)
+                    chained_move.set(piece=copy(chained_move.piece))
+                    if self.promotion_piece is None:
+                        self.log(f"[Ply {self.ply_count}] Move: {chained_move}")
+                    chained_move = chained_move.chained_move
+                    next_move = next_move.chained_move
+                if self.chain_start is None:
+                    self.chain_start = deepcopy(move)
+                    self.move_history.append(self.chain_start)
+                else:
+                    last_move = self.chain_start
+                    while last_move.chained_move:
+                        last_move = last_move.chained_move
+                    last_move.chained_move = deepcopy(move)
+                if move.chained_move is Unset and not self.promotion_piece:
+                    self.load_moves()
+                    chained = True
+                else:
+                    self.chain_start = None
+                    if self.promotion_piece is None:
+                        self.ply_count += 1
+            self.advance_turn()
+            if self.promotion_piece:
+                finished = True
+                break
+            if chained:
+                if next_move:
+                    next_move = next_move.chained_move
+                if next_move:
+                    continue
+                elif next_move is Unset:
+                    finished = True
+                    break
+            if future_move_history:
+                next_move = future_move_history.pop()
+            else:
+                finished = True
+                break
+        return finished
+
     def move(self, move: Move) -> None:
         self.deselect_piece()
         if move.piece is not None and move.pos_to is not None:
@@ -1909,6 +2007,7 @@ class Board(Window):
         if self.future_move_history[-1] is None:
             self.log(f"[Ply {self.ply_count}] Redo: Pass: {self.turn_side.opponent()}'s turn")
             self.clear_en_passant()
+            self.clear_castling_ep()
             self.move_history.append(deepcopy(last_move))
         elif piece_was_moved:
             chained_move = last_move
@@ -2753,6 +2852,7 @@ class Board(Window):
                     self.log(f"[Ply {self.ply_count}] Pass: {Side.WHITE}'s turn")
                     self.ply_count += 1
                     self.clear_en_passant()
+                    self.clear_castling_ep()
                     self.compare_history()
                     self.advance_turn()
             elif modifiers & key.MOD_SHIFT:  # Shift white piece set
@@ -2770,6 +2870,7 @@ class Board(Window):
                     self.log(f"[Ply {self.ply_count}] Pass: {Side.BLACK}'s turn")
                     self.ply_count += 1
                     self.clear_en_passant()
+                    self.clear_castling_ep()
                     self.compare_history()
                     self.advance_turn()
             elif modifiers & key.MOD_SHIFT:  # Shift black piece set
@@ -2786,6 +2887,7 @@ class Board(Window):
                 self.log(f"[Ply {self.ply_count}] Pass: {self.turn_side.opponent()}'s turn")
                 self.ply_count += 1
                 self.clear_en_passant()
+                self.clear_castling_ep()
                 self.compare_history()
                 self.advance_turn()
             elif modifiers & key.MOD_SHIFT:
