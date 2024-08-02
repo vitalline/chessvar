@@ -1456,11 +1456,8 @@ class Board(Window):
                     move = copy(move)
                     if (
                         (move.chained_move or self.chain_moves.get(turn_side, {}).get((move.pos_from, move.pos_to)))
-                        and not issubclass(
-                            move.movement_type,
-                            movement.CastlingMovement |
-                            movement.RangedAutoCaptureRiderMovement
-                        )
+                        and not issubclass(move.movement_type, movement.CastlingMovement)
+                        and not isinstance(move.piece.movement, movement.RangedAutoCaptureRiderMovement)
                     ):
                         move.chained_move = Unset  # do not chain moves because we are only counting one-move sequences
                     moves[turn_side].setdefault(move.pos_from, []).append(move)
@@ -2574,11 +2571,8 @@ class Board(Window):
                     move.promotion = Unset  # do not auto-promote because we are selecting promotion type manually
                 if (
                     (move.chained_move or self.chain_moves.get(self.turn_side, {}).get((move.pos_from, move.pos_to)))
-                    and not issubclass(
-                        move.movement_type,
-                        movement.CastlingMovement |
-                        movement.RangedAutoCaptureRiderMovement
-                    )
+                    and not issubclass(move.movement_type, movement.CastlingMovement)
+                    and not isinstance(move.piece.movement, movement.RangedAutoCaptureRiderMovement)
                 ):
                     move.chained_move = Unset  # do not chain moves because we are selecting chained move manually
                 self.update_auto_capture_markers(move)

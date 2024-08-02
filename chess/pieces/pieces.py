@@ -117,14 +117,7 @@ class Piece(Sprite):
 
     def moves(self, theoretical: bool = False):
         if self.movement:
-            for move in self.movement.moves(self.board_pos, self, theoretical):
-                if move.pos_to in self.board.castling_ep_markers:
-                    yield Move(
-                        pos_from=self.board_pos,
-                        pos_to=self.board.castling_ep_target.board_pos,
-                        movement_type=CastlingEnPassantMovement,
-                    )
-                yield move
+            yield from self.movement.moves(self.board_pos, self, theoretical)
         return ()
 
     def __copy__(self):

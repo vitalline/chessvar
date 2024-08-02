@@ -66,30 +66,32 @@ class BaseDirectionalMovement(BaseMovement):
     def transform(self, pos: Position) -> Position:
         return pos
 
-    def moves(self, pos_from: Position, piece: Piece, theoretical: bool = False):
+    def moves(self, pos_from: Position, piece: Piece, theoretical: bool = False, movement_type: type | None = None):
         if self.board.not_on_board(pos_from):
             return ()
+        if movement_type is None:
+            movement_type = type(self)
         direction_id = 0
         while direction_id < len(self.directions):
             direction = piece.side.direction(self.directions[direction_id])
             if direction[:2] == (0, 0):
-                yield Move(pos_from, self.transform(pos_from), type(self))
+                yield Move(pos_from, self.transform(pos_from), movement_type)
                 direction_id += 1
                 continue
             self.initialize_direction(direction, pos_from, piece)
             current_pos = pos_from
-            distance = 0
-            move = Move(pos_from, self.transform(current_pos), type(self))
+            move = Move(pos_from, self.transform(current_pos), movement_type)
             while not self.board.not_on_board(self.transform(current_pos)):
                 if self.stop_condition(move, direction, piece, theoretical):
                     direction_id += 1
                     break
                 current_pos = add(current_pos, direction[:2])
-                distance += 1
-                move = Move(pos_from, self.transform(current_pos), type(self))
+                move = Move(pos_from, self.transform(current_pos), movement_type)
                 self.advance_direction(move, direction, pos_from, piece)
                 if self.skip_condition(move, direction, piece, theoretical):
                     continue
+                if not theoretical and move.pos_to in self.board.castling_ep_markers:
+                    yield Move(move.pos_from, self.board.castling_ep_target.board_pos, CastlingEnPassantMovement)
                 yield move
             else:
                 direction_id += 1
@@ -133,7 +135,7 @@ class HalflingRiderMovement(RiderMovement):
     def __init__(self, board: Board, directions: list[AnyDirection], shift: int = 0):
         super().__init__(board, directions)
         self.board_size = self.board.board_height, self.board.board_width
-        self.current_distance = 0
+        self.distance = 0
         self.max_distance = 0
         self.shift = shift
 
@@ -143,16 +145,16 @@ class HalflingRiderMovement(RiderMovement):
         return (((size - position - 1) if direction > 0 else position) - self.shift) // abs(direction)
 
     def initialize_direction(self, direction: AnyDirection, pos_from: Position, piece: Piece) -> None:
-        self.current_distance = 0
+        self.distance = 0
         self.max_distance = min(ceil(
             self.distance_to_edge(pos_from[i], direction[i], self.board_size[i]) / 2
         ) for i in range(2))
 
     def advance_direction(self, move: Move, direction: AnyDirection, pos_from: Position, piece: Piece) -> None:
-        self.current_distance += 1
+        self.distance += 1
 
     def stop_condition(self, move: Move, direction: AnyDirection, piece: Piece, theoretical: bool = False) -> bool:
-        return self.current_distance >= self.max_distance or super().stop_condition(move, direction, piece, theoretical)
+        return self.distance >= self.max_distance or super().stop_condition(move, direction, piece, theoretical)
 
     def __copy_args__(self):
         return self.board, copy(self.directions), self.shift
@@ -211,13 +213,14 @@ class RangedCaptureRiderMovement(RiderMovement):
     def __init__(self, board: Board, directions: list[AnyDirection]):
         super().__init__(board, directions)
 
-    def moves(self, pos_from: Position, piece: Piece, theoretical: bool = False):
-        for move in super().moves(pos_from, piece, theoretical):
+    def moves(self, pos_from: Position, piece: Piece, theoretical: bool = False, movement_type: type | None = None):
+        for move in super().moves(pos_from, piece, theoretical, RiderMovement):
             if not theoretical:
                 captured_piece = self.board.get_piece(move.pos_to)
                 if not captured_piece.is_empty():
                     move.captured_piece = captured_piece
                     move.pos_to = move.pos_from
+                    move.movement_type = type(self)
             yield move
 
     def skip_condition(self, move: Move, direction: AnyDirection, piece: Piece, theoretical: bool = False) -> bool:
@@ -266,8 +269,8 @@ class RangedAutoCaptureRiderMovement(RiderMovement):
                 last_chain_move = last_chain_move.chained_move
         return move
 
-    def moves(self, pos_from: Position, piece: Piece, theoretical: bool = False):
-        for move in super().moves(pos_from, piece, theoretical):
+    def moves(self, pos_from: Position, piece: Piece, theoretical: bool = False, movement_type: type | None = None):
+        for move in super().moves(pos_from, piece, theoretical, RiderMovement):
             yield move if theoretical else self.generate_captures(move, piece)
 
 
@@ -291,6 +294,9 @@ class AutoRangedAutoCaptureRiderMovement(RangedAutoCaptureRiderMovement):
                 self.board.auto_capture_markers[piece.side][move.pos_to].discard(pos)
                 if not self.board.auto_capture_markers[piece.side][move.pos_to]:
                     del self.board.auto_capture_markers[piece.side][move.pos_to]
+
+    def moves(self, pos_from: Position, piece: Piece, theoretical: bool = False, movement_type: type | None = None):
+        yield from super().moves(pos_from, piece, theoretical, RiderMovement)
 
     def update(self, move: Move, piece: Piece):
         self.unmark(move.pos_from, piece)
@@ -371,25 +377,39 @@ class CastlingEnPassantMovement(BaseMovement):
 class EnPassantTargetRiderMovement(RiderMovement):
     def __init__(self, board: Board, directions: list[AnyDirection]):
         super().__init__(board, directions)
+        self.distance = 0
+
+    def initialize_direction(self, direction: AnyDirection, pos_from: Position, piece: Piece) -> None:
+        self.distance = 0
+
+    def advance_direction(self, move: Move, direction: AnyDirection, pos_from: Position, piece: Piece) -> None:
+        self.distance += 1
+
+    def moves(self, pos_from: Position, piece: Piece, theoretical: bool = False, movement_type: type | None = None):
+        for move in super().moves(pos_from, piece, theoretical, RiderMovement):
+            if self.distance > 1:
+                move.movement_type = type(self)
+            yield move
 
     def update(self, move: Move, piece: Piece):
-        for direction in self.directions:
-            direction = piece.side.direction(direction)
-            offset = sub(move.pos_to, move.pos_from)
-            steps = ddiv(offset, direction[:2])
-            if len(direction) > 2 and direction[2] > 0:
-                steps = min(steps, direction[2])
-            if steps < 2:
-                continue
-            positions = [add(move.pos_from, mul(direction[:2], i)) for i in range(1, steps)]
-            is_clear = True
-            for pos in positions:
-                if not self.board.not_a_piece(pos):
-                    is_clear = False
-                    break
-            if is_clear:
+        if move.movement_type == type(self):
+            for direction in self.directions:
+                direction = piece.side.direction(direction)
+                offset = sub(move.pos_to, move.pos_from)
+                steps = ddiv(offset, direction[:2])
+                if len(direction) > 2 and direction[2] > 0:
+                    steps = min(steps, direction[2])
+                if steps < 2:
+                    continue
+                positions = [add(move.pos_from, mul(direction[:2], i)) for i in range(1, steps)]
+                is_clear = True
                 for pos in positions:
-                    self.board.mark_en_passant(move.pos_to, pos)
+                    if not self.board.not_a_piece(pos):
+                        is_clear = False
+                        break
+                if is_clear:
+                    for pos in positions:
+                        self.board.mark_en_passant(move.pos_to, pos)
         super().update(move, piece)
 
     def undo(self, move: Move, piece: Piece):
@@ -401,11 +421,12 @@ class EnPassantRiderMovement(RiderMovement):
     def __init__(self, board: Board, directions: list[AnyDirection]):
         super().__init__(board, directions)
 
-    def moves(self, pos_from: Position, piece: Piece, theoretical: bool = False):
-        for move in super().moves(pos_from, piece, theoretical):
+    def moves(self, pos_from: Position, piece: Piece, theoretical: bool = False, movement_type: type | None = None):
+        for move in super().moves(pos_from, piece, theoretical, RiderMovement):
             if not theoretical:
                 if move.pos_to in self.board.en_passant_markers:
                     move.captured_piece = self.board.en_passant_target
+                    move.movement_type = type(self)
             yield move
 
 
@@ -476,13 +497,13 @@ class BentMovement(BaseMultiMovement):
             for direction in directions:
                 movement.directions = [direction]
                 move = None
-                for move in movement.moves(pos_from, piece, theoretical):
+                for move in movement.moves(pos_from, piece, theoretical, type(self)):
                     if self.start_index <= index:
                         yield copy(move)
                 if (
-                        move is not None and len(direction) > 2 and direction[2] and
-                        move.pos_to == add(pos_from, piece.side.direction(mul(direction[:2], direction[2])))
-                        and (theoretical or self.board.get_piece(move.pos_to).is_empty())
+                    move is not None and len(direction) > 2 and direction[2] and
+                    move.pos_to == add(pos_from, piece.side.direction(mul(direction[:2], direction[2])))
+                    and (theoretical or self.board.get_piece(move.pos_to).is_empty())
                 ):
                     for bent_move in self.moves(move.pos_to, piece, theoretical, index + 1):
                         yield copy(bent_move).set(pos_from=pos_from)
