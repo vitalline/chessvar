@@ -502,8 +502,10 @@ class Board(Window):
                 if isfile(save_path):
                     self.load_board(save_path)
                     if self.board_config['update_saves']:
-                        self.reload_history()
-                        self.save_board(save_path)
+                        if self.reload_history():
+                            self.save_board(save_path)
+                        else:
+                            self.log(f"[Ply {self.ply_count}] Error: Failed to reload history!")
                     loaded = True
             except Exception:
                 print_exc()
@@ -1764,7 +1766,8 @@ class Board(Window):
                     if self.promotion_piece is None:
                         self.log(f"[Ply {self.ply_count}] Move: {chained_move}")
                     chained_move = chained_move.chained_move
-                    next_move = next_move.chained_move
+                    if chained_move:
+                        next_move = next_move.chained_move
                 if self.chain_start is None:
                     self.chain_start = deepcopy(move)
                     self.move_history.append(self.chain_start)
@@ -1780,7 +1783,8 @@ class Board(Window):
                     self.chain_start = None
                     if self.promotion_piece is None:
                         self.ply_count += 1
-            self.advance_turn()
+            if not chained:
+                self.advance_turn()
             if self.promotion_piece:
                 finished = True
                 break

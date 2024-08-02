@@ -593,10 +593,12 @@ class ColorMovement(BaseMultiMovement):
         if self.board.is_light_square(pos_from):
             for movement in self.light:
                 for move in movement.moves(pos_from, piece, theoretical):
+                    move.movement_type = type(self)
                     yield copy(move)
         if self.board.is_dark_square(pos_from):
             for movement in self.dark:
                 for move in movement.moves(pos_from, piece, theoretical):
+                    move.movement_type = type(self)
                     yield copy(move)
 
     def __copy_args__(self):
@@ -618,10 +620,12 @@ class SideMovement(BaseMultiMovement):
         if pos_from[1] <= (self.board.board_width - 1) / 2:
             for movement in self.left:
                 for move in movement.moves(pos_from, piece, theoretical):
+                    move.movement_type = type(self)
                     yield copy(move)
         if pos_from[1] >= (self.board.board_width - 1) / 2:
             for movement in self.right:
                 for move in movement.moves(pos_from, piece, theoretical):
+                    move.movement_type = type(self)
                     yield copy(move)
 
     def __copy_args__(self):
