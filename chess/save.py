@@ -17,6 +17,8 @@ if TYPE_CHECKING:
 
 UNSET_STRING = '*'
 
+SUFFIXES = ('Movement', 'Rider')
+
 
 def save_type(piece_type: Type[abc.Piece] | frozenset | None) -> str | None:
     if piece_type is None:
@@ -40,7 +42,11 @@ def save_movement(movement_type: Type[BaseMovement] | frozenset | None) -> str |
         return None
     if movement_type is Unset:
         return UNSET_STRING
-    return movement_type.__name__.removesuffix('Movement')
+    name = movement_type.__name__
+    for suffix in SUFFIXES:
+        if name.endswith(suffix, 1):
+            name = name[:-len(suffix)]
+    return name
 
 
 def load_movement(data: str | None) -> Type[BaseMovement] | frozenset | None:
@@ -48,9 +54,12 @@ def load_movement(data: str | None) -> Type[BaseMovement] | frozenset | None:
         return None
     if data == UNSET_STRING:
         return Unset
-    if not data.endswith('Movement'):
-        data += 'Movement'
-    return getattr(import_module('chess.movement.movement'), data)
+    for i in range(len(SUFFIXES) + 1):
+        name = data + ''.join(SUFFIXES[:i][::-1])
+        movement_type = getattr(import_module('chess.movement.movement'), name, None)
+        if movement_type:
+            return movement_type
+    return None
 
 
 def save_piece(piece: abc.Piece | frozenset | None) -> dict | str | None:
