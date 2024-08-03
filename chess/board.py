@@ -1710,9 +1710,11 @@ class Board(Window):
                 self.probabilistic_piece_history = self.probabilistic_piece_history[:self.ply_count - 1]
 
     def reload_history(self) -> bool:
+        selection = self.selected_square
         self.log(f"[Ply {self.ply_count}] Info: Starting new game")
         self.reset_board()
         if not self.future_move_history:
+            self.select_piece(selection)
             return True
         future_move_history = self.future_move_history
         self.future_move_history = []
@@ -1746,7 +1748,6 @@ class Board(Window):
             else:
                 move = self.find_move(next_move.pos_from, next_move.pos_to)
                 if move is None:
-                    self.deselect_piece()
                     finished = False
                     break
                 self.update_move(move)
@@ -1803,6 +1804,8 @@ class Board(Window):
             else:
                 finished = True
                 break
+        if finished:
+            self.select_piece(selection)
         return finished
 
     def move(self, move: Move) -> None:
