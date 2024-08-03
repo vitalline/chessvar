@@ -747,7 +747,9 @@ class Board(Window):
             'chaos_blocklist': self.board_config['block_ids_chaos'],
             'set_ids': {side.value: piece_set_id for side, piece_set_id in self.piece_set_ids.items()},
             'sets': {side.value: [save_type(t) for t in piece_set] for side, piece_set in self.piece_sets.items()},
-            'pieces': {toa(p.board_pos): save_piece(p) for pieces in self.movable_pieces.values() for p in pieces},
+            'pieces': {
+                toa(p.board_pos): save_piece(p.on(None)) for pieces in self.movable_pieces.values() for p in pieces
+            },
             'moves': [save_move(m) for m in self.move_history],
             'future': [save_move(m) for m in self.future_move_history[::-1]],
             'rolls': {n: {toa(pos): d[pos] for pos in sorted(d)} for n, d in enumerate(self.roll_history) if d},
@@ -928,7 +930,7 @@ class Board(Window):
         for row, col in product(range(self.board_height), range(self.board_width)):
             piece_data = pieces.get(toa((row, col)))
             self.pieces[row].append(
-                NoPiece(self, (row, col)) if piece_data is None else load_piece(piece_data, self)
+                NoPiece(self, (row, col)) if piece_data is None else load_piece(piece_data, self).on((row, col))
             )
             self.pieces[row][col].scale = self.square_size / self.pieces[row][col].texture.width
             self.piece_sprite_list.append(self.pieces[row][col])

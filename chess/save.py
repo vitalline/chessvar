@@ -107,14 +107,26 @@ def save_move(move: Move | frozenset | None) -> dict | str | None:
         return None
     if move is Unset:
         return UNSET_STRING
+    piece = move.piece
+    if piece and (piece.board_pos == (move.pos_to or move.pos_from)):
+        piece = piece.on(None)
+    capture = move.captured_piece
+    if capture and (capture.board_pos == move.pos_to):
+        capture = capture.on(None)
+    swapped = move.swapped_piece
+    if swapped and (swapped.board_pos == move.pos_from):
+        swapped = swapped.on(None)
+    promotion = move.promotion
+    if promotion:
+        promotion = promotion.on(None)
     return {k: v for k, v in {
         'from': toa(move.pos_from) if move.pos_from else None,
         'to': toa(move.pos_to) if move.pos_to else None,
         'type': save_movement(move.movement_type),
-        'piece': save_piece(move.piece),
-        'captured': save_piece(move.captured_piece),
-        'swapped': save_piece(move.swapped_piece),
-        'promotion': save_piece(move.promotion),
+        'piece': save_piece(piece),
+        'captured': save_piece(capture),
+        'swapped': save_piece(swapped),
+        'promotion': save_piece(promotion),
         'chain': save_move(move.chained_move),
         'edit': move.is_edit,
     }.items() if v}
@@ -125,13 +137,24 @@ def load_move(data: dict | str | None, board: Board) -> Move | frozenset | None:
         return None
     if data == UNSET_STRING:
         return Unset
+    pos_from = fra(data['from']) if 'from' in data else None
+    pos_to = fra(data['to']) if 'to' in data else None
+    piece = load_piece(data.get('piece'), board)
+    if piece and not piece.board_pos:
+        piece.board_pos = pos_to or pos_from
+    capture = load_piece(data.get('captured'), board)
+    if capture and not capture.board_pos:
+        capture.board_pos = pos_to
+    swapped = load_piece(data.get('swapped'), board)
+    if swapped and not swapped.board_pos:
+        swapped.board_pos = pos_from
     return Move(
-        pos_from=fra(data['from']) if 'from' in data else None,  # type: ignore
-        pos_to=fra(data['to']) if 'to' in data else None,  # type: ignore
+        pos_from=pos_from,
+        pos_to=pos_to,
         movement_type=load_movement(data.get('type')),
-        piece=load_piece(data.get('piece'), board),
-        captured_piece=load_piece(data.get('captured'), board),
-        swapped_piece=load_piece(data.get('swapped'), board),
+        piece=piece,
+        captured_piece=capture,
+        swapped_piece=swapped,
         promotion=load_piece(data.get('promotion'), board),
         chained_move=load_move(data.get('chain'), board),
         is_edit=data.get('edit', False),

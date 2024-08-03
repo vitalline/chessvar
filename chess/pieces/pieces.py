@@ -7,7 +7,7 @@ from typing import TYPE_CHECKING, Type
 from arcade import Color, Sprite, load_texture
 
 from chess.movement.move import Move
-from chess.movement.movement import BaseMovement, CastlingEnPassantMovement
+from chess.movement.movement import BaseMovement
 from chess.movement.util import AnyDirection, Position
 from chess.util import Default, get_texture_path
 
@@ -128,9 +128,14 @@ class Piece(Sprite):
         )
         clone.movement = copy(self.movement)
         clone.scale = self.scale
-        clone.flipped_horizontally = self.flipped_horizontally
-        clone.flipped_vertically = self.flipped_vertically
         clone.is_hidden = self.is_hidden
+        return clone
+
+    def on(self, pos: Position | None) -> Piece:
+        clone = copy(self)
+        clone.board_pos = pos
+        if pos is not None:
+            clone.position = self.board.get_screen_position(pos)
         return clone
 
     @property
