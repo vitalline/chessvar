@@ -314,8 +314,8 @@ def print_piece_sets(fp: TextIO = stdout) -> None:
 
 
 def print_piece_types(fp: TextIO = stdout, side: Side = Side.WHITE) -> None:
-    for name, path in sorted((n, save_type(t)) for t, n in get_piece_types(side).items()):
-        fp.write(f"{name}: {path}\n")
+    for name, path, file in sorted((n, save_type(t), t.file_name) for t, n in get_piece_types(side).items()):
+        fp.write(f"{name}: {path}, {file}\n")
 
 
 def save_piece_sets(file_path: str = None) -> None:

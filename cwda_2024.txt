@@ -1,21 +1,28 @@
 2024 Chess with Different Armies thread: https://www.reddit.com/r/chessvariants/comments/190l46o/2024_chess_with_different_armies_thread/
 
-This is not even remotely the first thread like this from me.
+NB: The information presented here was partially reorganized, and edited to reflect the implementation used, for the reader's convenience.
 
-This variant, or more specifically the original armies, the Fabulous FIDEs (regular army) and 3 new ones, was created by Ralph Betza and is one of the more well known ones. I'm not sure how the castling was originally meant to work, so the ideas for that are suggestions based on an online CDA AI program and the arrangements are based on such as well. As for how the ideas presented here work, the consorts must be able to go to either color when unobstructed at any point, hence why a manticore (see below) would not make a good consort.
+This variant, specifically with the 4 original armies, the Fabulous FIDEs (regular army) and 3 new ones, was created by Ralph Betza and is one of the more well known ones.
+Wikipedia page: https://en.wikipedia.org/wiki/Chess_with_different_armies
+Chess Variant page: https://www.chessvariants.org/unequal.dir/cwda.html
 
-R - Castle (Rook position, some have each one being unique and opposite in some manner)
+At the start of the game, each player picks one of the armies listed below to play with. Players may select the armies in any way they like, be it randomly, by agreement, or independently. The pawns and kings always stay the same. Other pieces are replaced with the corresponding pieces of the given army. The king is still the royal piece - checkmate the enemy king to win.
+
+R - Castle (Rook position, some armies have each one being unique and opposite in some manner)
 N - Median (Knight position)
 B - Flank (Bishop position)
 Q - Consort (Queen position)
 
-Castling types: As the regular type would not be possible with all armies, here is a solution to that problem
+A lot (but not all) of the armies have one or more colorbound piece types. Such pieces can only move to squares of one color (black or white), the same color as the one they started on. Buzzing Busters (see below) also have pieces that are filebound, meaning they can only move to certain files (namely, files that are colored the same as the one such a piece started on). However, there are no armies where all of the new pieces have such movement restrictions. Notably, none of the consorts do.
 
-Type 1: Same as the Fabulous FIDEs, the corner piece (if not either) must slide 2 spaces the same time as the king so that they exchange sides and are 1 space away from the center and edge file respectively, and all the other original armies would also castle like this
-Type 2: Instead of going 2 spaces, each simply steps one space toward the other
-Type 3: Like Type 2 but the corner piece goes exactly 3 spaces when the king goes 1
+Castling works as normal, with one exception when castling queenside: if the piece replacing the rook is colorbound or filebound, the king moves three squares and the piece moves two. This is so that the rook-replacing piece does not change which colors or files it can move to. Kingside castling also works as normal, even if castling with a colorbound/filebound piece.
 
-Component pieces: These do not appear by themselves here but do appear as components for the compound pieces
+Pawns promote as normal, but can only be promoted to pieces that were on the board at the start of the game (owned by either player), excluding pawns and kings.
+
+NB: The notation used for the pieces is an extension of XBetza (itself an extension of Betza's notation) as defined here: https://www.chessvariants.com/page/MSbetza-notation-extended
+The additional extension is used to notate some of the more complicated movement conditions, such as halfling pieces (hh*), automatic capture in a certain range (cc*), movement that depends on board half (*l,*r), square color (*w,*b), whether the square color matches the side (*s,*d), and movement that is randomly chosen between multiple options ({*,*,...}), where * represents arbitrary movement notation. In addition, the notation used for some of the pieces may change later, likely to something more readable (but nonetheless valid).
+
+Component pieces: These do not appear by themselves here but do appear as components for the compound pieces.
 
 Ferz (F): 1 space diagonally
 Alfil (A): Leaps exactly 2 spaces diagonally, also known as an elephant but not the only one (the Xiangqi elephant is the lame, or non-leaping, version of this)
@@ -28,17 +35,17 @@ Mahavat (AA): Diagonal equivalent to a dede (I named it after a synonym to the H
 Mahadede (AADD): Dede/mahavat compound (I used maha- in the context of being the Indian "mega")
 Trebuchet (H): Leaps exactly 3 spaces orthogonally
 Tripper (G): Leaps exactly 3 spaces diagonally
-Horse: Like a knight but can be blocked by an orthogonally adjacent piece (from Xiangqi but also in Janggi)
-Bombard: Like a rook but must leap over a piece of either side to make any movement (from Janggi)
-Arbalest: Diagonal equivalent to the bombard
-Cannon: Moves passively as a rook but captures as an bombard (from Xiangqi)
-Arrow: Moves passively as a bishop but captures as an arbalest
-Point: 1 space orthogonally forward
-Cross: 1 space diagonally forward
-Gold general: Wazir/cross compound (from Shougi)
-Silver general: Ferz/point compound (from Shougi)
-Copper general: Like a cross or vertical wazir (from some Shougi variants)
-Platinum general: Like a guard except directly backward (from Chuu Shougi, called suizou in the original Japanese)
+Horse (afsW): Like a knight but can be blocked by an orthogonally adjacent piece (from Xiangqi but also in Janggi)
+Bombard (pR): Like a rook but must leap over a piece of either side to make any movement (from Janggi)
+Arbalest (pB): Diagonal equivalent to the bombard
+Cannon (mRcpR): Moves passively as a rook but captures as an bombard (from Xiangqi)
+Arrow (mBcpB): Moves passively as a bishop but captures as an arbalest
+Point (fW): 1 space orthogonally forward
+Cross (fF): 1 space diagonally forward
+Gold general (WfF): Wazir/cross compound (from Shougi)
+Silver general (FfW): Ferz/point compound (from Shougi)
+Copper general (vWfF): Like a cross or vertical wazir (from some Shougi variants)
+Platinum general (FfsW): Like a guard except directly backward (from Chuu Shougi, called suizou in the original Japanese)
 Manticore (WyafsW): As a wazir and can then slide diagonally outward
 Helm (fN): As a forward-most knight
 Crab (ffbsN): As a forward-most or backward horizontal-most knight
@@ -49,9 +56,10 @@ Wide [oblique piece]: Horizontal-most
 Lame [leaper]: Slides through the intermediate squares instead of leaping over them (meaning it can be blocked)
 Crooked [rider]: Changes direction in a zig-zag pattern along a certain path/direction
 
-Far-leaper limit: Because some pieces can leap over 2 spaces away, they could easily threaten pieces on the back row, so it would be best to have it so that they can only move there if the back row is unobstructed, thus limiting their leaping
+Far-leaper limit: Because some pieces can leap over 2 spaces away, they could easily threaten pieces on the back row, so it would be best to have it so that they can only move there if the back row is unobstructed, thus limiting their leaping.
+NB: The far-leaper limit is currently not implemented. This may change in the future.
 
-Original armies: The regular army is called the Fabulous Fides
+Original armies: The regular army is called the Fabulous FIDEs.
 
 Colorbound Clobberers: Based on color-bound pieces, especially those that leap exactly 2 spaces
 R - Bede (BD): As a bishop or leaps exactly 2 spaces orthogonally, i.e. a bishop/dabbaba compound
@@ -203,7 +211,7 @@ Armies based on specific ideas of the main variety like the originals: Meaning a
 
 Irritant Irons (metal): Based on the 'metal generals' (gold, silver, copper, platinum)
 R - Musth (FAfsW): Platinum general / alfil compound (combines 2 pieces with elephant-based names)
-N - Officer (vNfhKbW): Like a copper general or narrow knight
+N - Officer (vNvWfF): Like a copper general or narrow knight
 B - Silverrider (BfR): Bishop/lance compound
 Q - Goldrider (RfB): As a queen except diagonally backward
 
@@ -319,11 +327,11 @@ B - Blizzard (FflbrBfrrfbllbCl,FfrblBfllfbrrbCr): On the left side of the board,
 Q - Chanqueen (RlBrhNl,RrBlhNr): Knish/rook compound
 
 Colorful Characters: Each of these pieces moves differently depending on what color they're on while not being that much more or less powerful on either color
-R (starting on dark) - Elkrider (Rb,NNw): If on dark, can move as a rook, but if on light, can move as a nightrider (for context, an elk (Rb,Nw) would be like this piece, but it can only go as a knight on light)
-R (starting on light) - Caribourider (NNb,Rw): Space-color inverse of the elkrider (the knight-on-dark inverse of the elk (Nb,Rw) would be what I like to call a caribou)
-N - Deuterocannon (Nb,mRcpRw): Like a knight on dark and a cannon on light
-B - Nightlight (FW[W-DD]b,fBbhNw): As a forward bishop, backward knight on light, and a panda or ferz on dark
-Q - Nanqueen (Qi,NNKo): As a queen on the starting color and a nanking on the other one, so it can move as a guard regardless
+R (starting on dark) - Elkrider (NNw,Rb): If on dark, can move as a rook, but if on light, can move as a nightrider (for context, an elk (Rb,Nw) would be like this piece, but it can only go as a knight on light)
+R (starting on light) - Caribourider (Rw,NNb): Space-color inverse of the elkrider (the knight-on-dark inverse of the elk (Nb,Rw) would be what I like to call a caribou)
+N - Deuterocannon (mRcpRw,Nb): Like a knight on dark and a cannon on light
+B - Nightlight (fBbhNw,FW[W-DD]b): As a forward bishop, backward knight on light, and a panda or ferz on dark
+Q - Nanqueen (Qs,NNKd): As a queen on the color matching its side (light squares for white, dark squares for black) and a nanking on the other one, so it can move as a guard regardless
 
 Probable Prowlers: These pieces have a 50/50% chance, generally by way of coin toss, of either moving as one piece or another, and are either 'fast' (longer ranged) or 'slow' (shorter ranged), and yes, I've watched VeggieTales
 R - Veteran ({R,KAD}): Like a rook when fast and a guard/alibaba compound when slow

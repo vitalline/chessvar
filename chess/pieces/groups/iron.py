@@ -18,7 +18,7 @@ class Musth(Piece):
 
 class Officer(Piece):
     name = 'Officer'
-    file_name = 'vNfhKbW'
+    file_name = 'vNvWfF'
     asset_folder = 'iron'
 
     def __init__(self, board, board_pos, side, **kwargs):

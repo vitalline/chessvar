@@ -5,7 +5,7 @@ from chess.pieces.pieces import Piece, Side
 
 class ElkRdr(Piece):
     name = 'Elkrider'
-    file_name = '(Rb,NNw)'
+    file_name = '(NNw,Rb)'
     asset_folder = 'color'
 
     def __init__(self, board, board_pos, side, **kwargs):
@@ -13,8 +13,8 @@ class ElkRdr(Piece):
             board, board_pos, side,
             movement.ColorMovement(
                 board,
-                dark=[movement.RiderMovement(board, rot([(1, 0)]))],
                 light=[movement.RiderMovement(board, rot([(1, 2), (2, 1)]))],
+                dark=[movement.RiderMovement(board, rot([(1, 0)]))],
             ),
             **kwargs
         )
@@ -22,7 +22,7 @@ class ElkRdr(Piece):
 
 class CaribRdr(Piece):
     name = 'Caribourider'
-    file_name = '(NNb,Rw)'
+    file_name = '(Rw,NNb)'
     asset_folder = 'color'
 
     def __init__(self, board, board_pos, side, **kwargs):
@@ -30,8 +30,8 @@ class CaribRdr(Piece):
             board, board_pos, side,
             movement.ColorMovement(
                 board,
-                dark=[movement.RiderMovement(board, rot([(1, 2), (2, 1)]))],
                 light=[movement.RiderMovement(board, rot([(1, 0)]))],
+                dark=[movement.RiderMovement(board, rot([(1, 2), (2, 1)]))],
             ),
             **kwargs
         )
@@ -39,7 +39,7 @@ class CaribRdr(Piece):
 
 class DCannon(Piece):
     name = 'Deuterocannon'
-    file_name = '(Nb,mRcpRw)'
+    file_name = '(mRcpRw,Nb)'
     asset_folder = 'color'
 
     def __init__(self, board, board_pos, side, **kwargs):
@@ -47,12 +47,12 @@ class DCannon(Piece):
             board, board_pos, side,
             movement.ColorMovement(
                 board,
-                dark=[movement.RiderMovement(board, rot([(1, 2, 1), (2, 1, 1)]))],
                 light=[movement.MultiMovement(
                     board,
                     move=[movement.RiderMovement(board, rot([(1, 0)]))],
                     capture=[movement.CannonRiderMovement(board, rot([(1, 0)]))]
                 )],
+                dark=[movement.RiderMovement(board, rot([(1, 2, 1), (2, 1, 1)]))],
             ),
             **kwargs
         )
@@ -60,7 +60,7 @@ class DCannon(Piece):
 
 class Nightlight(Piece):
     name = 'Nightlight'
-    file_name = '(FW[W-DD]b,fBbhNw)'
+    file_name = '(fBbhNw,FW[W-DD]b)'
     asset_folder = 'color'
 
     def __init__(self, board, board_pos, side, **kwargs):
@@ -68,13 +68,13 @@ class Nightlight(Piece):
             board, board_pos, side,
             movement.ColorMovement(
                 board,
+                light=[movement.RiderMovement(board, symv([(-1, 2, 1), (-2, 1, 1), (1, 1)]))],
                 dark=[movement.MultiMovement(board, [movement.RiderMovement(board, rot([(1, 1, 1)]))] + [
                     movement.BentMovement(board, [
                         movement.RiderMovement(board, [(i, j, 1)]),
                         movement.RiderMovement(board, [(2 * i, 2 * j)])
                     ]) for i, j in rot([(1, 0)])
                 ])],
-                light=[movement.RiderMovement(board, symv([(-1, 2, 1), (-2, 1, 1), (1, 1)]))],
             ),
             **kwargs
         )
@@ -82,18 +82,18 @@ class Nightlight(Piece):
 
 class Nanqueen(Piece):
     name = 'Nanqueen'
-    file_name = '(Qi,NNKo)'
+    file_name = '(Qs,NNKd)'
     asset_folder = 'color'
 
     def __init__(self, board, board_pos, side, **kwargs):
-        starting_movement = movement.RiderMovement(board, rot([(1, 0), (1, 1)]))
-        opposite_movement = movement.RiderMovement(board, rot([(1, 0, 1), (1, 1, 1), (1, 2), (2, 1)]))
+        same_color_movement = movement.RiderMovement(board, rot([(1, 0), (1, 1)]))
+        different_color_movement = movement.RiderMovement(board, rot([(1, 0, 1), (1, 1, 1), (1, 2), (2, 1)]))
         super().__init__(
             board, board_pos, side,
             movement.ColorMovement(
                 board,
-                light=[starting_movement if side == Side.WHITE else opposite_movement],
-                dark=[starting_movement if side == Side.BLACK else opposite_movement]
+                light=[same_color_movement if side == Side.WHITE else different_color_movement],
+                dark=[same_color_movement if side == Side.BLACK else different_color_movement]
             ),
             **kwargs
         )
