@@ -19,7 +19,7 @@ Castling works as normal, with one exception when castling queenside: if the pie
 
 Pawns promote as normal, but can only be promoted to pieces that were on the board at the start of the game (owned by either player), excluding pawns and kings.
 
-NB: The notation used for the pieces is an extension of XBetza (itself an extension of Betza's notation) as defined here: https://www.chessvariants.com/page/MSbetza-notation-extended
+NB: The notation used for the pieces is an extension of XBetza (itself an extension of Betza notation) as defined here: https://www.chessvariants.com/page/MSbetza-notation-extended
 The additional extension is used to notate some of the more complicated movement conditions, such as halfling pieces (hh*), automatic capture in a certain range (cc*), movement that depends on board half (*l,*r), square color (*w,*b), whether the square color matches the side (*s,*d), and movement that is randomly chosen between multiple options ({*,*,...}), where * represents arbitrary movement notation. In addition, the notation used for some of the pieces may change later, likely to something more readable (but nonetheless valid).
 
 Component pieces: These do not appear by themselves here but do appear as components for the compound pieces.
@@ -30,7 +30,7 @@ Guard/Man/Commoner (K): 1 space radially, what a king is a royal instance of
 Wazir (W): 1 space orthogonally
 Dabbaba (D): Leaps exactly 2 spaces orthogonally
 Alibaba (AD): Leaps exactly 2 spaces radially, alfil/dabbaba compound
-Dede (DD): Like a rook but leaps over all differently-colored spaces, i.e. a dabbaba-rider (I named it after the funny notation)
+Dede (DD): Like a rook but leaps over all differently-colored spaces, i.e. a dabbaba-rider (I named it after its Betza notation)
 Mahavat (AA): Diagonal equivalent to a dede (I named it after a synonym to the Hindi word for "mahout")
 Mahadede (AADD): Dede/mahavat compound (I used maha- in the context of being the Indian "mega")
 Trebuchet (H): Leaps exactly 3 spaces orthogonally
