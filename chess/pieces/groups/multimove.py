@@ -4,7 +4,7 @@ from chess.pieces.pieces import Piece
 
 
 class MachineRdr(Piece):
-    name = 'Machine Rider'
+    name = 'Machinerider'
     file_name = 'WD2[W-D][D-W]'
     asset_folder = 'multimove'
 
