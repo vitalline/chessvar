@@ -327,8 +327,8 @@ B - Blizzard (FflbrBfrrfbllbCl,FfrblBfllfbrrbCr): On the left side of the board,
 Q - Chanqueen (RlBrhNl,RrBlhNr): Knish/rook compound
 
 Colorful Characters: Each of these pieces moves differently depending on what color they're on while not being that much more or less powerful on either color
-R (starting on dark) - Elkrider (NNw,Rb): If on dark, can move as a rook, but if on light, can move as a nightrider (for context, an elk (Rb,Nw) would be like this piece, but it can only go as a knight on light)
-R (starting on light) - Caribourider (Rw,NNb): Space-color inverse of the elkrider (the knight-on-dark inverse of the elk (Nb,Rw) would be what I like to call a caribou)
+R (starting on dark) - Elkrider (NNw,Rb): If on dark, can move as a rook, but if on light, can move as a nightrider (for context, an elk (Nw,Rb) would be like this piece, but it can only go as a knight on light)
+R (starting on light) - Caribourider (Rw,NNb): Space-color inverse of the elkrider (the knight-on-dark inverse of the elk (Rw,Nb) would be what I like to call a caribou)
 N - Deuterocannon (mRcpRw,Nb): Like a knight on dark and a cannon on light
 B - Nightlight (fBbhNw,FW[W-DD]b): As a forward bishop, backward knight on light, and a panda or ferz on dark
 Q - Nanqueen (Qs,NNKd): As a queen on the color matching its side (light squares for white, dark squares for black) and a nanking on the other one, so it can move as a guard regardless
