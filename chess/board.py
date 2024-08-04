@@ -346,6 +346,7 @@ class Board(Window):
             resizable=True,
             vsync=True,
             center_window=True,
+            visible=False,
         )
 
         self.origin = self.width / 2, self.height / 2
@@ -359,6 +360,7 @@ class Board(Window):
         self.color_scheme = colors[self.color_index]  # current color scheme
         self.background_color = self.color_scheme["background_color"]  # background color
         self.log_data = []  # list of presently logged strings
+        self.save_data = None  # last loaded save data
         self.skip_mouse_move = False  # setting this to True skips one mouse movement offset
         self.hovered_square = None  # square we are currently hovering over
         self.clicked_square = None  # square we clicked on
@@ -493,6 +495,8 @@ class Board(Window):
             sprite.scale = self.square_size / sprite.texture.width
             self.board_sprite_list.append(sprite)
 
+        save_update_mode = abs(self.board_config['save_update_mode'])
+
         # set up pieces on the board
         loaded = False
         if len(argv) > 1:
@@ -501,9 +505,15 @@ class Board(Window):
                 save_path = join(base_dir, argv[1])
                 if isfile(save_path):
                     self.load_board(save_path)
-                    if self.board_config['update_saves']:
-                        if self.reload_history():
-                            self.save_board(save_path)
+                    if save_update_mode:
+                        save_update_mode -= 1
+                        success = self.reload_history() if save_update_mode & 2 else True
+                        if success:
+                            self.save_board(
+                                path=save_path,
+                                indent=2 if save_update_mode & 1 else None,
+                                partial=not save_update_mode & 4,
+                            )
                         else:
                             self.log(f"[Ply {self.ply_count}] Error: Failed to reload history!")
                     loaded = True
@@ -729,7 +739,7 @@ class Board(Window):
         self.load_moves()
         self.show_moves()
 
-    def save_board(self, path: str | None = None, indent: int | None = None) -> None:
+    def save_board(self, path: str | None = None, indent: int | None = None, partial: bool = False) -> None:
         if path is None:
             path = get_filename('save', 'json')
         data = {
@@ -779,10 +789,19 @@ class Board(Window):
             'set_seed': self.set_seed,
             'roll_seed': self.roll_seed,
             'roll_update': self.board_config['update_roll_seed'],
-            'chaos_state': save_rng(self.chaos_rng),
-            'set_state': save_rng(self.set_rng),
-            'roll_state': save_rng(self.roll_rng),
         }
+        for k, v in {
+            'chaos': (self.chaos_seed, self.chaos_rng),
+            'set': (self.set_seed, self.set_rng),
+            'roll':  (self.roll_seed, self.roll_rng),
+        }.items():
+            seed, rng = v
+            new_rng = Random(seed)
+            if rng.getstate() != new_rng.getstate():
+                data[f"{k}_state"] = save_rng(rng)
+        if partial:
+            if self.save_data is not None:
+                data = {k: v for k, v in data.items() if k in self.save_data}
         with open(path, 'w') as file:
             if indent is None:
                 dump(data, file, separators=(',', ':'))
@@ -802,6 +821,11 @@ class Board(Window):
 
         with open(path) as file:
             data = load(file)
+            if isinstance(data, dict):
+                self.save_data = data
+            else:
+                print(f"Warning: Invalid save format (expected dict, but got {type(data)})")
+                return
 
         # might have to add more error checking to saving/loading, even if at the cost of slight redundancy.
         # who knows when someone decides to introduce a breaking change and absolutely destroy all the saves
@@ -2451,8 +2475,18 @@ class Board(Window):
                     sprite.angle = 0
 
     def resize(self, width: int, height: int):
+        old_width, old_height = self.width, self.height
+        x, y = self.get_location()
         min_width, min_height = (self.board_width + 2) * min_size, (self.board_height + 2) * min_size
+        self.set_visible(False)
         self.set_size(max(width, min_width), max(height, min_height))
+        self.set_location(x - (self.width - old_width) // 2, y - (self.height - old_height) // 2)
+        self.set_visible(True)
+
+    def set_visible(self, visible: bool = True):
+        if self.board_config['save_update_mode'] < 0 and self.save_data is not None:
+            visible = False
+        super().set_visible(visible)
 
     def on_draw(self):
         self.update_trickster_mode()
@@ -3314,4 +3348,8 @@ class Board(Window):
         return debug_log_data
 
     def run(self):
-        pass
+        if self.board_config['save_update_mode'] < 0 and self.save_data is not None:
+            self.close()
+        else:
+            self.set_visible()
+            super().run()

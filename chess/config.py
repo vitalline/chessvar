@@ -15,14 +15,14 @@ DEFAULT_CONFIG = {
         'hide_moves': '',
         'use_check': True,
         'royal_mode': 0,
+        'chaos_mode': 0,
+        'chaos_seed': '',
         'set_seed': '',
         'roll_seed': '',
-        'chaos_seed': '',
-        'chaos_mode': 0,
         'update_roll_seed': True,
-        'update_saves': False,
         'block_ids': '',
         'block_ids_chaos': '',
+        'save_update_mode': 0,
     },
 }
 
