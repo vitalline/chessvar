@@ -258,10 +258,10 @@ class RangedAutoCaptureRiderMovement(RiderMovement):
                     captures[capture.pos_to] = copy(capture)
                     captures[capture.pos_to].set(piece=piece, pos_to=move.pos_to, captured_piece=captured_piece)
             last_chain_move = move
-            while last_chain_move.chained_move and not issubclass(
-                last_chain_move.chained_move.movement_type,
+            while last_chain_move.chained_move and not (issubclass(
+                move.chained_move.movement_type,
                 AutoRangedAutoCaptureRiderMovement
-            ):
+            ) and move.chained_move.piece.side == piece.side):
                 last_chain_move = last_chain_move.chained_move
             for capture_pos_to in sorted(captures):
                 last_chain_move.chained_move = captures[capture_pos_to]

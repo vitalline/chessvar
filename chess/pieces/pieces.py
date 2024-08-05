@@ -211,12 +211,6 @@ class PromotablePiece(Piece):
                 return
             if not self.promotions:
                 return
-            self.board.update_auto_captures(move, self.side.opponent())
-            if (
-                move.chained_move and move.chained_move.captured_piece and
-                move.chained_move.captured_piece.board_pos == self.board_pos
-            ):  # the promoting piece was just auto-captured. stop promotion
-                return
             promotion_piece = self.board.promotion_piece
             if move.promotion:
                 self.board.promotion_piece = True

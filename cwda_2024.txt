@@ -106,7 +106,7 @@ N - Mushroom (vNfsCbF): Like a narrow knight, backward ferz, or forward wide cam
 B - Sausage (sWFvNvH): Like a ferz, horizontal wazir, narrow knight, or vertical trebuchet, and its moveset resembles an oblong object, such as a sausage, hence the name (for the latter to not highly shorten gameplay, the trebuchet movements could be lame, which fits the piece's theme even more)
 Q - Meatball (FWADfN): Like a guard, alibaba (AD, alfil/dabbaba compound), or helm, the moveset sort of resembles a dripping meatball
 
-Demirifle Destroyers: The following pieces will automatically capture any enemy on a space they can move to
+Demirifle Destroyers: The following pieces will automatically capture any enemy on a space they can move to (when facing each other, the piece tht just moved/promoted captures first)
 R - Snail (mccWmccfD): As a wazir or forward dabbaba
 N - Crab (mccffbsN): As a forward-most knight or backward wide knight
 B - Lobster (mccfAmccbF): As a forward alfil or backward ferz
