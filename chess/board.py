@@ -3326,7 +3326,7 @@ class Board(Window):
                 debug_log_data.append(f'  {toa(piece.board_pos)} {piece.board_pos}: {piece.name}')
             if not self.royal_pieces[side]:
                 debug_log_data[-1] += " None"
-            debug_log_data.append(f"{side} quasiroyal pieces ({len(self.quasi_royal_pieces[side])}):")
+            debug_log_data.append(f"{side} quasi-royal pieces ({len(self.quasi_royal_pieces[side])}):")
             for piece in self.quasi_royal_pieces[side]:
                 debug_log_data.append(f'  {toa(piece.board_pos)} {piece.board_pos}: {piece.name}')
             if not self.quasi_royal_pieces[side]:
