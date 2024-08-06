@@ -1588,6 +1588,7 @@ class Board(Window):
             self.clicked_square = None
         if pos is not None:
             self.highlight.position = self.get_screen_position(pos)
+        old_hovered_square = self.hovered_square
         if self.not_on_board(pos):
             self.highlight.color = (0, 0, 0, 0)
             self.hovered_square = None
@@ -1603,7 +1604,8 @@ class Board(Window):
                     self.show_moves()
                 elif self.promotion_piece:
                     self.hide_moves()
-        self.update_caption()
+        if self.hovered_square != old_hovered_square:
+            self.update_caption()
 
     def update_board(self, move: Move) -> None:
         if self.en_passant_target is not None and move.piece.side == self.en_passant_target.side.opponent():
