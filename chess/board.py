@@ -880,8 +880,8 @@ class Board(Window):
             self.roll_rng = Random(self.roll_seed)
         self.board_config['update_roll_seed'] = data.get('roll_update', self.board_config['update_roll_seed'])
 
-        piece_set_ids = {Side(int(k)): v for k, v in data.get('set_ids', {}).items()}
-        self.piece_set_ids |= piece_set_ids
+        self.chaos_sets = {}
+        self.piece_set_ids |= {Side(int(k)): v for k, v in data.get('set_ids', {}).items()}
         self.piece_sets, self.piece_set_names = self.get_piece_sets()
         saved_piece_sets = {Side(int(v)): [load_type(t) for t in d] for v, d in data.get('sets', {}).items()}
         update_sets = False
@@ -1371,6 +1371,8 @@ class Board(Window):
                     chained_move = chained_move.chained_move
                 if royal_capture:
                     check_side = self.turn_side
+                    self.moves[self.turn_side] = {}
+                    self.moves_queried[self.turn_side] = True
                     self.game_over = True
                     continue
             for piece in movable_pieces[turn_side] if chain_moves is None else [last_chain_move.piece]:
@@ -1407,6 +1409,8 @@ class Board(Window):
                                 self.check_side = turn_side
                             if chained_move.captured_piece in royal_pieces[self.turn_side.opponent()]:
                                 check_side = self.turn_side.opponent()
+                                self.moves[self.turn_side.opponent()] = {}
+                                self.moves_queried[self.turn_side.opponent()] = True
                                 self.game_over = True
                     if self.check_side != turn_side:
                         pos_from, pos_to = move.pos_from, move.pos_to
