@@ -1437,7 +1437,10 @@ class Board(Window):
                             self.mark_castling_ep(castling_ep_target.board_pos, marker)
             self.moves_queried[turn_side] = True
         if theoretical_moves_for is None:
-            theoretical_moves_for = self.turn_side.opponent()
+            if self.game_over and self.check_side == self.turn_side.opponent():
+                theoretical_moves_for = Side.NONE
+            else:
+                theoretical_moves_for = self.turn_side.opponent()
         if theoretical_moves_for == Side.ANY:
             turn_sides = [Side.WHITE, Side.BLACK]
         elif theoretical_moves_for == Side.NONE:
@@ -1514,7 +1517,7 @@ class Board(Window):
         self.hide_moves()
         self.update_caption()
         move_sprites = dict()
-        pos = self.selected_square or self.hovered_square or self.get_board_position(self.highlight.position)
+        pos = self.selected_square or self.hovered_square
         if not self.not_on_board(pos):
             piece = self.get_piece(pos)
             hide_moves = self.should_hide_moves
@@ -2903,8 +2906,12 @@ class Board(Window):
                         return
         if self.held_buttons:
             return
-        if symbol == key.S and modifiers & key.MOD_ACCEL:  # Save
-            self.save_board(path=select_save_name() if modifiers & key.MOD_SHIFT else None)
+        if symbol == key.S and modifiers & key.MOD_ACCEL:
+            if not modifiers & key.MOD_SHIFT:  # Save
+                self.save_board(get_filename('save', 'json'))
+            else:  # Save as
+                self.save_board(select_save_name())
+                self.on_deactivate()
         if symbol == key.R:  # Restart
             if modifiers & key.MOD_ALT:  # Reset piece sets
                 self.piece_set_ids = {side: 0 for side in self.piece_set_ids}
@@ -3189,6 +3196,7 @@ class Board(Window):
         if symbol == key.L:
             if modifiers & key.MOD_ALT:  # Load save data
                 self.load_save_data(select_save_data())
+                self.on_deactivate()
             else:  # Log
                 if modifiers & key.MOD_ACCEL:  # Save log
                     self.save_log()
