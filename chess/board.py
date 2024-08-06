@@ -7,6 +7,7 @@ from os import name as os_name, system
 from os.path import isfile, join
 from random import Random
 from sys import argv, stdout
+from tkinter import filedialog
 from traceback import print_exc
 from typing import Type, TextIO
 
@@ -328,6 +329,23 @@ def save_piece_types(file_path: str = None, side: Side = Side.WHITE) -> None:
         print_piece_types(fp, side)
 
 
+def select_save_data() -> str:
+    return filedialog.askopenfilename(
+        initialdir=base_dir,
+        initialfile='*.json',
+        filetypes=[("JSON save file", "*.json")],
+    )
+
+
+def select_save_name() -> str:
+    return filedialog.asksaveasfilename(
+        initialdir=base_dir,
+        initialfile=get_filename('save', 'json', in_dir=''),
+        filetypes=[("JSON save file", "*.json")],
+        defaultextension='.json',
+    )
+
+
 class Board(Window):
 
     def __init__(self):
@@ -495,30 +513,8 @@ class Board(Window):
             sprite.scale = self.square_size / sprite.texture.width
             self.board_sprite_list.append(sprite)
 
-        save_update_mode = abs(self.board_config['save_update_mode'])
-
         # set up pieces on the board
-        loaded = False
-        if len(argv) > 1:
-            # noinspection PyBroadException
-            try:
-                save_path = join(base_dir, argv[1])
-                if isfile(save_path):
-                    self.load_board(save_path)
-                    if save_update_mode:
-                        save_update_mode -= 1
-                        success = self.reload_history() if save_update_mode & 2 else True
-                        if success:
-                            self.save_board(
-                                path=save_path,
-                                indent=2 if save_update_mode & 1 else None,
-                                partial=not save_update_mode & 4,
-                            )
-                        else:
-                            self.log(f"[Ply {self.ply_count}] Error: Failed to reload history!")
-                    loaded = True
-            except Exception:
-                print_exc()
+        loaded = self.load_save_data(argv[1] if len(argv) > 1 else None)
         if not loaded:
             if self.should_hide_pieces == 1:
                 self.log(f"[Ply {self.ply_count}] Info: Pieces hidden")
@@ -739,9 +735,9 @@ class Board(Window):
         self.load_moves()
         self.show_moves()
 
-    def save_board(self, path: str | None = None, indent: int | None = None, partial: bool = False) -> None:
-        if path is None:
-            path = get_filename('save', 'json')
+    def save_board(self, path: str, partial: bool = False) -> None:
+        if not path:
+            return
         data = {
             'board_size': [self.board_width, self.board_height],
             'window_size': [self.width, self.height],
@@ -804,6 +800,7 @@ class Board(Window):
         if partial:
             if self.save_data is not None:
                 data = {k: v for k, v in data.items() if k in self.save_data}
+        indent = self.board_config['save_indent']
         with open(path, 'w') as file:
             if indent is None:
                 dump(data, file, separators=(',', ':'))
@@ -2903,9 +2900,13 @@ class Board(Window):
         if self.held_buttons:
             return
         if symbol == key.S and modifiers & key.MOD_ACCEL:  # Save
-            self.save_board(indent=2 if modifiers & key.MOD_SHIFT else None)
+            self.save_board(path=select_save_name() if modifiers & key.MOD_SHIFT else None)
         if symbol == key.R:  # Restart
-            if modifiers & key.MOD_SHIFT:  # Randomize piece sets
+            if modifiers & key.MOD_ALT:  # Reset piece sets
+                self.piece_set_ids = {side: 0 for side in self.piece_set_ids}
+                self.chaos_mode = 0
+                self.reset_board(update=True)
+            elif modifiers & key.MOD_SHIFT:  # Randomize piece sets
                 blocked_ids = set(self.board_config['block_ids'])
                 piece_set_ids = list(i for i in range(len(piece_groups)) if i not in blocked_ids)
                 if modifiers & key.MOD_ACCEL:  # Randomize piece sets (same for both sides)
@@ -3096,11 +3097,13 @@ class Board(Window):
                 self.future_move_history = []  # we don't know if we can redo the future moves anymore, so we clear them
                 self.advance_turn()
         if symbol == key.F:
-            if modifiers & key.MOD_ACCEL:  # Flip
+            if modifiers & key.MOD_ACCEL and not modifiers & key.MOD_SHIFT:  # Flip board
                 self.flip_board()
-            elif modifiers & key.MOD_SHIFT:  # Fast-forward
+            if not modifiers & key.MOD_SHIFT and modifiers & key.MOD_ACCEL:  # Fast-forward
                 while self.future_move_history:
                     self.redo_last_move()
+            if modifiers & key.MOD_ACCEL and modifiers & key.MOD_SHIFT:  # Fast-forward, but slowly. (Reload history)
+                self.reload_history()
         if symbol == key.G and not self.is_trickster_mode():  # Graphics
             old_color_index = self.color_index
             if modifiers & key.MOD_ACCEL and not modifiers & key.MOD_SHIFT:  # Graphics reset
@@ -3179,11 +3182,14 @@ class Board(Window):
                 self.undo_last_finished_move()
         if symbol == key.Y and modifiers & key.MOD_ACCEL:  # Redo
             self.redo_last_finished_move()
-        if symbol == key.L:  # Log
-            if modifiers & key.MOD_ACCEL:  # Save log
-                self.save_log()
-            if modifiers & key.MOD_SHIFT:  # Clear log
-                self.clear_log()
+        if symbol == key.L:
+            if modifiers & key.MOD_ALT:  # Load save data
+                self.load_save_data(select_save_data())
+            else:  # Log
+                if modifiers & key.MOD_ACCEL:  # Save log
+                    self.save_log()
+                if modifiers & key.MOD_SHIFT:  # Clear log
+                    self.clear_log()
         if symbol == key.D:  # Debug
             debug_log_data = self.debug_info()
             if modifiers & key.MOD_ACCEL:  # Save debug log
@@ -3249,6 +3255,29 @@ class Board(Window):
             self.on_mouse_release(
                 round(self.highlight.center_x), round(self.highlight.center_y),  MOUSE_BUTTON_RIGHT, modifiers
             )
+
+    def load_save_data(self, path: str | None = None) -> bool:
+        if not path:
+            return False
+        save_update_mode = abs(self.board_config['save_update_mode'])
+        # noinspection PyBroadException
+        try:
+            save_path = join(base_dir, path)
+            if not isfile(save_path):
+                return False
+            self.load_board(save_path)
+            if not save_update_mode:
+                return True
+            save_update_mode -= 1
+            success = self.reload_history() if save_update_mode & 2 else True
+            if success:
+                self.save_board(path=save_path, partial=not save_update_mode & 1)
+            else:
+                self.log(f"[Ply {self.ply_count}] Error: Failed to reload history!")
+            return True
+        except Exception:
+            print_exc()
+        return False
 
     def log(self, string: str) -> None:
         self.log_data.append(string)

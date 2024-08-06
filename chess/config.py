@@ -22,6 +22,7 @@ DEFAULT_CONFIG = {
         'update_roll_seed': True,
         'block_ids': '',
         'block_ids_chaos': '',
+        'save_indent': '',
         'save_update_mode': 0,
     },
 }
@@ -50,7 +51,11 @@ class Config(dict):
                     self[item] = [
                         int(s) for i in self.base_config[section][item].split(',') if (s := i.strip()).isdigit()
                     ]
-                if item.endswith('_id') or (item.endswith('_seed') and not item.startswith('update_')):
+                if (
+                    item == 'save_indent'
+                    or item.endswith('_id')
+                    or (item.endswith('_seed') and not item.startswith('update_'))
+                ):
                     if self.base_config[section][item].strip() == '':
                         self[item] = None
                     else:
@@ -67,7 +72,11 @@ class Config(dict):
                 self.base_config[section][item] = str(self[item])
                 if item.startswith('block_'):
                     self.base_config[section][item] = ', '.join(str(s) for s in self[item])
-                if item.endswith('_id') or (item.endswith('_seed') and not item.startswith('update_')):
+                if (
+                    item == 'save_indent'
+                    or item.endswith('_id')
+                    or (item.endswith('_seed') and not item.startswith('update_'))
+                ):
                     if self[item] is None:
                         self.base_config[section][item] = ''
                 if item == 'hide_moves':

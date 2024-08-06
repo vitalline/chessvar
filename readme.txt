@@ -5,11 +5,12 @@ RMB, Backspace: deselect piece
 Tab: select next piece or square
 F11: toggle full screen
 Escape: exit application
-Ctrl + S: save game state (compact)
-Ctrl + Shift + S: save game state (readable)
+Ctrl + S: save game state (without save dialog)
+Ctrl + Shift + S: save game state (with save dialog)
 Ctrl + R: start game with current armies
 Shift + R: start game with new random armies (different for each player)
 Ctrl + Shift + R: start game with a new random army (same for both players)
+Alt + R: start game with default armies
 Ctrl + C: save current configuration
 Shift + C: start game with new chaotic armies (different for each player)
 Ctrl + Shift + C: start game with a new chaotic army (same for both players)
@@ -45,6 +46,7 @@ Ctrl + Shift + O: force check/mate if any royal piece is threatened
 Alt + O: toggle between win by checkmate and by royal piece capture
 Ctrl + F: flip board
 Shift + F: fast-forward to last move
+Ctrl + Shift + F: reload move history
 Ctrl + G: reset graphics mode (colors)
 Shift + G: cycle graphics mode forward (+1)
 Ctrl + Shift + G: cycle graphics mode backward (-1)
@@ -62,6 +64,7 @@ Ctrl + Shift + Z: redo last move (if any)
 Ctrl + Y: redo last move (if any)
 Ctrl + L: save game log
 Shift + L: clear game log
+Alt + L: load saved game state
 Ctrl + D: save debug log
 Shift + D: print debug log
 Alt + D: save debug listings
