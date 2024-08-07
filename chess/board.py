@@ -966,6 +966,7 @@ class Board(Window):
                 last_move.piece.movement.reload(last_move, last_move.piece)
 
         self.load_pieces()
+        self.update_pieces()
         self.update_colors()
 
         self.log(f"[Ply {self.ply_count}] Info: Game loaded from {path}")
@@ -1268,10 +1269,11 @@ class Board(Window):
                     last_move = copy(move)
                     self.update_move(last_move)
                     if last_move.promotion and not last_move.is_edit:
-                        new_piece = last_move.promotion
-                        last_move.piece = new_piece
-                        self.update_promotion_auto_captures(last_move)
-                    self.update_auto_captures(last_move, side)
+                        piece = last_move.promotion
+                        if isinstance(piece.movement, movement.RangedAutoCaptureRiderMovement):
+                            piece.movement.generate_captures(last_move, piece)
+                    else:
+                        self.update_auto_captures(last_move, side)
                     while last_move:
                         if last_move.pos_to == royal.board_pos or last_move.captured_piece == royal:
                             self.check_side = side
