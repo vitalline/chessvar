@@ -3112,7 +3112,7 @@ class Board(Window):
         if symbol == key.F:
             if modifiers & key.MOD_ACCEL and not modifiers & key.MOD_SHIFT:  # Flip board
                 self.flip_board()
-            if not modifiers & key.MOD_SHIFT and modifiers & key.MOD_ACCEL:  # Fast-forward
+            if not modifiers & key.MOD_ACCEL and modifiers & key.MOD_SHIFT:  # Fast-forward
                 while self.future_move_history:
                     self.redo_last_move()
             if modifiers & key.MOD_ACCEL and modifiers & key.MOD_SHIFT:  # Fast-forward, but slowly. (Reload history)
