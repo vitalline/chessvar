@@ -732,8 +732,7 @@ class Board(Window):
             self.pieces[row][col].scale = self.square_size / self.pieces[row][col].texture.width
             self.piece_sprite_list.append(self.pieces[row][col])
 
-        self.load_moves()
-        self.show_moves()
+        self.update_status()
 
     def save_board(self, path: str, partial: bool = False) -> None:
         if not path:
@@ -1062,8 +1061,7 @@ class Board(Window):
             self.pieces[row][col].scale = self.square_size / self.pieces[row][col].texture.width
             self.piece_sprite_list.append(self.pieces[row][col])
 
-        self.load_moves()
-        self.show_moves()
+        self.update_status()
 
     def reset_promotions(self, piece_sets: dict[Side, list[Type[abc.Piece]]] | None = None) -> None:
         if piece_sets is None:
@@ -1467,6 +1465,8 @@ class Board(Window):
         self.auto_ranged_pieces = auto_ranged_pieces
         self.auto_capture_markers = auto_capture_markers
         self.check_side = check_side
+        if force_reload and not self.edit_mode and not self.moves.get(self.turn_side, {}):
+            self.game_over = True
 
     def unique_moves(self, side: Side | None = None) -> dict[Side, dict[Position, list[Move]]]:
         if side is None:
@@ -1986,7 +1986,7 @@ class Board(Window):
         else:
             self.chain_start = None
             self.load_moves()
-        self.chain_start = None
+            self.show_moves()
         self.future_move_history = future_move_history
         if self.future_move_history:
             copies = [
@@ -2115,7 +2115,6 @@ class Board(Window):
         elif last_chain_move.chained_move is Unset:
             self.load_moves()
             self.select_piece(last_chain_move.pos_to)
-            self.show_moves()
 
     def undo_last_finished_move(self) -> None:
         self.undo_last_move()
@@ -2143,8 +2142,6 @@ class Board(Window):
     def update_status(self) -> None:
         self.load_moves()  # this updates the check status as well
         self.show_moves()
-        if not self.moves.get(self.turn_side, {}):
-            self.game_over = True
         if self.game_over:
             # the game has ended. let's find out who won and show it by changing piece colors
             if self.check_side:
