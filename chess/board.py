@@ -814,6 +814,7 @@ class Board(Window):
         self.clear_en_passant()
         self.clear_castling_ep()
         self.clear_auto_capture_markers()
+        self.game_over = False
 
         for sprite_list in self.piece_sprite_list, self.promotion_piece_sprite_list, self.promotion_area_sprite_list:
             sprite_list.clear()
@@ -1295,6 +1296,7 @@ class Board(Window):
         theoretical_moves_for:  Side | None = None
     ) -> None:
         if force_reload:
+            self.game_over = False
             self.moves_queried = {side: False for side in self.moves_queried}
             self.theoretical_moves_queried = {side: False for side in self.theoretical_moves_queried}
         self.load_check()
