@@ -2291,7 +2291,13 @@ class Board(Window):
             self.promotion_area_sprite_list.append(background_sprite)
             if promotion is None:
                 continue
-            promotion_piece = promotion(self, pos, side)
+            promotion_piece = promotion(
+                board=self,
+                board_pos=pos,
+                side=side,
+                promotions=self.promotions.get(side),
+                promotion_squares=self.promotion_squares.get(side),
+            )
             if issubclass(promotion, abc.RoyalPiece) and promotion not in self.piece_sets[side]:
                 if self.edit_mode and self.edit_piece_set_id is not None:
                     promotion_piece.is_hidden = False
