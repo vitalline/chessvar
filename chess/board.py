@@ -370,6 +370,9 @@ class Board(Window):
         self.origin = self.width / 2, self.height / 2
         self.set_minimum_size((self.board_width + 2) * min_size, (self.board_height + 2) * min_size)
 
+        self.windowed_size = self.width, self.height
+        self.windowed_square_size = self.square_size
+
         if self.board_config['color_id'] < 0 or self.board_config['color_id'] >= len(colors):
             self.board_config['color_id'] %= len(colors)
             self.board_config.save(config_path)
@@ -739,8 +742,8 @@ class Board(Window):
             return
         data = {
             'board_size': [self.board_width, self.board_height],
-            'window_size': [self.width, self.height],
-            'square_size': self.square_size,
+            'window_size': list(self.windowed_size),
+            'square_size': self.windowed_square_size,
             'flip_mode': self.flip_mode,
             'color_index': self.color_index,
             'color_scheme': {
@@ -2219,7 +2222,8 @@ class Board(Window):
                 if (
                     (move.chained_move or self.chain_moves.get(self.turn_side, {}).get((move.pos_from, move.pos_to)))
                     and not issubclass(move.movement_type, movement.CastlingMovement)
-                    and not isinstance(move.piece.movement, movement.RangedAutoCaptureRiderMovement)
+                    # let's not show auto-captures because space in the caption is VERY limited
+                    # and not isinstance(move.piece.movement, movement.RangedAutoCaptureRiderMovement)
                 ):
                     move.chained_move = Unset  # do not chain moves because we are only showing selectable moves
                 moves = []
@@ -2578,6 +2582,8 @@ class Board(Window):
                     sprite.angle = 0
 
     def resize(self, width: int, height: int) -> None:
+        if self.fullscreen:
+            return
         old_width, old_height = self.width, self.height
         x, y = self.get_location()
         min_width, min_height = (self.board_width + 2) * min_size, (self.board_height + 2) * min_size
@@ -2585,6 +2591,8 @@ class Board(Window):
         self.set_size(max(width, min_width), max(height, min_height))
         self.set_location(x - (self.width - old_width) // 2, y - (self.height - old_height) // 2)
         self.set_visible(True)
+        self.windowed_size = self.width, self.height
+        self.windowed_square_size = min(self.width / (self.board_width + 2), self.height / (self.board_height + 2))
 
     def set_visible(self, visible: bool = True) -> None:
         if self.board_config['save_update_mode'] < 0 and self.save_data is not None:
@@ -2955,7 +2963,7 @@ class Board(Window):
                     self.advance_turn()
         if symbol == key.F11:  # Full screen (toggle)
             self.set_fullscreen(not self.fullscreen)
-        if symbol == key.MINUS:  # (-) Decrease window size
+        if symbol == key.MINUS and not self.fullscreen:  # (-) Decrease window size
             if modifiers & key.MOD_ACCEL and modifiers & key.MOD_SHIFT:
                 self.resize((self.board_width + 2) * min_size, (self.board_height + 2) * min_size)
             elif modifiers & key.MOD_ACCEL:
@@ -2968,7 +2976,7 @@ class Board(Window):
                 width, height = self.get_size()
                 size = min(round(width / (self.board_width + 2)), round(height / (self.board_height + 2)))
                 self.resize((self.board_width + 2) * size, (self.board_height + 2) * size)
-        if symbol == key.EQUAL:  # (+) Increase window size
+        if symbol == key.EQUAL and not self.fullscreen:  # (+) Increase window size
             if modifiers & key.MOD_ACCEL and modifiers & key.MOD_SHIFT:
                 self.resize((self.board_width + 2) * max_size, (self.board_height + 2) * max_size)
             elif modifiers & key.MOD_ACCEL:
@@ -2982,6 +2990,7 @@ class Board(Window):
                 size = max(round(width / (self.board_width + 2)), round(height / (self.board_height + 2)))
                 self.resize((self.board_width + 2) * size, (self.board_height + 2) * size)
         if symbol == key.KEY_0 and modifiers & key.MOD_ACCEL:  # Reset window size
+            self.set_fullscreen(False)
             self.resize((self.board_width + 2) * default_size, (self.board_height + 2) * default_size)
         if symbol == key.E:
             if modifiers & key.MOD_SHIFT:  # Empty board
