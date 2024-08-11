@@ -332,7 +332,6 @@ def save_piece_types(file_path: str = None, side: Side = Side.WHITE) -> None:
 def select_save_data() -> str:
     return filedialog.askopenfilename(
         initialdir=base_dir,
-        initialfile='*.json',
         filetypes=[("JSON save file", "*.json")],
     )
 
@@ -452,6 +451,7 @@ class Board(Window):
         self.selection.color = self.color_scheme["selection_color"]  # color it according to the color scheme
         self.selection.scale = self.square_size / self.selection.texture.width  # scale it to the size of a square
         self.active_piece = None  # piece that is currently being moved
+        self.is_active = True  # whether the window is active or not
         self.label_list = []  # labels for the rows and columns
         self.board_sprite_list = SpriteList()  # sprites for the board squares
         self.move_sprite_list = SpriteList()  # sprites for the move markers
@@ -2171,11 +2171,13 @@ class Board(Window):
         self.color_all_pieces()
 
     def update_caption(self) -> None:
+        selected_square = self.selected_square
+        hovered_square = self.hovered_square if self.is_active else None
         if self.promotion_piece:
             piece = self.promotion_piece
             if piece.is_empty():
-                if self.hovered_square in self.promotion_area:
-                    promotion = self.promotion_area[self.hovered_square]
+                if hovered_square in self.promotion_area:
+                    promotion = self.promotion_area[hovered_square]
                     promotion_name = "???" if promotion.is_hidden else promotion.name
                     message = f"[Ply {self.ply_count}] {promotion.side} {promotion_name}"
                 else:
@@ -2189,8 +2191,8 @@ class Board(Window):
                 return
             name = "???" if piece.is_hidden else piece.name
             message = f"[Ply {self.ply_count}] {piece.side} {name} on {toa(piece.board_pos)}"
-            if self.hovered_square in self.promotion_area:
-                promotion = self.promotion_area[self.hovered_square]
+            if hovered_square in self.promotion_area:
+                promotion = self.promotion_area[hovered_square]
                 promotion_name = "???" if promotion.is_hidden else promotion.name
                 message += f" promotes to {promotion_name}"
             else:
@@ -2199,7 +2201,7 @@ class Board(Window):
                     message += f" to {piece_groups[self.edit_piece_set_id]['name']}"
             self.set_caption(message)
             return
-        piece = self.get_piece(self.selected_square)
+        piece = self.get_piece(selected_square)
         if piece.is_empty():
             piece = None
         hide_piece = piece.is_hidden if piece else self.should_hide_pieces
@@ -2207,19 +2209,19 @@ class Board(Window):
             self.edit_mode or self.should_hide_moves or
             (hide_piece and self.should_hide_moves is not False)
         )
-        if self.selected_square:
-            if hide_moves and self.hovered_square:
+        if selected_square:
+            if hide_moves and hovered_square:
                 move = Move(
-                    pos_from=self.selected_square,
-                    pos_to=self.hovered_square,
+                    pos_from=selected_square,
+                    pos_to=hovered_square,
                     piece=piece,
                     is_edit=self.edit_mode,
                 )
                 self.set_caption(f"[Ply {self.ply_count}] {move}")
                 return
             move = None
-            if not hide_moves and self.hovered_square:
-                move = self.find_move(self.selected_square, self.hovered_square)
+            if not hide_moves and hovered_square:
+                move = self.find_move(selected_square, hovered_square)
             if move:
                 if move.promotion is not None:
                     move.promotion = Unset
@@ -2236,9 +2238,9 @@ class Board(Window):
                     move = move.chained_move
                 self.set_caption(f"[Ply {self.ply_count}] {'; '.join(str(move) for move in moves)}")
                 return
-        if piece or self.hovered_square:
+        if piece or hovered_square:
             if not piece:
-                piece = self.get_piece(self.hovered_square)
+                piece = self.get_piece(hovered_square)
             if not piece.is_empty():
                 name = "???" if piece.is_hidden else piece.name
                 self.set_caption(f"[Ply {self.ply_count}] {piece.side} {name} on {toa(piece.board_pos)}")
@@ -2637,16 +2639,18 @@ class Board(Window):
         self.update_sprites(self.flip_mode)
 
     def on_activate(self) -> None:
+        self.is_active = True
         if not self.not_on_board(self.get_board_position(self.highlight.position)):
             self.highlight.color = self.color_scheme["highlight_color"]
         self.show_moves()
 
     def on_deactivate(self) -> None:
+        self.is_active = False
         self.hovered_square = None
         self.clicked_square = None
         self.held_buttons = 0
         self.highlight.color = (0, 0, 0, 0)
-        self.hide_moves()
+        self.show_moves()
 
     def on_mouse_press(self, x: int, y: int, buttons: int, modifiers: int) -> None:
         self.piece_was_selected = False
