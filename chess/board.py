@@ -1593,6 +1593,8 @@ class Board(Window):
             self.clicked_square = None
         if pos is not None:
             self.highlight.position = self.get_screen_position(pos)
+        if not self.is_active:
+            return
         old_hovered_square = self.hovered_square
         if self.not_on_board(pos):
             self.highlight.color = (0, 0, 0, 0)
@@ -2163,7 +2165,11 @@ class Board(Window):
 
     def update_caption(self) -> None:
         selected_square = self.selected_square
-        hovered_square = self.hovered_square if self.is_active else None
+        hovered_square = None
+        if self.is_active:
+            hovered_square = self.hovered_square
+            if not hovered_square and self.highlight.alpha:
+                hovered_square = self.get_board_position(self.highlight.position)
         if self.promotion_piece:
             piece = self.promotion_piece
             if piece.is_empty():
