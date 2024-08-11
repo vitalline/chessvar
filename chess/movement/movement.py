@@ -79,7 +79,7 @@ class BaseDirectionalMovement(BaseMovement):
             self.initialize_direction(direction, pos_from, piece)
             current_pos = pos_from
             move = Move(pos_from, self.transform(current_pos), type(self))
-            while not self.board.not_on_board(self.transform(current_pos)):
+            while self.board.on_board(self.transform(current_pos)):
                 if self.stop_condition(move, direction, piece, theoretical):
                     direction_id += 1
                     break

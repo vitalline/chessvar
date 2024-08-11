@@ -597,6 +597,9 @@ class Board(Window):
     def reset_position(self, piece: abc.Piece) -> None:
         self.set_position(piece, piece.board_pos)
 
+    def on_board(self, pos: Position | None) -> bool:
+        return not self.not_on_board(pos)
+
     def not_on_board(self, pos: Position | None) -> bool:
         return pos is None or pos[0] < 0 or pos[0] >= self.board_height or pos[1] < 0 or pos[1] >= self.board_width
 
@@ -1527,7 +1530,7 @@ class Board(Window):
         pos = self.selected_square or self.hovered_square
         if not pos and self.highlight.alpha:
             pos = self.get_board_position(self.highlight.position)
-        if not self.not_on_board(pos):
+        if self.on_board(pos):
             piece = self.get_piece(pos)
             hide_moves = self.should_hide_moves
             if hide_moves is None:
@@ -2640,7 +2643,7 @@ class Board(Window):
 
     def on_activate(self) -> None:
         self.is_active = True
-        if not self.not_on_board(self.get_board_position(self.highlight.position)):
+        if self.on_board(self.get_board_position(self.highlight.position)):
             self.highlight.color = self.color_scheme["highlight_color"]
         self.show_moves()
 
