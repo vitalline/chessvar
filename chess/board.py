@@ -381,6 +381,7 @@ class Board(Window):
         self.background_color = self.color_scheme["background_color"]  # background color
         self.log_data = []  # list of presently logged strings
         self.save_data = None  # last loaded save data
+        self.save_loaded = False  # whether a save was successfully loaded
         self.skip_mouse_move = False  # setting this to True skips one mouse movement offset
         self.hovered_square = None  # square we are currently hovering over
         self.clicked_square = None  # square we clicked on
@@ -517,19 +518,10 @@ class Board(Window):
             self.board_sprite_list.append(sprite)
 
         # set up pieces on the board
-        loaded = self.load_save_data(argv[1] if len(argv) > 1 else None)
-        if not loaded:
-            if self.should_hide_pieces == 1:
-                self.log(f"[Ply {self.ply_count}] Info: Pieces hidden")
-            if self.should_hide_pieces == 2:
-                self.log(f"[Ply {self.ply_count}] Info: Penultima mode activated!")
-            if self.royal_piece_mode == 1:
-                self.log(f"[Ply {self.ply_count}] Info: Using royal check rule (threaten any royal piece)")
-            if self.royal_piece_mode == 2:
-                self.log(f"[Ply {self.ply_count}] Info: Using quasi-royal check rule (threaten last royal piece)")
-            if not self.use_check:
-                self.log(f"[Ply {self.ply_count}] Info: Checks disabled (capture the royal piece to win)")
+        self.load_save_data(argv[1] if len(argv) > 1 else None)
+        if not self.save_loaded:
             self.reset_board(update=True)
+            self.log_special_modes()
 
     def get_board_position(
         self,
@@ -644,7 +636,7 @@ class Board(Window):
         self.selected_square = None
         self.show_moves()
 
-    def reset_board(self, update: bool = False) -> None:
+    def reset_board(self, update: bool = False, log: bool = True) -> None:
         self.deselect_piece()
         self.clear_en_passant()
         self.clear_castling_ep()
@@ -673,11 +665,8 @@ class Board(Window):
             if no_chaos:
                 self.chaos_mode = 0
 
-        self.log(
-            f"[Ply {self.ply_count}] Game: "
-            f"{self.piece_set_names[Side.WHITE] if not self.should_hide_pieces else '???'} vs. "
-            f"{self.piece_set_names[Side.BLACK] if not self.should_hide_pieces else '???'}"
-        )
+        if log:
+            self.log_armies()
         self.ply_count += 1
 
         if update:
@@ -812,7 +801,10 @@ class Board(Window):
             else:
                 dump(data, file, indent=indent)
 
-    def load_board(self, path: str) -> None:
+    def load_board(self, path: str, with_history: bool = False) -> None:
+        self.save_loaded = False
+        success = True
+
         self.deselect_piece()
         self.clear_en_passant()
         self.clear_castling_ep()
@@ -913,19 +905,19 @@ class Board(Window):
         self.reset_edit_promotions()
         self.reset_penultima_pieces()
 
-        self.ply_count = data.get('ply', self.ply_count)
+        ply_count = data.get('ply', self.ply_count)
         self.turn_side = Side(data.get('side', self.turn_side))
         self.move_history = [load_move(d, self) for d in data.get('moves', [])]
         self.future_move_history = [load_move(d, self) for d in data.get('future', [])[::-1]]
 
         rolls = data.get('rolls', {})
         self.roll_history = [
-            ({fra(s): v for s, v in rolls[str(n)].items()} if str(n) in rolls else {}) for n in range(self.ply_count)
+            ({fra(s): v for s, v in rolls[str(n)].items()} if str(n) in rolls else {}) for n in range(ply_count)
         ]
         rph = data.get('roll_piece_history', {})
         self.probabilistic_piece_history = [
             ({(fra(k), load_type(v)) for k, v in rph[str(n)].items()} if str(n) in rph else set())
-            for n in range(self.ply_count)
+            for n in range(ply_count)
         ]
         ac = data.get('auto_captures', {})
         self.auto_capture_markers = {
@@ -976,18 +968,9 @@ class Board(Window):
         self.update_colors()
 
         self.log(f"[Ply {self.ply_count}] Info: Game loaded from {path}")
-        if self.should_hide_pieces == 1:
-            self.log(f"[Ply {self.ply_count}] Info: Pieces hidden")
-        if self.should_hide_pieces == 2:
-            self.log(f"[Ply {self.ply_count}] Info: Penultima mode activated!")
-        if self.royal_piece_mode == 1:
-            self.log(f"[Ply {self.ply_count}] Info: Using royal check rule (threaten any royal piece)")
-        if self.royal_piece_mode == 2:
-            self.log(f"[Ply {self.ply_count}] Info: Using quasi-royal check rule (threaten last royal piece)")
-        if not self.use_check:
-            self.log(f"[Ply {self.ply_count}] Info: Checks disabled (capture the royal piece to win)")
+        starting = 'Starting new' if with_history else 'Resuming saved'
         if None in self.piece_set_ids.values():
-            self.log(f"[Ply {self.ply_count}] Info: Resuming saved game (with custom piece sets)")
+            self.log(f"[Ply {self.ply_count}] Info: {starting} game (with custom piece sets)")
         else:
             some = 'regular' if not self.chaos_mode else 'chaotic'
             same = self.piece_set_ids[Side.WHITE] == self.piece_set_ids[Side.BLACK]
@@ -998,14 +981,18 @@ class Board(Window):
             if same:
                 some = f"a{'' if self.chaos_mode in {0, 1} else 'n'} {some}"
             sets = "set" if same else "sets"
-            self.log(f"[Ply {self.ply_count}] Info: Resuming saved game (with {some} piece {sets})")
-        self.log(
-            f"[Ply {self.ply_count}] Game: "
-            f"{self.piece_set_names[Side.WHITE] if not self.should_hide_pieces else '???'} vs. "
-            f"{self.piece_set_names[Side.BLACK] if not self.should_hide_pieces else '???'}"
-        )
-        self.log(f"[Ply {self.ply_count}] Mode: {'EDIT' if self.edit_mode else 'PLAY'}")
-        self.log(f"[Ply {self.ply_count}] Info: {self.turn_side} to move")
+            self.log(f"[Ply {self.ply_count}] Info: {starting} game (with {some} piece {sets})")
+        self.ply_count = 0 if with_history else ply_count
+        self.log_armies()
+        self.log_special_modes()
+        if with_history:
+            success = self.reload_history()
+            if not success:
+                self.log(f"[Ply {self.ply_count}] Error: Failed to reload history!")
+        if self.edit_mode:
+            self.log(f"[Ply {self.ply_count}] Mode: EDIT")
+        if not with_history:
+            self.log(f"[Ply {self.ply_count}] Info: {self.turn_side} to move")
 
         if self.promotion_piece:
             self.start_promotion(
@@ -1020,6 +1007,8 @@ class Board(Window):
             selection = data.get('selection')
             if selection:
                 self.select_piece(fra(selection))
+
+        self.save_loaded = success
 
     def empty_board(self) -> None:
         self.deselect_piece()
@@ -1759,8 +1748,7 @@ class Board(Window):
 
     def reload_history(self) -> bool:
         selection = self.selected_square
-        self.log(f"[Ply {self.ply_count}] Info: Starting new game")
-        self.reset_board()
+        self.reset_board(log=False)
         if not self.future_move_history:
             self.select_piece(selection)
             return True
@@ -3146,6 +3134,7 @@ class Board(Window):
                 while self.future_move_history:
                     self.redo_last_move()
             if modifiers & key.MOD_ACCEL and modifiers & key.MOD_SHIFT:  # Fast-forward, but slowly. (Reload history)
+                self.log(f"[Ply {self.ply_count}] Info: Starting new game")
                 self.reload_history()
         if symbol == key.G and not self.is_trickster_mode():  # Graphics
             old_color_index = self.color_index
@@ -3229,7 +3218,7 @@ class Board(Window):
             if modifiers & key.MOD_ALT:  # Load save data
                 self.on_deactivate()
                 self.draw(0)
-                self.load_save_data(select_save_data())
+                self.load_save_data(select_save_data(), with_history=modifiers & key.MOD_SHIFT)
                 self.on_activate()
             else:  # Log
                 if modifiers & key.MOD_ACCEL:  # Save log
@@ -3302,32 +3291,48 @@ class Board(Window):
                 round(self.highlight.center_x), round(self.highlight.center_y),  MOUSE_BUTTON_RIGHT, modifiers
             )
 
-    def load_save_data(self, path: str | None = None) -> bool:
+    def load_save_data(self, path: str | None = None, with_history: bool = False) -> None:
         if not path:
-            return False
-        save_update_mode = abs(self.board_config['save_update_mode'])
+            return
+        update_mode = abs(self.board_config['save_update_mode'])
+        should_update = bool(update_mode)
+        if should_update:
+            update_mode -= 1
         # noinspection PyBroadException
         try:
             save_path = join(base_dir, path)
             if not isfile(save_path):
-                return False
-            self.load_board(save_path)
-            if not save_update_mode:
-                return True
-            save_update_mode -= 1
-            success = self.reload_history() if save_update_mode & 2 else True
-            if success:
-                self.save_board(path=save_path, partial=not save_update_mode & 1)
-            else:
-                self.log(f"[Ply {self.ply_count}] Error: Failed to reload history!")
-            return True
+                return
+            self.load_board(save_path, with_history=with_history or update_mode & 2)
+            if not should_update:
+                return
+            if self.save_loaded:
+                self.save_board(path=save_path, partial=not update_mode & 1)
         except Exception:
             print_exc()
-        return False
 
     def log(self, string: str) -> None:
         self.log_data.append(string)
         print(string)
+
+    def log_armies(self):
+        self.log(
+            f"[Ply {self.ply_count}] Game: "
+            f"{self.piece_set_names[Side.WHITE] if not self.should_hide_pieces else '???'} vs. "
+            f"{self.piece_set_names[Side.BLACK] if not self.should_hide_pieces else '???'}"
+        )
+
+    def log_special_modes(self):
+        if self.should_hide_pieces == 1:
+            self.log(f"[Ply {self.ply_count}] Info: Pieces hidden")
+        if self.should_hide_pieces == 2:
+            self.log(f"[Ply {self.ply_count}] Info: Penultima mode activated!")
+        if self.royal_piece_mode == 1:
+            self.log(f"[Ply {self.ply_count}] Info: Using royal check rule (threaten any royal piece)")
+        if self.royal_piece_mode == 2:
+            self.log(f"[Ply {self.ply_count}] Info: Using quasi-royal check rule (threaten last royal piece)")
+        if not self.use_check:
+            self.log(f"[Ply {self.ply_count}] Info: Checks disabled (capture the royal piece to win)")
 
     def save_log(self, log_data: list[str] | None = None, log_name: str = "log") -> None:
         if not log_data:

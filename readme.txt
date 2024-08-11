@@ -65,6 +65,7 @@ Ctrl + Y: redo last move (if any)
 Ctrl + L: save game log
 Shift + L: clear game log
 Alt + L: load saved game state
+Alt + Shift + L: load saved game state and reload move history
 Ctrl + D: save debug log
 Shift + D: print debug log
 Alt + D: save debug listings
