@@ -1525,6 +1525,8 @@ class Board(Window):
         self.update_caption()
         move_sprites = dict()
         pos = self.selected_square or self.hovered_square
+        if not pos and self.highlight.alpha:
+            pos = self.get_board_position(self.highlight.position)
         if not self.not_on_board(pos):
             piece = self.get_piece(pos)
             hide_moves = self.should_hide_moves
@@ -2634,12 +2636,17 @@ class Board(Window):
         super().on_resize(width, height)
         self.update_sprites(self.flip_mode)
 
+    def on_activate(self) -> None:
+        if not self.not_on_board(self.get_board_position(self.highlight.position)):
+            self.highlight.color = self.color_scheme["highlight_color"]
+        self.show_moves()
+
     def on_deactivate(self) -> None:
         self.hovered_square = None
         self.clicked_square = None
         self.held_buttons = 0
-        self.highlight.alpha = 0
-        self.show_moves()
+        self.highlight.color = (0, 0, 0, 0)
+        self.hide_moves()
 
     def on_mouse_press(self, x: int, y: int, buttons: int, modifiers: int) -> None:
         self.piece_was_selected = False
@@ -2925,8 +2932,10 @@ class Board(Window):
             if not modifiers & key.MOD_SHIFT:  # Save
                 self.save_board(get_filename('save', 'json'))
             else:  # Save as
-                self.save_board(select_save_name())
                 self.on_deactivate()
+                self.draw(0)
+                self.save_board(select_save_name())
+                self.on_activate()
         if symbol == key.R:  # Restart
             if modifiers & key.MOD_ALT:  # Reset piece sets
                 self.piece_set_ids = {side: 0 for side in self.piece_set_ids}
@@ -3211,8 +3220,10 @@ class Board(Window):
             self.redo_last_finished_move()
         if symbol == key.L:
             if modifiers & key.MOD_ALT:  # Load save data
-                self.load_save_data(select_save_data())
                 self.on_deactivate()
+                self.draw(0)
+                self.load_save_data(select_save_data())
+                self.on_activate()
             else:  # Log
                 if modifiers & key.MOD_ACCEL:  # Save log
                     self.save_log()
