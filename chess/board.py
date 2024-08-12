@@ -14,7 +14,7 @@ from typing import Type, TextIO
 from PIL.ImageColor import getrgb
 from arcade import key, MOUSE_BUTTON_LEFT, MOUSE_BUTTON_RIGHT, Text
 from arcade import Sprite, SpriteList, Window
-from arcade import start_render
+from arcade import get_screens, start_render
 
 from chess.color import colors, trickster_colors
 from chess.color import average, darken, desaturate, lighten, saturate
@@ -2606,6 +2606,26 @@ class Board(Window):
         self.windowed_size = self.width, self.height
         self.windowed_square_size = min(self.width / (self.board_width + 2), self.height / (self.board_height + 2))
 
+    def toggle_fullscreen(self) -> None:
+        if self.fullscreen:
+            self.set_fullscreen(False)
+            return
+        screens = get_screens()
+        if len(screens) == 1:
+            self.set_fullscreen()
+            return
+        pos, size = self.get_location(), self.get_size()
+        pos_min, pos_max = pos, add(pos, size)  # a bit of an unconventional usage of add() here but sure i guess
+        portions = []
+        for screen in screens:
+            screen_min, screen_max = (screen.x, screen.y), add((screen.x, screen.y), (screen.width, screen.height))
+            portion = (
+                max(0, min(screen_max[0], pos_max[0]) - max(screen_min[0], pos_min[0])) *
+                max(0, min(screen_max[1], pos_max[1]) - max(screen_min[1], pos_min[1]))
+            )
+            portions.append(portion)
+        self.set_fullscreen(screen=screens[portions.index(max(portions))])
+
     def set_visible(self, visible: bool = True) -> None:
         if self.board_config['save_update_mode'] < 0 and self.save_data is not None:
             visible = False
@@ -3009,7 +3029,7 @@ class Board(Window):
                     self.log(f"[Ply {self.ply_count}] Info: Probabilistic pieces updated")
                     self.advance_turn()
         if symbol == key.F11:  # Full screen (toggle)
-            self.set_fullscreen(not self.fullscreen)
+            self.toggle_fullscreen()
         if symbol == key.MINUS and not self.fullscreen:  # (-) Decrease window size
             if modifiers & key.MOD_ACCEL and modifiers & key.MOD_SHIFT:
                 self.resize((self.board_width + 2) * min_size, (self.board_height + 2) * min_size)
