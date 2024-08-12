@@ -995,6 +995,7 @@ class Board(Window):
             self.log(f"[Ply {self.ply_count}] Info: {starting} game (with {some} piece {sets})")
         self.ply_count = 0 if with_history else ply_count
         self.log_armies()
+        self.ply_count = 1 if with_history else ply_count
         self.log_special_modes()
         if with_history:
             success = self.reload_history()
@@ -1042,10 +1043,10 @@ class Board(Window):
                 sprite_list.remove(sprite)
 
         self.log(f"[Ply {self.ply_count}] Info: Board cleared")
+        self.ply_count += 1
         if not self.edit_mode:
             self.log(f"[Ply {self.ply_count}] Mode: EDIT")
         self.edit_mode = True
-        self.ply_count += 1
 
         self.edit_piece_set_id = self.board_config['edit_id']
         self.roll_history = []
