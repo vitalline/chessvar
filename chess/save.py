@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from base64 import b64decode, b64encode
 from importlib import import_module
 from random import Random
 from typing import TYPE_CHECKING, Type
@@ -163,11 +164,14 @@ def load_move(data: dict | str | None, board: Board) -> Move | frozenset | None:
 
 def save_rng(rng: Random) -> list:
     state = rng.getstate()
-    return [state[0], list(state[1]), state[2]]
+    data = bytearray(x for i in state[1][:-1] for x in i.to_bytes(4, signed=False, byteorder='big'))
+    return [state[0], b64encode(data).decode(), state[1][-1], state[2]]
 
 
 def load_rng(data: list) -> Random:
-    state = data[0], tuple(data[1]), data[2]
+    arr = b64decode(data[1])
+    tup = (*(int.from_bytes(arr[i:i + 4], signed=False, byteorder='big') for i in range(0, len(arr), 4)), data[2])
+    state = (data[0], tup, data[3])
     rng = Random()
     rng.setstate(state)
     return rng
