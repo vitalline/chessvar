@@ -382,7 +382,8 @@ class Board(Window):
         self.log_data = []  # list of presently logged strings
         self.save_data = None  # last loaded save data
         self.save_loaded = False  # whether a save was successfully loaded
-        self.skip_mouse_move = False  # setting this to True skips one mouse movement offset
+        self.skip_mouse_move = 0  # setting this to >=1 skips mouse movement events
+        self.highlight_square = None  # square that is being highlighted with the keyboard
         self.hovered_square = None  # square we are currently hovering over
         self.clicked_square = None  # square we clicked on
         self.selected_square = None  # square selected for moving
@@ -1517,8 +1518,8 @@ class Board(Window):
         self.update_caption()
         move_sprites = dict()
         pos = self.selected_square or self.hovered_square
-        if not pos and self.highlight.alpha:
-            pos = self.get_board_position(self.highlight.position)
+        if not pos and self.is_active:
+            pos = self.highlight_square
         if self.on_board(pos):
             piece = self.get_piece(pos)
             hide_moves = self.should_hide_moves
@@ -2167,9 +2168,7 @@ class Board(Window):
         selected_square = self.selected_square
         hovered_square = None
         if self.is_active:
-            hovered_square = self.hovered_square
-            if not hovered_square and self.highlight.alpha:
-                hovered_square = self.get_board_position(self.highlight.position)
+            hovered_square = self.hovered_square or self.highlight_square
         if self.promotion_piece:
             piece = self.promotion_piece
             if piece.is_empty():
@@ -2542,12 +2541,13 @@ class Board(Window):
             )
         self.deselect_piece()
         self.select_piece(old_selected_square)
-        if self.hovered_square:
-            self.update_highlight(self.get_board_position(self.highlight.position, old_size, old_origin, old_flip_mode))
-        else:
-            self.update_highlight(self.get_board_position(self.highlight.position, old_size, old_origin))
+        if self.highlight_square:
+            self.update_highlight(self.highlight_square)
             self.hovered_square = None
-        self.skip_mouse_move = True
+        else:
+            self.update_highlight(self.get_board_position(self.highlight.position, old_size, old_origin, old_flip_mode))
+        if self.skip_mouse_move == 2:
+            self.skip_mouse_move = 1
 
     def flip_board(self) -> None:
         self.update_sprites(not self.flip_mode)
@@ -2593,6 +2593,9 @@ class Board(Window):
     def resize(self, width: int, height: int) -> None:
         if self.fullscreen:
             return
+        if width == self.width and height == self.height:
+            return
+        self.skip_mouse_move = 2
         old_width, old_height = self.width, self.height
         x, y = self.get_location()
         min_width, min_height = (self.board_width + 2) * min_size, (self.board_height + 2) * min_size
@@ -2632,11 +2635,15 @@ class Board(Window):
             self.trickster_angle_delta += delta_time
 
     def on_resize(self, width: float, height: float) -> None:
+        self.skip_mouse_move = 2
         super().on_resize(width, height)
         self.update_sprites(self.flip_mode)
 
     def on_activate(self) -> None:
         self.is_active = True
+        if self.highlight_square:
+            self.update_highlight(self.highlight_square)
+            self.hovered_square = None
         if self.on_board(self.get_board_position(self.highlight.position)):
             self.highlight.color = self.color_scheme["highlight_color"]
         self.show_moves()
@@ -2647,6 +2654,20 @@ class Board(Window):
         self.clicked_square = None
         self.held_buttons = 0
         self.highlight.color = (0, 0, 0, 0)
+        self.show_moves()
+
+    def on_mouse_enter(self, x: int, y: int):
+        highlight_square = self.highlight_square
+        self.update_highlight(self.highlight_square or self.get_board_position((x, y)))
+        if highlight_square:
+            self.hovered_square = None
+        self.show_moves()
+
+    def on_mouse_leave(self, x: int, y: int):
+        highlight_square = self.highlight_square
+        self.update_highlight(self.highlight_square)
+        if highlight_square:
+            self.hovered_square = None
         self.show_moves()
 
     def on_mouse_press(self, x: int, y: int, buttons: int, modifiers: int) -> None:
@@ -2715,20 +2736,26 @@ class Board(Window):
 
     def on_mouse_motion(self, x: int, y: int, dx: int, dy: int) -> None:
         if not self.held_buttons:
-            if self.skip_mouse_move:
-                dx, dy = 0, 0
-            pos = self.get_board_position((x + dx, y + dy))
-            self.update_highlight(pos)
+            if not self.skip_mouse_move:
+                pos = self.get_board_position((x, y))
+                self.update_highlight(pos)
+                self.highlight_square = None
+            elif self.skip_mouse_move == 1:
+                self.skip_mouse_move = 0
 
     def on_mouse_drag(self, x: int, y: int, dx: int, dy: int, buttons: int, modifiers: int) -> None:
-        pos = self.get_board_position((x + dx, y + dy))
-        self.update_highlight(pos)
-        if buttons & self.held_buttons & MOUSE_BUTTON_LEFT and self.selected_square is not None:
-            if self.edit_mode and modifiers & key.MOD_ACCEL:
-                self.reset_position(self.get_piece(self.selected_square))
-            else:
-                sprite = self.get_piece(self.selected_square)
-                sprite.position = x, y
+        if not self.skip_mouse_move:
+            pos = self.get_board_position((x, y))
+            self.update_highlight(pos)
+            self.highlight_square = None
+            if buttons & self.held_buttons & MOUSE_BUTTON_LEFT and self.selected_square is not None:
+                if self.edit_mode and modifiers & key.MOD_ACCEL:
+                    self.reset_position(self.get_piece(self.selected_square))
+                else:
+                    sprite = self.get_piece(self.selected_square)
+                    sprite.position = x, y
+        elif self.skip_mouse_move == 1:
+            self.skip_mouse_move = 0
 
     def on_mouse_release(self, x: int, y: int, buttons: int, modifiers: int) -> None:
         held_buttons = buttons & self.held_buttons
@@ -2903,6 +2930,7 @@ class Board(Window):
             row = max(0, min(self.board_height - 1, row if use_shift else start_row))
             col = max(0, min(self.board_width - 1, col if use_shift else start_col))
             self.update_highlight((row, col))
+            self.highlight_square = (row, col)
             self.hovered_square = None
         if symbol == key.TAB:  # Next piece
             start_row, start_col = self.get_board_position(self.highlight.position)
@@ -2925,6 +2953,7 @@ class Board(Window):
                     current_row = (start_row + row * direction + row_shift) % self.board_height
                     if (current_row, current_col) in positions:
                         self.update_highlight((current_row, current_col))
+                        self.highlight_square = (row, col)
                         self.hovered_square = None
                         return
         if self.held_buttons:
