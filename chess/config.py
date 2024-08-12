@@ -24,6 +24,9 @@ DEFAULT_CONFIG = {
         'block_ids_chaos': '',
         'save_indent': '',
         'save_update_mode': 0,
+        'autosave_act': 0,
+        'autosave_ply': 0,
+        'autosave_time': 0,
     },
 }
 

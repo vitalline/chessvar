@@ -3,8 +3,8 @@ from datetime import datetime
 from itertools import product, zip_longest
 from json import dump, load
 from math import ceil, sqrt
-from os import name as os_name, system
-from os.path import isfile, join
+from os import makedirs, name as os_name, system
+from os.path import dirname, isfile, join
 from random import Random
 from sys import argv, stdout
 from tkinter import filedialog
@@ -264,8 +264,10 @@ invalid_chars = ':<>|"?*'
 invalid_chars_trans_table = str.maketrans(invalid_chars, '_' * len(invalid_chars))
 
 
-def get_filename(name: str, ext: str, in_dir: str = base_dir, ts_format: str = "%Y-%m-%d_%H-%M-%S") -> str:
-    name_args = [name, datetime.now().strftime(ts_format)]
+def get_filename(
+    name: str, ext: str, in_dir: str = base_dir, ts: datetime | None = None, ts_format: str = "%Y-%m-%d_%H-%M-%S"
+) -> str:
+    name_args = [name, (ts or datetime.now()).strftime(ts_format)]
     full_name = '_'.join(s for s in name_args if s).translate(invalid_chars_trans_table)
     return join(in_dir, f"{full_name}.{ext}")
 
@@ -396,6 +398,7 @@ class Board(Window):
         self.castling_ep_markers = set()  # squares where it can be captured that way
         self.promotion_piece = None  # piece that is currently being promoted
         self.promotion_area = {}  # squares to draw possible promotions on
+        self.action_count = 0  # current number of actions taken
         self.ply_count = 0  # current half-move number
         self.ply_simulation = 0  # current number of look-ahead half-moves
         self.move_history = []  # list of moves made so far
@@ -460,6 +463,7 @@ class Board(Window):
         self.piece_sprite_list = SpriteList()  # sprites for the pieces
         self.promotion_area_sprite_list = SpriteList()  # sprites for the promotion area background tiles
         self.promotion_piece_sprite_list = SpriteList()  # sprites for the possible promotion pieces
+        self.save_interval = 0  # time since the last autosave
 
         # load piece set ids from the config
         for side in self.piece_set_ids:
@@ -638,6 +642,8 @@ class Board(Window):
         self.show_moves()
 
     def reset_board(self, update: bool = False, log: bool = True) -> None:
+        self.save_interval = 0
+
         self.deselect_piece()
         self.clear_en_passant()
         self.clear_castling_ep()
@@ -648,6 +654,7 @@ class Board(Window):
         self.edit_mode = False
         self.chain_start = None
         self.promotion_piece = None
+        self.action_count = 0
         self.ply_count = 0
 
         for sprite_list in self.piece_sprite_list, self.promotion_piece_sprite_list, self.promotion_area_sprite_list:
@@ -796,6 +803,7 @@ class Board(Window):
             if self.save_data is not None:
                 data = {k: v for k, v in data.items() if k in self.save_data}
         indent = self.board_config['save_indent']
+        makedirs(dirname(path), exist_ok=True)
         with open(path, 'w') as file:
             if indent is None:
                 dump(data, file, separators=(',', ':'))
@@ -803,6 +811,7 @@ class Board(Window):
                 dump(data, file, indent=indent)
 
     def load_board(self, path: str, with_history: bool = False) -> None:
+        self.save_interval = 0
         self.save_loaded = False
         success = True
 
@@ -811,6 +820,7 @@ class Board(Window):
         self.clear_castling_ep()
         self.clear_auto_capture_markers()
         self.game_over = False
+        self.action_count = 0
 
         for sprite_list in self.piece_sprite_list, self.promotion_piece_sprite_list, self.promotion_area_sprite_list:
             sprite_list.clear()
@@ -1012,6 +1022,8 @@ class Board(Window):
         self.save_loaded = success
 
     def empty_board(self) -> None:
+        self.save_interval = 0
+
         self.deselect_piece()
         self.clear_en_passant()
         self.clear_castling_ep()
@@ -1021,6 +1033,7 @@ class Board(Window):
         self.game_over = False
         self.chain_start = None
         self.promotion_piece = None
+        self.action_count = 0
         self.ply_count = 0
 
         for sprite_list in self.piece_sprite_list, self.promotion_piece_sprite_list, self.promotion_area_sprite_list:
@@ -2133,6 +2146,15 @@ class Board(Window):
         if self.promotion_piece:
             return
         self.game_over = False
+        self.action_count += 1
+        if self.board_config['autosave_act'] and self.action_count >= self.board_config['autosave_act']:
+            self.action_count %= self.board_config['autosave_act']
+            self.auto_save()
+        elif (
+            self.board_config['autosave_ply'] and self.ply_count and
+            self.ply_count % self.board_config['autosave_ply'] == 0
+        ):
+            self.auto_save()
         if self.edit_mode:
             self.load_pieces()  # loading the new piece positions in order to update the board state
             self.color_pieces()  # reverting the piece colors to normal in case they were changed
@@ -2653,6 +2675,10 @@ class Board(Window):
         if self.is_trickster_mode():
             self.trickster_color_delta += delta_time
             self.trickster_angle_delta += delta_time
+        self.save_interval += delta_time
+        if self.board_config['autosave_time'] and self.save_interval >= self.board_config['autosave_time']:
+            self.save_interval %= self.board_config['autosave_time']
+            self.auto_save()
 
     def on_resize(self, width: float, height: float) -> None:
         self.skip_mouse_move = 2
@@ -3365,6 +3391,9 @@ class Board(Window):
                 self.save_board(path=save_path, partial=not update_mode & 1)
         except Exception:
             print_exc()
+
+    def auto_save(self) -> None:
+        self.save_board(get_filename('save', 'json', in_dir=join(base_dir, 'auto')), partial=True)
 
     def log(self, string: str) -> None:
         self.log_data.append(string)
