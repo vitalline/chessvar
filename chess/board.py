@@ -3395,7 +3395,7 @@ class Board(Window):
             print_exc()
 
     def auto_save(self) -> None:
-        self.save_board(get_filename('save', 'json', in_dir=join(base_dir, 'auto')), partial=True)
+        self.save_board(get_filename('autosave', 'json', in_dir=join(base_dir, 'auto')), partial=True)
 
     def log(self, string: str) -> None:
         self.log_data.append(string)
