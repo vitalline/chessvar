@@ -250,10 +250,10 @@ white_promotion_squares = {(board_height - 1, i) for i in range(board_width)}
 black_promotion_squares = {(0, i) for i in range(board_width)}
 promotion_squares = {Side.WHITE: white_promotion_squares, Side.BLACK: black_promotion_squares}
 
-default_size = 50
-min_size = 25
-max_size = 100
-size_step = 5
+default_size = 50.0
+min_size = 25.0
+max_size = 100.0
+size_step = 5.0
 
 base_rng = Random()
 max_seed = 2 ** 32 - 1
@@ -359,8 +359,8 @@ class Board(Window):
         self.square_size = default_size
 
         super().__init__(
-            width=(self.board_width + 2) * self.square_size,
-            height=(self.board_height + 2) * self.square_size,
+            width=round((self.board_width + 2) * self.square_size),
+            height=round((self.board_height + 2) * self.square_size),
             title='Chess',
             resizable=True,
             vsync=True,
@@ -369,7 +369,7 @@ class Board(Window):
         )
 
         self.origin = self.width / 2, self.height / 2
-        self.set_minimum_size((self.board_width + 2) * min_size, (self.board_height + 2) * min_size)
+        self.set_minimum_size(round((self.board_width + 2) * min_size), round((self.board_height + 2) * min_size))
 
         self.windowed_size = self.width, self.height
         self.windowed_square_size = self.square_size
@@ -2612,7 +2612,7 @@ class Board(Window):
                 if isinstance(sprite, abc.Piece) and not sprite.is_empty():
                     sprite.angle = 0
 
-    def resize(self, width: int, height: int) -> None:
+    def resize(self, width: float, height: float) -> None:
         if self.fullscreen:
             return
         if width == self.width and height == self.height:
@@ -2622,11 +2622,9 @@ class Board(Window):
         x, y = self.get_location()
         min_width, min_height = (self.board_width + 2) * min_size, (self.board_height + 2) * min_size
         self.set_visible(False)
-        self.set_size(max(width, min_width), max(height, min_height))
+        self.set_size(round(max(width, min_width)), round(max(height, min_height)))
         self.set_location(x - (self.width - old_width) // 2, y - (self.height - old_height) // 2)
         self.set_visible(True)
-        self.windowed_size = self.width, self.height
-        self.windowed_square_size = min(self.width / (self.board_width + 2), self.height / (self.board_height + 2))
 
     def toggle_fullscreen(self) -> None:
         if self.fullscreen:
@@ -2684,6 +2682,9 @@ class Board(Window):
         self.skip_mouse_move = 2
         super().on_resize(width, height)
         self.update_sprites(self.flip_mode)
+        if not self.fullscreen:
+            self.windowed_size = self.width, self.height
+            self.windowed_square_size = min(self.width / (self.board_width + 2), self.height / (self.board_height + 2))
 
     def on_activate(self) -> None:
         self.is_active = True
@@ -3384,9 +3385,10 @@ class Board(Window):
             save_path = join(base_dir, path)
             if not isfile(save_path):
                 return
-            self.load_board(save_path, with_history=with_history or update_mode & 2)
             if not should_update:
+                self.load_board(save_path, with_history=with_history)
                 return
+            self.load_board(save_path, with_history=update_mode & 2)
             if self.save_loaded:
                 self.save_board(path=save_path, partial=not update_mode & 1)
         except Exception:
