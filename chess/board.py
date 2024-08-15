@@ -312,7 +312,7 @@ def print_piece_data(board: Board, fp: TextIO = stdout, side: Side = Side.WHITE)
             fp.write(',\n')
         fp.write(f'  "{save_piece_type(t)}":')
         p = t(board, None, side)  # type: ignore
-        dump(save_custom_type(p), fp, separators=(',', ':'))
+        dump(save_custom_type(p), fp, separators=(',', ':'), ensure_ascii=False)
     fp.write('\n}')
 
 
@@ -844,9 +844,9 @@ class Board(Window):
         makedirs(dirname(path), exist_ok=True)
         with open(path, mode='w', encoding='utf-8') as file:
             if indent is None:
-                dump(data, file, separators=(',', ':'))
+                dump(data, file, separators=(',', ':'), ensure_ascii=False)
             else:
-                dump(data, file, indent=indent)
+                dump(data, file, indent=indent, ensure_ascii=False)
 
     def load_board(self, path: str, with_history: bool = False) -> None:
         self.save_interval = 0
