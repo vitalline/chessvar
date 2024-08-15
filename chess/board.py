@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from copy import copy, deepcopy
 from datetime import datetime
 from itertools import product, zip_longest
@@ -43,7 +45,8 @@ from chess.pieces.groups import wide as wd
 from chess.pieces.groups import zebra as zb
 from chess.pieces.groups.util import NoPiece
 from chess.pieces.pieces import Side
-from chess.save import load_move, load_piece, load_rng, load_type, save_move, save_piece, save_rng, save_type
+from chess.save import load_move, load_piece, load_rng, load_piece_type, load_custom_type
+from chess.save import save_move, save_piece, save_rng, save_piece_type, save_custom_type
 from chess.util import Default, Unset, base_dir
 
 piece_groups: list[dict[str, str | list[Type[abc.Piece]]]] = [
@@ -302,6 +305,17 @@ def get_set_name(piece_set: list[Type[abc.Piece]]) -> str:
     return f"({piece_set_name})"
 
 
+def print_piece_data(board: Board, fp: TextIO = stdout, side: Side = Side.WHITE) -> None:
+    fp.write('{\n')
+    for i, t in enumerate(sorted(get_piece_types(side), key=lambda x: save_piece_type(x))):
+        if i:
+            fp.write(',\n')
+        fp.write(f'  "{save_piece_type(t)}":')
+        p = t(board, None, side)  # type: ignore
+        dump(save_custom_type(p), fp, separators=(',', ':'))
+    fp.write('\n}')
+
+
 def print_piece_sets(fp: TextIO = stdout) -> None:
     piece_types = get_piece_types()
     digits = len(str(len(piece_groups)))
@@ -313,12 +327,17 @@ def print_piece_sets(fp: TextIO = stdout) -> None:
             name = group['name'] + (f" - {side}" if side else '')
             fp.write(f"ID {i:0{digits}d}{side.key()[:1]}: {name} {get_set_name(piece_set)}\n")
             fp.write(f"  [{', '.join(piece_types[piece] for piece in piece_set)}]\n")
-            fp.write(f"  <{', '.join(save_type(piece) for piece in piece_set)}>\n")
+            fp.write(f"  <{', '.join(save_piece_type(piece) for piece in piece_set)}>\n")
 
 
 def print_piece_types(fp: TextIO = stdout, side: Side = Side.WHITE) -> None:
-    for name, path, file in sorted((n, save_type(t), t.file_name) for t, n in get_piece_types(side).items()):
+    for name, path, file in sorted((n, save_piece_type(t), t.file_name) for t, n in get_piece_types(side).items()):
         fp.write(f"{name}: {path}, {file}\n")
+
+
+def save_piece_data(board: Board, file_path: str = None) -> None:
+    with open(file_path or get_filename('debug_piece_data', 'json', ts_format=''), 'w') as fp:
+        print_piece_data(board, fp)
 
 
 def save_piece_sets(file_path: str = None) -> None:
@@ -440,6 +459,7 @@ class Board(Window):
         self.probabilistic_pieces = {Side.WHITE: [], Side.BLACK: []}  # pieces that can move probabilistically
         self.probabilistic_piece_history = []  # list of probabilistic piece positions for every ply
         self.penultima_pieces = {Side.WHITE: {}, Side.BLACK: {}}  # piece textures that are used for penultima mode
+        self.custom_pieces = {}  # custom piece types
         self.moves = {Side.WHITE: {}, Side.BLACK: {}}  # dictionary of valid moves from any square
         self.chain_moves = {Side.WHITE: {}, Side.BLACK: {}}  # dictionary of moves chained from a certain move (from/to)
         self.chain_start = None  # move that started the current chain (if any)
@@ -754,15 +774,18 @@ class Board(Window):
             'set_blocklist': self.board_config['block_ids'],
             'chaos_blocklist': self.board_config['block_ids_chaos'],
             'set_ids': {side.value: piece_set_id for side, piece_set_id in self.piece_set_ids.items()},
-            'sets': {side.value: [save_type(t) for t in piece_set] for side, piece_set in self.piece_sets.items()},
+            'sets': {
+                side.value: [save_piece_type(t) for t in piece_set] for side, piece_set in self.piece_sets.items()
+            },
             'pieces': {
                 toa(p.board_pos): save_piece(p.on(None)) for pieces in self.movable_pieces.values() for p in pieces
             },
+            'custom': {k: save_custom_type(v) for k, v in self.custom_pieces.items()},
             'moves': [save_move(m) for m in self.move_history],
             'future': [save_move(m) for m in self.future_move_history[::-1]],
             'rolls': {n: {toa(pos): d[pos] for pos in sorted(d)} for n, d in enumerate(self.roll_history) if d},
             'roll_piece_history': {
-                n: {toa(pos): save_type(t) for pos, t in sorted(d, key=lambda x: x[0])}
+                n: {toa(pos): save_piece_type(t) for pos, t in sorted(d, key=lambda x: x[0])}
                 for n, d in enumerate(self.probabilistic_piece_history) if d
             },
             'auto_captures': {
@@ -889,10 +912,14 @@ class Board(Window):
             self.roll_rng = Random(self.roll_seed)
         self.board_config['update_roll_seed'] = data.get('roll_update', self.board_config['update_roll_seed'])
 
+        custom_data = data.get('custom', {})
+        self.custom_pieces = {k: load_custom_type(v, k) for k, v in custom_data.items()}
+        c = self.custom_pieces
+
         self.chaos_sets = {}
         self.piece_set_ids |= {Side(int(k)): v for k, v in data.get('set_ids', {}).items()}
         self.piece_sets, self.piece_set_names = self.get_piece_sets()
-        saved_piece_sets = {Side(int(v)): [load_type(t) for t in d] for v, d in data.get('sets', {}).items()}
+        saved_piece_sets = {Side(int(v)): [load_piece_type(t, c) for t in d] for v, d in data.get('sets', {}).items()}
         update_sets = False
         for side in self.piece_sets:
             if self.piece_set_ids[side] is None:
@@ -918,8 +945,8 @@ class Board(Window):
 
         ply_count = data.get('ply', self.ply_count)
         self.turn_side = Side(data.get('side', self.turn_side))
-        self.move_history = [load_move(d, self) for d in data.get('moves', [])]
-        self.future_move_history = [load_move(d, self) for d in data.get('future', [])[::-1]]
+        self.move_history = [load_move(d, self, c) for d in data.get('moves', [])]
+        self.future_move_history = [load_move(d, self, c) for d in data.get('future', [])[::-1]]
 
         rolls = data.get('rolls', {})
         self.roll_history = [
@@ -927,7 +954,7 @@ class Board(Window):
         ]
         rph = data.get('roll_piece_history', {})
         self.probabilistic_piece_history = [
-            ({(fra(k), load_type(v)) for k, v in rph[str(n)].items()} if str(n) in rph else set())
+            ({(fra(k), load_piece_type(v, c)) for k, v in rph[str(n)].items()} if str(n) in rph else set())
             for n in range(ply_count)
         ]
         ac = data.get('auto_captures', {})
@@ -936,13 +963,13 @@ class Board(Window):
             if str(side.value) in ac else {} for side in self.auto_capture_markers
         }
 
-        self.chain_start = load_move(data.get('chain_start'), self)
+        self.chain_start = load_move(data.get('chain_start'), self, c)
         if self.move_history and self.move_history[-1] and self.move_history[-1].matches(self.chain_start):
             self.chain_start = self.move_history[-1]
         cm = data.get('chain_moves', [])
         self.chain_moves = {
             self.chain_start.piece.side: {
-                (self.chain_start.pos_from, self.chain_start.pos_to): [load_move(m, self) for m in cm]
+                (self.chain_start.pos_from, self.chain_start.pos_to): [load_move(m, self, c) for m in cm]
             }, self.chain_start.piece.side.opponent(): {}
         } if self.chain_start else {}
 
@@ -962,12 +989,13 @@ class Board(Window):
         for row, col in product(range(self.board_height), range(self.board_width)):
             piece_data = pieces.get(toa((row, col)))
             self.pieces[row].append(
-                NoPiece(self, (row, col)) if piece_data is None else load_piece(piece_data, self).on((row, col))
+                NoPiece(self, (row, col)) if piece_data is None
+                else load_piece(piece_data, self, c).on((row, col))
             )
             self.pieces[row][col].scale = self.square_size / self.pieces[row][col].texture.width
             self.piece_sprite_list.append(self.pieces[row][col])
 
-        self.promotion_piece = load_piece(data.get('promotion'), self)
+        self.promotion_piece = load_piece(data.get('promotion'), self, c)
 
         if self.move_history:
             last_move = self.move_history[-1]
@@ -3319,6 +3347,7 @@ class Board(Window):
                 for string in debug_log_data:
                     print(f"[Debug] {string}")
             if modifiers & key.MOD_ALT:  # Save debug listings
+                save_piece_data(self)
                 save_piece_sets()
                 save_piece_types()
         if symbol == key.SLASH:  # (?) Random
@@ -3529,6 +3558,12 @@ class Board(Window):
             debug_log_data.append(
                 f"{side} replacements ({len(self.edit_promotions[side])}): {piece_list if piece_list else 'None'}"
             )
+        debug_log_data.append(f"Edit piece set: {self.edit_piece_set_id}")
+        debug_log_data.append(f"Custom pieces ({len(self.custom_pieces)}):")
+        for piece, data in self.custom_pieces.items():
+            debug_log_data.append(f"  '{piece}': {save_custom_type(data)}")
+        if not self.custom_pieces:
+            debug_log_data[-1] += " None"
         en_passant_pos = toa(self.en_passant_target.board_pos) if self.en_passant_target else 'None'
         debug_log_data.append(f"En passant target: {en_passant_pos}")
         en_passant_squares = ', '.join(toa(xy) for xy in sorted(self.en_passant_markers)) or 'None'
