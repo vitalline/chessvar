@@ -12,7 +12,7 @@ class Lobefin(Piece):
     def __init__(self, board, board_pos, side, **kwargs):
         super().__init__(
             board, board_pos, side,
-            movement.RiderMovement(board, rot([(2, 0)]) + symv([(2, 2), (-1, 1)])),
+            movement.RiderMovement(board, rot([(2, 0, 1)]) + symv([(2, 2), (-1, 1)])),
             **kwargs
         )
 
