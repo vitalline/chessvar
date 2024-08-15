@@ -995,6 +995,9 @@ class Board(Window):
         if 'roll_state' in data:
             self.roll_rng = load_rng(data['roll_state'])
 
+        if self.roll_rng is None:
+            self.roll_rng = Random(self.roll_seed)
+
         pieces = data.get('pieces', {})
         self.pieces = []
 
