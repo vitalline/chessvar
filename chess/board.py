@@ -336,17 +336,32 @@ def print_piece_types(fp: TextIO = stdout, side: Side = Side.WHITE) -> None:
 
 
 def save_piece_data(board: Board, file_path: str = None) -> None:
-    with open(file_path or get_filename('debug_piece_data', 'json', ts_format=''), 'w') as fp:
+    with open(
+        file_path or
+        get_filename('debug_piece_data', 'json', ts_format=''),
+        mode='w',
+        encoding='utf-8',
+    ) as fp:
         print_piece_data(board, fp)
 
 
 def save_piece_sets(file_path: str = None) -> None:
-    with open(file_path or get_filename('debug_piece_sets', 'txt', ts_format=''), 'w') as fp:
+    with open(
+        file_path or
+        get_filename('debug_piece_sets', 'txt', ts_format=''),
+        mode='w',
+        encoding='utf-8',
+    ) as fp:
         print_piece_sets(fp)
 
 
 def save_piece_types(file_path: str = None, side: Side = Side.WHITE) -> None:
-    with open(file_path or get_filename('debug_piece_types', 'txt', ts_format=''), 'w') as fp:
+    with open(
+        file_path or
+        get_filename('debug_piece_types', 'txt', ts_format=''),
+        mode='w',
+        encoding='utf-8',
+    ) as fp:
         print_piece_types(fp, side)
 
 
@@ -827,7 +842,7 @@ class Board(Window):
                 data = {k: v for k, v in data.items() if k in self.save_data}
         indent = self.board_config['save_indent']
         makedirs(dirname(path), exist_ok=True)
-        with open(path, 'w') as file:
+        with open(path, mode='w', encoding='utf-8') as file:
             if indent is None:
                 dump(data, file, separators=(',', ':'))
             else:
@@ -850,7 +865,7 @@ class Board(Window):
             for sprite in sprite_list:
                 sprite_list.remove(sprite)
 
-        with open(path) as file:
+        with open(path, encoding='utf-8') as file:
             data = load(file)
             if isinstance(data, dict):
                 self.save_data = data
@@ -3457,7 +3472,7 @@ class Board(Window):
         if not log_data:
             log_data = self.log_data
         if log_data:
-            with open(get_filename(log_name, 'txt'), "w") as log_file:
+            with open(get_filename(log_name, 'txt'), mode='w', encoding='utf-8') as log_file:
                 log_file.write("\n".join(log_data))
 
     def clear_log(self, console: bool = True, file: bool = False) -> None:

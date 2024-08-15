@@ -85,7 +85,7 @@ class Config(dict):
                 if item == 'hide_moves':
                     if self[item] is None:
                         self.base_config[section][item] = ''
-        with open(path, 'w') as file:
+        with open(path, mode='w', encoding='utf-8') as file:
             self.base_config.write(file)
 
     def __copy__(self) -> Config:
