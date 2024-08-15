@@ -1006,6 +1006,9 @@ class Board(Window):
         if not with_history:
             self.log(f"[Ply {self.ply_count}] Info: {self.turn_side} to move")
 
+        if not success:
+            return
+
         if self.promotion_piece:
             self.start_promotion(
                 self.promotion_piece,
@@ -1014,7 +1017,7 @@ class Board(Window):
                 ]
             )
         else:
-            if not self.edit_mode:
+            if not with_history and not self.edit_mode:
                 self.update_status()
             selection = data.get('selection')
             if selection:
