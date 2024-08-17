@@ -18,7 +18,7 @@ from arcade import key, MOUSE_BUTTON_LEFT, MOUSE_BUTTON_RIGHT, Text
 from arcade import Sprite, SpriteList, Window
 from arcade import get_screens, start_render
 
-from chess.color import colors, trickster_colors
+from chess.color import colors, default_colors, trickster_colors
 from chess.color import average, darken, desaturate, lighten, saturate
 from chess.config import Config
 from chess.movement import movement
@@ -891,16 +891,21 @@ class Board(Window):
             print(f"Warning: Square size does not match (was {square_size}, but is {self.square_size})")
 
         self.color_index = data.get('color_index', self.color_index)
-        if self.color_index is not None:  # None here means we're using a custom color scheme as defined in the savefile
-            self.color_scheme = colors[self.color_index]
+        self.color_scheme = colors[self.color_index] if self.color_index is not None else default_colors
+        old_color_scheme = data.get('color_scheme', self.color_scheme)
         for k, v in self.color_scheme.items():
-            color_scheme = data.get('color_scheme', self.color_scheme)
-            old = (tuple(color_scheme[k]) if isinstance(v, tuple) else color_scheme[k])
+            old = old_color_scheme.get(k)
+            old = 'undefined' if old is None else tuple(old) if isinstance(v, tuple) else old
             if v != old:
-                self.color_scheme[k] = old  # first time when we might have enough information to fully restore old data
+                self.color_scheme[k] = v if old == 'undefined' else old  # first time when we can fully restore old data
                 # in all cases before we had to pick one or the other, but here we can try to reload the save faithfully
                 if self.color_index is not None:  # warning if there's an explicitly defined color scheme and it doesn't
                     print(f"Warning: Color scheme does not match ({k} was {old}, but is {v})")  # match the saved scheme
+        for k, v in old_color_scheme.items():
+            if k not in self.color_scheme:
+                self.color_scheme[k] = v
+                if self.color_index is not None:
+                    print(f"Warning: Color scheme does not match ({k} was {v}, but is undefined)")
 
         self.board_config['block_ids'] = data.get('set_blocklist', self.board_config['block_ids'])
         self.board_config['block_ids_chaos'] = data.get('chaos_blocklist', self.board_config['block_ids_chaos'])

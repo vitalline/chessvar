@@ -54,6 +54,14 @@ def desaturate(color: Color, amount: float) -> Color:
 # these are used as fallbacks in case a color scheme does not define a color
 default_colors = {
     "colored_pieces": False,
+    # these next few colors are intentionally picked to look like placeholder values
+    # normally these would be all defined in the color schemes - these are fallbacks
+    "scheme_type": "default",
+    "light_square_color": (255, 128, 255),
+    "dark_square_color": (128, 128, 128),
+    "background_color": (255, 255, 255),
+    "promotion_area_color": (192, 192, 192),
+    # alright, enough of that - here are the actual defaults
     "text_color": (0, 0, 0),
     "highlight_color": (0, 0, 0, 80),
     "selection_color": (0, 0, 0, 120),
@@ -183,7 +191,7 @@ for i in range(len(colors)):
     if colors[i]["scheme_type"].startswith("cherub"):
         # define the cherub piece colors (white pieces are red in cherub1 and green in cherub2)
         scheme_id = int(colors[i]["scheme_type"][-1])
-        colors[i]["scheme_type"] = "cherub"
+        colors[i]["scheme_type"] = "cherub"  # normalize the scheme type
         colors[i]["colored_pieces"] = True
         colors[i]["white_piece_color"] = (255, 0, 0) if scheme_id == 1 else (0, 255, 0)
         colors[i]["black_piece_color"] = (255, 0, 0) if scheme_id == 2 else (0, 255, 0)
