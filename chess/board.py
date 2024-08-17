@@ -1836,6 +1836,7 @@ class Board(Window):
                 self.clear_en_passant()
                 self.clear_castling_ep()
             if next_move.is_edit:
+                self.update_move(next_move)
                 next_move.piece.move(next_move)
                 self.update_auto_capture_markers(next_move)
                 self.move_history.append(deepcopy(next_move))
@@ -1851,7 +1852,8 @@ class Board(Window):
                         self.update_auto_capture_markers(next_move)
                         self.update_promotion_auto_captures(next_move)
                         self.promotion_piece = None
-                        self.log(f"[Ply {self.ply_count}] Edit: {self.move_history[-1]}")
+                if self.promotion_piece is None:
+                    self.log(f"[Ply {self.ply_count}] Edit: {self.move_history[-1]}")
             else:
                 move = self.find_move(next_move.pos_from, next_move.pos_to)
                 if move is None:
@@ -2131,6 +2133,7 @@ class Board(Window):
                 self.log(f'''[Ply {self.ply_count}] Redo: {
                     f"{'Edit' if chained_move.is_edit else 'Move'}: " + str(chained_move)
                 }''')
+                last_chain_move = chained_move
                 chained_move = chained_move.chained_move
                 if chained_move:
                     chained_move.piece.move(chained_move)
