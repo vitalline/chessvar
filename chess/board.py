@@ -1665,14 +1665,14 @@ class Board(Window):
         if not self.is_active:
             return
         old_hovered_square = self.hovered_square
-        if self.not_on_board(pos):
+        if not self.is_active or self.not_on_board(pos):
             self.highlight.color = (0, 0, 0, 0)
             self.hovered_square = None
             if (self.selected_square is None and not self.move_history) or self.promotion_piece:
                 self.hide_moves()
             else:
                 self.show_moves()
-        else:
+        elif self.is_active:
             self.highlight.color = self.color_scheme["highlight_color"]
             if self.hovered_square != pos:
                 self.hovered_square = pos
@@ -2709,6 +2709,14 @@ class Board(Window):
             visible = False
         super().set_visible(visible)
 
+    def activate(self):
+        self.is_active = True
+        self.on_activate()
+
+    def deactivate(self):
+        self.is_active = False
+        self.on_deactivate()
+
     def on_draw(self) -> None:
         self.update_trickster_mode()
         start_render()
@@ -2745,16 +2753,19 @@ class Board(Window):
             self.windowed_square_size = min(self.width / (self.board_width + 2), self.height / (self.board_height + 2))
 
     def on_activate(self) -> None:
-        self.is_active = True
+        if not self.is_active:
+            return
         if self.highlight_square:
             self.update_highlight(self.highlight_square)
             self.hovered_square = None
-        if self.on_board(self.get_board_position(self.highlight.position)):
+        hovered_square = self.get_board_position(self.highlight.position)
+        if self.on_board(hovered_square):
             self.highlight.color = self.color_scheme["highlight_color"]
+            if not self.highlight_square:
+                self.hovered_square = hovered_square
         self.show_moves()
 
     def on_deactivate(self) -> None:
-        self.is_active = False
         self.hovered_square = None
         self.clicked_square = None
         self.held_buttons = 0
@@ -2776,6 +2787,8 @@ class Board(Window):
         self.show_moves()
 
     def on_mouse_press(self, x: int, y: int, buttons: int, modifiers: int) -> None:
+        if not self.is_active:
+            return
         self.piece_was_selected = False
         if buttons & MOUSE_BUTTON_LEFT:
             self.held_buttons = MOUSE_BUTTON_LEFT
@@ -2853,7 +2866,7 @@ class Board(Window):
             pos = self.get_board_position((x, y))
             self.update_highlight(pos)
             self.highlight_square = None
-            if buttons & self.held_buttons & MOUSE_BUTTON_LEFT and self.selected_square is not None:
+            if self.is_active and buttons & self.held_buttons & MOUSE_BUTTON_LEFT and self.selected_square is not None:
                 if self.edit_mode and modifiers & key.MOD_ACCEL:
                     self.reset_position(self.get_piece(self.selected_square))
                 else:
@@ -2863,6 +2876,8 @@ class Board(Window):
             self.skip_mouse_move = 0
 
     def on_mouse_release(self, x: int, y: int, buttons: int, modifiers: int) -> None:
+        if not self.is_active:
+            return
         held_buttons = buttons & self.held_buttons
         self.held_buttons = 0
         if self.edit_mode:
@@ -3007,6 +3022,8 @@ class Board(Window):
                     self.deselect_piece()
 
     def on_key_press(self, symbol: int, modifiers: int) -> None:
+        if not self.is_active:
+            return
         if self.edit_mode and modifiers & key.MOD_ACCEL:
             if self.held_buttons & MOUSE_BUTTON_LEFT and self.selected_square is not None:
                 self.reset_position(self.get_piece(self.selected_square))
@@ -3067,10 +3084,10 @@ class Board(Window):
             if not modifiers & key.MOD_SHIFT:  # Save
                 self.save_board(get_filename('save', 'json'))
             else:  # Save as
-                self.on_deactivate()
+                self.deactivate()
                 self.draw(0)
                 self.save_board(select_save_name())
-                self.on_activate()
+                self.activate()
         if symbol == key.R:  # Restart
             if modifiers & key.MOD_ALT:  # Reset piece sets
                 self.piece_set_ids = {side: 0 for side in self.piece_set_ids}
@@ -3356,10 +3373,10 @@ class Board(Window):
             self.redo_last_finished_move()
         if symbol == key.L:
             if modifiers & key.MOD_ALT:  # Load save data
-                self.on_deactivate()
+                self.deactivate()
                 self.draw(0)
                 self.load_save_data(select_save_data(), with_history=modifiers & key.MOD_SHIFT)
-                self.on_activate()
+                self.activate()
             else:  # Log
                 if modifiers & key.MOD_ACCEL:  # Save log
                     self.save_log()
@@ -3423,6 +3440,8 @@ class Board(Window):
                         self.advance_turn()
 
     def on_key_release(self, symbol: int, modifiers: int) -> None:
+        if not self.is_active:
+            return
         if symbol == key.ENTER:  # Simulate LMB
             self.on_mouse_release(
                 round(self.highlight.center_x), round(self.highlight.center_y),  MOUSE_BUTTON_LEFT, modifiers
