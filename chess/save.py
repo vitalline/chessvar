@@ -193,12 +193,14 @@ def load_custom_type(data: dict | None, name: str) -> type[abc.Piece] | None:
     if 'movement' in data:
         args['movement_data'] = data['movement']
     cls = type(CUSTOM_PREFIX + name, (base,), args)
+
     def init(self, board, board_pos, side, **kwargs):
         base.__init__(
             self, board, board_pos, side,
             load_movement(getattr(self, 'movement_data', None), board),
             **kwargs
         )
+
     cls.__init__ = init
     return cls  # type: ignore
 

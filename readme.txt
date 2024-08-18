@@ -10,7 +10,8 @@ Ctrl + Shift + S: save game state (with save dialog)
 Ctrl + R: start game with current armies
 Shift + R: start game with new random armies (different for each player)
 Ctrl + Shift + R: start game with a new random army (same for both players)
-Alt + R: start game with default armies
+Alt + R: reload last loaded game state
+Alt + Shift + R: reload last saved game state
 Ctrl + C: save current configuration
 Shift + C: start game with new chaotic armies (different for each player)
 Ctrl + Shift + C: start game with a new chaotic army (same for both players)
@@ -31,12 +32,15 @@ Ctrl + 0: make window regular (50px/square)
 Ctrl + W: pass turn to white player (if it's not their turn)
 Shift + W: cycle white army forward (+1)
 Ctrl + Shift + W: cycle white army backward (-1)
+Alt + W: reset white army to default
 Ctrl + B: pass turn to black player (if it's not their turn)
 Shift + B: cycle black army forward (+1)
 Ctrl + Shift + B: cycle black army backward (-1)
+Alt + B: reset black army to default
 Ctrl + N: pass turn to next player
 Shift + N: cycle both armies forward (+1) if they're the same, swap otherwise
 Ctrl + Shift + N: cycle both armies backward (-1) if they're the same, swap otherwise
+Alt + N: reset both armies to default
 Ctrl + P: reset replacement pieces to current armies
 Shift + P: cycle replacement pieces forward (+1)
 Ctrl + Shift + P: cycle replacement pieces backward (-1)

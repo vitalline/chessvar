@@ -53,23 +53,23 @@ def desaturate(color: Color, amount: float) -> Color:
 # defaults for colors that are not defined in the color schemes
 # these are used as fallbacks in case a color scheme does not define a color
 default_colors = {
-    "colored_pieces": False,
+    'colored_pieces': False,
     # these next few colors are intentionally picked to look like placeholder values
     # normally these would be all defined in the color schemes - these are fallbacks
-    "scheme_type": "default",
-    "light_square_color": (255, 128, 255),
-    "dark_square_color": (128, 128, 128),
-    "background_color": (255, 255, 255),
-    "promotion_area_color": (192, 192, 192),
+    'scheme_type': 'default',
+    'light_square_color': (255, 128, 255),
+    'dark_square_color': (128, 128, 128),
+    'background_color': (255, 255, 255),
+    'promotion_area_color': (192, 192, 192),
     # alright, enough of that - here are the actual defaults
-    "text_color": (0, 0, 0),
-    "highlight_color": (0, 0, 0, 80),
-    "selection_color": (0, 0, 0, 120),
-    "piece_color": (255, 255, 255),
-    "check_color": (200, 200, 200),
-    "win_color": (225, 225, 225),
-    "draw_color": (175, 175, 175),
-    "loss_color": (125, 125, 125),
+    'text_color': (0, 0, 0),
+    'highlight_color': (0, 0, 0, 80),
+    'selection_color': (0, 0, 0, 120),
+    'piece_color': (255, 255, 255),
+    'check_color': (200, 200, 200),
+    'win_color': (225, 225, 225),
+    'draw_color': (175, 175, 175),
+    'loss_color': (125, 125, 125),
 }
 
 # base colors for trickster mode
@@ -86,11 +86,11 @@ trickster_colors = [
 
 colors = [
     {
-        "scheme_type": pair[2],
-        "light_square_color": pair[0],
-        "dark_square_color": pair[1],
-        "background_color": average(pair[0], pair[1]),
-        "text_color": (0, 0, 0),
+        'scheme_type': pair[2],
+        'light_square_color': pair[0],
+        'dark_square_color': pair[1],
+        'background_color': average(pair[0], pair[1]),
+        'text_color': (0, 0, 0),
     } for pair in [
         # light square color, dark square color, type
 
@@ -152,54 +152,54 @@ colors = [
 
 for i in range(len(colors)):
     # set the promotion area background color to be a lighter or darker version of the background color
-    colors[i]["promotion_area_color"] = lighten_or_darken(colors[i]["background_color"], 0.25)
-    if colors[i]["scheme_type"] == "troll" or colors[i]["scheme_type"].startswith("cherub"):
+    colors[i]['promotion_area_color'] = lighten_or_darken(colors[i]['background_color'], 0.25)
+    if colors[i]['scheme_type'] == 'troll' or colors[i]['scheme_type'].startswith('cherub'):
         # make the text, highlight, and selection colors lighter
-        colors[i]["text_color"] = to_color(
+        colors[i]['text_color'] = to_color(
             # grayscale text that is readable on the background color (30% brightness increase compared to bg)
-            hsv_to_rgb(0, 0, bound_float(rgb_to_hsv(*to_float(colors[i]["background_color"]))[2] + 0.3))
+            hsv_to_rgb(0, 0, bound_float(rgb_to_hsv(*to_float(colors[i]['background_color']))[2] + 0.3))
         )
-        colors[i]["highlight_color"] = (255, 255, 255, 80)
-        colors[i]["selection_color"] = (255, 255, 255, 120)
-    elif colors[i]["scheme_type"] == "color":
+        colors[i]['highlight_color'] = (255, 255, 255, 80)
+        colors[i]['selection_color'] = (255, 255, 255, 120)
+    elif colors[i]['scheme_type'] == 'color':
         # make the text color match the promotion background color
-        colors[i]["text_color"] = colors[i]["promotion_area_color"]
+        colors[i]['text_color'] = colors[i]['promotion_area_color']
     else:
         # make the text color black
-        colors[i]["text_color"] = (0, 0, 0)
-    if colors[i]["scheme_type"] == "troll":
-        if colors[i]["light_square_color"] == getrgb('#626262'):
+        colors[i]['text_color'] = (0, 0, 0)
+    if colors[i]['scheme_type'] == 'troll':
+        if colors[i]['light_square_color'] == getrgb('#626262'):
             # special case for karkat's color - make the white pieces gray and distinguishable
-            colors[i]["white_piece_color"] = (128, 128, 128)
-            colors[i]["white_check_color"] = (100, 100, 100)
-            colors[i]["white_win_color"] = (112, 112, 112)
-            colors[i]["white_draw_color"] = (88, 88, 88)
-            colors[i]["white_loss_color"] = (62, 62, 62)
+            colors[i]['white_piece_color'] = (128, 128, 128)
+            colors[i]['white_check_color'] = (100, 100, 100)
+            colors[i]['white_win_color'] = (112, 112, 112)
+            colors[i]['white_draw_color'] = (88, 88, 88)
+            colors[i]['white_loss_color'] = (62, 62, 62)
         else:
             # make the white pieces match the hue of the light squares (i.e. respective troll's color)
-            colors[i]["white_piece_color"] = lighten(colors[i]["light_square_color"], 0.2)
-            colors[i]["white_check_color"] = desaturate(colors[i]["white_piece_color"], 0.25)
-            colors[i]["white_win_color"] = lighten(colors[i]["light_square_color"], 0.25)
-            colors[i]["white_draw_color"] = desaturate(colors[i]["light_square_color"], 0.25)
-            colors[i]["white_loss_color"] = desaturate(colors[i]["white_check_color"], 0.25)
+            colors[i]['white_piece_color'] = lighten(colors[i]['light_square_color'], 0.2)
+            colors[i]['white_check_color'] = desaturate(colors[i]['white_piece_color'], 0.25)
+            colors[i]['white_win_color'] = lighten(colors[i]['light_square_color'], 0.25)
+            colors[i]['white_draw_color'] = desaturate(colors[i]['light_square_color'], 0.25)
+            colors[i]['white_loss_color'] = desaturate(colors[i]['white_check_color'], 0.25)
         # make the black pieces depend on the dark square color (i.e. a perceptible shade of gray)
-        colors[i]["black_piece_color"] = multiply(colors[i]["dark_square_color"], 2)
-        colors[i]["black_check_color"] = multiply(colors[i]["dark_square_color"], 1.5625)
-        colors[i]["black_win_color"] = multiply(colors[i]["dark_square_color"], 1.75)
-        colors[i]["black_draw_color"] = multiply(colors[i]["dark_square_color"], 1.375)
-        colors[i]["black_loss_color"] = multiply(colors[i]["dark_square_color"], 1)
-    if colors[i]["scheme_type"].startswith("cherub"):
+        colors[i]['black_piece_color'] = multiply(colors[i]['dark_square_color'], 2)
+        colors[i]['black_check_color'] = multiply(colors[i]['dark_square_color'], 1.5625)
+        colors[i]['black_win_color'] = multiply(colors[i]['dark_square_color'], 1.75)
+        colors[i]['black_draw_color'] = multiply(colors[i]['dark_square_color'], 1.375)
+        colors[i]['black_loss_color'] = multiply(colors[i]['dark_square_color'], 1)
+    if colors[i]['scheme_type'].startswith('cherub'):
         # define the cherub piece colors (white pieces are red in cherub1 and green in cherub2)
-        scheme_id = int(colors[i]["scheme_type"][-1])
-        colors[i]["scheme_type"] = "cherub"  # normalize the scheme type
-        colors[i]["colored_pieces"] = True
-        colors[i]["white_piece_color"] = (255, 0, 0) if scheme_id == 1 else (0, 255, 0)
-        colors[i]["black_piece_color"] = (255, 0, 0) if scheme_id == 2 else (0, 255, 0)
-        colors[i]["white_check_color"] = (192, 0, 0) if scheme_id == 1 else (0, 192, 0)
-        colors[i]["black_check_color"] = (192, 0, 0) if scheme_id == 2 else (0, 192, 0)
-        colors[i]["white_draw_color"] = (192, 64, 64) if scheme_id == 1 else (64, 192, 64)
-        colors[i]["black_draw_color"] = (192, 64, 64) if scheme_id == 2 else (64, 192, 64)
-        colors[i]["win_color"] = None
+        scheme_id = int(colors[i]['scheme_type'][-1])
+        colors[i]['scheme_type'] = 'cherub'  # normalize the scheme type
+        colors[i]['colored_pieces'] = True
+        colors[i]['white_piece_color'] = (255, 0, 0) if scheme_id == 1 else (0, 255, 0)
+        colors[i]['black_piece_color'] = (255, 0, 0) if scheme_id == 2 else (0, 255, 0)
+        colors[i]['white_check_color'] = (192, 0, 0) if scheme_id == 1 else (0, 192, 0)
+        colors[i]['black_check_color'] = (192, 0, 0) if scheme_id == 2 else (0, 192, 0)
+        colors[i]['white_draw_color'] = (192, 64, 64) if scheme_id == 1 else (64, 192, 64)
+        colors[i]['black_draw_color'] = (192, 64, 64) if scheme_id == 2 else (64, 192, 64)
+        colors[i]['win_color'] = None
     # add defaults for required colors that were not previously defined
     for key in default_colors:
         if key not in colors[i]:

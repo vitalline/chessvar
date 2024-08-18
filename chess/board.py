@@ -3,7 +3,7 @@ from __future__ import annotations
 from copy import copy, deepcopy
 from datetime import datetime
 from itertools import product, zip_longest
-from json import dump, load
+from json import dumps, loads, JSONDecodeError
 from math import ceil, sqrt
 from os import makedirs, name as os_name, system
 from os.path import dirname, isfile, join
@@ -312,7 +312,7 @@ def print_piece_data(board: Board, fp: TextIO = stdout, side: Side = Side.WHITE)
             fp.write(',\n')
         fp.write(f'  "{save_piece_type(t)}":')
         p = t(board, None, side)  # type: ignore
-        dump(save_custom_type(p), fp, separators=(',', ':'), ensure_ascii=False)
+        fp.write(dumps(save_custom_type(p), separators=(',', ':'), ensure_ascii=False))
     fp.write('\n}')
 
 
@@ -414,9 +414,12 @@ class Board(Window):
 
         self.color_index = self.board_config['color_id'] or 0  # index of the current color scheme
         self.color_scheme = colors[self.color_index]  # current color scheme
-        self.background_color = self.color_scheme["background_color"]  # background color
+        self.background_color = self.color_scheme['background_color']  # background color
         self.log_data = []  # list of presently logged strings
-        self.save_data = None  # last loaded save data
+        self.load_data = None  # last loaded data
+        self.load_path = None  # path to the last loaded data file
+        self.save_data = None  # last saved data
+        self.save_path = None  # path to the last saved data file
         self.save_loaded = False  # whether a save was successfully loaded
         self.skip_mouse_move = 0  # setting this to >=1 skips mouse movement events
         self.highlight_square = None  # square that is being highlighted with the keyboard
@@ -485,10 +488,10 @@ class Board(Window):
         self.display_theoretical_moves = {Side.WHITE: False, Side.BLACK: False}  # same for theoretical moves
         self.anchor = 0, 0  # used to have the board scale from the origin instead of the center
         self.highlight = Sprite("assets/util/selection.png")  # sprite for the highlight marker
-        self.highlight.color = self.color_scheme["highlight_color"]  # color it according to the color scheme
+        self.highlight.color = self.color_scheme['highlight_color']  # color it according to the color scheme
         self.highlight.scale = self.square_size / self.highlight.texture.width  # scale it to the size of a square
         self.selection = Sprite("assets/util/selection.png")  # sprite for the selection marker
-        self.selection.color = self.color_scheme["selection_color"]  # color it according to the color scheme
+        self.selection.color = self.color_scheme['selection_color']  # color it according to the color scheme
         self.selection.scale = self.square_size / self.selection.texture.width  # scale it to the size of a square
         self.active_piece = None  # piece that is currently being moved
         self.is_active = True  # whether the window is active or not
@@ -534,7 +537,7 @@ class Board(Window):
             'width': self.square_size / 2,
             'bold': True,
             'align': 'center',
-            'color': self.color_scheme["text_color"],
+            'color': self.color_scheme['text_color'],
         }
 
         for row in range(self.board_height):
@@ -558,7 +561,7 @@ class Board(Window):
             self.board_sprite_list.append(sprite)
 
         # set up pieces on the board
-        self.load_save_data(argv[1] if len(argv) > 1 else None)
+        self.load(argv[1] if len(argv) > 1 else None)
         if not self.save_loaded:
             self.reset_board(update=True)
             self.log_special_modes()
@@ -649,7 +652,7 @@ class Board(Window):
 
         # set selection properties for the selected square
         self.selected_square = pos
-        self.selection.color = self.color_scheme["selection_color"]
+        self.selection.color = self.color_scheme['selection_color']
         self.selection.position = self.get_screen_position(pos)
 
         # make the piece displayed on top of everything else
@@ -763,18 +766,16 @@ class Board(Window):
                 self.pieces[row][col].set_color(
                     self.color_scheme.get(
                         f"{self.pieces[row][col].side.key()}piece_color",
-                        self.color_scheme["piece_color"]
+                        self.color_scheme['piece_color']
                     ),
-                    self.color_scheme["colored_pieces"]
+                    self.color_scheme['colored_pieces']
                 )
             self.pieces[row][col].scale = self.square_size / self.pieces[row][col].texture.width
             self.piece_sprite_list.append(self.pieces[row][col])
 
         self.update_status()
 
-    def save_board(self, path: str, partial: bool = False) -> None:
-        if not path:
-            return
+    def dump_board(self) -> str:
         data = {
             'board_size': [self.board_width, self.board_height],
             'window_size': list(self.windowed_size),
@@ -837,18 +838,27 @@ class Board(Window):
             new_rng = Random(seed)
             if rng.getstate() != new_rng.getstate():
                 data[f"{k}_state"] = save_rng(rng)
-        if partial:
-            if self.save_data is not None:
-                data = {k: v for k, v in data.items() if k in self.save_data}
+        if self.board_config['partial_save']:
+            if self.load_data is not None:
+                data = {k: v for k, v in data.items() if k in self.load_data}
         indent = self.board_config['save_indent']
-        makedirs(dirname(path), exist_ok=True)
-        with open(path, mode='w', encoding='utf-8') as file:
-            if indent is None:
-                dump(data, file, separators=(',', ':'), ensure_ascii=False)
-            else:
-                dump(data, file, indent=indent, ensure_ascii=False)
+        if indent is None:
+            return dumps(data, separators=(',', ':'), ensure_ascii=False)
+        else:
+            return dumps(data, indent=indent, ensure_ascii=False)
 
-    def load_board(self, path: str, with_history: bool = False) -> None:
+    def load_board(self, dump: str, with_history: bool = False) -> None:
+        try:
+            data = loads(dump)
+        except JSONDecodeError:
+            self.log(f"[Ply {self.ply_count}] Error: Malformed save data")
+            print_exc()
+            return
+
+        if not isinstance(data, dict):
+            self.log(f"[Ply {self.ply_count}] Error: Invalid save format (expected dict, but got {type(data)})")
+            return
+
         self.save_interval = 0
         self.save_loaded = False
         success = True
@@ -865,20 +875,12 @@ class Board(Window):
             for sprite in sprite_list:
                 sprite_list.remove(sprite)
 
-        with open(path, encoding='utf-8') as file:
-            data = load(file)
-            if isinstance(data, dict):
-                self.save_data = data
-            else:
-                print(f"Warning: Invalid save format (expected dict, but got {type(data)})")
-                return
-
         # might have to add more error checking to saving/loading, even if at the cost of slight redundancy.
         # who knows when someone decides to introduce a breaking change and absolutely destroy all the saves
         board_size = tuple(data.get('board_size', (self.board_width, self.board_height)))
         if (self.board_width, self.board_height) != board_size:
-            print(
-                f"Warning: Board size does not match (was {board_size}, "
+            self.log(
+                f"Ply {self.ply_count}] Error: Board size does not match (was {board_size}, "
                 f"but is {(self.board_width, self.board_height)})"
             )
 
@@ -888,7 +890,9 @@ class Board(Window):
         self.update_sprites(data.get('flip_mode', self.flip_mode))
         square_size = data.get('square_size', self.square_size)
         if self.square_size != square_size:
-            print(f"Warning: Square size does not match (was {square_size}, but is {self.square_size})")
+            self.log(
+                f"Ply {self.ply_count}] Error: Square size does not match (was {square_size}, but is {self.square_size})"
+            )
 
         self.color_index = data.get('color_index', self.color_index)
         self.color_scheme = colors[self.color_index] if self.color_index is not None else default_colors
@@ -899,13 +903,13 @@ class Board(Window):
             if v != old:
                 self.color_scheme[k] = v if old == 'undefined' else old  # first time when we can fully restore old data
                 # in all cases before we had to pick one or the other, but here we can try to reload the save faithfully
-                if self.color_index is not None:  # warning if there's an explicitly defined color scheme and it doesn't
-                    print(f"Warning: Color scheme does not match ({k} was {old}, but is {v})")  # match the saved scheme
+                if self.color_index is not None:  # show warning if the defined color scheme doesn't match the saved one
+                    self.log(f"Ply {self.ply_count}] Error: Color scheme doesn't match ({k} was {old}, but is {v})")
         for k, v in old_color_scheme.items():
             if k not in self.color_scheme:
                 self.color_scheme[k] = v
                 if self.color_index is not None:
-                    print(f"Warning: Color scheme does not match ({k} was {v}, but is undefined)")
+                    self.log(f"Ply {self.ply_count}] Error: Color scheme doesn't match ({k} was {v}, but is undefined)")
 
         self.board_config['block_ids'] = data.get('set_blocklist', self.board_config['block_ids'])
         self.board_config['block_ids_chaos'] = data.get('chaos_blocklist', self.board_config['block_ids_chaos'])
@@ -950,8 +954,9 @@ class Board(Window):
                 if pair[0] != pair[1]:
                     # this can mean a few things, namely the RNG implementation changing or new sets/pieces being added.
                     # either way, we should at least try to load the old pieces defined in the save to recreate the game
-                    print(
-                        f"Warning: Piece set does not match ({side}: {toa(((0 if side == Side.WHITE else 7), i))} "
+                    self.log(
+                        f"Ply {self.ply_count}] Error: Piece set does not match "
+                        f"({side}: {toa(((0 if side == Side.WHITE else 7), i))} "
                         f"was {pair[0].name}, but is {pair[1].name})"
                     )
                     update_sets = True
@@ -1029,7 +1034,6 @@ class Board(Window):
         self.update_pieces()
         self.update_colors()
 
-        self.log(f"[Ply {self.ply_count}] Info: Game loaded from {path}")
         starting = 'Starting new' if with_history else 'Resuming saved'
         if None in self.piece_set_ids.values():
             self.log(f"[Ply {self.ply_count}] Info: {starting} game (with custom piece sets)")
@@ -1042,7 +1046,7 @@ class Board(Window):
                 some = f"asymmetrical {some}"
             if same:
                 some = f"a{'' if self.chaos_mode in {0, 1} else 'n'} {some}"
-            sets = "set" if same else "sets"
+            sets = 'set' if same else 'sets'
             self.log(f"[Ply {self.ply_count}] Info: {starting} game (with {some} piece {sets})")
         self.ply_count = 0 if with_history else ply_count
         self.log_armies()
@@ -1265,14 +1269,14 @@ class Board(Window):
             return self.get_extremely_random_set(side, asymmetrical)
 
     def load_chaos_sets(self, mode: int, same: bool) -> None:
-        chaotic = "chaotic"
+        chaotic = 'chaotic'
         if mode in {3, 4}:
             chaotic = f"extremely {chaotic}"
         if mode in {2, 4}:
             chaotic = f"asymmetrical {chaotic}"
         if same:
             chaotic = f"a{'' if mode == 1 else 'n'} {chaotic}"
-        sets = "set" if same else "sets"
+        sets = 'set' if same else 'sets'
         self.log(f"[Ply {self.ply_count}] Info: Starting new game (with {chaotic} piece {sets})")
         self.chaos_mode = mode
         self.chaos_sets = {}
@@ -1604,7 +1608,7 @@ class Board(Window):
                     if pos_to in move_sprites:
                         continue
                     sprite = Sprite(f"assets/util/{'move' if self.not_a_piece(pos_to) else 'capture'}.png")
-                    sprite.color = self.color_scheme["selection_color" if self.selected_square else "highlight_color"]
+                    sprite.color = self.color_scheme['selection_color' if self.selected_square else 'highlight_color']
                     sprite.position = self.get_screen_position(pos_to)
                     sprite.scale = self.square_size / sprite.texture.width
                     self.move_sprite_list.append(sprite)
@@ -1625,19 +1629,19 @@ class Board(Window):
                     captures.append(last_move.captured_piece.board_pos)
                 if pos_from is not None and pos_from != pos_to:
                     if pos_from in move_sprites and not self.not_a_piece(pos_from):
-                        move_sprites[pos_from].color = self.color_scheme["selection_color"]
+                        move_sprites[pos_from].color = self.color_scheme['selection_color']
                     else:
                         sprite = Sprite(f"assets/util/{'capture' if self.not_a_piece(pos_from) else 'selection'}.png")
-                        sprite.color = self.color_scheme["selection_color"]
+                        sprite.color = self.color_scheme['selection_color']
                         sprite.position = self.get_screen_position(pos_from)
                         sprite.scale = self.square_size / sprite.texture.width
                         self.move_sprite_list.append(sprite)
                 if pos_to is not None:
                     if pos_to in move_sprites:
-                        move_sprites[pos_to].color = self.color_scheme["selection_color"]
+                        move_sprites[pos_to].color = self.color_scheme['selection_color']
                     else:
                         sprite = Sprite(f"assets/util/{'capture' if self.not_a_piece(pos_to) else 'selection'}.png")
-                        sprite.color = self.color_scheme["selection_color"]
+                        sprite.color = self.color_scheme['selection_color']
                         sprite.position = self.get_screen_position(pos_to)
                         sprite.scale = self.square_size / sprite.texture.width
                         self.move_sprite_list.append(sprite)
@@ -1645,10 +1649,10 @@ class Board(Window):
                     if capture == pos_to:
                         continue
                     if capture in move_sprites:
-                        move_sprites[capture].color = self.color_scheme["selection_color"]
+                        move_sprites[capture].color = self.color_scheme['selection_color']
                     else:
                         sprite = Sprite(f"assets/util/{'capture' if self.not_a_piece(capture) else 'selection'}.png")
-                        sprite.color = self.color_scheme["highlight_color"]
+                        sprite.color = self.color_scheme['highlight_color']
                         sprite.position = self.get_screen_position(capture)
                         sprite.scale = self.square_size / sprite.texture.width
                         self.move_sprite_list.append(sprite)
@@ -1673,7 +1677,7 @@ class Board(Window):
             else:
                 self.show_moves()
         elif self.is_active:
-            self.highlight.color = self.color_scheme["highlight_color"]
+            self.highlight.color = self.color_scheme['highlight_color']
             if self.hovered_square != pos:
                 self.hovered_square = pos
                 if self.selected_square is None and not self.promotion_piece:
@@ -2365,7 +2369,7 @@ class Board(Window):
         side = self.get_promotion_side(piece)
         for promotion, pos in zip_longest(promotions, area_squares):
             background_sprite = Sprite("assets/util/square.png")
-            background_sprite.color = self.color_scheme["promotion_area_color"]
+            background_sprite.color = self.color_scheme['promotion_area_color']
             background_sprite.position = self.get_screen_position(pos)
             background_sprite.scale = self.square_size / background_sprite.texture.width
             self.promotion_area_sprite_list.append(background_sprite)
@@ -2390,9 +2394,9 @@ class Board(Window):
             promotion_piece.set_color(
                 self.color_scheme.get(
                     f"{promotion_piece.side.key()}piece_color",
-                    self.color_scheme["piece_color"]
+                    self.color_scheme['piece_color']
                 ),
-                self.color_scheme["colored_pieces"]
+                self.color_scheme['colored_pieces']
             )
             self.promotion_piece_sprite_list.append(promotion_piece)
             self.promotion_area[pos] = promotion_piece
@@ -2419,9 +2423,9 @@ class Board(Window):
         new_piece.set_color(
             self.color_scheme.get(
                 f"{new_piece.side.key()}piece_color",
-                self.color_scheme["piece_color"]
+                self.color_scheme['piece_color']
             ),
-            self.color_scheme["colored_pieces"]
+            self.color_scheme['colored_pieces']
         )
         new_piece.scale = self.square_size / new_piece.texture.width
         self.piece_sprite_list.append(new_piece)
@@ -2434,9 +2438,9 @@ class Board(Window):
                 color if color is not None else
                 self.color_scheme.get(
                     f"{piece.side.key()}piece_color",
-                    self.color_scheme["piece_color"]
+                    self.color_scheme['piece_color']
                 ),
-                self.color_scheme["colored_pieces"]
+                self.color_scheme['colored_pieces']
             )
 
     def color_all_pieces(self) -> None:
@@ -2446,14 +2450,14 @@ class Board(Window):
                     self.check_side,
                     self.color_scheme.get(
                         f"{self.check_side.key()}loss_color",
-                        self.color_scheme["loss_color"]
+                        self.color_scheme['loss_color']
                     ),
                 )
                 self.color_pieces(
                     self.check_side.opponent(),
                     self.color_scheme.get(
                         f"{self.check_side.opponent().key()}win_color",
-                        self.color_scheme["win_color"]
+                        self.color_scheme['win_color']
                     ),
                 )
             else:
@@ -2461,14 +2465,14 @@ class Board(Window):
                     Side.WHITE,
                     self.color_scheme.get(
                         f"{Side.WHITE.key()}draw_color",
-                        self.color_scheme["draw_color"]
+                        self.color_scheme['draw_color']
                     ),
                 )
                 self.color_pieces(
                     Side.BLACK,
                     self.color_scheme.get(
                         f"{Side.BLACK.key()}draw_color",
-                        self.color_scheme["draw_color"]
+                        self.color_scheme['draw_color']
                     ),
                 )
         else:
@@ -2477,7 +2481,7 @@ class Board(Window):
                     self.check_side,
                     self.color_scheme.get(
                         f"{self.check_side.key()}check_color",
-                        self.color_scheme["check_color"]
+                        self.color_scheme['check_color']
                     ),
                 )
                 self.color_pieces(self.check_side.opponent())
@@ -2491,45 +2495,45 @@ class Board(Window):
                 trickster_colors[self.trickster_color_index - 1],
                 trickster_colors[self.trickster_color_index % len(trickster_colors)]
             )
-            self.color_scheme["light_square_color"] = lighten(desaturate(new_colors[0], 0.11), 0.011)
-            self.color_scheme["dark_square_color"] = lighten(desaturate(new_colors[1], 0.11), 0.011)
-            self.color_scheme["background_color"] = darken(average(
-                self.color_scheme["light_square_color"],
-                self.color_scheme["dark_square_color"]
+            self.color_scheme['light_square_color'] = lighten(desaturate(new_colors[0], 0.11), 0.011)
+            self.color_scheme['dark_square_color'] = lighten(desaturate(new_colors[1], 0.11), 0.011)
+            self.color_scheme['background_color'] = darken(average(
+                self.color_scheme['light_square_color'],
+                self.color_scheme['dark_square_color']
             ), 0.11 / 2)
-            self.color_scheme["promotion_area_color"] = darken(self.color_scheme["background_color"], 0.11)
-            self.color_scheme["highlight_color"] = saturate(self.color_scheme["promotion_area_color"], 0.11 * 2) + (80,)
-            self.color_scheme["selection_color"] = self.color_scheme["highlight_color"][:3] + (120,)
-            self.color_scheme["text_color"] = darken(self.color_scheme["background_color"], 0.11 * 3)
-            self.color_scheme["white_piece_color"] = saturate(darken(new_colors[0], 0.11), 0.11)
-            self.color_scheme["black_piece_color"] = desaturate(darken(new_colors[1], 0.11), 0.11)
-            self.color_scheme["white_check_color"] = desaturate(self.color_scheme["white_piece_color"], 0.11)
-            self.color_scheme["black_check_color"] = desaturate(self.color_scheme["black_piece_color"], 0.11)
-            self.color_scheme["white_win_color"] = darken(self.color_scheme["white_piece_color"], 0.11)
-            self.color_scheme["black_win_color"] = darken(self.color_scheme["black_piece_color"], 0.11)
-            self.color_scheme["white_draw_color"] = desaturate(self.color_scheme["white_piece_color"], 0.11 * 5)
-            self.color_scheme["black_draw_color"] = desaturate(self.color_scheme["black_piece_color"], 0.11 * 5)
-            self.color_scheme["loss_color"] = getrgb("#bbbbbb")
-        self.background_color = self.color_scheme["background_color"]
+            self.color_scheme['promotion_area_color'] = darken(self.color_scheme['background_color'], 0.11)
+            self.color_scheme['highlight_color'] = saturate(self.color_scheme['promotion_area_color'], 0.11 * 2) + (80,)
+            self.color_scheme['selection_color'] = self.color_scheme['highlight_color'][:3] + (120,)
+            self.color_scheme['text_color'] = darken(self.color_scheme['background_color'], 0.11 * 3)
+            self.color_scheme['white_piece_color'] = saturate(darken(new_colors[0], 0.11), 0.11)
+            self.color_scheme['black_piece_color'] = desaturate(darken(new_colors[1], 0.11), 0.11)
+            self.color_scheme['white_check_color'] = desaturate(self.color_scheme['white_piece_color'], 0.11)
+            self.color_scheme['black_check_color'] = desaturate(self.color_scheme['black_piece_color'], 0.11)
+            self.color_scheme['white_win_color'] = darken(self.color_scheme['white_piece_color'], 0.11)
+            self.color_scheme['black_win_color'] = darken(self.color_scheme['black_piece_color'], 0.11)
+            self.color_scheme['white_draw_color'] = desaturate(self.color_scheme['white_piece_color'], 0.11 * 5)
+            self.color_scheme['black_draw_color'] = desaturate(self.color_scheme['black_piece_color'], 0.11 * 5)
+            self.color_scheme['loss_color'] = getrgb('#bbbbbb')
+        self.background_color = self.color_scheme['background_color']
         for sprite in self.label_list:
-            sprite.color = self.color_scheme["text_color"]
+            sprite.color = self.color_scheme['text_color']
         for sprite in self.board_sprite_list:
             position = self.get_board_position(sprite.position)
             sprite.color = self.color_scheme[f"{'light' if self.is_light_square(position) else 'dark'}_square_color"]
         for sprite in self.promotion_area_sprite_list:
-            sprite.color = self.color_scheme["promotion_area_color"]
+            sprite.color = self.color_scheme['promotion_area_color']
         for sprite in self.promotion_piece_sprite_list:
             if isinstance(sprite, abc.Piece):
                 sprite.set_color(
                     self.color_scheme.get(
                         f"{sprite.side.key()}piece_color",
-                        self.color_scheme["piece_color"]
+                        self.color_scheme['piece_color']
                     ),
-                    self.color_scheme["colored_pieces"]
+                    self.color_scheme['colored_pieces']
                 )
         self.color_all_pieces()
-        self.selection.color = self.color_scheme["selection_color"] if self.selection.alpha else (0, 0, 0, 0)
-        self.highlight.color = self.color_scheme["highlight_color"] if self.highlight.alpha else (0, 0, 0, 0)
+        self.selection.color = self.color_scheme['selection_color'] if self.selection.alpha else (0, 0, 0, 0)
+        self.highlight.color = self.color_scheme['highlight_color'] if self.highlight.alpha else (0, 0, 0, 0)
         self.show_moves()
 
     def update_piece(
@@ -2658,7 +2662,7 @@ class Board(Window):
             return  # trickster mode is enabled
         if self.color_index is None:
             self.color_index = 0
-            while colors[self.color_index]["scheme_type"] != "cherub":
+            while colors[self.color_index]['scheme_type'] != 'cherub':
                 self.color_index += 1
                 if self.color_index >= len(colors):
                     self.color_index = 0
@@ -2705,7 +2709,7 @@ class Board(Window):
         self.set_fullscreen(screen=screens[portions.index(max(portions))])
 
     def set_visible(self, visible: bool = True) -> None:
-        if self.board_config['save_update_mode'] < 0 and self.save_data is not None:
+        if self.board_config['save_update_mode'] < 0 and self.load_data is not None:
             visible = False
         super().set_visible(visible)
 
@@ -2760,7 +2764,7 @@ class Board(Window):
             self.hovered_square = None
         hovered_square = self.get_board_position(self.highlight.position)
         if self.on_board(hovered_square):
-            self.highlight.color = self.color_scheme["highlight_color"]
+            self.highlight.color = self.color_scheme['highlight_color']
             if not self.highlight_square:
                 self.hovered_square = hovered_square
         self.show_moves()
@@ -3080,19 +3084,25 @@ class Board(Window):
                         return
         if self.held_buttons:
             return
-        if symbol == key.S and modifiers & key.MOD_ACCEL:
+        if symbol == key.S and modifiers & key.MOD_ACCEL:  # Save data
             if not modifiers & key.MOD_SHIFT:  # Save
-                self.save_board(get_filename('save', 'json'))
+                save_path = get_filename('save', 'json')
+                self.save(save_path)
             else:  # Save as
                 self.deactivate()
                 self.draw(0)
-                self.save_board(select_save_name())
+                save_path = select_save_name()
+                self.save(save_path)
                 self.activate()
         if symbol == key.R:  # Restart
-            if modifiers & key.MOD_ALT:  # Reset piece sets
-                self.piece_set_ids = {side: 0 for side in self.piece_set_ids}
-                self.chaos_mode = 0
-                self.reset_board(update=True)
+            if modifiers & key.MOD_ALT:  # Reload save data
+                data = self.save_data if modifiers & key.MOD_SHIFT else self.load_data
+                if data is not None:
+                    which = 'saved' if modifiers & key.MOD_SHIFT else 'loaded'
+                    path = self.save_path if modifiers & key.MOD_SHIFT else self.load_path
+                    at = 'at' if isfile(path) else 'was at'
+                    self.log(f"[Ply {self.ply_count}] Info: Reloading last {which} data ({at} {path})")
+                    self.load_board(data)
             elif modifiers & key.MOD_SHIFT:  # Randomize piece sets
                 blocked_ids = set(self.board_config['block_ids'])
                 piece_set_ids = list(i for i in range(len(piece_groups)) if i not in blocked_ids)
@@ -3176,7 +3186,15 @@ class Board(Window):
                     self.theoretical_moves = {side: {} for side in self.theoretical_moves}
                     self.show_moves()
         if symbol == key.W:  # White
-            if modifiers & key.MOD_ACCEL and not modifiers & key.MOD_SHIFT:  # White is in control
+            if modifiers & key.MOD_ALT:  # Reset white set to default
+                self.piece_set_ids[Side.WHITE] = 0
+                set_name_suffix = ''
+                if not self.should_hide_pieces:
+                    set_name = piece_groups[self.piece_set_ids[Side.WHITE]].get('name')
+                    set_name_suffix = f" ({set_name})"
+                self.log(f"[Ply {self.ply_count}] Info: Using default piece set for White{set_name_suffix}")
+                self.reset_board(update=True)
+            elif modifiers & key.MOD_ACCEL and not modifiers & key.MOD_SHIFT:  # White is in control
                 if self.turn_side != Side.WHITE and not self.chain_start:
                     self.move_history.append(None)
                     self.log(f"[Ply {self.ply_count}] Pass: {Side.WHITE} to move")
@@ -3192,9 +3210,26 @@ class Board(Window):
                     % (len(piece_groups) + len(self.chaos_sets))
                     - len(self.chaos_sets)
                 ) if self.piece_set_ids[Side.WHITE] is not None else 0
+                which = {-1: 'previous', 1: 'next'}[d]
+                set_name_suffix = ''
+                if not self.should_hide_pieces:
+                    if self.piece_set_ids[Side.WHITE] < 0:
+                        set_name = get_set_name(self.chaos_sets[-self.piece_set_ids[Side.WHITE]])
+                    else:
+                        set_name = piece_groups[self.piece_set_ids[Side.WHITE]].get('name')
+                    set_name_suffix = f" ({set_name})"
+                self.log(f"[Ply {self.ply_count}] Info: Using {which} piece set for White{set_name_suffix}")
                 self.reset_board(update=True)
         if symbol == key.B:  # Black
-            if modifiers & key.MOD_ACCEL and not modifiers & key.MOD_SHIFT:  # Black is in control
+            if modifiers & key.MOD_ALT:  # Reset black set to default
+                self.piece_set_ids[Side.BLACK] = 0
+                set_name_suffix = ''
+                if not self.should_hide_pieces:
+                    set_name = piece_groups[self.piece_set_ids[Side.BLACK]].get('name')
+                    set_name_suffix = f" ({set_name})"
+                self.log(f"[Ply {self.ply_count}] Info: Using default piece set for Black{set_name_suffix}")
+                self.reset_board(update=True)
+            elif modifiers & key.MOD_ACCEL and not modifiers & key.MOD_SHIFT:  # Black is in control
                 if self.turn_side != Side.BLACK and not self.chain_start:
                     self.move_history.append(None)
                     self.log(f"[Ply {self.ply_count}] Pass: {Side.BLACK} to move")
@@ -3210,9 +3245,27 @@ class Board(Window):
                     % (len(piece_groups) + len(self.chaos_sets))
                     - len(self.chaos_sets)
                 ) if self.piece_set_ids[Side.BLACK] is not None else 0
+                which = {-1: 'previous', 1: 'next'}[d]
+                set_name_suffix = ''
+                if not self.should_hide_pieces:
+                    if self.piece_set_ids[Side.BLACK] < 0:
+                        set_name = get_set_name(self.chaos_sets[-self.piece_set_ids[Side.BLACK]])
+                    else:
+                        set_name = piece_groups[self.piece_set_ids[Side.BLACK]].get('name')
+                    set_name_suffix = f" ({set_name})"
+                self.log(f"[Ply {self.ply_count}] Info: Using {which} piece set for Black{set_name_suffix}")
                 self.reset_board(update=True)
         if symbol == key.N:  # Next
-            if modifiers & key.MOD_ACCEL and not modifiers & key.MOD_SHIFT and not self.chain_start:  # Next player
+            if modifiers & key.MOD_ALT:  # Reset white and black sets to default
+                self.chaos_mode = 0
+                self.piece_set_ids = {side: 0 for side in self.piece_set_ids}
+                set_name_suffix = ''
+                if not self.should_hide_pieces:
+                    set_name = piece_groups[self.piece_set_ids[Side.WHITE]].get('name')
+                    set_name_suffix = f" ({set_name})"
+                self.log(f"[Ply {self.ply_count}] Info: Using default piece set{set_name_suffix}")
+                self.reset_board(update=True)
+            elif modifiers & key.MOD_ACCEL and not modifiers & key.MOD_SHIFT and not self.chain_start:  # Next player
                 self.move_history.append(None)
                 self.log(f"[Ply {self.ply_count}] Pass: {self.turn_side.opponent()} to move")
                 self.ply_count += 1
@@ -3236,9 +3289,23 @@ class Board(Window):
                         % (len(piece_groups) + len(self.chaos_sets))
                         - len(self.chaos_sets)
                     ) if self.piece_set_ids[Side.BLACK] is not None else 0
+                    which = {-1: 'previous', 1: 'next'}[d]
+                    set_name_suffix = ''
+                    if not self.should_hide_pieces:
+                        if self.piece_set_ids[Side.WHITE] < 0:
+                            set_name = get_set_name(self.chaos_sets[-self.piece_set_ids[Side.WHITE]])
+                        else:
+                            set_name = piece_groups[self.piece_set_ids[Side.WHITE]].get('name')
+                        set_name_suffix = f" ({set_name})"
+                    self.log(f"[Ply {self.ply_count}] Info: Using {which} piece set{set_name_suffix}")
                 else:  # Next player goes first
                     for data in (self.piece_sets, self.piece_set_ids, self.piece_set_names):
                         data[Side.WHITE], data[Side.BLACK] = data[Side.BLACK], data[Side.WHITE]
+                    set_name_suffix = ''
+                    if not self.should_hide_pieces:
+                        set_names = [self.piece_set_names[side] for side in (Side.WHITE, Side.BLACK)]
+                        set_name_suffix = f" ({' vs. '.join(set_names)})"
+                    self.log(f"[Ply {self.ply_count}] Info: Swapping piece sets{set_name_suffix}")
                 self.reset_board(update=True)
         if symbol == key.P:  # Promotion
             if self.edit_mode:
@@ -3247,10 +3314,21 @@ class Board(Window):
                     if self.edit_piece_set_id is not None:
                         d = -1 if modifiers & key.MOD_ACCEL else 1
                         self.edit_piece_set_id = (self.edit_piece_set_id + d) % len(piece_groups)
+                        which = {-1: 'previous', 1: 'next'}[d]
                     else:
                         self.edit_piece_set_id = 0
+                        which = 'default'
+                    set_name = piece_groups[self.edit_piece_set_id].get('name')
+                    set_name_suffix = f" ({set_name})"
+                    self.log(f"[Ply {self.ply_count}] Info: Placing from {which} piece set{set_name_suffix}")
                 elif modifiers & key.MOD_ACCEL:  # Reset promotion piece set
                     self.edit_piece_set_id = None
+                    set_names = [self.piece_set_names[side] for side in (Side.WHITE, Side.BLACK)]
+                    set_names = list(dict.fromkeys(set_names))
+                    set_name_suffix = f"{'s' * (len(set_names) > 1)}"
+                    if not self.should_hide_pieces:
+                        set_name_suffix += f" ({' vs. '.join(set_names)})"
+                    self.log(f"[Ply {self.ply_count}] Info: Placing from current piece set{set_name_suffix}")
                 if old_id != self.edit_piece_set_id:
                     self.reset_edit_promotions()
                     if self.promotion_piece:
@@ -3347,19 +3425,22 @@ class Board(Window):
                     self.should_hide_moves = old_should_hide_moves
                 self.update_pieces()
                 self.show_moves()
-        if symbol == key.K:  # Move markers
+        if symbol == key.K and not self.should_hide_moves:  # Move markers
             selected_square = self.selected_square
             if modifiers & key.MOD_ACCEL and modifiers & key.MOD_SHIFT:  # Default
+                self.log(f"[Ply {self.ply_count}] Info: Showing legal moves for moving player")
                 self.load_moves(False)
             elif modifiers & key.MOD_ACCEL:  # Valid moves
+                self.log(f"[Ply {self.ply_count}] Info: Showing legal moves for both players")
                 self.load_moves(False, Side.ANY, Side.NONE)
             elif modifiers & key.MOD_SHIFT:  # Theoretical moves
+                self.log(f"[Ply {self.ply_count}] Info: Showing all possible moves for both players")
                 self.load_moves(False, Side.NONE, Side.ANY)
             if selected_square:
                 self.select_piece(selected_square)
             self.show_moves()
         if symbol == key.T and modifiers & key.MOD_ACCEL:  # Trickster mode
-            if self.color_scheme["scheme_type"] == "cherub":
+            if self.color_scheme['scheme_type'] == 'cherub':
                 self.trickster_color_index = (
                     0 if self.is_trickster_mode() else base_rng.randrange(len(trickster_colors)) + 1
                 )
@@ -3375,7 +3456,7 @@ class Board(Window):
             if modifiers & key.MOD_ALT:  # Load save data
                 self.deactivate()
                 self.draw(0)
-                self.load_save_data(select_save_data(), with_history=modifiers & key.MOD_SHIFT)
+                self.load(select_save_data(), with_history=modifiers & key.MOD_SHIFT)
                 self.activate()
             else:  # Log
                 if modifiers & key.MOD_ACCEL:  # Save log
@@ -3385,7 +3466,7 @@ class Board(Window):
         if symbol == key.D:  # Debug
             debug_log_data = self.debug_info()
             if modifiers & key.MOD_ACCEL:  # Save debug log
-                self.save_log(debug_log_data, "debug")
+                self.save_log(debug_log_data, 'debug')
             if modifiers & key.MOD_SHIFT:  # Print debug log
                 for string in debug_log_data:
                     print(f"[Debug] {string}")
@@ -3451,7 +3532,7 @@ class Board(Window):
                 round(self.highlight.center_x), round(self.highlight.center_y),  MOUSE_BUTTON_RIGHT, modifiers
             )
 
-    def load_save_data(self, path: str | None = None, with_history: bool = False) -> None:
+    def load(self, path: str | None, with_history: bool = False) -> None:
         if not path:
             return
         update_mode = abs(self.board_config['save_update_mode'])
@@ -3463,17 +3544,35 @@ class Board(Window):
             save_path = join(base_dir, path)
             if not isfile(save_path):
                 return
-            if not should_update:
-                self.load_board(save_path, with_history=with_history)
-                return
-            self.load_board(save_path, with_history=update_mode & 2)
+            self.log(f"[Ply {self.ply_count}] Info: Loading from {path}")
+            with open(save_path, mode='r', encoding='utf-8') as file:
+                save_data = file.read()
+            self.load_board(save_data, with_history=update_mode & 1 if should_update else with_history)
             if self.save_loaded:
-                self.save_board(path=save_path, partial=not update_mode & 1)
+                self.load_data = save_data
+                self.load_path = save_path
+                if should_update:
+                    self.save(save_path)
         except Exception:
+            self.log(f"[Ply {self.ply_count}] Error: Failed to load from {path}")
             print_exc()
 
+    def save(self, path: str | None, auto: bool = False) -> None:
+        if not path:
+            return
+        data = self.dump_board()
+        if auto and data == self.save_data:
+            return
+        makedirs(dirname(path), exist_ok=True)
+        with open(path, mode='w', encoding='utf-8') as file:
+            file.write(data)
+        self.save_data = data
+        self.save_path = path
+        saved = 'Auto-saved' if auto else 'Saved'
+        self.log(f"[Ply {self.ply_count}] Info: {saved} to {path}")
+
     def auto_save(self) -> None:
-        self.save_board(get_filename('autosave', 'json', in_dir=join(base_dir, 'auto')), partial=True)
+        self.save(get_filename('autosave', 'json', in_dir=join(base_dir, 'auto')), auto=True)
 
     def log(self, string: str) -> None:
         self.log_data.append(string)
@@ -3498,19 +3597,19 @@ class Board(Window):
         if not self.use_check:
             self.log(f"[Ply {self.ply_count}] Info: Checks disabled (capture the royal piece to win)")
 
-    def save_log(self, log_data: list[str] | None = None, log_name: str = "log") -> None:
+    def save_log(self, log_data: list[str] | None = None, log_name: str = 'log') -> None:
         if not log_data:
             log_data = self.log_data
         if log_data:
             with open(get_filename(log_name, 'txt'), mode='w', encoding='utf-8') as log_file:
-                log_file.write("\n".join(log_data))
+                log_file.write('\n'.join(log_data))
 
     def clear_log(self, console: bool = True, file: bool = False) -> None:
         self.log(f"[Ply {self.ply_count}] Info: Log cleared")
         if file:
             self.log_data.clear()
         if console:
-            system("cls" if os_name == "nt" else "clear")
+            system('cls' if os_name == 'nt' else 'clear')
 
     def save_config(self) -> None:
         config = copy(self.board_config)
@@ -3617,20 +3716,20 @@ class Board(Window):
         debug_log_data.append(f"Castling EP target: {castling_ep_pos}")
         castling_ep_squares = ', '.join(toa(xy) for xy in sorted(self.castling_ep_markers)) or 'None'
         debug_log_data.append(f"Castling EP squares ({len(self.castling_ep_markers)}): {castling_ep_squares}")
-        piece_modes = {0: 'Shown', 1: 'Hidden', 2: 'Penultima'}
+        piece_modes = {0: "Shown", 1: "Hidden", 2: "Penultima"}
         debug_log_data.append(f"Hide pieces: {self.should_hide_pieces} - {piece_modes[self.should_hide_pieces]}")
-        move_modes = {None: 'Default', False: 'Shown', True: 'Hidden'}
+        move_modes = {None: "Default", False: "Shown", True: "Hidden"}
         debug_log_data.append(f"Hide moves: {self.should_hide_moves} - {move_modes[self.should_hide_moves]}")
-        check_modes = {False: 'Capture the royal piece to win', True: 'Checkmate the royal piece to win'}
+        check_modes = {False: "Capture the royal piece to win", True: "Checkmate the royal piece to win"}
         debug_log_data.append(f"Use check: {self.use_check} - {check_modes[self.use_check]}")
-        royal_modes = {0: 'Default', 1: 'Force royal (Threaten Any)', 2: 'Force quasi-royal (Threaten Last)'}
+        royal_modes = {0: "Default", 1: "Force royal (Threaten Any)", 2: "Force quasi-royal (Threaten Last)"}
         debug_log_data.append(f"Royal mode: {self.royal_piece_mode} - {royal_modes[self.royal_piece_mode]}")
         chaos_modes = {
-            0: 'Off',
-            1: 'Chaos (Matching Pieces)',
-            2: 'Chaos (Matching Pieces), Asymmetrical',
-            3: 'Extreme Chaos (Any Pieces)',
-            4: 'Extreme Chaos (Any Pieces), Asymmetrical'
+            0: "Off",
+            1: "Chaos (Matching Pieces)",
+            2: "Chaos (Matching Pieces), Asymmetrical",
+            3: "Extreme Chaos (Any Pieces)",
+            4: "Extreme Chaos (Any Pieces), Asymmetrical"
         }
         debug_log_data.append(f"Chaos mode: {self.chaos_mode} - {chaos_modes[self.chaos_mode]}")
         debug_log_data.append(f"Board mode: {'Edit' if self.edit_mode else 'Play'}")
@@ -3693,7 +3792,7 @@ class Board(Window):
         return debug_log_data
 
     def run(self):
-        if self.board_config['save_update_mode'] < 0 and self.save_data is not None:
+        if self.board_config['save_update_mode'] < 0 and self.load_data is not None:
             self.close()
         else:
             self.set_visible()
