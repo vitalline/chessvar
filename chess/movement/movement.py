@@ -531,8 +531,9 @@ class ChainMovement(BaseMultiMovement):
             return ()
         if theoretical:
             for move in self.movements[index].moves(pos_from, piece, theoretical):
+                yield copy(move)
                 for chained_move in self.moves(move.pos_to, piece, theoretical, index + 1):
-                    yield copy(move).set(pos_to=chained_move.pos_to)
+                    yield copy(chained_move).set(pos_from=move.pos_from)
         else:
             for move in self.movements[index].moves(pos_from, piece, theoretical):
                 self.board.update_move(move)  # this is most likely SUPER inefficient but i've spent about a day on this

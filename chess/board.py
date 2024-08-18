@@ -1056,10 +1056,14 @@ class Board(Window):
             success = self.reload_history()
             if not success:
                 self.log(f"[Ply {self.ply_count}] Error: Failed to reload history!")
+        else:
+            self.log(f"[Ply {self.ply_count}] Info: {self.turn_side} to move")
         if self.edit_mode:
             self.log(f"[Ply {self.ply_count}] Mode: EDIT")
-        if not with_history:
-            self.log(f"[Ply {self.ply_count}] Info: {self.turn_side} to move")
+            self.moves = {side: {} for side in self.moves}
+            self.chain_moves = {side: {} for side in self.chain_moves}
+            self.theoretical_moves = {side: {} for side in self.theoretical_moves}
+            self.show_moves()
 
         if not success:
             return
@@ -1823,10 +1827,12 @@ class Board(Window):
                 self.probabilistic_piece_history = self.probabilistic_piece_history[:self.ply_count - 1]
 
     def reload_history(self) -> bool:
+        edit_mode = self.edit_mode
         selection = self.selected_square
         self.reset_board(log=False)
         if not self.future_move_history:
             self.select_piece(selection)
+            self.edit_mode = edit_mode
             return True
         future_move_history = self.future_move_history
         self.future_move_history = []
@@ -1920,6 +1926,7 @@ class Board(Window):
                 break
         if finished:
             self.select_piece(selection)
+            self.edit_mode = edit_mode
         return finished
 
     def move(self, move: Move) -> None:
@@ -3372,6 +3379,11 @@ class Board(Window):
             if modifiers & key.MOD_ACCEL and modifiers & key.MOD_SHIFT:  # Fast-forward, but slowly. (Reload history)
                 self.log(f"[Ply {self.ply_count}] Info: Starting new game")
                 self.reload_history()
+                if self.edit_mode:
+                    self.moves = {side: {} for side in self.moves}
+                    self.chain_moves = {side: {} for side in self.chain_moves}
+                    self.theoretical_moves = {side: {} for side in self.theoretical_moves}
+                    self.show_moves()
         if symbol == key.G and not self.is_trickster_mode():  # Graphics
             old_color_index = self.color_index
             if modifiers & key.MOD_ACCEL and not modifiers & key.MOD_SHIFT:  # Graphics reset
