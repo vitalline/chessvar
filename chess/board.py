@@ -1694,7 +1694,8 @@ class Board(Window):
             self.clear_castling_ep()
 
     def update_move(self, move: Move) -> None:
-        move.set(piece=self.get_piece(move.pos_from))
+        if move.pos_from:
+            move.set(piece=self.get_piece(move.pos_from))
         new_piece = move.swapped_piece or move.captured_piece
         new_piece = self.get_piece(new_piece.board_pos if new_piece is not None else move.pos_to)
         if move.piece != new_piece and not new_piece.is_empty():
