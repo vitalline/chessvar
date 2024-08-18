@@ -891,7 +891,8 @@ class Board(Window):
         square_size = data.get('square_size', self.square_size)
         if self.square_size != square_size:
             self.log(
-                f"Ply {self.ply_count}] Error: Square size does not match (was {square_size}, but is {self.square_size})"
+                f"Ply {self.ply_count}] Error: Square size does not match "
+                f"(was {square_size}, but is {self.square_size})"
             )
 
         self.color_index = data.get('color_index', self.color_index)
