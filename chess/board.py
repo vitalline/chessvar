@@ -3106,10 +3106,10 @@ class Board(Window):
             if modifiers & key.MOD_ALT:  # Reload save data
                 data = self.save_data if modifiers & key.MOD_SHIFT else self.load_data
                 if data is not None:
-                    which = 'saved' if modifiers & key.MOD_SHIFT else 'loaded'
+                    whence = 'saved to' if modifiers & key.MOD_SHIFT else 'loaded from'
                     path = self.save_path if modifiers & key.MOD_SHIFT else self.load_path
-                    at = 'at' if isfile(path) else 'was at'
-                    self.log(f"[Ply {self.ply_count}] Info: Reloading last {which} data ({at} {path})")
+                    state = '' if isfile(path) else '(deleted) '
+                    self.log(f"[Ply {self.ply_count}] Info: Reloading data {whence} {state}{path}")
                     self.load_board(data)
             elif modifiers & key.MOD_SHIFT:  # Randomize piece sets
                 blocked_ids = set(self.board_config['block_ids'])
