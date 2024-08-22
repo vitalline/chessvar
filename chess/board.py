@@ -880,7 +880,7 @@ class Board(Window):
         board_size = tuple(data.get('board_size', (self.board_width, self.board_height)))
         if (self.board_width, self.board_height) != board_size:
             self.log(
-                f"Ply {self.ply_count}] Error: Board size does not match (was {board_size}, "
+                f"[Ply {self.ply_count}] Error: Board size does not match (was {board_size}, "
                 f"but is {(self.board_width, self.board_height)})"
             )
 
@@ -891,7 +891,7 @@ class Board(Window):
         square_size = data.get('square_size', self.square_size)
         if self.square_size != square_size:
             self.log(
-                f"Ply {self.ply_count}] Error: Square size does not match "
+                f"[Ply {self.ply_count}] Error: Square size does not match "
                 f"(was {square_size}, but is {self.square_size})"
             )
 
@@ -900,17 +900,19 @@ class Board(Window):
         old_color_scheme = data.get('color_scheme', self.color_scheme)
         for k, v in self.color_scheme.items():
             old = old_color_scheme.get(k)
-            old = 'undefined' if old is None else tuple(old) if isinstance(v, tuple) else old
+            old = None if old is None else tuple(old) if isinstance(v, tuple) else old
             if v != old:
-                self.color_scheme[k] = v if old == 'undefined' else old  # first time when we can fully restore old data
+                self.color_scheme[k] = v if old is None else old  # first time when we attempt to fully restore old data
                 # in all cases before we had to pick one or the other, but here we can try to reload the save faithfully
                 if self.color_index is not None:  # show warning if the defined color scheme doesn't match the saved one
-                    self.log(f"Ply {self.ply_count}] Error: Color scheme doesn't match ({k} was {old}, but is {v})")
-        for k, v in old_color_scheme.items():
+                    old = 'undefined' if old is None else old
+                    self.log(f"[Ply {self.ply_count}] Error: Color scheme doesn't match ({k} was {old}, but is {v})")
+        for k, old in old_color_scheme.items():
             if k not in self.color_scheme:
-                self.color_scheme[k] = v
+                self.color_scheme[k] = old
                 if self.color_index is not None:
-                    self.log(f"Ply {self.ply_count}] Error: Color scheme doesn't match ({k} was {v}, but is undefined)")
+                    v = 'undefined'
+                    self.log(f"[Ply {self.ply_count}] Error: Color scheme doesn't match ({k} was {old}, but is {v})")
 
         self.board_config['block_ids'] = data.get('set_blocklist', self.board_config['block_ids'])
         self.board_config['block_ids_chaos'] = data.get('chaos_blocklist', self.board_config['block_ids_chaos'])
@@ -956,7 +958,7 @@ class Board(Window):
                     # this can mean a few things, namely the RNG implementation changing or new sets/pieces being added.
                     # either way, we should at least try to load the old pieces defined in the save to recreate the game
                     self.log(
-                        f"Ply {self.ply_count}] Error: Piece set does not match "
+                        f"[Ply {self.ply_count}] Error: Piece set does not match "
                         f"({side}: {toa(((0 if side == Side.WHITE else 7), i))} "
                         f"was {pair[0].name}, but is {pair[1].name})"
                     )
