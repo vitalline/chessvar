@@ -12,5 +12,6 @@
 /**/log_*.txt
 /**/log_*.json
 /**/save_*.json
+/**/verbose_*.txt
 *.ini
 *.spec

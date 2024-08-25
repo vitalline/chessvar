@@ -28,6 +28,7 @@ DEFAULT_CONFIG = {
         'autosave_act': 0,
         'autosave_ply': 0,
         'autosave_time': 0,
+        'verbose': True,
     },
 }
 

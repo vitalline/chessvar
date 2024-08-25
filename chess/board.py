@@ -415,7 +415,9 @@ class Board(Window):
         self.color_index = self.board_config['color_id'] or 0  # index of the current color scheme
         self.color_scheme = colors[self.color_index]  # current color scheme
         self.background_color = self.color_scheme['background_color']  # background color
-        self.log_data = []  # list of presently logged strings
+        self.log_data = []  # list of important logged strings
+        self.verbose_data = []  # list of all logged strings
+        self.verbose = self.board_config['verbose']  # whether to use verbose data for console output
         self.load_data = None  # last loaded data
         self.load_path = None  # path to the last loaded data file
         self.save_data = None  # last saved data
@@ -527,6 +529,12 @@ class Board(Window):
             else base_rng.randint(0, max_seed)
         )
         self.chaos_rng = Random(self.chaos_seed)
+
+        # log verbose data
+        self.log(f"[Ply {self.ply_count}] Info: Verbose output: {'ON' if self.verbose else 'OFF'}", False)
+        self.log(f"[Ply {self.ply_count}] Info: Roll seed: {self.roll_seed}", False)
+        self.log(f"[Ply {self.ply_count}] Info: Piece set seed: {self.set_seed}", False)
+        self.log(f"[Ply {self.ply_count}] Info: Chaos set seed: {self.chaos_seed}", False)
 
         # initialize row/column labels
         label_kwargs = {
@@ -1060,9 +1068,9 @@ class Board(Window):
             if not success:
                 self.log(f"[Ply {self.ply_count}] Error: Failed to reload history!")
         else:
-            self.log(f"[Ply {self.ply_count}] Info: {self.turn_side} to move")
+            self.log(f"[Ply {self.ply_count}] Info: {self.turn_side} to move", False)
         if self.edit_mode:
-            self.log(f"[Ply {self.ply_count}] Mode: EDIT")
+            self.log(f"[Ply {self.ply_count}] Mode: EDIT", False)
             self.moves = {side: {} for side in self.moves}
             self.chain_moves = {side: {} for side in self.chain_moves}
             self.theoretical_moves = {side: {} for side in self.theoretical_moves}
@@ -1110,7 +1118,7 @@ class Board(Window):
         self.log(f"[Ply {self.ply_count}] Info: Board cleared")
         self.ply_count += 1
         if not self.edit_mode:
-            self.log(f"[Ply {self.ply_count}] Mode: EDIT")
+            self.log(f"[Ply {self.ply_count}] Mode: EDIT", False)
         self.edit_mode = True
 
         self.edit_piece_set_id = self.board_config['edit_id']
@@ -2696,15 +2704,18 @@ class Board(Window):
         min_width, min_height = (self.board_width + 2) * min_size, (self.board_height + 2) * min_size
         self.set_visible(False)
         self.set_size(round(max(width, min_width)), round(max(height, min_height)))
+        self.log(f"[Ply {self.ply_count}] Info: Resized to {self.width}x{self.height}", False)
         self.set_location(x - (self.width - old_width) // 2, y - (self.height - old_height) // 2)
         self.set_visible(True)
 
     def toggle_fullscreen(self) -> None:
         if self.fullscreen:
+            self.log(f"[Ply {self.ply_count}] Info: Fullscreen disabled", False)
             self.set_fullscreen(False)
             return
         screens = get_screens()
         if len(screens) == 1:
+            self.log(f"[Ply {self.ply_count}] Info: Fullscreen enabled", False)
             self.set_fullscreen()
             return
         pos, size = self.get_location(), self.get_size()
@@ -2717,7 +2728,9 @@ class Board(Window):
                 max(0, min(screen_max[1], pos_max[1]) - max(screen_min[1], pos_min[1]))
             )
             portions.append(portion)
-        self.set_fullscreen(screen=screens[portions.index(max(portions))])
+        screen = portions.index(max(portions))
+        self.log(f"[Ply {self.ply_count}] Info: Fullscreen enabled on screen {screen + 1}", False)
+        self.set_fullscreen(screen=screens[screen])
 
     def set_visible(self, visible: bool = True) -> None:
         if self.board_config['save_update_mode'] < 0 and self.load_data is not None:
@@ -3102,6 +3115,7 @@ class Board(Window):
             else:  # Save as
                 self.deactivate()
                 self.draw(0)
+                self.log(f"[Ply {self.ply_count}] Info: Selecting a file to save to", False)
                 save_path = select_save_name()
                 self.save(save_path)
                 self.activate()
@@ -3118,23 +3132,30 @@ class Board(Window):
                 blocked_ids = set(self.board_config['block_ids'])
                 piece_set_ids = list(i for i in range(len(piece_groups)) if i not in blocked_ids)
                 if modifiers & key.MOD_ACCEL:  # Randomize piece sets (same for both sides)
-                    self.log(f"[Ply {self.ply_count}] Info: Starting new game (with a random piece set)")
+                    self.log(
+                        f"[Ply {self.ply_count}] Info: Starting new game (with a random piece set)",
+                        bool(self.should_hide_pieces)
+                    )
                     piece_set_ids = self.set_rng.sample(piece_set_ids, k=1)
                     self.piece_set_ids = {side: piece_set_ids[0] for side in self.piece_set_ids}
                 else:  # Randomize piece sets (different for each side)
-                    self.log(f"[Ply {self.ply_count}] Info: Starting new game (with random piece sets)")
+                    self.log(
+                        f"[Ply {self.ply_count}] Info: Starting new game (with random piece sets)",
+                        bool(self.should_hide_pieces)
+                    )
                     piece_set_ids = self.set_rng.sample(piece_set_ids, k=len(self.piece_set_ids))
                     self.piece_set_ids = {side: set_id for side, set_id in zip(self.piece_set_ids, piece_set_ids)}
                 self.chaos_mode = 0
                 self.reset_board(update=True)
             elif modifiers & key.MOD_ACCEL:  # Restart with the same piece sets
-                self.log(f"[Ply {self.ply_count}] Info: Starting new game")
+                self.log(f"[Ply {self.ply_count}] Info: Starting new game", bool(self.should_hide_pieces))
                 self.reset_board()
         if symbol == key.C:
             if modifiers & (key.MOD_SHIFT | key.MOD_ALT):  # Chaos mode
                 self.load_chaos_sets(1 + bool(modifiers & key.MOD_ALT), modifiers & key.MOD_ACCEL)
             elif modifiers & key.MOD_ACCEL:  # Config
                 self.save_config()
+                self.log(f"[Ply {self.ply_count}] Info: Configuration saved", False)
         if symbol == key.X:
             if modifiers & (key.MOD_SHIFT | key.MOD_ALT):  # Extreme chaos mode
                 self.load_chaos_sets(3 + bool(modifiers & key.MOD_ALT), modifiers & key.MOD_ACCEL)
@@ -3187,7 +3208,7 @@ class Board(Window):
                 self.empty_board()
             if modifiers & key.MOD_ACCEL:  # Edit mode (toggle)
                 self.edit_mode = not self.edit_mode
-                self.log(f"[Ply {self.ply_count}] Mode: {'EDIT' if self.edit_mode else 'PLAY'}")
+                self.log(f"[Ply {self.ply_count}] Mode: {'EDIT' if self.edit_mode else 'PLAY'}", False)
                 self.deselect_piece()
                 self.hide_moves()
                 self.advance_turn()
@@ -3203,7 +3224,10 @@ class Board(Window):
                 if not self.should_hide_pieces:
                     set_name = piece_groups[self.piece_set_ids[Side.WHITE]].get('name')
                     set_name_suffix = f" ({set_name})"
-                self.log(f"[Ply {self.ply_count}] Info: Using default piece set for White{set_name_suffix}")
+                self.log(
+                    f"[Ply {self.ply_count}] Info: Using default piece set for White{set_name_suffix}",
+                    bool(self.should_hide_pieces)
+                )
                 self.reset_board(update=True)
             elif modifiers & key.MOD_ACCEL and not modifiers & key.MOD_SHIFT:  # White is in control
                 if self.turn_side != Side.WHITE and not self.chain_start:
@@ -3229,7 +3253,10 @@ class Board(Window):
                     else:
                         set_name = piece_groups[self.piece_set_ids[Side.WHITE]].get('name')
                     set_name_suffix = f" ({set_name})"
-                self.log(f"[Ply {self.ply_count}] Info: Using {which} piece set for White{set_name_suffix}")
+                self.log(
+                    f"[Ply {self.ply_count}] Info: Using {which} piece set for White{set_name_suffix}",
+                    bool(self.should_hide_pieces)
+                )
                 self.reset_board(update=True)
         if symbol == key.B:  # Black
             if modifiers & key.MOD_ALT:  # Reset black set to default
@@ -3238,7 +3265,10 @@ class Board(Window):
                 if not self.should_hide_pieces:
                     set_name = piece_groups[self.piece_set_ids[Side.BLACK]].get('name')
                     set_name_suffix = f" ({set_name})"
-                self.log(f"[Ply {self.ply_count}] Info: Using default piece set for Black{set_name_suffix}")
+                self.log(
+                    f"[Ply {self.ply_count}] Info: Using default piece set for Black{set_name_suffix}",
+                    bool(self.should_hide_pieces)
+                )
                 self.reset_board(update=True)
             elif modifiers & key.MOD_ACCEL and not modifiers & key.MOD_SHIFT:  # Black is in control
                 if self.turn_side != Side.BLACK and not self.chain_start:
@@ -3264,7 +3294,10 @@ class Board(Window):
                     else:
                         set_name = piece_groups[self.piece_set_ids[Side.BLACK]].get('name')
                     set_name_suffix = f" ({set_name})"
-                self.log(f"[Ply {self.ply_count}] Info: Using {which} piece set for Black{set_name_suffix}")
+                self.log(
+                    f"[Ply {self.ply_count}] Info: Using {which} piece set for Black{set_name_suffix}",
+                    bool(self.should_hide_pieces)
+                )
                 self.reset_board(update=True)
         if symbol == key.N:  # Next
             if modifiers & key.MOD_ALT:  # Reset white and black sets to default
@@ -3274,7 +3307,10 @@ class Board(Window):
                 if not self.should_hide_pieces:
                     set_name = piece_groups[self.piece_set_ids[Side.WHITE]].get('name')
                     set_name_suffix = f" ({set_name})"
-                self.log(f"[Ply {self.ply_count}] Info: Using default piece set{set_name_suffix}")
+                self.log(
+                    f"[Ply {self.ply_count}] Info: Using default piece set{set_name_suffix}",
+                    bool(self.should_hide_pieces)
+                )
                 self.reset_board(update=True)
             elif modifiers & key.MOD_ACCEL and not modifiers & key.MOD_SHIFT and not self.chain_start:  # Next player
                 self.move_history.append(None)
@@ -3308,7 +3344,10 @@ class Board(Window):
                         else:
                             set_name = piece_groups[self.piece_set_ids[Side.WHITE]].get('name')
                         set_name_suffix = f" ({set_name})"
-                    self.log(f"[Ply {self.ply_count}] Info: Using {which} piece set{set_name_suffix}")
+                    self.log(
+                        f"[Ply {self.ply_count}] Info: Using {which} piece set{set_name_suffix}",
+                        bool(self.should_hide_pieces)
+                    )
                 else:  # Next player goes first
                     for data in (self.piece_sets, self.piece_set_ids, self.piece_set_names):
                         data[Side.WHITE], data[Side.BLACK] = data[Side.BLACK], data[Side.WHITE]
@@ -3316,7 +3355,10 @@ class Board(Window):
                     if not self.should_hide_pieces:
                         set_names = [self.piece_set_names[side] for side in (Side.WHITE, Side.BLACK)]
                         set_name_suffix = f" ({' vs. '.join(set_names)})"
-                    self.log(f"[Ply {self.ply_count}] Info: Swapping piece sets{set_name_suffix}")
+                    self.log(
+                        f"[Ply {self.ply_count}] Info: Swapping piece sets{set_name_suffix}",
+                        bool(self.should_hide_pieces)
+                    )
                 self.reset_board(update=True)
         if symbol == key.P:  # Promotion
             if self.edit_mode:
@@ -3331,7 +3373,7 @@ class Board(Window):
                         which = 'default'
                     set_name = piece_groups[self.edit_piece_set_id].get('name')
                     set_name_suffix = f" ({set_name})"
-                    self.log(f"[Ply {self.ply_count}] Info: Placing from {which} piece set{set_name_suffix}")
+                    self.log(f"[Ply {self.ply_count}] Info: Placing from {which} piece set{set_name_suffix}", False)
                 elif modifiers & key.MOD_ACCEL:  # Reset promotion piece set
                     self.edit_piece_set_id = None
                     set_names = [self.piece_set_names[side] for side in (Side.WHITE, Side.BLACK)]
@@ -3339,7 +3381,7 @@ class Board(Window):
                     set_name_suffix = f"{'s' * (len(set_names) > 1)}"
                     if not self.should_hide_pieces:
                         set_name_suffix += f" ({' vs. '.join(set_names)})"
-                    self.log(f"[Ply {self.ply_count}] Info: Placing from current piece set{set_name_suffix}")
+                    self.log(f"[Ply {self.ply_count}] Info: Placing from current piece set{set_name_suffix}", False)
                 if old_id != self.edit_piece_set_id:
                     self.reset_edit_promotions()
                     if self.promotion_piece:
@@ -3376,11 +3418,15 @@ class Board(Window):
         if symbol == key.F:
             if modifiers & key.MOD_ACCEL and not modifiers & key.MOD_SHIFT:  # Flip board
                 self.flip_board()
+                self.log(f"[Ply {self.ply_count}] Info: Board flipped", False)
             if not modifiers & key.MOD_ACCEL and modifiers & key.MOD_SHIFT:  # Fast-forward
+                if self.future_move_history:
+                    self.log(f"[Ply {self.ply_count}] Info: Fast-forwarding", False)
                 while self.future_move_history:
                     self.redo_last_move()
             if modifiers & key.MOD_ACCEL and modifiers & key.MOD_SHIFT:  # Fast-forward, but slowly. (Reload history)
-                self.log(f"[Ply {self.ply_count}] Info: Starting new game")
+                self.log(f"[Ply {self.ply_count}] Info: Reloading history", False)
+                self.log(f"[Ply {self.ply_count}] Info: Starting new game", bool(self.should_hide_pieces))
                 self.reload_history()
                 if self.edit_mode:
                     self.moves = {side: {} for side in self.moves}
@@ -3389,14 +3435,20 @@ class Board(Window):
                     self.show_moves()
         if symbol == key.G and not self.is_trickster_mode():  # Graphics
             old_color_index = self.color_index
+            which = 'current'
             if modifiers & key.MOD_ACCEL and not modifiers & key.MOD_SHIFT:  # Graphics reset
                 self.color_index = 0
+                which = 'default'
             elif modifiers & key.MOD_SHIFT:  # Graphics shift
                 if self.color_index is None:
                     self.color_index = 0
+                    which = 'default'
                 else:
-                    self.color_index = (self.color_index + (-1 if modifiers & key.MOD_ACCEL else 1)) % len(colors)
+                    d = -1 if modifiers & key.MOD_ACCEL else 1
+                    self.color_index = (self.color_index + d) % len(colors)
+                    which = {-1: 'previous', 1: 'next'}[d]
             if old_color_index != self.color_index:
+                self.log(f"[Ply {self.ply_count}] Info: Using {which} color scheme (ID {self.color_index})", False)
                 self.color_scheme = colors[self.color_index]
                 self.update_colors()
         if symbol == key.H:  # Hide
@@ -3432,11 +3484,11 @@ class Board(Window):
                 self.should_hide_moves = False
             if old_should_hide_moves != self.should_hide_moves:
                 if self.should_hide_moves is None:
-                    self.log(f"[Ply {self.ply_count}] Info: Move markers default to piece visibility")
+                    self.log(f"[Ply {self.ply_count}] Info: Move markers default to piece visibility", False)
                 elif self.should_hide_moves is False:
-                    self.log(f"[Ply {self.ply_count}] Info: Move markers default to shown")
+                    self.log(f"[Ply {self.ply_count}] Info: Move markers default to shown", False)
                 elif self.should_hide_moves is True:
-                    self.log(f"[Ply {self.ply_count}] Info: Move markers default to hidden")
+                    self.log(f"[Ply {self.ply_count}] Info: Move markers default to hidden", False)
                 else:
                     self.should_hide_moves = old_should_hide_moves
                 self.update_pieces()
@@ -3444,13 +3496,13 @@ class Board(Window):
         if symbol == key.K and not self.should_hide_moves:  # Move markers
             selected_square = self.selected_square
             if modifiers & key.MOD_ACCEL and modifiers & key.MOD_SHIFT:  # Default
-                self.log(f"[Ply {self.ply_count}] Info: Showing legal moves for moving player")
+                self.log(f"[Ply {self.ply_count}] Info: Showing legal moves for moving player", False)
                 self.load_moves(False)
             elif modifiers & key.MOD_ACCEL:  # Valid moves
-                self.log(f"[Ply {self.ply_count}] Info: Showing legal moves for both players")
+                self.log(f"[Ply {self.ply_count}] Info: Showing legal moves for both players", False)
                 self.load_moves(False, Side.ANY, Side.NONE)
             elif modifiers & key.MOD_SHIFT:  # Theoretical moves
-                self.log(f"[Ply {self.ply_count}] Info: Showing all possible moves for both players")
+                self.log(f"[Ply {self.ply_count}] Info: Showing all possible moves for both players", False)
                 self.load_moves(False, Side.NONE, Side.ANY)
             if selected_square:
                 self.select_piece(selected_square)
@@ -3472,21 +3524,30 @@ class Board(Window):
             if modifiers & key.MOD_ALT:  # Load save data
                 self.deactivate()
                 self.draw(0)
+                self.log(f"[Ply {self.ply_count}] Info: Selecting a file to load from", False)
                 self.load(select_save_data(), with_history=modifiers & key.MOD_SHIFT)
                 self.activate()
             else:  # Log
-                if modifiers & key.MOD_ACCEL:  # Save log
+                if modifiers & key.MOD_ACCEL and modifiers & key.MOD_SHIFT:  # Toggle verbose
+                    self.verbose = not self.verbose
+                    self.log(f"[Ply {self.ply_count}] Info: Verbose output: {'ON' if self.verbose else 'OFF'}", False)
+                elif modifiers & key.MOD_ACCEL:  # Save log
+                    self.log(f"[Ply {self.ply_count}] Info: Saving log", False)
                     self.save_log()
-                if modifiers & key.MOD_SHIFT:  # Clear log
-                    self.clear_log()
+                elif modifiers & key.MOD_SHIFT:  # Save verbose log
+                    self.log(f"[Ply {self.ply_count}] Info: Saving verbose log", False)
+                    self.save_log(self.verbose_data, 'verbose')
         if symbol == key.D:  # Debug
             debug_log_data = self.debug_info()
             if modifiers & key.MOD_ACCEL:  # Save debug log
+                self.log(f"[Ply {self.ply_count}] Info: Saving debug log", False)
                 self.save_log(debug_log_data, 'debug')
             if modifiers & key.MOD_SHIFT:  # Print debug log
+                self.log(f"[Ply {self.ply_count}] Info: Printing debug log", False)
                 for string in debug_log_data:
                     print(f"[Debug] {string}")
             if modifiers & key.MOD_ALT:  # Save debug listings
+                self.log(f"[Ply {self.ply_count}] Info: Saving debug listings", False)
                 save_piece_data(self)
                 save_piece_sets()
                 save_piece_types()
@@ -3497,6 +3558,7 @@ class Board(Window):
             if modifiers & key.MOD_SHIFT:  # Random piece
                 self.deselect_piece()
                 if moves:
+                    self.log(f"[Ply {self.ply_count}] Info: Selecting a random piece", False)
                     self.select_piece(base_rng.choice(list(moves.keys())))
             if modifiers & key.MOD_ACCEL:  # Random move
                 if self.game_over:
@@ -3507,6 +3569,8 @@ class Board(Window):
                     else sum(moves.values(), [])  # Pick from all possible moves
                 )
                 if choices:
+                    suffix = ' with selected piece' if self.selected_square else ''
+                    self.log(f"[Ply {self.ply_count}] Info: Making a random move{suffix}", False)
                     move = base_rng.choice(choices)
                     self.update_auto_capture_markers(move)
                     self.update_auto_captures(move, self.turn_side.opponent())
@@ -3585,14 +3649,17 @@ class Board(Window):
         self.save_data = data
         self.save_path = path
         saved = 'Auto-saved' if auto else 'Saved'
-        self.log(f"[Ply {self.ply_count}] Info: {saved} to {path}")
+        self.log(f"[Ply {self.ply_count}] Info: {saved} to {path}", False)
 
     def auto_save(self) -> None:
         self.save(get_filename('autosave', 'json', in_dir=join(base_dir, 'auto')), auto=True)
 
-    def log(self, string: str) -> None:
-        self.log_data.append(string)
-        print(string)
+    def log(self, string: str, important: bool = True) -> None:
+        self.verbose_data.append(string)
+        if important:
+            self.log_data.append(string)
+        if important or self.verbose:
+            print(string)
 
     def log_armies(self):
         self.log(
@@ -3620,12 +3687,14 @@ class Board(Window):
             with open(get_filename(log_name, 'txt'), mode='w', encoding='utf-8') as log_file:
                 log_file.write('\n'.join(log_data))
 
-    def clear_log(self, console: bool = True, file: bool = False) -> None:
-        self.log(f"[Ply {self.ply_count}] Info: Log cleared")
-        if file:
-            self.log_data.clear()
+    def clear_log(self, console: bool = True, log: bool = True, verbose: bool = True) -> None:
+        self.log(f"[Ply {self.ply_count}] Info: Log cleared", False)
         if console:
             system('cls' if os_name == 'nt' else 'clear')
+        if log:
+            self.log_data.clear()
+        if verbose:
+            self.verbose_data.clear()
 
     def save_config(self) -> None:
         config = copy(self.board_config)
@@ -3640,6 +3709,7 @@ class Board(Window):
         config['roll_seed'] = self.roll_seed
         config['chaos_seed'] = self.chaos_seed
         config['chaos_mode'] = self.chaos_mode
+        config['verbose'] = self.verbose
         config.save(get_filename('config', 'ini'))
 
     def debug_info(self) -> list[str]:

@@ -67,7 +67,8 @@ Ctrl + Z: undo last move (if any)
 Ctrl + Shift + Z: redo last move (if any)
 Ctrl + Y: redo last move (if any)
 Ctrl + L: save game log
-Shift + L: clear game log
+Shift + L: save verbose game log
+Ctrl + Shift + L: toggle verbose console output
 Alt + L: load saved game state
 Alt + Shift + L: load saved game state and reload move history
 Ctrl + D: save debug log
