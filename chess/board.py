@@ -3130,21 +3130,21 @@ class Board(Window):
                     self.load_board(data)
             elif modifiers & key.MOD_SHIFT:  # Randomize piece sets
                 blocked_ids = set(self.board_config['block_ids'])
-                piece_set_ids = list(i for i in range(len(piece_groups)) if i not in blocked_ids)
+                set_id_list = list(i for i in range(len(piece_groups)) if i not in blocked_ids)
                 if modifiers & key.MOD_ACCEL:  # Randomize piece sets (same for both sides)
                     self.log(
                         f"[Ply {self.ply_count}] Info: Starting new game (with a random piece set)",
                         bool(self.should_hide_pieces)
                     )
-                    piece_set_ids = self.set_rng.sample(piece_set_ids, k=1)
-                    self.piece_set_ids = {side: piece_set_ids[0] for side in self.piece_set_ids}
+                    chosen_id = self.set_rng.sample(set_id_list, k=1)[0]
+                    self.piece_set_ids = {side: chosen_id for side in self.piece_set_ids}
                 else:  # Randomize piece sets (different for each side)
                     self.log(
                         f"[Ply {self.ply_count}] Info: Starting new game (with random piece sets)",
                         bool(self.should_hide_pieces)
                     )
-                    piece_set_ids = self.set_rng.sample(piece_set_ids, k=len(self.piece_set_ids))
-                    self.piece_set_ids = {side: set_id for side, set_id in zip(self.piece_set_ids, piece_set_ids)}
+                    chosen_ids = self.set_rng.sample(set_id_list, k=len(self.piece_set_ids))
+                    self.piece_set_ids = {side: set_id for side, set_id in zip(self.piece_set_ids, chosen_ids)}
                 self.chaos_mode = 0
                 self.reset_board(update=True)
             elif modifiers & key.MOD_ACCEL:  # Restart with the same piece sets
