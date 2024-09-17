@@ -7,6 +7,7 @@ F11: toggle full screen
 Escape: exit application
 Ctrl + S: save game state (without save dialog)
 Ctrl + Shift + S: save game state (with save dialog)
+Alt + S: save current position as starting position
 Ctrl + R: start game with current armies
 Shift + R: start game with new random armies (different for each player)
 Ctrl + Shift + R: start game with a new random army (same for both players)

@@ -486,6 +486,7 @@ class Board(Window):
         self.obstacles = []  # list of obstacles (neutral pieces that block movement and cannot move)
         self.penultima_pieces = {Side.WHITE: {}, Side.BLACK: {}}  # piece textures that are used for penultima mode
         self.custom_pieces = {}  # custom piece types
+        self.custom_layout = {}  # custom starting layout of the board
         self.moves = {Side.WHITE: {}, Side.BLACK: {}}  # dictionary of valid moves from any square
         self.chain_moves = {Side.WHITE: {}, Side.BLACK: {}}  # dictionary of moves chained from a certain move (from/to)
         self.chain_start = None  # move that started the current chain (if any)
@@ -733,19 +734,26 @@ class Board(Window):
             self.pieces += [[]]
 
         for row, col in product(range(self.board_height), range(self.board_width)):
-            piece_type = types[row][col]
-            piece_side = sides[row][col]
-            if isinstance(piece_type, Side):
-                piece_type = self.piece_sets[piece_side][col]
-            self.pieces[row].append(
-                piece_type(
-                    board=self,
-                    board_pos=(row, col),
-                    side=piece_side,
-                    promotions=self.promotions.get(piece_side),
-                    promotion_squares=self.promotion_squares.get(piece_side),
+            if self.custom_layout:
+                self.pieces[row].append(
+                    copy(self.custom_layout[(row, col)])
+                    if (row, col) in self.custom_layout
+                    else NoPiece(self, (row, col))
                 )
-            )
+            else:
+                piece_type = types[row][col]
+                piece_side = sides[row][col]
+                if isinstance(piece_type, Side):
+                    piece_type = self.piece_sets[piece_side][col]
+                self.pieces[row].append(
+                    piece_type(
+                        board=self,
+                        board_pos=(row, col),
+                        side=piece_side,
+                        promotions=self.promotions.get(piece_side),
+                        promotion_squares=self.promotion_squares.get(piece_side),
+                    )
+                )
             if not self.pieces[row][col].is_empty():
                 self.update_piece(self.pieces[row][col])
                 self.pieces[row][col].set_color(
@@ -783,6 +791,7 @@ class Board(Window):
                 for pieces in [*self.movable_pieces.values(), self.obstacles] for p in pieces
             },
             'custom': {k: save_custom_type(v) for k, v in self.custom_pieces.items()},
+            'layout': {toa(pos): save_piece(p.on(None)) for pos, p in self.custom_layout.items()},
             'moves': [save_move(m) for m in self.move_history],
             'future': [save_move(m) for m in self.future_move_history[::-1]],
             'rolls': {n: {toa(pos): d[pos] for pos in sorted(d)} for n, d in enumerate(self.roll_history) if d},
@@ -926,6 +935,7 @@ class Board(Window):
         custom_data = data.get('custom', {})
         self.custom_pieces = {k: load_custom_type(v, k) for k, v in custom_data.items()}
         c = self.custom_pieces
+        self.custom_layout = {(p := fra(k)): load_piece(v, self, c).on(p) for k, v in data.get('layout', {}).items()}
 
         self.chaos_sets = {}
         self.piece_set_ids |= {Side(int(k)): v for k, v in data.get('set_ids', {}).items()}
@@ -1022,7 +1032,9 @@ class Board(Window):
         self.update_colors()
 
         starting = 'Starting new' if with_history else 'Resuming saved'
-        if None in self.piece_set_ids.values():
+        if self.custom_layout:
+            self.log(f"[Ply {self.ply_count}] Info: {starting} game (with custom starting layout)")
+        elif None in self.piece_set_ids.values():
             self.log(f"[Ply {self.ply_count}] Info: {starting} game (with custom piece sets)")
         else:
             some = 'regular' if not self.chaos_mode else 'chaotic'
@@ -3162,11 +3174,17 @@ class Board(Window):
                         return
         if self.held_buttons:
             return
-        if symbol == key.S and modifiers & key.MOD_ACCEL:  # Save data
-            if not modifiers & key.MOD_SHIFT:  # Save
+        if symbol == key.S:  # Save data
+            if modifiers & key.MOD_ALT:  # Save custom layout
+                self.custom_layout = {}
+                for pieces in [*self.movable_pieces.values(), self.obstacles]:
+                    for piece in pieces:
+                        self.custom_layout[piece.board_pos] = copy(piece)
+                self.log(f"[Ply {self.ply_count}] Info: Custom layout saved")
+            elif modifiers & key.MOD_ACCEL and not modifiers & key.MOD_SHIFT:  # Save
                 save_path = get_filename('save', 'json')
                 self.save(save_path)
-            else:  # Save as
+            elif modifiers & key.MOD_ACCEL and modifiers & key.MOD_SHIFT:  # Save as
                 self.deactivate()
                 self.draw(0)
                 self.log(f"[Ply {self.ply_count}] Info: Selecting a file to save to", False)
@@ -3721,6 +3739,9 @@ class Board(Window):
             print(string)
 
     def log_armies(self):
+        if self.custom_layout:
+            self.log(f"[Ply {self.ply_count}] Game: Custom")
+            return
         self.log(
             f"[Ply {self.ply_count}] Game: "
             f"{self.piece_set_names[Side.WHITE] if not self.should_hide_pieces else '???'} vs. "
@@ -3852,6 +3873,17 @@ class Board(Window):
         for piece, data in self.custom_pieces.items():
             debug_log_data.append(f"  '{piece}': {save_custom_type(data)}")
         if not self.custom_pieces:
+            debug_log_data[-1] += " None"
+        debug_log_data.append(f"Custom layout ({len(self.custom_layout)}):")
+        for pos, piece in self.custom_layout.items():
+            suffixes = []
+            if piece.movement and piece.movement.total_moves:
+                suffixes.append(f"Moves: {piece.movement.total_moves}")
+            if piece.is_hidden is False:
+                suffixes.append('Never hide')
+            suffix = f" ({', '.join(suffixes)})" if suffixes else ''
+            debug_log_data.append(f"  {toa(pos)} {pos}: {piece}{suffix}")
+        if not self.custom_layout:
             debug_log_data[-1] += " None"
         en_passant_pos = toa(self.en_passant_target.board_pos) if self.en_passant_target else 'None'
         debug_log_data.append(f"En passant target: {en_passant_pos}")
