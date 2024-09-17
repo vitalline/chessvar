@@ -2750,14 +2750,13 @@ class Board(Window):
             Side.BLACK: {(0, i) for i in range(self.board_width)},
         }
 
-        if self.game_loaded:
-            for row in range(len(self.pieces), self.board_height):
-                self.pieces += [[]]
-            for row in range(self.board_height):
-                for col in range(len(self.pieces[row]), self.board_width):
-                    self.pieces[row].append(NoPiece(self, (row, col)))
-                self.pieces[row] = self.pieces[row][:self.board_width]
-            self.pieces = self.pieces[:self.board_height]
+        for row in range(len(self.pieces), self.board_height):
+            self.pieces += [[]]
+        for row in range(self.board_height):
+            for col in range(len(self.pieces[row]), self.board_width):
+                self.pieces[row].append(NoPiece(self, (row, col)))
+            self.pieces[row] = self.pieces[row][:self.board_width]
+        self.pieces = self.pieces[:self.board_height]
 
         if self.game_loaded or self.board_width != board_width or self.board_height != board_height:
             self.log(f"[Ply {self.ply_count}] Info: Changed board size to {self.board_width}x{self.board_height}")
