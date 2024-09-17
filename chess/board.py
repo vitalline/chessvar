@@ -754,7 +754,7 @@ class Board(Window):
                         promotion_squares=self.promotion_squares.get(piece_side),
                     )
                 )
-            if not self.pieces[row][col].is_empty():
+            if not self.pieces[row][col].is_empty() and not isinstance(self.pieces[row][col], Obstacle):
                 self.update_piece(self.pieces[row][col])
                 self.pieces[row][col].set_color(
                     self.color_scheme.get(
@@ -2399,7 +2399,7 @@ class Board(Window):
             promotion_piece.scale = self.square_size / promotion_piece.texture.width
             if isinstance(promotion_piece, Wall):
                 promotion_piece.scale *= 0.8
-            if not isinstance(promotion_piece, Obstacle):
+            if not promotion_piece.is_empty() and not isinstance(promotion_piece, Obstacle):
                 promotion_piece.set_color(
                     self.color_scheme.get(
                         f"{promotion_piece.side.key()}piece_color",
@@ -2442,7 +2442,7 @@ class Board(Window):
         self.pieces[pos[0]][pos[1]] = new_piece
         self.set_position(new_piece, pos)
         self.update_piece(new_piece)
-        if not isinstance(new_piece, Obstacle):
+        if not new_piece.is_empty() and not isinstance(new_piece, Obstacle):
             new_piece.set_color(
                 self.color_scheme.get(
                     f"{new_piece.side.key()}piece_color",
@@ -2549,7 +2549,9 @@ class Board(Window):
             sprite.color = self.color_scheme['promotion_area_color']
         for sprite in self.promotion_piece_sprite_list:
             if isinstance(sprite, abc.Piece):
-                if sprite.side is not Side.NONE:
+                if isinstance(sprite, Obstacle):
+                    sprite.color = self.color_scheme.get('wall_color', self.color_scheme['background_color'])
+                elif not sprite.is_empty():
                     sprite.set_color(
                         self.color_scheme.get(
                             f"{sprite.side.key()}piece_color",
@@ -2557,8 +2559,6 @@ class Board(Window):
                         ),
                         self.color_scheme['colored_pieces']
                     )
-                elif not sprite.is_empty():
-                    sprite.color = self.color_scheme.get('wall_color', self.color_scheme['background_color'])
         self.color_all_pieces()
         self.selection.color = self.color_scheme['selection_color'] if self.selection.alpha else (0, 0, 0, 0)
         self.highlight.color = self.color_scheme['highlight_color'] if self.highlight.alpha else (0, 0, 0, 0)
