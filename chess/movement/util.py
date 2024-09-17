@@ -114,9 +114,24 @@ def merge(a: list[AnyDirection], b: list[AnyDirection], clash_resolution: ClashR
 UNKNOWN_COORDINATE_STRING = '\u2588' * 2
 
 
+LOWERCASE_OFFSET = ord('a') - 1
+
+
+def to_b26(n: int) -> str:
+    return '' if n == 0 else to_b26((n - 1) // 26) + chr((n - 1) % 26 + LOWERCASE_OFFSET + 1)
+
+
+def from_b26(s: str) -> int:
+    return 0 if not s else from_b26(s[:-1]) * 26 + ord(s[-1]) - LOWERCASE_OFFSET
+
+
 def to_alpha(pos: Position | None) -> str:
-    return UNKNOWN_COORDINATE_STRING if pos is None else chr(pos[1] + 97) + str(pos[0] + 1)
+    return UNKNOWN_COORDINATE_STRING if pos is None else to_b26(pos[1] + 1) + str(pos[0] + 1)
 
 
 def from_alpha(pos: str) -> Position | None:
-    return None if str == UNKNOWN_COORDINATE_STRING else (int(pos[1:]) - 1, ord(pos[0]) - 97)
+    if str == UNKNOWN_COORDINATE_STRING:
+        return None
+    pos = pos.lower()
+    split_index = next((i for i, c in enumerate(pos) if c.isdigit()), len(pos))
+    return int(pos[split_index:]) - 1, from_b26(pos[:split_index]) - 1

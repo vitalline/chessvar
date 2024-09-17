@@ -23,7 +23,7 @@ from chess.color import average, darken, desaturate, lighten, saturate
 from chess.config import Config
 from chess.movement import movement
 from chess.movement.move import Move
-from chess.movement.util import Position, add, to_alpha as toa, from_alpha as fra
+from chess.movement.util import Position, add, to_alpha as toa, from_alpha as fra, to_b26 as b26
 from chess.pieces import piece as abc
 from chess.pieces.groups import classic as fide
 from chess.pieces.groups import amazon as am, amontillado as ao, asymmetry as ay, avian as av
@@ -427,6 +427,7 @@ class Board(Window):
         self.save_data = None  # last saved data
         self.save_path = None  # path to the last saved data file
         self.save_loaded = False  # whether a save was successfully loaded
+        self.game_loaded = False  # whether the game had successfully loaded
         self.skip_mouse_move = 0  # setting this to >=1 skips mouse movement events
         self.highlight_square = None  # square that is being highlighted with the keyboard
         self.hovered_square = None  # square we are currently hovering over
@@ -542,43 +543,13 @@ class Board(Window):
         self.log(f"[Ply {self.ply_count}] Info: Piece set seed: {self.set_seed}", False)
         self.log(f"[Ply {self.ply_count}] Info: Chaos set seed: {self.chaos_seed}", False)
 
-        # initialize row/column labels
-        label_kwargs = {
-            'anchor_x': 'center',
-            'anchor_y': 'center',
-            'font_name': 'Courier New',
-            'font_size': self.square_size / 2,
-            'width': self.square_size / 2,
-            'bold': True,
-            'align': 'center',
-            'color': self.color_scheme['text_color'],
-        }
-
-        for row in range(self.board_height):
-            self.label_list.extend([
-                Text(str(row + 1), *self.get_screen_position((row, -1)), **label_kwargs),
-                Text(str(row + 1), *self.get_screen_position((row, self.board_width)), **label_kwargs)
-            ])
-
-        for col in range(self.board_width):
-            self.label_list.extend([
-                Text(chr(col + ord('a')), *self.get_screen_position((-1, col)), **label_kwargs),
-                Text(chr(col + ord('a')), *self.get_screen_position((self.board_height, col)), **label_kwargs),
-            ])
-
-        # initialize board sprites
-        for row, col in product(range(self.board_height), range(self.board_width)):
-            sprite = Sprite("assets/util/square.png")
-            sprite.color = self.color_scheme[f"{'light' if self.is_light_square((row, col)) else 'dark'}_square_color"]
-            sprite.position = self.get_screen_position((row, col))
-            sprite.scale = self.square_size / sprite.texture.width
-            self.board_sprite_list.append(sprite)
-
-        # set up pieces on the board
+        # set up the board
+        self.resize_board()
         self.load(argv[1] if len(argv) > 1 else None)
         if not self.save_loaded:
             self.reset_board(update=True)
             self.log_special_modes()
+        self.game_loaded = True
 
     def get_board_position(
         self,
@@ -893,18 +864,16 @@ class Board(Window):
         # might have to add more error checking to saving/loading, even if at the cost of slight redundancy.
         # who knows when someone decides to introduce a breaking change and absolutely destroy all the saves
         board_size = tuple(data.get('board_size', (self.board_width, self.board_height)))
-        if (self.board_width, self.board_height) != board_size:
-            self.log(
-                f"[Ply {self.ply_count}] Error: Board size does not match (was {board_size}, "
-                f"but is {(self.board_width, self.board_height)})"
-            )
+        self.resize_board(*board_size)
 
         window_size = data.get('window_size')
+        square_size = data.get('square_size')
         if window_size is not None:
             self.resize(*window_size)
+        elif square_size is not None:
+            self.resize(round((self.board_width + 2) * square_size), round((self.board_height + 2) * square_size))
         self.update_sprites(data.get('flip_mode', self.flip_mode))
-        square_size = data.get('square_size', self.square_size)
-        if self.square_size != square_size:
+        if window_size is not None and square_size is not None and self.square_size != square_size:
             self.log(
                 f"[Ply {self.ply_count}] Error: Square size does not match "
                 f"(was {square_size}, but is {self.square_size})"
@@ -2720,6 +2689,64 @@ class Board(Window):
             for sprite in sprite_list:
                 if isinstance(sprite, abc.Piece) and not sprite.is_empty():
                     sprite.angle = 0
+
+    def resize_board(self, width: int = 0, height: int = 0) -> None:
+        width, height = width or self.board_width, height or self.board_height
+        if self.game_loaded and self.board_width == width and self.board_height == height:
+            return
+        old_width, old_height = self.board_width, self.board_height
+        self.board_width, self.board_height = width, height
+
+        self.board_sprite_list.clear()
+        self.label_list.clear()
+
+        label_kwargs = {
+            'anchor_x': 'center',
+            'anchor_y': 'center',
+            'font_name': 'Courier New',
+            'font_size': self.square_size / 2,
+            'bold': True,
+            'align': 'center',
+            'color': self.color_scheme['text_color'],
+        }
+
+        for row in range(self.board_height):
+            text = str(row + 1)
+            width = round(self.square_size / 2 * len(text))
+            self.label_list.extend([
+                Text(text, *self.get_screen_position((row, -1)), width=width, **label_kwargs),
+                Text(text, *self.get_screen_position((row, self.board_width)), width=width, **label_kwargs)
+            ])
+
+        for col in range(self.board_width):
+            text = b26(col + 1)
+            width = round(self.square_size / 2 * len(text))
+            self.label_list.extend([
+                Text(text, *self.get_screen_position((-1, col)), width=width, **label_kwargs),
+                Text(text, *self.get_screen_position((self.board_height, col)), width=width, **label_kwargs),
+            ])
+
+        for row, col in product(range(self.board_height), range(self.board_width)):
+            sprite = Sprite("assets/util/square.png")
+            sprite.color = self.color_scheme[f"{'light' if self.is_light_square((row, col)) else 'dark'}_square_color"]
+            sprite.position = self.get_screen_position((row, col))
+            sprite.scale = self.square_size / sprite.texture.width
+            self.board_sprite_list.append(sprite)
+
+        if self.game_loaded:
+            for row in range(len(self.pieces), self.board_height):
+                self.pieces += [[]]
+                for col in range(len(self.pieces[row]), self.board_width):
+                    self.pieces[row].append(NoPiece(self, (row, col)))
+                self.pieces[row] = self.pieces[row][:self.board_width]
+            self.pieces = self.pieces[:self.board_height]
+
+        if self.game_loaded or self.board_width != board_width or self.board_height != board_height:
+            self.log(f"[Ply {self.ply_count}] Info: Changed board size to {self.board_width}x{self.board_height}")
+            self.resize(
+                self.width + self.square_size * (self.board_width - old_width),
+                self.height + self.square_size * (self.board_height - old_height)
+            )
 
     def resize(self, width: float, height: float) -> None:
         if self.fullscreen:
