@@ -11,7 +11,7 @@ from random import Random
 from sys import argv, stdout
 from tkinter import filedialog
 from traceback import print_exc
-from typing import Type, TextIO
+from typing import Any, Type, TextIO
 
 from PIL.ImageColor import getrgb
 from arcade import key, MOUSE_BUTTON_LEFT, MOUSE_BUTTON_RIGHT, Text
@@ -24,7 +24,7 @@ from chess.config import Config
 from chess.movement import movement
 from chess.movement.move import Move
 from chess.movement.util import Position, add, to_alpha as toa, from_alpha as fra
-from chess.pieces import pieces as abc
+from chess.pieces import piece as abc
 from chess.pieces.groups import classic as fide
 from chess.pieces.groups import amazon as am, amontillado as ao, asymmetry as ay, avian as av
 from chess.pieces.groups import backward as bw, beast as bs, breakfast as bk, burn as br, buzz as bz
@@ -43,8 +43,8 @@ from chess.pieces.groups import splash as sp, starbound as st, stone as so, swit
 from chess.pieces.groups import thrash as th
 from chess.pieces.groups import wide as wd
 from chess.pieces.groups import zebra as zb
-from chess.pieces.groups.util import NoPiece
-from chess.pieces.pieces import Side
+from chess.pieces.groups.util import NoPiece, Obstacle, Block, Wall
+from chess.pieces.side import Side
 from chess.save import load_move, load_piece, load_rng, load_piece_type, load_custom_type
 from chess.save import save_move, save_piece, save_rng, save_piece_type, save_custom_type
 from chess.util import Default, Unset, base_dir
@@ -305,6 +305,10 @@ def get_set_name(piece_set: list[Type[abc.Piece]]) -> str:
     return f"({piece_set_name})"
 
 
+def is_prefix_of(string: Any, prefix: Any) -> bool:
+    return isinstance(string, str) and isinstance(prefix, str) and string.lower().startswith(prefix.lower())
+
+
 def print_piece_data(board: Board, fp: TextIO = stdout, side: Side = Side.WHITE) -> None:
     fp.write('{\n')
     for i, t in enumerate(sorted(get_piece_types(side), key=lambda x: save_piece_type(x))):
@@ -478,6 +482,7 @@ class Board(Window):
         self.auto_capture_markers = {Side.WHITE: {}, Side.BLACK: {}}  # squares where the side's pieces can auto-capture
         self.probabilistic_pieces = {Side.WHITE: [], Side.BLACK: []}  # pieces that can move probabilistically
         self.probabilistic_piece_history = []  # list of probabilistic piece positions for every ply
+        self.obstacles = []  # list of obstacles (neutral pieces that block movement and cannot move)
         self.penultima_pieces = {Side.WHITE: {}, Side.BLACK: {}}  # piece textures that are used for penultima mode
         self.custom_pieces = {}  # custom piece types
         self.moves = {Side.WHITE: {}, Side.BLACK: {}}  # dictionary of valid moves from any square
@@ -758,7 +763,7 @@ class Board(Window):
         for row, col in product(range(self.board_height), range(self.board_width)):
             piece_type = types[row][col]
             piece_side = sides[row][col]
-            if isinstance(piece_type, abc.Side):
+            if isinstance(piece_type, Side):
                 piece_type = self.piece_sets[piece_side][col]
             self.pieces[row].append(
                 piece_type(
@@ -1165,6 +1170,15 @@ class Board(Window):
                 self.promotions[side].extend(promotion_types[::-1])
 
     def reset_edit_promotions(self, piece_sets: dict[Side, list[Type[abc.Piece]]] | None = None) -> None:
+        if is_prefix_of('custom', self.edit_piece_set_id):
+            self.edit_promotions = {
+                side: [piece_type for _, piece_type in self.custom_pieces.items()] + [Block, Wall]
+                for side in self.edit_promotions
+            }
+            return
+        if is_prefix_of('wall', self.edit_piece_set_id):
+            self.edit_promotions = {side: [Block, Wall] for side in self.edit_promotions}
+            return
         if piece_sets is None:
             if self.edit_piece_set_id is None:
                 piece_sets = self.piece_sets
@@ -1306,9 +1320,10 @@ class Board(Window):
         self.quasi_royal_pieces = {Side.WHITE: [], Side.BLACK: []}
         self.probabilistic_pieces = {Side.WHITE: [], Side.BLACK: []}
         self.auto_ranged_pieces = {Side.WHITE: [], Side.BLACK: []}
+        self.obstacles = []
         for row, col in product(range(self.board_height), range(self.board_width)):
             piece = self.get_piece((row, col))
-            if piece.side and not piece.is_empty():
+            if piece.side in self.movable_pieces and not piece.is_empty():
                 self.movable_pieces[piece.side].append(piece)
                 if isinstance(piece, abc.RoyalPiece):
                     self.royal_pieces[piece.side].append(piece)
@@ -1318,6 +1333,8 @@ class Board(Window):
                     self.probabilistic_pieces[piece.side].append(piece)
                 if isinstance(piece.movement, movement.AutoRangedAutoCaptureRiderMovement):
                     self.auto_ranged_pieces[piece.side].append(piece)
+            elif isinstance(piece, Obstacle):
+                self.obstacles.append(piece)
         if self.royal_piece_mode == 1:  # Force royal pieces
             for side in (Side.WHITE, Side.BLACK):
                 self.royal_pieces[side].extend(self.quasi_royal_pieces[side])
@@ -1613,9 +1630,9 @@ class Board(Window):
             if hide_moves is None:
                 hide_moves = piece.is_hidden
             if not piece.is_empty() and not hide_moves:
-                if self.display_theoretical_moves[piece.side]:
+                if self.display_theoretical_moves.get(piece.side, False):
                     move_dict = self.theoretical_moves.get(piece.side, {})
-                elif self.display_moves[piece.side]:
+                elif self.display_moves.get(piece.side, False):
                     move_dict = self.moves.get(piece.side, {})
                 else:
                     move_dict = {}
@@ -1751,7 +1768,7 @@ class Board(Window):
             piece_poss = self.auto_capture_markers[side][move.pos_to]
             piece_pos = sorted(list(piece_poss))[0]
             piece = self.get_piece(piece_pos)
-            if piece.side == side and move.piece.side == side.opponent():
+            if piece.side == side and piece.side.captures(move.piece.side):
                 chained_move = Move(
                     piece=piece,
                     movement_type=type(piece.movement),
@@ -1862,18 +1879,10 @@ class Board(Window):
                 next_move.piece.move(next_move)
                 self.update_auto_capture_markers(next_move)
                 self.move_history.append(deepcopy(next_move))
-                if next_move.promotion is not None:
-                    if next_move.promotion is Unset:
-                        promotion_side = self.get_promotion_side(next_move.piece)
-                        self.start_promotion(next_move.piece, self.edit_promotions[promotion_side])
-                        finished = True
-                        break
-                    else:
-                        self.promotion_piece = True
-                        self.replace(next_move.piece, next_move.promotion)
-                        self.update_auto_capture_markers(next_move)
-                        self.update_promotion_auto_captures(next_move)
-                        self.promotion_piece = None
+                self.apply_edit_promotion(next_move)
+                if next_move.promotion is Unset:
+                    finished = True
+                    break
                 if self.promotion_piece is None:
                     self.log(f"[Ply {self.ply_count}] Edit: {self.move_history[-1]}")
             else:
@@ -2175,16 +2184,7 @@ class Board(Window):
                 self.log(f'''[Ply {self.ply_count}] Redo: {
                     f"{'Edit' if chained_move.is_edit else 'Move'}: " + str(chained_move)
                 }''')
-                if chained_move.is_edit and chained_move.promotion is not None:
-                    if chained_move.promotion is Unset:
-                        promotion_side = self.get_promotion_side(chained_move.piece)
-                        self.start_promotion(chained_move.piece, self.edit_promotions[promotion_side])
-                    else:
-                        self.promotion_piece = True
-                        self.replace(chained_move.piece, chained_move.promotion)
-                        self.update_auto_capture_markers(chained_move)
-                        self.update_promotion_auto_captures(chained_move)
-                        self.promotion_piece = None
+                self.apply_edit_promotion(chained_move)
                 last_chain_move = chained_move
                 chained_move = chained_move.chained_move
                 if chained_move:
@@ -2277,27 +2277,30 @@ class Board(Window):
             if piece.is_empty():
                 if hovered_square in self.promotion_area:
                     promotion = self.promotion_area[hovered_square]
-                    promotion_name = "???" if promotion.is_hidden else promotion.name
-                    message = f"[Ply {self.ply_count}] {promotion.side} {promotion_name}"
+                    message = f"[Ply {self.ply_count}] {promotion}"
                 else:
                     message = f"[Ply {self.ply_count}] "
                     if self.edit_mode and self.edit_piece_set_id is not None:
-                        message += f"Piece from {piece_groups[self.edit_piece_set_id]['name']}"
+                        if is_prefix_of('custom', self.edit_piece_set_id):
+                            message += f"Custom piece"
+                        else:
+                            message += f"Piece from {piece_groups[self.edit_piece_set_id]['name']}"
                     else:
                         message += f"New piece"
                 message += f" appears on {toa(piece.board_pos)}"
                 self.set_caption(message)
                 return
-            name = "???" if piece.is_hidden else piece.name
-            message = f"[Ply {self.ply_count}] {piece.side} {name} on {toa(piece.board_pos)}"
+            message = f"[Ply {self.ply_count}] {piece} on {toa(piece.board_pos)}"
             if hovered_square in self.promotion_area:
                 promotion = self.promotion_area[hovered_square]
-                promotion_name = "???" if promotion.is_hidden else promotion.name
-                message += f" promotes to {promotion_name}"
+                message += f" promotes to {promotion}"
             else:
                 message += " promotes"
                 if self.edit_mode and self.edit_piece_set_id is not None:
-                    message += f" to {piece_groups[self.edit_piece_set_id]['name']}"
+                    if is_prefix_of('custom', self.edit_piece_set_id):
+                        message += f" to a custom piece"
+                    else:
+                        message += f" to {piece_groups[self.edit_piece_set_id]['name']}"
             self.set_caption(message)
             return
         piece = self.get_piece(selected_square)
@@ -2341,8 +2344,7 @@ class Board(Window):
             if not piece:
                 piece = self.get_piece(hovered_square)
             if not piece.is_empty():
-                name = "???" if piece.is_hidden else piece.name
-                self.set_caption(f"[Ply {self.ply_count}] {piece.side} {name} on {toa(piece.board_pos)}")
+                self.set_caption(f"[Ply {self.ply_count}] {piece} on {toa(piece.board_pos)}")
                 return
         if self.edit_mode:
             self.set_caption(f"[Ply {self.ply_count}] Editing board")
@@ -2367,7 +2369,7 @@ class Board(Window):
         piece_pos = piece.board_pos
         direction = (Side.WHITE if piece_pos[0] < self.board_height / 2 else Side.BLACK).direction
         area = len(promotions)
-        area_height = max(self.board_height // 2, ceil(sqrt(area)))
+        area_height = min(len(promotions), max(self.board_height // 2, ceil(sqrt(area))))
         area_width = ceil(area / area_height)
         area_origin = piece_pos
         while self.not_on_board((area_origin[0] + direction(area_height - 1), area_origin[1])):
@@ -2410,16 +2412,32 @@ class Board(Window):
             else:
                 promotion_piece.reload(is_hidden=False, flipped_horizontally=False)
             promotion_piece.scale = self.square_size / promotion_piece.texture.width
-            promotion_piece.set_color(
-                self.color_scheme.get(
-                    f"{promotion_piece.side.key()}piece_color",
-                    self.color_scheme['piece_color']
-                ),
-                self.color_scheme['colored_pieces']
-            )
+            if isinstance(promotion_piece, Wall):
+                promotion_piece.scale *= 0.8
+            if not isinstance(promotion_piece, Obstacle):
+                promotion_piece.set_color(
+                    self.color_scheme.get(
+                        f"{promotion_piece.side.key()}piece_color",
+                        self.color_scheme['piece_color']
+                    ),
+                    self.color_scheme['colored_pieces']
+                )
             self.promotion_piece_sprite_list.append(promotion_piece)
             self.promotion_area[pos] = promotion_piece
         self.update_caption()
+
+    def apply_edit_promotion(self, move: Move) -> None:
+        if move.is_edit and move.promotion is not None:
+            if move.promotion is Unset:
+                promotion_side = self.get_promotion_side(move.piece)
+                if len(self.edit_promotions[promotion_side]):
+                    self.start_promotion(move.piece, self.edit_promotions[promotion_side])
+            else:
+                self.promotion_piece = True
+                self.replace(move.piece, move.promotion)
+                self.update_auto_capture_markers(move)
+                self.update_promotion_auto_captures(move)
+                self.promotion_piece = None
 
     def end_promotion(self) -> None:
         self.promotion_piece = None
@@ -2439,13 +2457,14 @@ class Board(Window):
         self.pieces[pos[0]][pos[1]] = new_piece
         self.set_position(new_piece, pos)
         self.update_piece(new_piece)
-        new_piece.set_color(
-            self.color_scheme.get(
-                f"{new_piece.side.key()}piece_color",
-                self.color_scheme['piece_color']
-            ),
-            self.color_scheme['colored_pieces']
-        )
+        if not isinstance(new_piece, Obstacle):
+            new_piece.set_color(
+                self.color_scheme.get(
+                    f"{new_piece.side.key()}piece_color",
+                    self.color_scheme['piece_color']
+                ),
+                self.color_scheme['colored_pieces']
+            )
         new_piece.scale = self.square_size / new_piece.texture.width
         self.piece_sprite_list.append(new_piece)
         if pos in self.en_passant_markers and not self.not_a_piece(pos):
@@ -2534,6 +2553,8 @@ class Board(Window):
             self.color_scheme['black_draw_color'] = desaturate(self.color_scheme['black_piece_color'], 0.11 * 5)
             self.color_scheme['loss_color'] = getrgb('#bbbbbb')
         self.background_color = self.color_scheme['background_color']
+        for sprite in self.obstacles:
+            sprite.color = self.color_scheme.get('wall_color', self.color_scheme['background_color'])
         for sprite in self.label_list:
             sprite.color = self.color_scheme['text_color']
         for sprite in self.board_sprite_list:
@@ -2543,13 +2564,16 @@ class Board(Window):
             sprite.color = self.color_scheme['promotion_area_color']
         for sprite in self.promotion_piece_sprite_list:
             if isinstance(sprite, abc.Piece):
-                sprite.set_color(
-                    self.color_scheme.get(
-                        f"{sprite.side.key()}piece_color",
-                        self.color_scheme['piece_color']
-                    ),
-                    self.color_scheme['colored_pieces']
-                )
+                if sprite.side is not Side.NONE:
+                    sprite.set_color(
+                        self.color_scheme.get(
+                            f"{sprite.side.key()}piece_color",
+                            self.color_scheme['piece_color']
+                        ),
+                        self.color_scheme['colored_pieces']
+                    )
+                elif not sprite.is_empty():
+                    sprite.color = self.color_scheme.get('wall_color', self.color_scheme['background_color'])
         self.color_all_pieces()
         self.selection.color = self.color_scheme['selection_color'] if self.selection.alpha else (0, 0, 0, 0)
         self.highlight.color = self.color_scheme['highlight_color'] if self.highlight.alpha else (0, 0, 0, 0)
@@ -2563,6 +2587,8 @@ class Board(Window):
         penultima_flip: bool = None,
         penultima_hide: bool = None,
     ) -> None:
+        if piece.side not in self.piece_set_ids:
+            return
         if penultima_flip is None:
             set_id = self.piece_set_ids[piece.side]
             penultima_flip = (self.chaos_mode in {2, 4}) and (set_id is None or set_id < 0)
@@ -2872,6 +2898,7 @@ class Board(Window):
             self.deselect_piece()
             if self.promotion_piece:
                 self.undo_last_finished_move()
+                self.update_caption()
                 return
             if self.edit_mode:
                 pos = self.get_board_position((x, y))
@@ -2969,11 +2996,6 @@ class Board(Window):
                         ))
                     elif len(self.edit_promotions[side]) > 1:
                         move.set(promotion=Unset)
-                        move.piece.move(move)
-                        self.update_auto_capture_markers(move)
-                        self.move_history.append(deepcopy(move))
-                        self.start_promotion(move.piece, self.edit_promotions[side])
-                        return
                 else:
                     if self.not_a_piece(pos):
                         self.deselect_piece()
@@ -2983,6 +3005,7 @@ class Board(Window):
                 return
             move.piece.move(move)
             self.update_auto_capture_markers(move)
+            self.apply_edit_promotion(move)
             self.move_history.append(deepcopy(move))
             if not self.promotion_piece:
                 self.log(f"[Ply {self.ply_count}] Edit: {self.move_history[-1]}")
@@ -3363,8 +3386,12 @@ class Board(Window):
         if symbol == key.P:  # Promotion
             if self.edit_mode:
                 old_id = self.edit_piece_set_id
-                if modifiers & key.MOD_SHIFT:  # Shift promotion piece set
-                    if self.edit_piece_set_id is not None:
+                if modifiers & key.MOD_ALT:  # Promote to custom pieces
+                    self.edit_piece_set_id = 'wall' if modifiers & key.MOD_SHIFT else 'custom'
+                    which = {'custom': 'from custom', 'wall': 'wall'}[self.edit_piece_set_id]
+                    self.log(f"[Ply {self.ply_count}] Info: Placing {which} pieces", False)
+                elif modifiers & key.MOD_SHIFT:  # Shift promotion piece set
+                    if isinstance(self.edit_piece_set_id, int):
                         d = -1 if modifiers & key.MOD_ACCEL else 1
                         self.edit_piece_set_id = (self.edit_piece_set_id + d) % len(piece_groups)
                         which = {-1: 'previous', 1: 'next'}[d]
@@ -3388,7 +3415,8 @@ class Board(Window):
                         promotion_piece = self.promotion_piece
                         promotion_side = self.get_promotion_side(promotion_piece)
                         self.end_promotion()
-                        self.start_promotion(promotion_piece, self.edit_promotions[promotion_side])
+                        if len(self.edit_promotions[promotion_side]):
+                            self.start_promotion(promotion_piece, self.edit_promotions[promotion_side])
         if symbol == key.O:  # Royal pieces
             old_mode = self.royal_piece_mode
             old_check = self.use_check

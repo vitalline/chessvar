@@ -6,10 +6,11 @@ from typing import TYPE_CHECKING
 
 from chess.movement.move import Move
 from chess.movement.util import AnyDirection, Direction, Position, add, sub, mul, ddiv
+from chess.pieces.side import Side
 
 if TYPE_CHECKING:
     from chess.board import Board
-    from chess.pieces.pieces import Piece
+    from chess.pieces.piece import Piece
 
 
 class BaseMovement(object):
@@ -122,8 +123,11 @@ class RiderMovement(BaseDirectionalMovement):
                 move.pos_to == self.transform(add(move.pos_from, mul(direction[:2], direction[2])))
             )
             or not theoretical and (
-                (piece.side == (next_piece := self.board.get_piece(next_pos_to)).side and piece != next_piece)
-                or (piece.side == self.board.get_side(move.pos_to).opponent() and move.pos_from != move.pos_to)
+                (piece.side.blocked_by((next_piece := self.board.get_piece(next_pos_to)).side) and piece != next_piece)
+                or (piece.side.captures(self.board.get_side(move.pos_to)) and move.pos_from != move.pos_to)
+            )
+            or theoretical and (
+                (next_piece := self.board.get_piece(next_pos_to)).side == Side.IMMUNE and next_piece.movement is None
             )
         )
 
@@ -254,7 +258,7 @@ class RangedAutoCaptureRiderMovement(RiderMovement):
             captures = {}
             for capture in super().moves(move.pos_to, piece):
                 captured_piece = self.board.get_piece(capture.pos_to)
-                if captured_piece.side == piece.side.opponent():
+                if piece.side.captures(captured_piece.side):
                     captures[capture.pos_to] = copy(capture)
                     captures[capture.pos_to].set(piece=piece, pos_to=move.pos_to, captured_piece=captured_piece)
             last_chain_move = move
@@ -572,7 +576,7 @@ class MultiMovement(BaseMultiMovement):
             for movement in self.move_or_capture + self.capture:
                 for move in movement.moves(pos_from, piece, theoretical):
                     captured_piece = move.captured_piece or self.board.get_piece(move.pos_to)
-                    if captured_piece.side == piece.side.opponent():
+                    if piece.side.captures(captured_piece.side):
                         yield copy(move)
 
     def __copy_args__(self):

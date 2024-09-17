@@ -7,7 +7,7 @@ from chess.util import Default, Unset
 
 if TYPE_CHECKING:
     from chess.movement.movement import BaseMovement
-    from chess.pieces.pieces import Piece
+    from chess.pieces.piece import Piece
 
 
 class Move(object):
@@ -127,37 +127,21 @@ class Move(object):
         else:
             string = "does something very mysterious"
         if self.piece:
-            side = self.piece.side
             if self.piece.is_empty() and not (self.promotion and not moved):
                 side = board.get_promotion_side(self.piece)
                 string = f"{side} {string}"
-            elif self.piece.is_empty() and not board.should_hide_pieces:
-                side = self.promotion.side
-                string = f"{side} {self.promotion.name} {string}"
             elif self.piece.is_empty():
-                side = self.promotion.side
-                if not self.promotion.is_hidden:
-                    string = f"{side} {self.promotion.name} {string}"
-                else:
-                    string = f"{side} ??? {string}"
-            elif not self.piece.is_hidden:
-                string = f"{side} {self.piece.name} {string}"
+                string = f"{self.promotion} {string}"
             else:
-                string = f"{side} ??? {string}"
+                string = f"{self.piece} {string}"
         else:
             string = f"Piece {string}"
         if self.captured_piece:
-            if self.captured_piece.is_hidden:
-                string += f", takes {self.captured_piece.side} ???"
-            else:
-                string += f", takes {self.captured_piece.side} {self.captured_piece.name}"
+            string += f", takes {self.captured_piece}"
             if self.captured_piece.board_pos != self.pos_to:
                 string += f" on {to_alpha(self.captured_piece.board_pos)}"
         if self.swapped_piece:
-            if self.swapped_piece.is_hidden:
-                string += f", swaps with {self.swapped_piece.side} ???"
-            else:
-                string += f", swaps with {self.swapped_piece.side} {self.swapped_piece.name}"
+            string += f", swaps with {self.swapped_piece}"
         if self.pos_from is not None and not (self.piece and self.piece.is_empty() and not moved) and self.piece:
             if self.promotion is Unset:
                 string += f", tries to promote"

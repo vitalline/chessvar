@@ -44,6 +44,8 @@ Alt + N: reset both armies to default
 Ctrl + P: reset replacement pieces to current armies
 Shift + P: cycle replacement pieces forward (+1)
 Ctrl + Shift + P: cycle replacement pieces backward (-1)
+Alt + P: place custom pieces
+Alt + Shift + P: place wall pieces
 Ctrl + O: restore default behavior for check/mate (piece-dependent)
 Shift + O: force check/mate if one's last royal piece is threatened
 Ctrl + Shift + O: force check/mate if any royal piece is threatened

@@ -1,6 +1,6 @@
 from chess.movement import movement
 from chess.movement.util import rot, sym
-from chess.pieces.pieces import Piece
+from chess.pieces.piece import Piece
 
 
 class Howitzer(Piece):

@@ -1,77 +1,18 @@
 from __future__ import annotations
 
 from copy import copy
-from enum import Enum
 from typing import TYPE_CHECKING, Type
 
 from arcade import Color, Sprite, load_texture
 
-from chess.movement.move import Move
-from chess.movement.movement import BaseMovement
-from chess.movement.util import AnyDirection, Position
+from chess.pieces.side import Side
 from chess.util import Default, get_texture_path
 
 if TYPE_CHECKING:
     from chess.board import Board
-
-
-class Side(Enum):
-    NONE = 0
-    WHITE = 1
-    BLACK = 2
-    ANY = -1
-
-    def __bool__(self):
-        return self is not Side.NONE
-
-    def opponent(self):
-        match self:
-            case Side.WHITE:
-                return Side.BLACK
-            case Side.BLACK:
-                return Side.WHITE
-            case _:
-                return self
-
-    def direction(self, dpos: AnyDirection | int | None = None) -> AnyDirection | int:
-        match self:
-            case Side.WHITE:
-                return 1 if dpos is None else dpos if type(dpos) is int else dpos
-            case Side.BLACK:
-                return -1 if dpos is None else -dpos if type(dpos) is int else (-dpos[0], *dpos[1:])
-            case _:
-                return 0 if dpos is None else 0 if type(dpos) is int else (0, 0)
-
-    def __str__(self):
-        match self:
-            case Side.NONE:
-                return "Empty"  # "Blank" is technically more accurate, but much easier to confuse with "Black"
-            case Side.WHITE:
-                return "White"
-            case Side.BLACK:
-                return "Black"
-            case Side.ANY:
-                return "Universal"
-            case _:
-                return ""
-
-    def key(self):
-        match self:
-            case Side.WHITE:
-                return "white_"
-            case Side.BLACK:
-                return "black_"
-            case _:
-                return ""
-
-    def file_prefix(self):
-        match self:
-            case Side.WHITE:
-                return "0."
-            case Side.BLACK:
-                return "1."
-            case _:
-                return ""
+    from chess.movement.move import Move
+    from chess.movement.movement import BaseMovement
+    from chess.movement.util import Position
 
 
 class Piece(Sprite):
@@ -119,6 +60,9 @@ class Piece(Sprite):
         if self.movement:
             yield from self.movement.moves(self.board_pos, self, theoretical)
         return ()
+
+    def __str__(self):
+        return f"{self.side} {'???' if self.is_hidden else self.name}".strip()
 
     def __copy__(self):
         clone = type(self)(

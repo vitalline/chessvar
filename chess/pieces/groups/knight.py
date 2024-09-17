@@ -1,6 +1,6 @@
 from chess.movement import movement
 from chess.movement.util import sym, symv
-from chess.pieces.pieces import Piece
+from chess.pieces.piece import Piece
 
 
 class Forerook(Piece):

@@ -7,8 +7,10 @@ from typing import TYPE_CHECKING, Type, Any
 
 from chess.movement.move import Move
 from chess.movement.movement import BaseMovement
+from chess.pieces.side import Side
 from chess.movement.util import to_alpha as toa, from_alpha as fra
-from chess.pieces import pieces as abc
+from chess.pieces import piece as piece_module
+from chess.pieces.piece import Piece
 from chess.pieces.groups.util import NoPiece
 from chess.util import Unset
 
@@ -23,19 +25,19 @@ SUFFIXES = ('Movement', 'Rider')
 CUSTOM_PREFIX = '_custom_'
 
 
-def save_piece_type(piece_type: Type[abc.Piece] | frozenset | None) -> str | None:
+def save_piece_type(piece_type: Type[Piece] | frozenset | None) -> str | None:
     if piece_type is None:
         return None
     if piece_type is Unset:
         return UNSET_STRING
     if piece_type.__name__.startswith(CUSTOM_PREFIX):
         return piece_type.__name__.removeprefix(CUSTOM_PREFIX)
-    if piece_type.__module__ == abc.__name__:
+    if piece_type.__module__ == piece_module.__name__:
         return piece_type.__name__
     return f"{piece_type.__module__.rsplit('.', 1)[-1]}.{piece_type.__name__}"
 
 
-def load_piece_type(data: str | None, from_dict: dict | None = None) -> Type[abc.Piece] | frozenset | None:
+def load_piece_type(data: str | None, from_dict: dict | None = None) -> Type[Piece] | frozenset | None:
     if data is None:
         return None
     if data == UNSET_STRING:
@@ -45,7 +47,7 @@ def load_piece_type(data: str | None, from_dict: dict | None = None) -> Type[abc
     parts = data.split('.', 1)
     try:
         if len(parts) == 1:
-            return getattr(abc, data)
+            return getattr(piece_module, data)
         return getattr(import_module(f"chess.pieces.groups.{parts[0]}"), parts[1])
     except AttributeError:
         return None
@@ -76,7 +78,7 @@ def load_movement_type(data: str | None) -> Type[BaseMovement] | frozenset | Non
     return None
 
 
-def save_piece(piece: abc.Piece | frozenset | None) -> dict | str | None:
+def save_piece(piece: Piece | frozenset | None) -> dict | str | None:
     if piece is None:
         return None
     if piece is Unset:
@@ -92,14 +94,14 @@ def save_piece(piece: abc.Piece | frozenset | None) -> dict | str | None:
     }.items() if v}
 
 
-def load_piece(data: dict | str | None, board: Board, from_dict: dict | None = None) -> abc.Piece | frozenset | None:
+def load_piece(data: dict | str | None, board: Board, from_dict: dict | None = None) -> Piece | frozenset | None:
     if data is None:
         return None
     if data == UNSET_STRING:
         return Unset
     if isinstance(data, str):
         return NoPiece(board, fra(data))
-    side = abc.Side(data.get('side', 0))
+    side = Side(data.get('side', 0))
     piece_type = load_piece_type(data.get('cls'), from_dict) or NoPiece
     piece = piece_type(
         board=board,
@@ -158,15 +160,15 @@ def load_movement(data: list | str | None, board: Board) -> BaseMovement | froze
     return load_movement_type(data[0])(board, *[load_arg(arg) for arg in data[1:]])  # and that's it. we're done here.
 
 
-def save_custom_type(piece: type[abc.Piece] | abc.Piece | None) -> dict | None:
+def save_custom_type(piece: type[Piece] | Piece | None) -> dict | None:
     if piece is None:
         return None
-    piece, piece_type = (piece, type(piece)) if isinstance(piece, abc.Piece) else (None, piece)
-    if not issubclass(piece_type, abc.Piece):
+    piece, piece_type = (piece, type(piece)) if isinstance(piece, Piece) else (None, piece)
+    if not issubclass(piece_type, Piece):
         return None
     base = piece_type.__base__
     return {k: v for k, v in {
-        'cls': save_piece_type(base) if base is not abc.Piece else None,
+        'cls': save_piece_type(base) if base is not Piece else None,
         'name': piece_type.name,
         'file': piece_type.file_name,
         'path': piece_type.asset_folder,
@@ -175,11 +177,11 @@ def save_custom_type(piece: type[abc.Piece] | abc.Piece | None) -> dict | None:
     }.items() if v}
 
 
-def load_custom_type(data: dict | None, name: str) -> type[abc.Piece] | None:
+def load_custom_type(data: dict | None, name: str) -> type[Piece] | None:
     if data is None:
         return None
-    base = load_piece_type(data.get('cls')) or abc.Piece
-    if not isinstance(base, type) or not issubclass(base, abc.Piece):
+    base = load_piece_type(data.get('cls')) or Piece
+    if not isinstance(base, type) or not issubclass(base, Piece):
         return None
     args = {}
     if 'name' in data:

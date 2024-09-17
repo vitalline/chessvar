@@ -1,6 +1,7 @@
 from chess.movement import movement
 from chess.movement.util import rot, symv
-from chess.pieces.pieces import Piece, Side
+from chess.pieces.piece import Piece
+from chess.pieces.side import Side
 
 
 class ElkRdr(Piece):

@@ -63,8 +63,10 @@ class Config(dict):
                 ):
                     if self.base_config[section][item].strip() == '':
                         self[item] = None
-                    else:
+                    elif self.base_config[section][item].isdigit():
                         self[item] = self.base_config.getint(section, item)
+                    else:
+                        self[item] = self.base_config[section][item]
                 if item == 'hide_moves':
                     if self.base_config[section][item].strip() == '':
                         self[item] = None
