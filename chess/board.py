@@ -605,7 +605,10 @@ class Board(Window):
         return self.get_piece(pos).side
 
     def get_promotion_side(self, piece: Piece):
-        return piece.side or (Side.WHITE if piece.board_pos[0] < self.board_height / 2 else Side.BLACK)
+        return (
+            piece.side if piece.side in {Side.WHITE, Side.BLACK} else
+            (Side.WHITE if piece.board_pos[0] < self.board_height / 2 else Side.BLACK)
+        )
 
     def set_position(self, piece: Piece, pos: Position) -> None:
         piece.board_pos = pos
