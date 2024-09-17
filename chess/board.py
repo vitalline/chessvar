@@ -2751,6 +2751,7 @@ class Board(Window):
         if self.game_loaded:
             for row in range(len(self.pieces), self.board_height):
                 self.pieces += [[]]
+            for row in range(self.board_height):
                 for col in range(len(self.pieces[row]), self.board_width):
                     self.pieces[row].append(NoPiece(self, (row, col)))
                 self.pieces[row] = self.pieces[row][:self.board_width]
