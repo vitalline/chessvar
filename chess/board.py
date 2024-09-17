@@ -548,7 +548,7 @@ class Board(Window):
         self.resize_board()
         self.load(argv[1] if len(argv) > 1 else None)
         if not self.save_loaded:
-            self.reset_board(update=True)
+            self.reset_board()
             self.log_special_modes()
         self.game_loaded = True
 
@@ -665,7 +665,7 @@ class Board(Window):
         self.selected_square = None
         self.show_moves()
 
-    def reset_board(self, update: bool = False, log: bool = True) -> None:
+    def reset_board(self, update: bool | None = True, log: bool = True) -> None:
         self.save_interval = 0
 
         self.deselect_piece()
@@ -680,6 +680,13 @@ class Board(Window):
         self.promotion_piece = None
         self.action_count = 0
         self.ply_count = 0
+
+        if update is None:
+            update = not self.move_history
+
+        if update:
+            self.custom_layout = {}
+            self.custom_pieces = {}
 
         for sprite_list in self.piece_sprite_list, self.promotion_piece_sprite_list, self.promotion_area_sprite_list:
             sprite_list.clear()
@@ -712,16 +719,9 @@ class Board(Window):
         else:
             self.future_move_history += self.move_history[::-1]
 
-        update_rolls = not self.move_history and self.roll_history
-
-        if update_rolls:
-            self.roll_history = []
-            self.future_move_history = []
-            self.probabilistic_piece_history = []
-
         if self.roll_rng is None:
             self.roll_rng = Random(self.roll_seed)
-        elif update or update_rolls:
+        elif update:
             if self.board_config['update_roll_seed']:
                 self.roll_seed = self.roll_rng.randint(0, max_seed)
             self.roll_rng = Random(self.roll_seed)
@@ -1295,7 +1295,7 @@ class Board(Window):
         self.chaos_seed = self.chaos_rng.randint(0, max_seed)
         self.chaos_rng = Random(self.chaos_seed)
         self.piece_set_ids = {Side.WHITE: -1, Side.BLACK: -1 if same else -2}
-        self.reset_board(update=True)
+        self.reset_board()
 
     def load_pieces(self):
         self.movable_pieces = {Side.WHITE: [], Side.BLACK: []}
@@ -1840,7 +1840,9 @@ class Board(Window):
     def reload_history(self) -> bool:
         edit_mode = self.edit_mode
         selection = self.selected_square
-        self.reset_board(log=False)
+        self.reset_board(update=False, log=False)  # Don't clear redoing data, we're going to use it for, well, redoing.
+        # Note that the custom pieces and layouts will be preserved as well. It's why we're using False instead of None.
+        # Also, a restart message should have been logged prior to this function being called, so we do not log it here.
         if not self.future_move_history:
             self.select_piece(selection)
             self.edit_mode = edit_mode
@@ -3218,10 +3220,10 @@ class Board(Window):
                     chosen_ids = self.set_rng.sample(set_id_list, k=len(self.piece_set_ids))
                     self.piece_set_ids = {side: set_id for side, set_id in zip(self.piece_set_ids, chosen_ids)}
                 self.chaos_mode = 0
-                self.reset_board(update=True)
+                self.reset_board()
             elif modifiers & key.MOD_ACCEL:  # Restart with the same piece sets
                 self.log(f"[Ply {self.ply_count}] Info: Starting new game", bool(self.should_hide_pieces))
-                self.reset_board()
+                self.reset_board(update=None)  # Clear custom data and redoing iff no moves made yet, i.e. double Ctrl+R
         if symbol == key.C:
             if modifiers & (key.MOD_SHIFT | key.MOD_ALT):  # Chaos mode
                 self.load_chaos_sets(1 + bool(modifiers & key.MOD_ALT), modifiers & key.MOD_ACCEL)
@@ -3300,7 +3302,7 @@ class Board(Window):
                     f"[Ply {self.ply_count}] Info: Using default piece set for White{set_name_suffix}",
                     bool(self.should_hide_pieces)
                 )
-                self.reset_board(update=True)
+                self.reset_board()
             elif modifiers & key.MOD_ACCEL and not modifiers & key.MOD_SHIFT:  # White is in control
                 if self.turn_side != Side.WHITE and not self.chain_start:
                     self.move_history.append(None)
@@ -3329,7 +3331,7 @@ class Board(Window):
                     f"[Ply {self.ply_count}] Info: Using {which} piece set for White{set_name_suffix}",
                     bool(self.should_hide_pieces)
                 )
-                self.reset_board(update=True)
+                self.reset_board()
         if symbol == key.B:  # Black
             if modifiers & key.MOD_ALT:  # Reset black set to default
                 self.piece_set_ids[Side.BLACK] = 0
@@ -3341,7 +3343,7 @@ class Board(Window):
                     f"[Ply {self.ply_count}] Info: Using default piece set for Black{set_name_suffix}",
                     bool(self.should_hide_pieces)
                 )
-                self.reset_board(update=True)
+                self.reset_board()
             elif modifiers & key.MOD_ACCEL and not modifiers & key.MOD_SHIFT:  # Black is in control
                 if self.turn_side != Side.BLACK and not self.chain_start:
                     self.move_history.append(None)
@@ -3370,7 +3372,7 @@ class Board(Window):
                     f"[Ply {self.ply_count}] Info: Using {which} piece set for Black{set_name_suffix}",
                     bool(self.should_hide_pieces)
                 )
-                self.reset_board(update=True)
+                self.reset_board()
         if symbol == key.N:  # Next
             if modifiers & key.MOD_ALT:  # Reset white and black sets to default
                 self.chaos_mode = 0
@@ -3383,7 +3385,7 @@ class Board(Window):
                     f"[Ply {self.ply_count}] Info: Using default piece set{set_name_suffix}",
                     bool(self.should_hide_pieces)
                 )
-                self.reset_board(update=True)
+                self.reset_board()
             elif modifiers & key.MOD_ACCEL and not modifiers & key.MOD_SHIFT and not self.chain_start:  # Next player
                 self.move_history.append(None)
                 self.log(f"[Ply {self.ply_count}] Pass: {self.turn_side.opponent()} to move")
@@ -3431,7 +3433,7 @@ class Board(Window):
                         f"[Ply {self.ply_count}] Info: Swapping piece sets{set_name_suffix}",
                         bool(self.should_hide_pieces)
                     )
-                self.reset_board(update=True)
+                self.reset_board()
         if symbol == key.P:  # Promotion
             if self.edit_mode:
                 old_id = self.edit_piece_set_id

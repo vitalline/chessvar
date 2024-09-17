@@ -43,7 +43,7 @@ def load_piece_type(data: str | None, from_dict: dict | None = None) -> Type[Pie
     if data == UNSET_STRING:
         return Unset
     if from_dict and data in from_dict:
-            return from_dict[data]
+        return from_dict[data]
     parts = data.split('.', 1)
     try:
         if len(parts) == 1:
