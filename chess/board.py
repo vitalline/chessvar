@@ -249,10 +249,6 @@ neutral_row = [Side.NONE] * board_width
 types = [white_row, pawn_row] + [empty_row] * (board_height - 4) + [pawn_row, black_row]
 sides = [white_row, white_row] + [neutral_row] * (board_height - 4) + [black_row, black_row]
 
-white_promotion_squares = {(board_height - 1, i) for i in range(board_width)}
-black_promotion_squares = {(0, i) for i in range(board_width)}
-promotion_squares = {Side.WHITE: white_promotion_squares, Side.BLACK: black_promotion_squares}
-
 default_size = 50.0
 min_size = 25.0
 max_size = 100.0
@@ -474,7 +470,7 @@ class Board(Window):
         self.chaos_sets = {}  # piece sets generated in chaos mode
         self.piece_sets = {Side.WHITE: [], Side.BLACK: []}  # types of pieces each side starts with
         self.promotions = {Side.WHITE: [], Side.BLACK: []}  # types of pieces each side promotes to
-        self.promotion_squares = promotion_squares  # squares where pawns can promote for each side
+        self.promotion_squares = {Side.WHITE: [], Side.BLACK: []}  # squares where pawns can promote for each side
         self.edit_promotions = {Side.WHITE: [], Side.BLACK: []}  # types of pieces each side can promote to in edit mode
         self.movable_pieces = {Side.WHITE: [], Side.BLACK: []}  # pieces that can be moved by each side
         self.royal_pieces = {Side.WHITE: [], Side.BLACK: []}  # these have to stay on the board and should be protected
@@ -2746,6 +2742,11 @@ class Board(Window):
             sprite.position = self.get_screen_position((row, col))
             sprite.scale = self.square_size / sprite.texture.width
             self.board_sprite_list.append(sprite)
+
+        self.promotion_squares = {
+            Side.WHITE: {(self.board_height - 1, i) for i in range(self.board_width)},
+            Side.BLACK: {(0, i) for i in range(self.board_width)},
+        }
 
         if self.game_loaded:
             for row in range(len(self.pieces), self.board_height):
