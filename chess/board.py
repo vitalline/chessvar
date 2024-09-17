@@ -502,6 +502,7 @@ class Board(Window):
         self.selection.scale = self.square_size / self.selection.texture.width  # scale it to the size of a square
         self.active_piece = None  # piece that is currently being moved
         self.is_active = True  # whether the window is active or not
+        self.is_focused = True  # whether the mouse cursor is over the window
         self.label_list = []  # labels for the rows and columns
         self.board_sprite_list = SpriteList()  # sprites for the board squares
         self.move_sprite_list = SpriteList()  # sprites for the move markers
@@ -2813,7 +2814,7 @@ class Board(Window):
         if self.highlight_square:
             self.update_highlight(self.highlight_square)
             self.hovered_square = None
-        hovered_square = self.get_board_position(self.highlight.position)
+        hovered_square = self.get_board_position(self.highlight.position) if self.is_focused else None
         if self.on_board(hovered_square):
             self.highlight.color = self.color_scheme['highlight_color']
             if not self.highlight_square:
@@ -2828,6 +2829,7 @@ class Board(Window):
         self.show_moves()
 
     def on_mouse_enter(self, x: int, y: int):
+        self.is_focused = True
         highlight_square = self.highlight_square
         self.update_highlight(self.highlight_square or self.get_board_position((x, y)))
         if highlight_square:
@@ -2835,6 +2837,7 @@ class Board(Window):
         self.show_moves()
 
     def on_mouse_leave(self, x: int, y: int):
+        self.is_focused = False
         highlight_square = self.highlight_square
         self.update_highlight(self.highlight_square)
         if highlight_square:
