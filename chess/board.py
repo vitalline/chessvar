@@ -807,7 +807,8 @@ class Board(Window):
                 side.value: [save_piece_type(t) for t in piece_set] for side, piece_set in self.piece_sets.items()
             },
             'pieces': {
-                toa(p.board_pos): save_piece(p.on(None)) for pieces in self.movable_pieces.values() for p in pieces
+                toa(p.board_pos): save_piece(p.on(None))
+                for pieces in [*self.movable_pieces.values(), self.obstacles] for p in pieces
             },
             'custom': {k: save_custom_type(v) for k, v in self.custom_pieces.items()},
             'moves': [save_move(m) for m in self.move_history],

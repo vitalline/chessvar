@@ -11,7 +11,7 @@ from chess.pieces.side import Side
 from chess.movement.util import to_alpha as toa, from_alpha as fra
 from chess.pieces import piece as piece_module
 from chess.pieces.piece import Piece
-from chess.pieces.groups.util import NoPiece
+from chess.pieces.groups.util import NonMovingPiece, NoPiece
 from chess.util import Unset
 
 if TYPE_CHECKING:
@@ -88,8 +88,8 @@ def save_piece(piece: Piece | frozenset | None) -> dict | str | None:
     return {k: v for k, v in {
         'cls': save_piece_type(type(piece)),
         'pos': toa(piece.board_pos) if piece.board_pos else None,
-        'side': piece.side.value,
-        'moves': piece.movement.total_moves,
+        'side': piece.side.value if not isinstance(piece, NonMovingPiece) else None,
+        'moves': piece.movement.total_moves if piece.movement else None,
         'show': True if piece.is_hidden is False else None,
     }.items() if v}
 
@@ -111,7 +111,8 @@ def load_piece(data: dict | str | None, board: Board, from_dict: dict | None = N
         promotion_squares=board.promotion_squares.get(side),
     )
     piece.is_hidden = False if data.get('show') is True else None
-    piece.movement.set_moves(data.get('moves', 0))
+    if piece.movement:
+        piece.movement.set_moves(data.get('moves', 0))
     piece.scale = board.square_size / piece.texture.width
     if not piece.is_empty():
         board.update_piece(piece)
@@ -245,7 +246,9 @@ def load_move(data: dict | str | None, board: Board, from_dict: dict | None = No
     pos_from = fra(data['from']) if 'from' in data else None
     pos_to = fra(data['to']) if 'to' in data else None
     piece = load_piece(data.get('piece'), board, from_dict)
-    if piece and not piece.board_pos:
+    if not piece:
+        piece = NoPiece(board, pos_to or pos_from)
+    elif not piece.board_pos:
         piece.board_pos = pos_to or pos_from
     capture = load_piece(data.get('captured'), board, from_dict)
     if capture and not capture.board_pos:
