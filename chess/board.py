@@ -24,7 +24,6 @@ from chess.config import Config
 from chess.movement import movement
 from chess.movement.move import Move
 from chess.movement.util import Position, add, to_alpha as toa, from_alpha as fra, to_b26 as b26
-from chess.pieces import piece as abc
 from chess.pieces.groups import classic as fide
 from chess.pieces.groups import amazon as am, amontillado as ao, asymmetry as ay, avian as av
 from chess.pieces.groups import backward as bw, beast as bs, breakfast as bk, burn as br, buzz as bz
@@ -44,12 +43,13 @@ from chess.pieces.groups import thrash as th
 from chess.pieces.groups import wide as wd
 from chess.pieces.groups import zebra as zb
 from chess.pieces.groups.util import NoPiece, Obstacle, Block, Wall
+from chess.pieces.piece import Piece, QuasiRoyalPiece, RoyalPiece
 from chess.pieces.side import Side
 from chess.save import load_move, load_piece, load_rng, load_piece_type, load_custom_type
 from chess.save import save_move, save_piece, save_rng, save_piece_type, save_custom_type
 from chess.util import Default, Unset, base_dir
 
-piece_groups: list[dict[str, str | list[Type[abc.Piece]]]] = [
+piece_groups: list[dict[str, str | list[Type[Piece]]]] = [
     {
         'name': "Fabulous FIDEs",
         'set': [fide.Rook, fide.Knight, fide.Bishop, fide.Queen, fide.King, fide.Bishop, fide.Knight, fide.Rook],
@@ -239,8 +239,8 @@ penultima_textures = [f'ghost{s}' if s else None for s in ('R', 'N', 'B', 'Q', N
 board_width = 8
 board_height = 8
 
-pawn_row: list[Type[abc.Piece]] = [fide.Pawn] * board_width
-empty_row: list[Type[abc.Piece]] = [NoPiece] * board_width
+pawn_row: list[Type[Piece]] = [fide.Pawn] * board_width
+empty_row: list[Type[Piece]] = [NoPiece] * board_width
 
 white_row = [Side.WHITE] * board_width
 black_row = [Side.BLACK] * board_width
@@ -275,7 +275,7 @@ def get_filename(
     return join(in_dir, f"{full_name}.{ext}")
 
 
-def get_piece_types(side: Side = Side.WHITE) -> dict[Type[abc.Piece], str]:
+def get_piece_types(side: Side = Side.WHITE) -> dict[Type[Piece], str]:
     piece_types = {
         get_set(side, i)[j]
         for i in range(len(piece_groups)) for j in [i for i in range(4)] + [7]
@@ -284,12 +284,12 @@ def get_piece_types(side: Side = Side.WHITE) -> dict[Type[abc.Piece], str]:
     return {t: t.name + (' (CB)' if t.is_colorbound() or t == cb.King else '') for t in piece_types}
 
 
-def get_set(side: Side, set_id: int) -> list[Type[abc.Piece]]:
+def get_set(side: Side, set_id: int) -> list[Type[Piece]]:
     piece_group = piece_groups[set_id]
     return piece_group.get(f"set_{side.key()[0]}", piece_group.get('set', empty_row))
 
 
-def get_set_name(piece_set: list[Type[abc.Piece]]) -> str:
+def get_set_name(piece_set: list[Type[Piece]]) -> str:
     piece_name_order = [[0, 7], [1, 6], [2, 5], [3]]
     piece_names = []
     for group in piece_name_order:
@@ -602,20 +602,20 @@ class Board(Window):
     def is_light_square(self, pos: Position) -> bool:
         return self.get_square_color(pos) == 1
 
-    def get_piece(self, pos: Position | None) -> abc.Piece:
+    def get_piece(self, pos: Position | None) -> Piece:
         return NoPiece(self, pos) if self.not_on_board(pos) else self.pieces[pos[0]][pos[1]]
 
     def get_side(self, pos: Position | None) -> Side:
         return self.get_piece(pos).side
 
-    def get_promotion_side(self, piece: abc.Piece):
+    def get_promotion_side(self, piece: Piece):
         return piece.side or (Side.WHITE if piece.board_pos[0] < self.board_height / 2 else Side.BLACK)
 
-    def set_position(self, piece: abc.Piece, pos: Position) -> None:
+    def set_position(self, piece: Piece, pos: Position) -> None:
         piece.board_pos = pos
         piece.position = self.get_screen_position(pos)
 
-    def reset_position(self, piece: abc.Piece) -> None:
+    def reset_position(self, piece: Piece) -> None:
         self.set_position(piece, piece.board_pos)
 
     def on_board(self, pos: Position | None) -> bool:
@@ -1135,7 +1135,7 @@ class Board(Window):
 
         self.update_status()
 
-    def reset_promotions(self, piece_sets: dict[Side, list[Type[abc.Piece]]] | None = None) -> None:
+    def reset_promotions(self, piece_sets: dict[Side, list[Type[Piece]]] | None = None) -> None:
         if piece_sets is None:
             piece_sets = self.piece_sets
         self.promotions = {side: [] for side in self.promotions}
@@ -1147,12 +1147,12 @@ class Board(Window):
             ):
                 promotion_types = []
                 for piece in pieces:
-                    if piece not in used_piece_set and not issubclass(piece, abc.RoyalPiece):
+                    if piece not in used_piece_set and not issubclass(piece, RoyalPiece):
                         used_piece_set.add(piece)
                         promotion_types.append(piece)
                 self.promotions[side].extend(promotion_types[::-1])
 
-    def reset_edit_promotions(self, piece_sets: dict[Side, list[Type[abc.Piece]]] | None = None) -> None:
+    def reset_edit_promotions(self, piece_sets: dict[Side, list[Type[Piece]]] | None = None) -> None:
         if is_prefix_of('custom', self.edit_piece_set_id):
             self.edit_promotions = {
                 side: [piece_type for _, piece_type in self.custom_pieces.items()] + [Block, Wall]
@@ -1182,7 +1182,7 @@ class Board(Window):
                         promotion_types.append(piece)
                 self.edit_promotions[side].extend(promotion_types[::-1])
 
-    def reset_penultima_pieces(self, piece_sets: dict[Side, list[Type[abc.Piece]]] | None = None) -> None:
+    def reset_penultima_pieces(self, piece_sets: dict[Side, list[Type[Piece]]] | None = None) -> None:
         if piece_sets is None:
             piece_sets = self.piece_sets
         self.penultima_pieces = {side: {} for side in self.penultima_pieces}
@@ -1201,7 +1201,7 @@ class Board(Window):
     def get_piece_sets(
             self,
             piece_set_ids: dict[Side, int] | int | None = None
-    ) -> tuple[dict[Side, list[Type[abc.Piece]]], dict[Side, str]]:
+    ) -> tuple[dict[Side, list[Type[Piece]]], dict[Side, str]]:
         if piece_set_ids is None:
             piece_set_ids = self.piece_set_ids
         elif isinstance(piece_set_ids, int):
@@ -1228,7 +1228,7 @@ class Board(Window):
                 piece_names[side] = '-'
         return piece_sets, piece_names
 
-    def get_random_set(self, side: Side, asymmetrical: bool = False) -> tuple[list[Type[abc.Piece]], str]:
+    def get_random_set(self, side: Side, asymmetrical: bool = False) -> tuple[list[Type[Piece]], str]:
         # random_set_poss: independent random choices
         # random_set_poss[]: unique randomly sampled armies
         # random_set_poss[][]: positions taken by the random army
@@ -1248,7 +1248,7 @@ class Board(Window):
                     piece_set[pos] = get_set(side, random_set_ids[j])[pos]
         return piece_set, get_set_name(piece_set)
 
-    def get_extremely_random_set(self, side: Side, asymmetrical: bool = False) -> tuple[list[Type[abc.Piece]], str]:
+    def get_extremely_random_set(self, side: Side, asymmetrical: bool = False) -> tuple[list[Type[Piece]], str]:
         blocked_ids = set(self.board_config['block_ids_chaos'])
         piece_set_ids = list(i for i in range(len(piece_groups)) if i not in blocked_ids)
         piece_pos_ids = [i for i in range(4)] + [7]
@@ -1273,7 +1273,7 @@ class Board(Window):
         piece_set[4] = cb.King if piece_set[0].is_colorbound() else fide.King
         return piece_set, get_set_name(piece_set)
 
-    def get_chaos_set(self, side: Side) -> tuple[list[Type[abc.Piece]], str]:
+    def get_chaos_set(self, side: Side) -> tuple[list[Type[Piece]], str]:
         asymmetrical = self.chaos_mode in {2, 4}
         if self.chaos_mode in {1, 2}:
             return self.get_random_set(side, asymmetrical)
@@ -1308,9 +1308,9 @@ class Board(Window):
             piece = self.get_piece((row, col))
             if piece.side in self.movable_pieces and not piece.is_empty():
                 self.movable_pieces[piece.side].append(piece)
-                if isinstance(piece, abc.RoyalPiece):
+                if isinstance(piece, RoyalPiece):
                     self.royal_pieces[piece.side].append(piece)
-                elif isinstance(piece, abc.QuasiRoyalPiece):
+                elif isinstance(piece, QuasiRoyalPiece):
                     self.quasi_royal_pieces[piece.side].append(piece)
                 if isinstance(piece.movement, movement.ProbabilisticMovement):
                     self.probabilistic_pieces[piece.side].append(piece)
@@ -1445,8 +1445,8 @@ class Board(Window):
                 while chained_move:  # NB: could be None but if it is the loop is skipped anyway
                     capture = chained_move.captured_piece
                     if capture and capture.side == turn_side:
-                        royal_capture = isinstance(capture, abc.RoyalPiece)  # NB: quasi-royal pieces are treated as
-                        quasi_royal_capture = isinstance(capture, abc.QuasiRoyalPiece)  # royal if only one remains!
+                        royal_capture = isinstance(capture, RoyalPiece)  # NB: quasi-royal pieces are treated as
+                        quasi_royal_capture = isinstance(capture, QuasiRoyalPiece)  # royal if only one remains!
                         if self.royal_piece_mode == 1 and quasi_royal_capture:  # treat as royal capture (game over)
                             royal_capture = True
                         elif self.royal_piece_mode == 2:  # only treat as royal capture iff no other royalty exists!
@@ -2348,7 +2348,7 @@ class Board(Window):
             else:
                 self.set_caption(f"[Ply {self.ply_count}] {self.turn_side} to move")
 
-    def start_promotion(self, piece: abc.Piece, promotions: list[Type[abc.Piece]]) -> None:
+    def start_promotion(self, piece: Piece, promotions: list[Type[Piece]]) -> None:
         self.hide_moves()
         self.promotion_piece = piece
         piece_pos = piece.board_pos
@@ -2388,7 +2388,7 @@ class Board(Window):
                 promotions=self.promotions.get(side),
                 promotion_squares=self.promotion_squares.get(side),
             )
-            if issubclass(promotion, abc.RoyalPiece) and promotion not in self.piece_sets[side]:
+            if issubclass(promotion, RoyalPiece) and promotion not in self.piece_sets[side]:
                 if self.edit_mode and self.edit_piece_set_id is not None:
                     promotion_piece.is_hidden = False
                 self.update_piece(promotion_piece, asset_folder='other')
@@ -2432,8 +2432,8 @@ class Board(Window):
 
     def replace(
         self,
-        piece: abc.Piece,
-        new_piece: abc.Piece
+        piece: Piece,
+        new_piece: Piece
     ) -> None:
         new_piece.board_pos = None
         new_piece = copy(new_piece)
@@ -2548,7 +2548,7 @@ class Board(Window):
         for sprite in self.promotion_area_sprite_list:
             sprite.color = self.color_scheme['promotion_area_color']
         for sprite in self.promotion_piece_sprite_list:
-            if isinstance(sprite, abc.Piece):
+            if isinstance(sprite, Piece):
                 if isinstance(sprite, Obstacle):
                     sprite.color = self.color_scheme.get('wall_color', self.color_scheme['background_color'])
                 elif not sprite.is_empty():
@@ -2566,7 +2566,7 @@ class Board(Window):
 
     def update_piece(
         self,
-        piece: abc.Piece,
+        piece: Piece,
         asset_folder: str | None = None,
         file_name: str | None = None,
         penultima_flip: bool = None,
@@ -2609,8 +2609,8 @@ class Board(Window):
         for piece in sum(self.movable_pieces.values(), []):
             self.update_piece(piece)
         for piece in self.promotion_piece_sprite_list:
-            if isinstance(piece, abc.Piece) and not piece.is_empty():
-                if isinstance(piece, abc.RoyalPiece) and type(piece) not in self.piece_sets[piece.side]:
+            if isinstance(piece, Piece) and not piece.is_empty():
+                if isinstance(piece, RoyalPiece) and type(piece) not in self.piece_sets[piece.side]:
                     self.update_piece(piece, asset_folder='other')
                 elif not self.edit_mode or self.edit_piece_set_id is None:
                     self.update_piece(piece, penultima_flip=True)
@@ -2680,7 +2680,7 @@ class Board(Window):
         for sprite_list in (self.piece_sprite_list, self.promotion_piece_sprite_list, [self.active_piece]):
             for sprite in sprite_list:
                 if (
-                    isinstance(sprite, abc.Piece) and not sprite.is_empty()
+                    isinstance(sprite, Piece) and not sprite.is_empty()
                     and not (self.game_over and not self.edit_mode and sprite.side == self.check_side)
                 ):
                     direction = 1 if self.is_light_square(sprite.board_pos) else -1
@@ -2701,7 +2701,7 @@ class Board(Window):
         self.update_colors()
         for sprite_list in (self.piece_sprite_list, self.promotion_piece_sprite_list, [self.active_piece]):
             for sprite in sprite_list:
-                if isinstance(sprite, abc.Piece) and not sprite.is_empty():
+                if isinstance(sprite, Piece) and not sprite.is_empty():
                     sprite.angle = 0
 
     def resize_board(self, width: int = 0, height: int = 0) -> None:
