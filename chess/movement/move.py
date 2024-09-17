@@ -41,8 +41,8 @@ class Move(object):
         piece: Piece | None = None,
         captured_piece: Piece | None = None,
         swapped_piece: Piece | None = None,
-        promotion: Piece | frozenset | None = None,
-        chained_move: Move | frozenset | None = None,
+        promotion: Piece | type(Default) | None = None,
+        chained_move: Move | type(Default) | None = None,
         is_edit: bool | None = None
     ) -> Move:
         self.pos_from = pos_from or self.pos_from
@@ -52,11 +52,11 @@ class Move(object):
         self.captured_piece = captured_piece or self.captured_piece
         self.swapped_piece = swapped_piece or self.swapped_piece
         self.promotion = (
-            promotion if promotion is not None and promotion is not Default
+            promotion if promotion not in {None, Default}
             else None if promotion is Default else self.promotion
         )
         self.chained_move = (
-            chained_move if chained_move is not None and chained_move is not Default
+            chained_move if chained_move not in {None, Default}
             else None if chained_move is Default else self.chained_move
         )
         self.is_edit = is_edit if is_edit is not None else self.is_edit
