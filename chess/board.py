@@ -2704,6 +2704,8 @@ class Board(Window):
         width, height = width or self.board_width, height or self.board_height
         if self.game_loaded and self.board_width == width and self.board_height == height:
             return
+
+        old_highlight = self.get_board_position(self.highlight.position) if self.highlight_square else None
         old_width, old_height = self.board_width, self.board_height
         self.board_width, self.board_height = width, height
 
@@ -2763,6 +2765,7 @@ class Board(Window):
                 self.width + self.square_size * (self.board_width - old_width),
                 self.height + self.square_size * (self.board_height - old_height)
             )
+            self.update_highlight(old_highlight)
 
     def resize(self, width: float, height: float) -> None:
         if self.fullscreen:
