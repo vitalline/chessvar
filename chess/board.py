@@ -418,7 +418,6 @@ class Board(Window):
         self.log_data = []  # list of important logged strings
         self.verbose_data = []  # list of all logged strings
         self.verbose = self.board_config['verbose']  # whether to use verbose data for console output
-        self.last_data = None  # last saved or loaded data
         self.load_data = None  # last loaded data
         self.load_dict = None  # last loaded data, parsed from JSON
         self.load_path = None  # path to the last loaded data file
@@ -1081,7 +1080,6 @@ class Board(Window):
             if selection:
                 self.select_piece(fra(selection))
 
-        self.last_data = dump
         self.load_data = dump
         self.load_dict = data
         self.save_loaded = success
@@ -3744,12 +3742,11 @@ class Board(Window):
         if not path:
             return
         data = self.dump_board(self.board_config[f"partial_{'auto' * auto}save"])  # completely unnecessary but whatever
-        if auto and data == self.last_data:
+        if auto and data == self.save_data:
             return
         makedirs(dirname(path), exist_ok=True)
         with open(path, mode='w', encoding='utf-8') as file:
             file.write(data)
-        self.last_data = data
         self.save_data = data
         self.save_path = path
         saved = 'Auto-saved' if auto else 'Saved'
