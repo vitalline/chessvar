@@ -2790,6 +2790,9 @@ class Board(Window):
         self.set_size(round(max(width, min_width)), round(max(height, min_height)))
         self.log(f"[Ply {self.ply_count}] Info: Resized to {self.width}x{self.height}", False)
         self.set_location(x - (self.width - old_width) // 2, y - (self.height - old_height) // 2)
+        if not self.fullscreen:
+            self.windowed_size = self.width, self.height
+            self.windowed_square_size = min(self.width / (self.board_width + 2), self.height / (self.board_height + 2))
         self.set_visible(True)
 
     def toggle_fullscreen(self) -> None:
@@ -2817,7 +2820,7 @@ class Board(Window):
         self.set_fullscreen(screen=screens[screen])
 
     def set_visible(self, visible: bool = True) -> None:
-        if self.board_config['save_update_mode'] < 0 and self.load_data is not None:
+        if self.board_config['save_update_mode'] < 0 and self.load_data is None:
             visible = False
         super().set_visible(visible)
 
@@ -2860,9 +2863,6 @@ class Board(Window):
         self.skip_mouse_move = 2
         super().on_resize(width, height)
         self.update_sprites(self.flip_mode)
-        if not self.fullscreen:
-            self.windowed_size = self.width, self.height
-            self.windowed_square_size = min(self.width / (self.board_width + 2), self.height / (self.board_height + 2))
 
     def on_activate(self) -> None:
         if not self.is_active:
