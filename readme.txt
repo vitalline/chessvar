@@ -63,6 +63,7 @@ Ctrl + Shift + H: show pieces
 Ctrl + M: show move markers
 Shift + M: hide move markers
 Ctrl + Shift + M: show move markers if pieces are shown, hide otherwise
+Alt + M: clear future move history (twice: also clear future rolls)
 Ctrl + K: show valid moves for both sides
 Shift + K: show theoretical moves for both sides
 Ctrl + Shift + K: show valid moves for current player, theoretical moves for other player

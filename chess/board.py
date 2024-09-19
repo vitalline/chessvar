@@ -1422,8 +1422,7 @@ class Board(Window):
                     signature |= {(piece.board_pos, type(piece))}
                 old_signature = self.probabilistic_piece_history[self.ply_count - 1]
                 if signature != old_signature:
-                    self.roll_history = self.roll_history[:self.ply_count]
-                    self.probabilistic_piece_history = self.probabilistic_piece_history[:self.ply_count]
+                    self.clear_future_history()
                     removed = old_signature.difference(signature)
                     for pos, piece_type in sorted(removed, key=lambda x: x[0]):
                         if pos in self.roll_history[self.ply_count - 1]:
@@ -1822,6 +1821,11 @@ class Board(Window):
                     move.swapped_piece.movement.unmark(move.pos_from, move.swapped_piece)
                     move.swapped_piece.movement.mark(move.pos_to, move.swapped_piece)
 
+    def clear_future_history(self) -> None:
+        self.future_move_history = []
+        self.roll_history = self.roll_history[:self.ply_count - 1]
+        self.probabilistic_piece_history = self.probabilistic_piece_history[:self.ply_count - 1]
+
     def compare_history(self) -> None:
         # check if the last move matches the first future move
         if self.future_move_history and self.move_history:  # if there are any moves to compare that is
@@ -1831,9 +1835,7 @@ class Board(Window):
             ):
                 self.future_move_history.pop()  # if it does, the other future moves are still makeable, so we keep them
             else:
-                self.future_move_history = []  # otherwise, we can't redo the future moves anymore, so we clear them
-                self.roll_history = self.roll_history[:self.ply_count - 1]  # and we also clear the roll history
-                self.probabilistic_piece_history = self.probabilistic_piece_history[:self.ply_count - 1]
+                self.clear_future_history()  # otherwise, we can't redo the future moves anymore, so we clear them
 
     def reload_history(self) -> bool:
         edit_mode = self.edit_mode
@@ -3252,8 +3254,7 @@ class Board(Window):
                         self.log(f"[Ply {self.ply_count}] Info: Probabilistic piece on {toa(piece.board_pos)} updated")
                         self.advance_turn()
                 else:  # Update all probabilistic pieces
-                    self.roll_history = self.roll_history[:self.ply_count - 1]
-                    self.probabilistic_piece_history = self.probabilistic_piece_history[:self.ply_count - 1]
+                    self.clear_future_history()
                     self.log(f"[Ply {self.ply_count}] Info: Probabilistic pieces updated")
                     self.advance_turn()
         if symbol == key.F11:  # Full screen (toggle)
@@ -3564,24 +3565,33 @@ class Board(Window):
                 self.update_pieces()
                 self.show_moves()
         if symbol == key.M:  # Moves
-            old_should_hide_moves = self.should_hide_moves
-            if modifiers & key.MOD_ACCEL and modifiers & key.MOD_SHIFT:  # Default
-                self.should_hide_moves = None
-            elif modifiers & key.MOD_SHIFT:  # Hide
-                self.should_hide_moves = True
-            elif modifiers & key.MOD_ACCEL:  # Show
-                self.should_hide_moves = False
-            if old_should_hide_moves != self.should_hide_moves:
-                if self.should_hide_moves is None:
-                    self.log(f"[Ply {self.ply_count}] Info: Move markers default to piece visibility", False)
-                elif self.should_hide_moves is False:
-                    self.log(f"[Ply {self.ply_count}] Info: Move markers default to shown", False)
-                elif self.should_hide_moves is True:
-                    self.log(f"[Ply {self.ply_count}] Info: Move markers default to hidden", False)
+            if modifiers & key.MOD_ALT:  # Clear future move history
+                self.log(f"[Ply {self.ply_count}] Info: Future move history cleared", False)
+                if self.future_move_history:
+                    self.future_move_history = []
                 else:
-                    self.should_hide_moves = old_should_hide_moves
-                self.update_pieces()
-                self.show_moves()
+                    self.clear_future_history()
+                    self.log(f"[Ply {self.ply_count}] Info: Probabilistic pieces updated")
+                    self.advance_turn()
+            else:
+                old_should_hide_moves = self.should_hide_moves
+                if modifiers & key.MOD_ACCEL and modifiers & key.MOD_SHIFT:  # Default
+                    self.should_hide_moves = None
+                elif modifiers & key.MOD_SHIFT:  # Hide
+                    self.should_hide_moves = True
+                elif modifiers & key.MOD_ACCEL:  # Show
+                    self.should_hide_moves = False
+                if old_should_hide_moves != self.should_hide_moves:
+                    if self.should_hide_moves is None:
+                        self.log(f"[Ply {self.ply_count}] Info: Move markers default to piece visibility", False)
+                    elif self.should_hide_moves is False:
+                        self.log(f"[Ply {self.ply_count}] Info: Move markers default to shown", False)
+                    elif self.should_hide_moves is True:
+                        self.log(f"[Ply {self.ply_count}] Info: Move markers default to hidden", False)
+                    else:
+                        self.should_hide_moves = old_should_hide_moves
+                    self.update_pieces()
+                    self.show_moves()
         if symbol == key.K and not self.should_hide_moves:  # Move markers
             selected_square = self.selected_square
             if modifiers & key.MOD_ACCEL and modifiers & key.MOD_SHIFT:  # Default
