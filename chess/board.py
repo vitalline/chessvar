@@ -3207,7 +3207,10 @@ class Board(Window):
                 self.draw(0)
                 self.log(f"[Ply {self.ply_count}] Info: Selecting a file to save to", False)
                 save_path = select_save_name()
-                self.save(save_path)
+                if save_path:
+                    self.save(save_path)
+                else:
+                    self.log(f"[Ply {self.ply_count}] Info: Save cancelled", False)
                 self.activate()
         if symbol == key.R:  # Restart
             if modifiers & key.MOD_ALT:  # Reload save data
@@ -3628,7 +3631,11 @@ class Board(Window):
                 self.deactivate()
                 self.draw(0)
                 self.log(f"[Ply {self.ply_count}] Info: Selecting a file to load from", False)
-                self.load(select_save_data(), with_history=modifiers & key.MOD_SHIFT)
+                load_path = select_save_data()
+                if load_path:
+                    self.load(load_path, with_history=modifiers & key.MOD_SHIFT)
+                else:
+                    self.log(f"[Ply {self.ply_count}] Info: Load cancelled", False)
                 self.activate()
             else:  # Log
                 if modifiers & key.MOD_ACCEL and modifiers & key.MOD_SHIFT:  # Toggle verbose
