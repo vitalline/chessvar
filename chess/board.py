@@ -767,7 +767,7 @@ class Board(Window):
 
         self.update_status()
 
-    def dump_board(self) -> str:
+    def dump_board(self, partial: bool = False) -> str:
         data = {
             'board_size': [self.board_width, self.board_height],
             'window_size': list(self.windowed_size),
@@ -832,9 +832,8 @@ class Board(Window):
             new_rng = Random(seed)
             if rng.getstate() != new_rng.getstate():
                 data[f"{k}_state"] = save_rng(rng)
-        if self.board_config['partial_save']:
-            if self.load_data is not None:
-                data = {k: v for k, v in data.items() if k in self.load_data}
+        if partial and self.load_data is not None:
+            data = {k: v for k, v in data.items() if k in self.load_data}
         indent = self.board_config['save_indent']
         if indent is None:
             return dumps(data, separators=(',', ':'), ensure_ascii=False)
@@ -3726,7 +3725,7 @@ class Board(Window):
     def save(self, path: str | None, auto: bool = False) -> None:
         if not path:
             return
-        data = self.dump_board()
+        data = self.dump_board(self.board_config[f"partial_{'auto' * auto}save"])  # completely unnecessary but whatever
         if auto and data == self.save_data:
             return
         makedirs(dirname(path), exist_ok=True)

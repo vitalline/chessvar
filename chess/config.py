@@ -25,6 +25,7 @@ DEFAULT_CONFIG = {
         'save_indent': '',
         'save_update_mode': 0,
         'partial_save': False,
+        'partial_autosave': False,
         'autosave_act': 0,
         'autosave_ply': 0,
         'autosave_time': 0,
