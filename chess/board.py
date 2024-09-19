@@ -23,7 +23,7 @@ from chess.color import average, darken, desaturate, lighten, saturate
 from chess.config import Config
 from chess.movement import movement
 from chess.movement.move import Move
-from chess.movement.util import Position, add, to_alpha as toa, from_alpha as fra, to_b26 as b26
+from chess.movement.util import Position, add, to_algebraic as toa, from_algebraic as fra, to_alpha as b26
 from chess.pieces.groups import classic as fide
 from chess.pieces.groups import amazon as am, amontillado as ao, asymmetry as ay, avian as av
 from chess.pieces.groups import backward as bw, beast as bs, breakfast as bk, burn as br, buzz as bz

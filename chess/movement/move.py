@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Type
 
-from chess.movement.util import Position, to_alpha
+from chess.movement.util import Position, to_algebraic as toa
 from chess.util import Default, Unset
 
 if TYPE_CHECKING:
@@ -112,18 +112,18 @@ class Move(object):
         moved = self.pos_from != self.pos_to
         if self.pos_from is not None and self.pos_to is not None and moved:
             if self.is_edit:
-                string = f"on {to_alpha(self.pos_from)} is moved to {to_alpha(self.pos_to)}"
+                string = f"on {toa(self.pos_from)} is moved to {toa(self.pos_to)}"
             else:
-                string = f"on {to_alpha(self.pos_from)} goes to {to_alpha(self.pos_to)}"
+                string = f"on {toa(self.pos_from)} goes to {toa(self.pos_to)}"
         elif self.pos_from is None or (self.piece and self.piece.is_empty() and not moved):
             if self.promotion is Unset:
-                string = f"wants something to appear on {to_alpha(self.pos_to)}"
+                string = f"wants something to appear on {toa(self.pos_to)}"
             else:
-                string = f"appears on {to_alpha(self.pos_to)}"
+                string = f"appears on {toa(self.pos_to)}"
         elif self.pos_to is None:
-            string = f"disappears from {to_alpha(self.pos_from)}"
+            string = f"disappears from {toa(self.pos_from)}"
         elif not moved:
-            string = f"decides to stay on {to_alpha(self.pos_from)}"
+            string = f"decides to stay on {toa(self.pos_from)}"
         else:
             string = "does something very mysterious"
         if self.piece:
@@ -139,7 +139,7 @@ class Move(object):
         if self.captured_piece:
             string += f", takes {self.captured_piece}"
             if self.captured_piece.board_pos != self.pos_to:
-                string += f" on {to_alpha(self.captured_piece.board_pos)}"
+                string += f" on {toa(self.captured_piece.board_pos)}"
         if self.swapped_piece:
             string += f", swaps with {self.swapped_piece}"
         if self.pos_from is not None and not (self.piece and self.piece.is_empty() and not moved) and self.piece:

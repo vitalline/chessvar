@@ -112,26 +112,24 @@ def merge(a: list[AnyDirection], b: list[AnyDirection], clash_resolution: ClashR
 
 
 UNKNOWN_COORDINATE_STRING = '\u2588' * 2
+COORDINATE_ALPHABET = 'abcdefghijklmnopqrstuvwxyz'
 
 
-LOWERCASE_OFFSET = ord('a') - 1
+def to_alpha(n: int) -> str:
+    return '' if n == 0 else to_alpha((n - 1) // 26) + COORDINATE_ALPHABET[(n - 1) % 26]
 
 
-def to_b26(n: int) -> str:
-    return '' if n == 0 else to_b26((n - 1) // 26) + chr((n - 1) % 26 + LOWERCASE_OFFSET + 1)
+def from_alpha(s: str) -> int:
+    return 0 if not s else from_alpha(s[:-1]) * 26 + COORDINATE_ALPHABET.index(s[-1]) + 1
 
 
-def from_b26(s: str) -> int:
-    return 0 if not s else from_b26(s[:-1]) * 26 + ord(s[-1]) - LOWERCASE_OFFSET
+def to_algebraic(pos: Position | None) -> str:
+    return UNKNOWN_COORDINATE_STRING if pos is None else to_alpha(pos[1] + 1) + str(pos[0] + 1)
 
 
-def to_alpha(pos: Position | None) -> str:
-    return UNKNOWN_COORDINATE_STRING if pos is None else to_b26(pos[1] + 1) + str(pos[0] + 1)
-
-
-def from_alpha(pos: str) -> Position | None:
+def from_algebraic(pos: str) -> Position | None:
     if str == UNKNOWN_COORDINATE_STRING:
         return None
     pos = pos.lower()
     split_index = next((i for i, c in enumerate(pos) if c.isdigit()), len(pos))
-    return int(pos[split_index:]) - 1, from_b26(pos[:split_index]) - 1
+    return int(pos[split_index:]) - 1, from_alpha(pos[:split_index]) - 1

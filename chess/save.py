@@ -8,7 +8,7 @@ from typing import TYPE_CHECKING, Type, Any
 from chess.movement.move import Move
 from chess.movement.movement import BaseMovement
 from chess.pieces.side import Side
-from chess.movement.util import to_alpha as toa, from_alpha as fra
+from chess.movement.util import to_algebraic as toa, from_algebraic as fra
 from chess.pieces import piece as piece_module
 from chess.pieces.piece import Piece
 from chess.pieces.groups.util import NonMovingPiece, NoPiece
