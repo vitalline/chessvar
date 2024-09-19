@@ -934,7 +934,6 @@ class Board(Window):
         custom_data = data.get('custom', {})
         self.custom_pieces = {k: load_custom_type(v, k) for k, v in custom_data.items()}
         c = self.custom_pieces
-        self.custom_layout = {(p := fra(k)): load_piece(v, self, c).on(p) for k, v in data.get('layout', {}).items()}
 
         self.chaos_sets = {}
         self.piece_set_ids |= {Side(int(k)): v for k, v in data.get('set_ids', {}).items()}
@@ -963,6 +962,8 @@ class Board(Window):
         self.reset_promotions()
         self.reset_edit_promotions()
         self.reset_penultima_pieces()
+
+        self.custom_layout = {(p := fra(k)): load_piece(v, self, c).on(p) for k, v in data.get('layout', {}).items()}
 
         ply_count = data.get('ply', self.ply_count)
         self.turn_side = Side(data.get('side', self.turn_side))
