@@ -23,7 +23,7 @@ from chess.color import average, darken, desaturate, lighten, saturate
 from chess.config import Config
 from chess.movement import movement
 from chess.movement.move import Move
-from chess.movement.util import Position, add, to_algebraic as toa, from_algebraic as fra, to_alpha as b26
+from chess.movement.util import Position, add, to_alpha as b26, to_algebraic as toa, from_algebraic as fra
 from chess.pieces.groups import classic as fide
 from chess.pieces.groups import amazon as am, amontillado as ao, asymmetry as ay, avian as av
 from chess.pieces.groups import backward as bw, beast as bs, breakfast as bk, burn as br, buzz as bz
@@ -2386,7 +2386,9 @@ class Board(Window):
                 promotions=self.promotions.get(side),
                 promotion_squares=self.promotion_squares.get(side),
             )
-            if issubclass(promotion, RoyalPiece) and promotion not in self.piece_sets[side]:
+            if self.edit_mode and is_prefix_of('custom', self.edit_piece_set_id):
+                promotion_piece.reload(is_hidden=False, flipped_horizontally=False)
+            elif issubclass(promotion, RoyalPiece) and promotion not in self.piece_sets[side]:
                 if self.edit_mode and self.edit_piece_set_id is not None:
                     promotion_piece.is_hidden = False
                 self.update_piece(promotion_piece, asset_folder='other')
@@ -2608,7 +2610,9 @@ class Board(Window):
             self.update_piece(piece)
         for piece in self.promotion_piece_sprite_list:
             if isinstance(piece, Piece) and not piece.is_empty():
-                if isinstance(piece, RoyalPiece) and type(piece) not in self.piece_sets[piece.side]:
+                if self.edit_mode and is_prefix_of('custom', self.edit_piece_set_id):
+                    piece.reload(is_hidden=False, flipped_horizontally=False)
+                elif isinstance(piece, RoyalPiece) and type(piece) not in self.piece_sets[piece.side]:
                     self.update_piece(piece, asset_folder='other')
                 elif not self.edit_mode or self.edit_piece_set_id is None:
                     self.update_piece(piece, penultima_flip=True)
