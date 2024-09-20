@@ -2610,6 +2610,7 @@ class Board(Window):
             is_hidden = bool(self.should_hide_pieces) or Default
         file_name, flip = (file_name[:-1], penultima_flip) if file_name[-1] == '|' else (file_name, False)
         piece.reload(is_hidden=is_hidden, asset_folder=asset_folder, file_name=file_name, flipped_horizontally=flip)
+        piece.scale = self.square_size / piece.texture.width
 
     def update_pieces(self) -> None:
         for piece in sum(self.movable_pieces.values(), []):
