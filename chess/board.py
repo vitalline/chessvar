@@ -3642,18 +3642,19 @@ class Board(Window):
                     self.verbose = not self.verbose
                     self.log(f"[Ply {self.ply_count}] Info: Verbose output: {'ON' if self.verbose else 'OFF'}", False)
                 elif modifiers & key.MOD_ACCEL:  # Save log
-                    self.log(f"[Ply {self.ply_count}] Info: Saving log", False)
                     self.save_log()
+                    self.log(f"[Ply {self.ply_count}] Info: Log file saved", False)
                 elif modifiers & key.MOD_SHIFT:  # Save verbose log
-                    self.log(f"[Ply {self.ply_count}] Info: Saving verbose log", False)
                     self.save_log(self.verbose_data, 'verbose')
+                    self.log(f"[Ply {self.ply_count}] Info: Verbose log file saved", False)
         if symbol == key.D:  # Debug
-            debug_log_data = self.debug_info()
             if modifiers & key.MOD_ACCEL:  # Save debug log
-                self.log(f"[Ply {self.ply_count}] Info: Saving debug log", False)
+                self.log(f"[Ply {self.ply_count}] Info: Saving debug information", False)
+                debug_log_data = self.debug_info()
                 self.save_log(debug_log_data, 'debug')
             if modifiers & key.MOD_SHIFT:  # Print debug log
-                self.log(f"[Ply {self.ply_count}] Info: Printing debug log", False)
+                self.log(f"[Ply {self.ply_count}] Info: Printing debug information", False)
+                debug_log_data = self.debug_info()
                 for string in debug_log_data:
                     print(f"[Debug] {string}")
             if modifiers & key.MOD_ALT:  # Save debug listings
