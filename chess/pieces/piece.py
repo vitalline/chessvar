@@ -118,6 +118,7 @@ class Piece(Sprite):
             )
             self.texture = new_texture
             self.color = color
+            self.scale = self.board.square_size / self.texture.width
 
     def set_color(self, color: Color, force_color: bool = False):
         if not self.name:
