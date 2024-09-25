@@ -938,7 +938,9 @@ class Board(Window):
         self.chaos_sets = {}
         self.piece_set_ids |= {Side(int(k)): v for k, v in data.get('set_ids', {}).items()}
         self.piece_sets, self.piece_set_names = self.get_piece_sets()
-        saved_piece_sets = {Side(int(v)): [load_piece_type(t, c) for t in d] for v, d in data.get('sets', {}).items()}
+        saved_piece_sets = {
+            Side(int(v)): [load_piece_type(t, c) or NoPiece for t in d] for v, d in data.get('sets', {}).items()
+        }
         update_sets = False
         for side in self.piece_sets:
             if self.piece_set_ids[side] is None:

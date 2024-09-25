@@ -49,6 +49,8 @@ def load_piece_type(data: str | None, from_dict: dict | None = None) -> Type[Pie
         if len(parts) == 1:
             return getattr(piece_module, data)
         return getattr(import_module(f"chess.pieces.groups.{parts[0]}"), parts[1])
+    except ImportError:
+        return None
     except AttributeError:
         return None
 
