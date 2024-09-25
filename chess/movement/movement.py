@@ -117,9 +117,7 @@ class RiderMovement(BaseDirectionalMovement):
         return (
             self.board.not_on_board(next_pos_to)
             or move.pos_from == next_pos_to
-            or len(direction) > 2 and direction[2] and (
-                move.pos_to == self.transform(add(move.pos_from, mul(direction[:2], direction[2])))
-            )
+            or len(direction) > 2 and direction[2] and self.steps >= direction[2]
             or not theoretical and (
                 (piece.side.blocked_by((next_piece := self.board.get_piece(next_pos_to)).side) and piece != next_piece)
                 or (piece.side.captures(self.board.get_side(move.pos_to)) and move.pos_from != move.pos_to)
