@@ -269,10 +269,14 @@ class RangedCaptureRiderMovement(RiderMovement):
 class RangedAutoCaptureRiderMovement(RiderMovement):
     # Note: This implementation assumes that the pieces that utilize it cannot be blocked by another piece mid-movement.
     # This is true for the only army that utilizes this movement type, but it may not work correctly in other scenarios.
+    def __init__(self, board: Board, directions: list[AnyDirection]):
+        super().__init__(board, directions)
+        self.range = RiderMovement(board, directions)
+
     def generate_captures(self, move: Move, piece: Piece) -> Move:
         if not move.is_edit:
             captures = {}
-            for capture in super().moves(move.pos_to, piece):
+            for capture in self.range.moves(move.pos_to, piece):
                 captured_piece = self.board.get_piece(capture.pos_to)
                 if piece.side.captures(captured_piece.side):
                     captures[capture.pos_to] = copy(capture)
@@ -297,14 +301,14 @@ class RangedAutoCaptureRiderMovement(RiderMovement):
 class AutoRangedAutoCaptureRiderMovement(RangedAutoCaptureRiderMovement):
     # Note: Same as RangedAutoCaptureRiderMovement, this assumes that pieces that use it cannot be blocked mid-movement.
     def mark(self, pos: Position, piece: Piece):
-        for move in self.moves(pos, piece, True):
+        for move in self.range.moves(pos, piece, True):
             if move.pos_to not in self.board.auto_capture_markers[piece.side]:
                 self.board.auto_capture_markers[piece.side][move.pos_to] = set()
             # noinspection PyTestUnpassedFixture
             self.board.auto_capture_markers[piece.side][move.pos_to].add(pos)
 
     def unmark(self, pos: Position, piece: Piece):
-        for move in self.moves(pos, piece, True):
+        for move in self.range.moves(pos, piece, True):
             if move.pos_to in self.board.auto_capture_markers[piece.side]:
                 self.board.auto_capture_markers[piece.side][move.pos_to].discard(pos)
                 if not self.board.auto_capture_markers[piece.side][move.pos_to]:
