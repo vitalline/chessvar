@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from copy import copy, deepcopy
-from math import ceil
+from math import ceil, floor
 from typing import TYPE_CHECKING
 
 from chess.movement.move import Move
@@ -48,9 +48,9 @@ class BaseMovement(object):
 
 
 class BaseDirectionalMovement(BaseMovement):
-    def __init__(self, board: Board, directions: list[AnyDirection]):
+    def __init__(self, board: Board, directions: list[AnyDirection] | None = None):
         super().__init__(board)
-        self.directions = directions
+        self.directions = directions or []
         self.steps = 0
 
     def initialize_direction(self, direction: AnyDirection, pos_from: Position, piece: Piece) -> None:
@@ -134,7 +134,7 @@ class RiderMovement(BaseDirectionalMovement):
 
 
 class HalflingRiderMovement(RiderMovement):
-    def __init__(self, board: Board, directions: list[AnyDirection], shift: int = 0):
+    def __init__(self, board: Board, directions: list[AnyDirection] | None = None, shift: int = 0):
         super().__init__(board, directions)
         self.shift = shift
         self.max_steps = 0
@@ -156,7 +156,7 @@ class HalflingRiderMovement(RiderMovement):
 
 
 class CannonRiderMovement(RiderMovement):
-    def __init__(self, board: Board, directions: list[AnyDirection]):
+    def __init__(self, board: Board, directions: list[AnyDirection] | None = None):
         super().__init__(board, directions)
         self.jumped = None
 
@@ -440,9 +440,9 @@ class EnPassantRiderMovement(RiderMovement):
 
 
 class BaseMultiMovement(BaseMovement):
-    def __init__(self, board: Board, movements: list[BaseMovement]):
+    def __init__(self, board: Board, movements: list[BaseMovement] | None = None):
         super().__init__(board)
-        self.movements = movements
+        self.movements = movements or []
         for movement in self.movements:
             movement.board = board  # just in case.
 
@@ -493,7 +493,7 @@ class FirstMoveMovement(BaseMultiMovement):
 
 
 class BentMovement(BaseMultiMovement):
-    def __init__(self, board: Board, movements: list[BaseDirectionalMovement], start_index: int = 0):
+    def __init__(self, board: Board, movements: list[BaseDirectionalMovement] | None = None, start_index: int = 0):
         super().__init__(board, movements)
         self.start_index = start_index
 
@@ -522,6 +522,32 @@ class BentMovement(BaseMultiMovement):
 
     def __copy_args__(self):
         return self.board, deepcopy(self.movements), self.start_index
+
+
+class RepeatMovement(BentMovement):
+    def __init__(
+        self,
+        board: Board,
+        movements: list[BaseDirectionalMovement] | None = None,
+        start_index: int = 0,
+        count: int = 0
+    ):
+        super().__init__(board, movements, start_index)
+        self.count = count
+        self.loops = 0
+
+    def moves(self, pos_from: Position, piece: Piece, theoretical: bool = False, index: int = 0):
+        if index == 0:
+            self.loops = 0
+        if index >= len(self.movements):
+            self.loops += 1
+        index %= len(self.movements)
+        if self.count and self.count <= index + self.loops * len(self.movements):
+            return ()
+        yield from super().moves(pos_from, piece, theoretical, index)
+
+    def __copy_args__(self):
+        return self.board, deepcopy(self.movements), self.start_index, self.count
 
 
 class ChainMovement(BaseMultiMovement):
@@ -615,20 +641,34 @@ class SideMovement(BaseMultiMovement):
         self,
         board: Board,
         left: list[BaseMovement] | None = None,
-        right: list[BaseMovement] | None = None
+        right: list[BaseMovement] | None = None,
+        bottom: list[BaseMovement] | None = None,
+        top: list[BaseMovement] | None = None
     ):
         self.left = left or []
         self.right = right or []
+        self.bottom = bottom or []
+        self.top = top or []
         super().__init__(board, self.left + self.right)
 
     def moves(self, pos_from: Position, piece: Piece, theoretical: bool = False):
-        if pos_from[1] <= (self.board.board_width - 1) / 2:
+        if pos_from[1] < ceil(self.board.board_width / 2):
             for movement in self.left:
                 for move in movement.moves(pos_from, piece, theoretical):
                     move.movement_type = type(self)
                     yield copy(move)
-        if pos_from[1] >= (self.board.board_width - 1) / 2:
+        if pos_from[1] >= floor(self.board.board_width / 2):
             for movement in self.right:
+                for move in movement.moves(pos_from, piece, theoretical):
+                    move.movement_type = type(self)
+                    yield copy(move)
+        if pos_from[0] < ceil(self.board.board_height / 2):
+            for movement in self.bottom:
+                for move in movement.moves(pos_from, piece, theoretical):
+                    move.movement_type = type(self)
+                    yield copy(move)
+        if pos_from[0] >= floor(self.board.board_height / 2):
+            for movement in self.top:
                 for move in movement.moves(pos_from, piece, theoretical):
                     move.movement_type = type(self)
                     yield copy(move)

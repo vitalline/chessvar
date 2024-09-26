@@ -1,5 +1,3 @@
-from math import ceil
-
 from chess.movement import movement
 from chess.movement.util import rot, sym, symh, symv
 from chess.pieces.piece import Piece
@@ -48,16 +46,14 @@ class Sidewinder(Piece):
     colorbound = True
 
     def __init__(self, board, board_pos, side, **kwargs):
-        movements = [movement.RiderMovement(board, symh([(2, 0, 1)]))]
-        for i, j in rot([(1, 1)]):
-            rider_movements = []
-            for m in range(int(ceil(max(board.board_width, board.board_height) / 2))):
-                rider_movements.append(movement.RiderMovement(board, [(i, j, 1)]))
-                rider_movements.append(movement.RiderMovement(board, [(-i, j, 1)]))
-            movements.append(movement.BentMovement(board, rider_movements))
         super().__init__(
             board, board_pos, side,
-            movement.MultiMovement(board, movements),
+            movement.MultiMovement(board, [movement.RiderMovement(board, symh([(2, 0, 1)]))] + [
+                movement.RepeatMovement(board, [
+                    movement.RiderMovement(board, [(i, j, 1)]),
+                    movement.RiderMovement(board, [(-i, j, 1)])
+                ]) for i, j in rot([(1, 1)])
+            ]),
             **kwargs
         )
 

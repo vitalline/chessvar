@@ -9,18 +9,14 @@ class MachineRdr(Piece):
     asset_folder = 'multimove'
 
     def __init__(self, board, board_pos, side, **kwargs):
-        movements = [movement.RiderMovement(board, rot([(2, 0, 2)]))]
-        for i, j in rot([(1, 0)]):
-            for k, l in [(1, 2), (2, 1)]:
-                movements.append(
-                    movement.BentMovement(board, [
-                        movement.RiderMovement(board, [(k * i, k * j, 1)]),
-                        movement.RiderMovement(board, [(l * i, l * j, 1)])
-                    ])
-                )
         super().__init__(
             board, board_pos, side,
-            movement.MultiMovement(board, movements),
+            movement.MultiMovement(board, [movement.RiderMovement(board, rot([(2, 0, 2)]))] + [
+                movement.BentMovement(board, [
+                    movement.RiderMovement(board, [(k * i, k * j, 1)]),
+                    movement.RiderMovement(board, [(l * i, l * j, 1)])
+                ]) for i, j in rot([(1, 0)]) for k, l in [(1, 2), (2, 1)]
+            ]),
             **kwargs
         )
 
@@ -45,18 +41,14 @@ class Tusker(Piece):
     colorbound = True
 
     def __init__(self, board, board_pos, side, **kwargs):
-        movements = [movement.RiderMovement(board, rot([(2, 2, 2)]))]
-        for i, j in rot([(1, 1)]):
-            for k, l in [(1, 2), (2, 1)]:
-                movements.append(
-                    movement.BentMovement(board, [
-                        movement.RiderMovement(board, [(k * i, k * j, 1)]),
-                        movement.RiderMovement(board, [(l * -i, l * j, 1), (l * i, l * -j, 1)])
-                    ])
-                )
         super().__init__(
             board, board_pos, side,
-            movement.MultiMovement(board, movements),
+            movement.MultiMovement(board, [movement.RiderMovement(board, rot([(2, 2, 2)]))] + [
+                movement.BentMovement(board, [
+                    movement.RiderMovement(board, [(k * i, k * j, 1)]),
+                    movement.RiderMovement(board, [(l * -i, l * j, 1), (l * i, l * -j, 1)])
+                ]) for i, j in rot([(1, 1)]) for k, l in [(1, 2), (2, 1)]
+            ]),
             **kwargs
         )
 
@@ -67,17 +59,13 @@ class Hierophant(Piece):
     asset_folder = 'multimove'
 
     def __init__(self, board, board_pos, side, **kwargs):
-        movements = [movement.RiderMovement(board, rot([(2, 0, 2), (2, 2, 2)]))]
-        for i, j in rot([(1, 0), (1, 1)]):
-            for k, l in [(1, 2), (2, 1)]:
-                movements.append(
-                    movement.BentMovement(board, [
-                        movement.RiderMovement(board, [(k * i, k * j, 1)]),
-                        movement.RiderMovement(board, [(l * i, l * j, 1)])
-                    ])
-                )
         super().__init__(
             board, board_pos, side,
-            movement.MultiMovement(board, movements),
+            movement.MultiMovement(board, [movement.RiderMovement(board, rot([(2, 0, 2), (2, 2, 2)]))] + [
+                movement.BentMovement(board, [
+                    movement.RiderMovement(board, [(k * i, k * j, 1)]),
+                    movement.RiderMovement(board, [(l * i, l * j, 1)])
+                ]) for i, j in rot([(1, 0), (1, 1)]) for k, l in [(1, 2), (2, 1)]
+            ]),
             **kwargs
         )

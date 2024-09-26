@@ -140,11 +140,14 @@ def save_movement(movement: BaseMovement | frozenset | None) -> list | str | Non
         return None  # if the movement is Unset (which I'm pretty sure it never is), return the UNSET_STRING
     if movement is Unset:  # otherwise, we need to return a list consisting of the movement type as a string
         return UNSET_STRING  # and the rest of the arguments saved as a list of arguments (using the helper)
-    return [save_movement_type(type(movement))] + [save_arg(arg) for arg in movement.__copy_args__()[1:]]
+    args = list(movement.__copy_args__()[1:])  # store arguments of the movement (except the board argument)
+    while not args[-1]:  # some movement classes have optional __init__() arguments with falsy defaults that
+        args.pop()  # aren't needed to reconstruct the movement, so we can remove the trailing ones and then
+    return [save_movement_type(type(movement))] + [save_arg(arg) for arg in args]  # save the data as a list
 
 
 def load_movement(data: list | str | None, board: Board) -> BaseMovement | frozenset | None:
-    def load_arg(arg: Any) -> Any:  # the logic is slightly more complicated in this helper function but only slightly
+    def load_arg(arg: Any) -> Any:  # the logic is slightly less complicated in this helper function but only slightly
         if isinstance(arg, list):  # it's a list, so it's either a direction, a movement, or a list of either of those
             if not arg:  # if it's empty, it's an empty list. duh. just return it as is, same as the last helper func.
                 return arg  # it is the one case where we don't have to do anything. if only life was always this easy
