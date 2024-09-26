@@ -799,10 +799,6 @@ class Board(Window):
                 n: {toa(pos): save_piece_type(t) for pos, t in sorted(d, key=lambda x: x[0])}
                 for n, d in enumerate(self.probabilistic_piece_history) if d
             },
-            'auto_captures': {
-                side.value: {toa(on): [toa(of) for of in sorted(ofs)] for on, ofs in d.items()}
-                for side, d in self.auto_capture_markers.items() if d
-            },
             'promotion': save_piece(self.promotion_piece),
             'chain_start': save_move(self.chain_start),
             'chain_moves': [
@@ -981,11 +977,6 @@ class Board(Window):
             ({(fra(k), load_piece_type(v, c)) for k, v in rph[str(n)].items()} if str(n) in rph else set())
             for n in range(ply_count)
         ]
-        ac = data.get('auto_captures', {})
-        self.auto_capture_markers = {
-            side: {fra(on): {fra(of) for of in ofs} for on, ofs in ac[str(side.value)].items()}
-            if str(side.value) in ac else {} for side in self.auto_capture_markers
-        }
 
         self.chain_start = load_move(data.get('chain_start'), self, c)
         if self.move_history and self.move_history[-1] and self.move_history[-1].matches(self.chain_start):
@@ -1032,6 +1023,9 @@ class Board(Window):
         self.load_pieces()
         self.update_pieces()
         self.update_colors()
+        for side in self.auto_ranged_pieces:
+            if self.auto_ranged_pieces[side]:
+                self.load_auto_capture_markers(side)
 
         starting = 'Starting new' if with_history else 'Resuming saved'
         if self.custom_layout:
