@@ -1510,11 +1510,9 @@ class Board(Window):
                         self.revert_auto_capture_markers(chained_move)
                     self.check_side = check_side
                     if en_passant_target is not None:
-                        self.clear_en_passant()
                         for marker in en_passant_markers:
                             self.mark_en_passant(en_passant_target.board_pos, marker)
                     if castling_ep_target is not None:
-                        self.clear_castling_ep()
                         for marker in castling_ep_markers:
                             self.mark_castling_ep(castling_ep_target.board_pos, marker)
             self.moves_queried[turn_side] = True
@@ -1718,7 +1716,7 @@ class Board(Window):
 
     def mark_en_passant(self, piece_pos: Position, marker_pos: Position) -> None:
         if self.en_passant_target is not None and self.en_passant_target.board_pos != piece_pos:
-            return
+            self.clear_en_passant()
         self.en_passant_target = self.get_piece(piece_pos)
         self.en_passant_markers.add(marker_pos)
 
@@ -1728,7 +1726,7 @@ class Board(Window):
 
     def mark_castling_ep(self, piece_pos: Position, marker_pos: Position) -> None:
         if self.castling_ep_target is not None and self.castling_ep_target.board_pos != piece_pos:
-            return
+            self.clear_castling_ep()
         self.castling_ep_target = self.get_piece(piece_pos)
         self.castling_ep_markers.add(marker_pos)
 
