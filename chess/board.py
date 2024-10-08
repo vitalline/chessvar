@@ -681,13 +681,6 @@ class Board(Window):
         self.action_count = 0
         self.ply_count = 0
 
-        if update is None:
-            update = not self.move_history
-
-        if update:
-            self.custom_layout = {}
-            self.custom_pieces = {}
-
         for sprite_list in self.piece_sprite_list, self.promotion_piece_sprite_list, self.promotion_area_sprite_list:
             sprite_list.clear()
             for sprite in sprite_list:
@@ -707,6 +700,9 @@ class Board(Window):
         if log:
             self.log_armies()
         self.ply_count += 1
+
+        if update is None:
+            update = not self.move_history
 
         if update:
             self.edit_piece_set_id = self.board_config['edit_id']
