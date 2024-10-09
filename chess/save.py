@@ -109,8 +109,6 @@ def load_piece(data: dict | str | None, board: Board, from_dict: dict | None = N
         board=board,
         board_pos=fra(data['pos']) if 'pos' in data else None,  # type: ignore
         side=side,
-        promotions=board.promotions.get(side),
-        promotion_squares=board.promotion_squares.get(side),
     )
     piece.is_hidden = False if data.get('show') is True else None
     if piece.movement:

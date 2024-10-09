@@ -58,7 +58,22 @@ class Piece(Sprite):
 
     def moves(self, theoretical: bool = False):
         if self.movement:
-            yield from self.movement.moves(self.board_pos, self, theoretical)
+            for move in self.movement.moves(self.board_pos, self, theoretical):
+                if self.side in self.board.promotions:
+                    side_promotions = self.board.promotions[self.side]
+                    if type(self) in side_promotions:
+                        promotion_squares = side_promotions[type(self)]
+                        if move.pos_to in promotion_squares:
+                            promotions = promotion_squares[move.pos_to]
+                            if promotions:
+                                for promotion in promotions:
+                                    yield copy(move).set(promotion=promotion(
+                                        board=self.board,
+                                        board_pos=self.board_pos,
+                                        side=self.side,
+                                    ))
+                                continue
+                yield move
         return ()
 
     def __str__(self):
@@ -131,71 +146,6 @@ class Piece(Sprite):
         self.color = color
         if side != self.texture_side:  # if side was defined and does not match the current texture
             self.reload(side=side)
-
-
-class PromotablePiece(Piece):
-    def __init__(
-        self,
-        board: Board,
-        board_pos: Position | None = None,
-        side: Side = Side.NONE,
-        movement: BaseMovement | None = None,
-        promotions: list[Type[Piece]] | None = None,
-        promotion_squares: set[Position] | None = None,
-        **kwargs
-    ):
-        super().__init__(board, board_pos, side, movement, **kwargs)
-        self.promotions = promotions or []
-        self.promotion_squares = promotion_squares or set()
-
-    def move(self, move: Move):
-        super().move(move)
-        if self.board_pos in self.promotion_squares:
-            if move.is_edit:
-                return
-            if not self.promotions:
-                return
-            promotion_piece = self.board.promotion_piece
-            if move.promotion:
-                self.board.promotion_piece = True
-                self.board.replace(self, move.promotion)
-                self.board.update_promotion_auto_captures(move)
-                self.board.promotion_piece = promotion_piece
-                return
-            if len(self.promotions) == 1:
-                self.board.promotion_piece = True
-                move.set(promotion=self.promotions[0](
-                    board=self.board,
-                    board_pos=self.board_pos,
-                    side=self.side,
-                    promotions=self.board.promotions.get(self.side),
-                    promotion_squares=self.board.promotion_squares.get(self.side),
-                ))
-                self.board.replace(self, move.promotion)
-                self.board.update_promotion_auto_captures(move)
-                self.board.promotion_piece = promotion_piece
-                return
-            self.board.start_promotion(self, self.promotions)
-
-    def moves(self, theoretical: bool = False):
-        for move in super().moves(theoretical):
-            if self.promotions and move.pos_to in self.promotion_squares:
-                for promotion in self.promotions:
-                    yield copy(move).set(promotion=promotion(
-                        board=self.board,
-                        board_pos=self.board_pos,
-                        side=self.side,
-                        promotions=self.board.promotions.get(self.side),
-                        promotion_squares=self.board.promotion_squares.get(self.side),
-                    ))
-            else:
-                yield move
-
-    def __copy__(self):
-        clone = super().__copy__()
-        clone.promotions = copy(self.promotions)
-        clone.promotion_squares = copy(self.promotion_squares)
-        return clone
 
 
 class QuasiRoyalPiece(Piece):

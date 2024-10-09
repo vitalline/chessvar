@@ -1,6 +1,6 @@
 from chess.movement import movement
 from chess.movement.util import rot, symv
-from chess.pieces.piece import Piece, PromotablePiece, RoyalPiece
+from chess.pieces.piece import Piece, RoyalPiece
 
 
 class Rook(Piece):
@@ -81,12 +81,12 @@ class King(RoyalPiece):
         )
 
 
-class Pawn(PromotablePiece):
+class Pawn(Piece):
     name = 'Pawn'
     file_name = 'P'
     asset_folder = 'classic'
 
-    def __init__(self, board, board_pos, side, promotions=None, promotion_squares=None, **kwargs):
+    def __init__(self, board, board_pos, side, **kwargs):
         super().__init__(
             board, board_pos, side,
             movement.MultiMovement(
@@ -102,7 +102,5 @@ class Pawn(PromotablePiece):
                     movement.EnPassantRiderMovement(board, symv([(1, 1, 1)]))
                 ]
             ),
-            promotions,
-            promotion_squares,
             **kwargs
         )

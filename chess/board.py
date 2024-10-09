@@ -470,8 +470,7 @@ class Board(Window):
         self.chaos_mode = self.board_config['chaos_mode']  # 0: no, 1: match pos, 2: match pos asym, 3: any, 4: any asym
         self.chaos_sets = {}  # piece sets generated in chaos mode
         self.piece_sets = {Side.WHITE: [], Side.BLACK: []}  # types of pieces each side starts with
-        self.promotions = {Side.WHITE: [], Side.BLACK: []}  # types of pieces each side promotes to
-        self.promotion_squares = {Side.WHITE: [], Side.BLACK: []}  # squares where pawns can promote for each side
+        self.promotions = {Side.WHITE: {}, Side.BLACK: {}}  # promotion options, as {side: {from: {pos: [to]}}}
         self.edit_promotions = {Side.WHITE: [], Side.BLACK: []}  # types of pieces each side can promote to in edit mode
         self.movable_pieces = {Side.WHITE: [], Side.BLACK: []}  # pieces that can be moved by each side
         self.royal_pieces = {Side.WHITE: [], Side.BLACK: []}  # these have to stay on the board and should be protected
@@ -484,6 +483,7 @@ class Board(Window):
         self.penultima_pieces = {Side.WHITE: {}, Side.BLACK: {}}  # piece textures that are used for penultima mode
         self.custom_pieces = {}  # custom piece types
         self.custom_layout = {}  # custom starting layout of the board
+        self.custom_promotions = {}  # custom promotion options, as {side: {from: {to: [pos]}}}
         self.moves = {Side.WHITE: {}, Side.BLACK: {}}  # dictionary of valid moves from any square
         self.chain_moves = {Side.WHITE: {}, Side.BLACK: {}}  # dictionary of moves chained from a certain move (from/to)
         self.chain_start = None  # move that started the current chain (if any)
@@ -746,8 +746,6 @@ class Board(Window):
                         board=self,
                         board_pos=(row, col),
                         side=piece_side,
-                        promotions=self.promotions.get(piece_side),
-                        promotion_squares=self.promotion_squares.get(piece_side),
                     )
                 )
             if not self.pieces[row][col].is_empty() and not isinstance(self.pieces[row][col], Obstacle):
@@ -788,6 +786,15 @@ class Board(Window):
             },
             'custom': {k: save_custom_type(v) for k, v in self.custom_pieces.items()},
             'layout': {toa(pos): save_piece(p.on(None)) for pos, p in self.custom_layout.items()},
+            'promotions': {
+                side.value: {
+                    save_piece_type(f): {
+                        save_piece_type(t): [
+                            toa(pos) for pos in sorted(l)
+                        ] for t, l in s.items()
+                    } for f, s in d.items()
+                } for side, d in self.custom_promotions.items()
+            },
             'moves': [save_move(m) for m in self.move_history],
             'future': [save_move(m) for m in self.future_move_history[::-1]],
             'rolls': {n: {toa(pos): d[pos] for pos in sorted(d)} for n, d in enumerate(self.roll_history) if d},
@@ -926,6 +933,15 @@ class Board(Window):
         custom_data = data.get('custom', {})
         self.custom_pieces = {k: load_custom_type(v, k) for k, v in custom_data.items()}
         c = self.custom_pieces
+        self.custom_promotions = {
+            Side(int(v)): {
+                load_piece_type(f, c): {
+                    load_piece_type(t, c): [
+                        fra(pos) for pos in l
+                    ] for t, l in s.items()
+                } for f, s in d.items()
+            } for v, d in data.get('promotions', {}).items()
+        }
 
         self.chaos_sets = {}
         self.piece_set_ids |= {Side(int(k)): v for k, v in data.get('set_ids', {}).items()}
@@ -1132,19 +1148,36 @@ class Board(Window):
     def reset_promotions(self, piece_sets: dict[Side, list[Type[Piece]]] | None = None) -> None:
         if piece_sets is None:
             piece_sets = self.piece_sets
-        self.promotions = {side: [] for side in self.promotions}
-        for side in self.promotions:
+        self.promotions = {}
+        if self.custom_promotions:
+            for side in self.custom_promotions:
+                self.promotions[side] = {}
+                for piece in self.custom_promotions[side]:
+                    self.promotions[side][piece] = {}
+                    for to_piece in self.custom_promotions[side][piece]:
+                        for pos in self.custom_promotions[side][piece][to_piece]:
+                            if pos not in self.promotions[side][piece]:
+                                self.promotions[side][piece][pos] = []
+                            self.promotions[side][piece][pos].append(to_piece)
+            return
+        promotion_squares = {
+            Side.WHITE: [(self.board_height - 1, i) for i in range(self.board_width)],
+            Side.BLACK: [(0, i) for i in range(self.board_width)],
+        }
+        for side in promotion_squares:
+            promotions = []
             used_piece_set = set()
             for pieces in (
-                    piece_sets[side][3::-1], piece_sets[side.opponent()][3::-1],
-                    piece_sets[side][5:], piece_sets[side.opponent()][5:],
+                piece_sets[side][3::-1], piece_sets[side.opponent()][3::-1],
+                piece_sets[side][5:], piece_sets[side.opponent()][5:],
             ):
                 promotion_types = []
                 for piece in pieces:
                     if piece not in used_piece_set and not issubclass(piece, RoyalPiece):
                         used_piece_set.add(piece)
                         promotion_types.append(piece)
-                self.promotions[side].extend(promotion_types[::-1])
+                promotions.extend(promotion_types[::-1])
+            self.promotions[side] = {fide.Pawn: {pos: promotions.copy() for pos in promotion_squares[side]}}
 
     def reset_edit_promotions(self, piece_sets: dict[Side, list[Type[Piece]]] | None = None) -> None:
         if is_prefix_of('custom', self.edit_piece_set_id):
@@ -1965,6 +1998,9 @@ class Board(Window):
         if not move.is_edit or (move.pos_from == move.pos_to and move.promotion is None):
             # call movement.update() to update movement state after the move (e.g. pawn double move, castling rights)
             move.piece.movement.update(move, move.piece)
+        if not move.is_edit:
+            # check if the piece needs to be promoted
+            self.try_promotion(move)
 
     def undo(self, move: Move) -> None:
         if move.pos_from != move.pos_to or move.promotion is not None:
@@ -2342,6 +2378,36 @@ class Board(Window):
             else:
                 self.set_caption(f"[Ply {self.ply_count}] {self.turn_side} to move")
 
+    def try_promotion(self, move: Move) -> None:
+        if move.piece.side not in self.promotions:
+            return
+        side_promotions = self.promotions[move.piece.side]
+        if type(move.piece) not in side_promotions:
+            return
+        promotion_squares = side_promotions[type(move.piece)]
+        if move.piece.board_pos not in promotion_squares:
+            return
+        promotions = promotion_squares[move.piece.board_pos]
+        promotion_piece = self.promotion_piece
+        if move.promotion:
+            self.promotion_piece = True
+            self.replace(move.piece, move.promotion)
+            self.update_promotion_auto_captures(move)
+            self.promotion_piece = promotion_piece
+            return
+        if len(promotions) == 1:
+            self.promotion_piece = True
+            move.set(promotion=promotions[0](
+                board=self,
+                board_pos=move.piece.board_pos,
+                side=move.piece.side,
+            ))
+            self.replace(move.piece, move.promotion)
+            self.update_promotion_auto_captures(move)
+            self.promotion_piece = promotion_piece
+            return
+        self.start_promotion(move.piece, promotions)
+
     def start_promotion(self, piece: Piece, promotions: list[Type[Piece]]) -> None:
         self.hide_moves()
         self.promotion_piece = piece
@@ -2379,8 +2445,6 @@ class Board(Window):
                 board=self,
                 board_pos=pos,
                 side=side,
-                promotions=self.promotions.get(side),
-                promotion_squares=self.promotion_squares.get(side),
             )
             if self.edit_mode and is_prefix_of('custom', self.edit_piece_set_id):
                 promotion_piece.reload(is_hidden=False, flipped_horizontally=False)
@@ -2748,10 +2812,7 @@ class Board(Window):
             sprite.scale = self.square_size / sprite.texture.width
             self.board_sprite_list.append(sprite)
 
-        self.promotion_squares = {
-            Side.WHITE: {(self.board_height - 1, i) for i in range(self.board_width)},
-            Side.BLACK: {(0, i) for i in range(self.board_width)},
-        }
+        self.reset_promotions()
 
         for row in range(len(self.pieces), self.board_height):
             self.pieces += [[]]
@@ -3043,8 +3104,6 @@ class Board(Window):
                             board=self,
                             board_pos=move.pos_to,
                             side=side,
-                            promotions=self.promotions.get(side),
-                            promotion_squares=self.promotion_squares.get(side),
                         ))
                     elif len(self.edit_promotions[side]) > 1:
                         move.set(promotion=Unset)
@@ -3884,10 +3943,16 @@ class Board(Window):
                 }""")
             if not self.auto_capture_markers[side]:
                 debug_log_data[-1] += " None"
-            piece_list = ', '.join(piece.name for piece in self.promotions[side])
-            debug_log_data.append(
-                f"{side} promotions ({len(self.promotions[side])}): {piece_list if piece_list else 'None'}"
-            )
+            debug_log_data.append(f"{side} promotions ({len(self.promotions[side])}):")
+            for piece in self.promotions[side]:
+                debug_log_data.append(f"  {piece.name} ({len(self.promotions[side][piece])}):")
+                for pos in self.promotions[side][piece]:
+                    piece_list = ', '.join(to_piece.name for to_piece in self.promotions[side][piece][pos])
+                    debug_log_data.append(f"    {toa(pos)} {pos}: {piece_list if piece_list else 'None'}")
+                if not self.promotions[side][piece]:
+                    debug_log_data[-1] += " None"
+            if not self.promotions[side]:
+                debug_log_data[-1] += " None"
             piece_list = ', '.join(piece.name for piece in self.edit_promotions[side])
             debug_log_data.append(
                 f"{side} replacements ({len(self.edit_promotions[side])}): {piece_list if piece_list else 'None'}"
