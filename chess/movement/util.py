@@ -143,22 +143,24 @@ def to_algebraic_list(poss: list[Position], width: int, height: int) -> list[str
     remain = set(poss)
     result = set()
     by_row = {row: set() for row in rows}
-    for pos in poss:
+    for pos in poss:  # find all files listed for each rank
         by_row[pos[0]].add(pos[1])
     for row in rows:
-        if by_row[row] == cols:
-            result.add(f'*{row + 1}')
+        if by_row[row] == cols:  # if all positions for the nth rank are listed
+            result.add(f'*{row + 1}')  # add '*n' to the result and remove them from the remaining positions
             remain.difference_update((row, col) for col in cols)
-    if not remain:
+    if not remain:  # if all listed positions were discarded, return the result
+        if result == {f'*{row + 1}' for row in rows}:  # unless all positions for every rank were listed
+            return ['*']  # in which case, return '*' to represent all possible positions
         return sorted(result)
     by_col = {col: set() for col in cols}
-    for pos in poss:
+    for pos in poss:  # find all ranks listed for each file
         by_col[pos[1]].add(pos[0])
     for col in cols:
-        if by_col[col] == rows:
-            result.add(f'{to_alpha(col + 1)}*')
+        if by_col[col] == rows:  # if all positions for the l file are listed
+            result.add(f'{to_alpha(col + 1)}*')  # add 'l*' to the result and remove them from the remaining positions
             remain.difference_update((row, col) for row in rows)
-    result.update(to_algebraic(pos) for pos in remain)
+    result.update(to_algebraic(pos) for pos in remain)  # add the remaining positions to the result
     return sorted(result)
 
 
