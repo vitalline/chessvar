@@ -132,4 +132,50 @@ def from_algebraic(pos: str) -> Position | None:
         return None
     pos = pos.lower()
     split_index = next((i for i, c in enumerate(pos) if c.isdigit()), len(pos))
-    return int(pos[split_index:]) - 1, from_alpha(pos[:split_index]) - 1
+    return int(pos[split_index:]) - 1, from_alpha(pos[:split_index]) - 1  # return as (rank, file), or (y, x)
+    # this is the opposite of the usual (x, y) coordinate system OR the usual (file, rank) algebraic notation
+    # the board is represented as a list of lists, so the rank is the outer list and goes first when indexing
+
+
+def to_algebraic_list(poss: list[Position], width: int, height: int) -> list[str]:
+    cols = {col for col in range(width)}
+    rows = {row for row in range(height)}
+    remain = set(poss)
+    result = set()
+    by_row = {row: set() for row in rows}
+    for pos in poss:
+        by_row[pos[0]].add(pos[1])
+    for row in rows:
+        if by_row[row] == cols:
+            result.add(f'*{row + 1}')
+            remain.difference_update((row, col) for col in cols)
+    if not remain:
+        return sorted(result)
+    by_col = {col: set() for col in cols}
+    for pos in poss:
+        by_col[pos[1]].add(pos[0])
+    for col in cols:
+        if by_col[col] == rows:
+            result.add(f'{to_alpha(col + 1)}*')
+            remain.difference_update((row, col) for row in rows)
+    result.update(to_algebraic(pos) for pos in remain)
+    return sorted(result)
+
+
+def from_algebraic_list(poss: list[str], width: int, height: int) -> list[Position]:
+    result = set()
+    for pos in poss:
+        if pos == UNKNOWN_COORDINATE_STRING:
+            continue
+        pos = pos.lower()
+        if pos[0] == '*' and pos[-1] == '*':  # '*' (or '**') means all positions
+            result.update((row, col) for row in range(height) for col in range(width))
+        elif pos[0] == '*':  # '*n' means all positions in the nth rank
+            row = int(pos[1:]) - 1
+            result.update((row, col) for col in range(width))
+        elif pos[-1] == '*':  # 'l*' means all positions in the l file
+            col = from_alpha(pos[:-1]) - 1
+            result.update((row, col) for row in range(height))
+        else:
+            result.add(from_algebraic(pos))
+    return sorted(result)

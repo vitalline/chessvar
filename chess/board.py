@@ -23,7 +23,9 @@ from chess.color import average, darken, desaturate, lighten, saturate
 from chess.config import Config
 from chess.movement import movement
 from chess.movement.move import Move
-from chess.movement.util import Position, add, to_alpha as b26, to_algebraic as toa, from_algebraic as fra
+from chess.movement.util import Position, add, to_alpha as b26
+from chess.movement.util import to_algebraic as toa, from_algebraic as fra
+from chess.movement.util import to_algebraic_list as toal, from_algebraic_list as fral
 from chess.pieces.groups import classic as fide
 from chess.pieces.groups import amazon as am, amontillado as ao, asymmetry as ay, avian as av
 from chess.pieces.groups import backward as bw, beast as bs, breakfast as bk, burn as br, buzz as bz
@@ -789,9 +791,7 @@ class Board(Window):
             'promotions': {
                 side.value: {
                     save_piece_type(f): {
-                        save_piece_type(t): [
-                            toa(pos) for pos in sorted(l)
-                        ] for t, l in s.items()
+                        save_piece_type(t): toal(l, self.board_width, self.board_height) for t, l in s.items()
                     } for f, s in d.items()
                 } for side, d in self.custom_promotions.items()
             },
@@ -936,9 +936,7 @@ class Board(Window):
         self.custom_promotions = {
             Side(int(v)): {
                 load_piece_type(f, c): {
-                    load_piece_type(t, c): [
-                        fra(pos) for pos in l
-                    ] for t, l in s.items()
+                    load_piece_type(t, c): fral(l, self.board_width, self.board_height) for t, l in s.items()
                 } for f, s in d.items()
             } for v, d in data.get('promotions', {}).items()
         }
