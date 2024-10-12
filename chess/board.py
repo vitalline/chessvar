@@ -474,7 +474,7 @@ class Board(Window):
         self.chaos_sets = {}  # piece sets generated in chaos mode
         self.piece_sets = {Side.WHITE: [], Side.BLACK: []}  # types of pieces each side starts with
         self.promotions = {Side.WHITE: {}, Side.BLACK: {}}  # promotion options, as {side: {from: {pos: [to]}}}
-        self.edit_promotions = {Side.WHITE: [], Side.BLACK: []}  # types of pieces each side can promote to in edit mode
+        self.edit_promotions = {Side.WHITE: [], Side.BLACK: []}  # types of pieces each side can place in edit mode
         self.movable_pieces = {Side.WHITE: [], Side.BLACK: []}  # pieces that can be moved by each side
         self.royal_pieces = {Side.WHITE: [], Side.BLACK: []}  # these have to stay on the board and should be protected
         self.quasi_royal_pieces = {Side.WHITE: [], Side.BLACK: []}  # at least one of these has to stay on the board
@@ -487,6 +487,9 @@ class Board(Window):
         self.custom_pieces = {}  # custom piece types
         self.custom_layout = {}  # custom starting layout of the board
         self.custom_promotions = {}  # custom promotion options
+        self.custom_drops = {}  # custom drop options, as {side: {was: {pos: as}}}
+        self.custom_extra_drops = {}  # custom extra drops, as {side: [as]}
+        self.captured_pieces = {Side.WHITE: [], Side.BLACK: []}  # pieces captured by each side
         self.alias_dict = {}  # dictionary of aliases for save data
         self.moves = {Side.WHITE: {}, Side.BLACK: {}}  # dictionary of valid moves from any square
         self.chain_moves = {Side.WHITE: {}, Side.BLACK: {}}  # dictionary of moves chained from a certain move (from/to)
@@ -677,6 +680,7 @@ class Board(Window):
         self.clear_en_passant()
         self.clear_castling_ep()
         self.clear_auto_capture_markers()
+        self.reset_drops()
 
         self.turn_side = Side.WHITE
         self.game_over = False
@@ -747,11 +751,7 @@ class Board(Window):
                 if isinstance(piece_type, Side):
                     piece_type = self.piece_sets[piece_side][col]
                 self.pieces[row].append(
-                    piece_type(
-                        board=self,
-                        board_pos=(row, col),
-                        side=piece_side,
-                    )
+                    piece_type(board=self, board_pos=(row, col), side=piece_side)
                 )
             if not self.pieces[row][col].is_empty() and not isinstance(self.pieces[row][col], Obstacle):
                 self.update_piece(self.pieces[row][col])
@@ -800,6 +800,22 @@ class Board(Window):
                         ] for p, l in s.items()
                     }, *wh) for f, s in d.items()
                 } for side, d in self.custom_promotions.items()
+            },
+            'drops': {
+                side.value: {
+                    save_piece_type(f): cnd_alg({
+                        p: (save_piece if isinstance(t, Piece) else save_piece_type)(t)
+                        for p, t in s.items()
+                    }, *wh) for f, s in d.items()
+                } for side, d in self.custom_drops.items()
+            },
+            'extra': {
+                side.value: [
+                    (save_piece if isinstance(t, Piece) else save_piece_type)(t) for t in pieces
+                ] for side, pieces in self.custom_extra_drops.items()
+            },
+            'captured': {
+                side.value: [save_piece(p) for p in pieces] for side, pieces in self.captured_pieces.items()
             },
             'moves': [save_move(m) for m in self.move_history],
             'future': [save_move(m) for m in self.future_move_history[::-1]],
@@ -957,6 +973,25 @@ class Board(Window):
                 } for f, s in d.items()
             } for v, d in data.get('promotions', {}).items()
         }
+        self.custom_drops = {
+            Side(int(v)): {
+                load_piece_type(f, c): {
+                    p: (load_piece_type(t, c) if isinstance(t, str) else load_piece(t, self, c))
+                    for p, t in exp_alg(s, *wh).items()
+                } for f, s in d.items()
+            } for v, d in data.get('drops', {}).items()
+        }
+        self.custom_extra_drops = {
+            Side(int(v)): [
+                load_piece_type(t, c) if isinstance(t, str) else load_piece(t, self, c) for t in l
+            ] for v, l in data.get('extra', {}).items()
+        }
+        if 'captured' in data:
+            self.captured_pieces = {
+                Side(int(v)): [load_piece(t, self, c) for t in l] for v, l in data.get('captured', {}).items()
+            }
+        else:
+            self.reset_drops()
 
         self.chaos_sets = {}
         self.piece_set_ids |= {Side(int(k)): v for k, v in data.get('set_ids', {}).items()}
@@ -1044,7 +1079,7 @@ class Board(Window):
 
         if self.move_history:
             last_move = self.move_history[-1]
-            if last_move and not last_move.is_edit:
+            if last_move and not (last_move.is_edit or issubclass(last_move.movement_type, movement.DropMovement)):
                 last_move.piece.movement.reload(last_move, last_move.piece)
 
         self.load_pieces()
@@ -1091,12 +1126,14 @@ class Board(Window):
             return
 
         if self.promotion_piece:
-            self.start_promotion(
-                self.promotion_piece,
-                (self.edit_promotions if self.edit_mode else self.promotions)[
-                    self.get_promotion_side(self.promotion_piece)
-                ]
-            )
+            piece = self.promotion_piece
+            self.end_promotion()
+            if self.edit_mode:
+                self.start_promotion(piece, self.edit_promotions[self.get_promotion_side(piece)])
+            elif piece.is_empty():
+                self.try_drop(piece.board_pos)
+            elif self.move_history and self.move_history[-1].piece.board_pos == piece.board_pos:
+                self.try_promotion(self.move_history[-1])
         else:
             if not with_history and not self.edit_mode:
                 self.update_status()
@@ -1115,6 +1152,7 @@ class Board(Window):
         self.clear_en_passant()
         self.clear_castling_ep()
         self.clear_auto_capture_markers()
+        self.captured_pieces = {Side.WHITE: [], Side.BLACK: []}
 
         self.turn_side = Side.WHITE
         self.game_over = False
@@ -1162,17 +1200,27 @@ class Board(Window):
 
     def reset_custom_data(self) -> None:
         self.alias_dict = {}
-        self.alias_dict = {}
+        self.custom_drops = {}
         self.custom_pieces = {}
         self.custom_layout = {}
         self.custom_promotions = {}
 
+    def reset_drops(self) -> None:
+        self.captured_pieces = {Side.WHITE: [], Side.BLACK: []}
+        for side in self.captured_pieces:
+            if side in self.custom_extra_drops:
+                for drop in self.custom_extra_drops[side]:
+                    if isinstance(drop, Piece):
+                        self.captured_pieces[side].append(drop.of(drop.side or side))
+                    else:
+                        self.captured_pieces[side].append(drop(board=self, board_pos=None, side=side))
+
     def reset_promotions(self, piece_sets: dict[Side, list[Type[Piece]]] | None = None) -> None:
-        if piece_sets is None:
-            piece_sets = self.piece_sets
         if self.custom_promotions:
             self.promotions = deepcopy(self.custom_promotions)
             return
+        if piece_sets is None:
+            piece_sets = self.piece_sets
         self.promotions = {}
         promotion_squares = {
             Side.WHITE: [(self.board_height - 1, i) for i in range(self.board_width)],
@@ -1911,6 +1959,22 @@ class Board(Window):
                     break
                 if self.promotion_piece is None:
                     self.log(f"[Ply {self.ply_count}] Edit: {self.move_history[-1]}")
+            elif issubclass(next_move.movement_type, movement.DropMovement):
+                pos = next_move.pos_to
+                if not self.not_on_board(pos) and self.get_piece(pos).is_empty():
+                    if next_move.promotion is Unset:
+                        self.try_drop(pos)
+                        if self.promotion_piece:
+                            self.move_history.append(next_move)
+                    else:
+                        promotion_piece = self.promotion_piece
+                        self.promotion_piece = True
+                        self.replace(next_move.piece, next_move.promotion)
+                        self.update_promotion_auto_captures(next_move)
+                        self.promotion_piece = promotion_piece
+                        self.log(f"[Ply {self.ply_count}] Drop: {next_move}")
+                        self.move_history.append(next_move)
+                        self.ply_count += 1
             else:
                 move = self.find_move(next_move.pos_from, next_move.pos_to)
                 if move is None:
@@ -2009,12 +2073,22 @@ class Board(Window):
             # piece was added to the board, update it and add it to the sprite list
             self.update_piece(move.piece)
             self.piece_sprite_list.append(move.piece)
-        if not move.is_edit or (move.pos_from == move.pos_to and move.promotion is None):
+        if (drop := self.get_drop(move)) is not None:
+            # piece was captured, add its droppable version to the roster of captured pieces
+            self.captured_pieces[move.piece.side].append(drop)
+        if (
+            not (move.is_edit or issubclass(move.movement_type, movement.DropMovement))
+            or (move.pos_from == move.pos_to and move.promotion is None)
+        ):
             # call movement.update() to update movement state after the move (e.g. pawn double move, castling rights)
             move.piece.movement.update(move, move.piece)
         if not move.is_edit:
-            # check if the piece needs to be promoted
-            self.try_promotion(move)
+            if move.piece.is_empty():
+                # check if a piece can be dropped
+                self.try_drop(move.pos_to)
+            else:
+                # check if the piece needs to be promoted
+                self.try_promotion(move)
 
     def undo(self, move: Move) -> None:
         if move.pos_from != move.pos_to or move.promotion is not None:
@@ -2050,6 +2124,12 @@ class Board(Window):
             self.update_piece(move.captured_piece)  # update the piece sprite to reflect current piece hiding mode
             self.pieces[capture_pos[0]][capture_pos[1]] = move.captured_piece
             self.piece_sprite_list.append(move.captured_piece)
+        if (drop := self.get_drop(move)) is not None:
+            # piece was captured, remove its droppable version from the roster of captured pieces
+            for piece in self.captured_pieces[move.piece.side][::-1]:
+                if piece.matches(drop):
+                    self.captured_pieces[move.piece.side].remove(piece)
+                    break
         if move.pos_to is not None and move.pos_from != move.pos_to:
             # piece was added on or moved to a different square, restore the piece that was there before
             if move.captured_piece is None or move.captured_piece.board_pos != move.pos_to:
@@ -2063,7 +2143,10 @@ class Board(Window):
                 self.update_piece(move.swapped_piece)  # update the piece sprite to reflect current piece hiding mode
                 self.pieces[move.pos_to[0]][move.pos_to[1]] = move.swapped_piece
                 self.piece_sprite_list.append(move.swapped_piece)
-        if not move.is_edit or (move.pos_from == move.pos_to and move.promotion is None):
+        if (
+            not (move.is_edit or issubclass(move.movement_type, movement.DropMovement))
+            or (move.pos_from == move.pos_to and move.promotion is None)
+        ):
             # call movement.undo() to restore movement state before the move (e.g. pawn double move, castling rights)
             move.piece.movement.undo(move, move.piece)
 
@@ -2102,15 +2185,21 @@ class Board(Window):
                 logged_move = copy(chained_move)
                 if in_promotion:
                     logged_move.set(promotion=Unset)
-                self.log(f'''[Ply {self.ply_count}] Undo: {
-                    f"{'Edit' if logged_move.is_edit else 'Move'}: " + str(logged_move)
-                }''')
+                move_type = (
+                    'Edit' if logged_move.is_edit
+                    else 'Drop' if logged_move.movement_type == movement.DropMovement
+                    else 'Move'
+                )
+                self.log(f"[Ply {self.ply_count}] Undo: {move_type}: {logged_move}")
                 in_promotion = False
         else:
             self.log(f"[Ply {self.ply_count}] Undo: Pass: {self.turn_side} to move")
         if self.move_history:
             move = self.move_history[-1]
-            if move is not None and (not move.is_edit or (move.pos_from == move.pos_to and move.promotion is None)):
+            if move is not None and (
+                not (move.is_edit or issubclass(move.movement_type, movement.DropMovement))
+                or (move.pos_from == move.pos_to and move.promotion is None)
+            ):
                 move.piece.movement.reload(move, move.piece)
         future_move_history = self.future_move_history.copy()
         if self.chain_start is None:
@@ -2191,9 +2280,12 @@ class Board(Window):
         elif piece_was_moved:
             chained_move = last_move
             while chained_move:
-                self.log(f'''[Ply {self.ply_count}] Redo: {
-                    f"{'Edit' if chained_move.is_edit else 'Move'}: " + str(chained_move)
-                }''')
+                move_type = (
+                    'Edit' if chained_move.is_edit
+                    else 'Drop' if chained_move.movement_type == movement.DropMovement
+                    else 'Move'
+                )
+                self.log(f"[Ply {self.ply_count}] Redo: {move_type}: {chained_move}")
                 last_chain_move = chained_move
                 chained_move = chained_move.chained_move
                 if chained_move:
@@ -2210,9 +2302,12 @@ class Board(Window):
                 chained_move.piece.move(chained_move)
                 self.update_auto_capture_markers(chained_move)
                 chained_move.set(piece=copy(chained_move.piece))
-                self.log(f'''[Ply {self.ply_count}] Redo: {
-                    f"{'Edit' if chained_move.is_edit else 'Move'}: " + str(chained_move)
-                }''')
+                move_type = (
+                    'Edit' if chained_move.is_edit
+                    else 'Drop' if chained_move.movement_type == movement.DropMovement
+                    else 'Move'
+                )
+                self.log(f"[Ply {self.ply_count}] Redo: {move_type}: {chained_move}")
                 self.apply_edit_promotion(chained_move)
                 last_chain_move = chained_move
                 chained_move = chained_move.chained_move
@@ -2392,6 +2487,38 @@ class Board(Window):
             else:
                 self.set_caption(f"[Ply {self.ply_count}] {self.turn_side} to move")
 
+    def get_drop(self, move: Move) -> Piece | None:
+        if self.custom_drops and move.piece.side in self.custom_drops and not move.is_edit:
+            if move.captured_piece is not None and move.piece.side in self.captured_pieces:
+                if type(move.captured_piece) in self.custom_drops[move.piece.side]:
+                    drop_squares = self.custom_drops[move.piece.side][type(move.captured_piece)]
+                    pos = move.captured_piece.board_pos
+                    if pos in drop_squares:
+                        drop = drop_squares[pos]
+                        if isinstance(drop, Piece):
+                            return drop.of(drop.side or move.piece.side).on(pos)
+                        return drop(board=self, board_pos=pos, side=move.piece.side)
+        return None
+
+    def try_drop(self, pos: tuple[int, int]) -> None:
+        if self.turn_side not in self.custom_drops:
+            return
+        if not self.captured_pieces[self.turn_side]:
+            return
+        side_drops = self.custom_drops[self.turn_side]
+        drop_list = []
+        for piece in self.captured_pieces[self.turn_side]:
+            if type(piece) not in side_drops:
+                continue
+            drop_squares = side_drops[type(piece)]
+            if pos not in drop_squares:
+                continue
+            drop = drop_squares[pos]
+            drop_list.append(drop)
+        if not drop_list:
+            return
+        self.start_promotion(self.get_piece(pos), drop_list)
+
     def try_promotion(self, move: Move) -> None:
         if move.piece.side not in self.promotions:
             return
@@ -2411,18 +2538,18 @@ class Board(Window):
             return
         if len(promotions) == 1:
             self.promotion_piece = True
-            move.set(promotion=promotions[0](
-                board=self,
-                board_pos=move.piece.board_pos,
-                side=move.piece.side,
-            ))
+            promotion = promotions[0]
+            if isinstance(promotion, Piece):
+                move.set(promotion=promotion.of(promotion.side or move.piece.side).on(move.pos_to))
+            else:
+                move.set(promotion=promotion(board=self, board_pos=move.piece.board_pos, side=move.piece.side))
             self.replace(move.piece, move.promotion)
             self.update_promotion_auto_captures(move)
             self.promotion_piece = promotion_piece
             return
         self.start_promotion(move.piece, promotions)
 
-    def start_promotion(self, piece: Piece, promotions: list[Type[Piece]]) -> None:
+    def start_promotion(self, piece: Piece, promotions: list[Piece | Type[Piece]]) -> None:
         self.hide_moves()
         self.promotion_piece = piece
         piece_pos = piece.board_pos
@@ -2446,7 +2573,7 @@ class Board(Window):
                 new_col = col + col_increment
                 current_col = area_origin[1] + ((new_col + 1) // 2 * ((aim_left + new_col) % 2 * 2 - 1))
             area_squares.append((current_row, current_col))
-        side = self.get_promotion_side(piece)
+        side = self.get_promotion_side(piece) if self.edit_mode else (piece.side or self.turn_side)
         for promotion, pos in zip_longest(promotions, area_squares):
             background_sprite = Sprite("assets/util/square.png")
             background_sprite.color = self.color_scheme['promotion_area_color']
@@ -2455,11 +2582,11 @@ class Board(Window):
             self.promotion_area_sprite_list.append(background_sprite)
             if promotion is None:
                 continue
-            promotion_piece = promotion(
-                board=self,
-                board_pos=pos,
-                side=side,
-            )
+            if isinstance(promotion, Piece):
+                promotion_piece = promotion.of(promotion.side or side).on(pos)
+                promotion = type(promotion)
+            else:
+                promotion_piece = promotion(board=self, board_pos=pos, side=side)
             if self.edit_mode and is_prefix_of('custom', self.edit_piece_set_id):
                 promotion_piece.reload(is_hidden=False, flipped_horizontally=False)
             elif issubclass(promotion, RoyalPiece) and promotion not in self.piece_sets[side]:
@@ -2504,11 +2631,7 @@ class Board(Window):
         self.promotion_area_sprite_list.clear()
         self.promotion_piece_sprite_list.clear()
 
-    def replace(
-        self,
-        piece: Piece,
-        new_piece: Piece
-    ) -> None:
+    def replace(self, piece: Piece, new_piece: Piece) -> None:
         new_piece.board_pos = None
         new_piece = copy(new_piece)
         pos = piece.board_pos
@@ -2985,11 +3108,12 @@ class Board(Window):
                     self.end_promotion()
                     chained_move = self.move_history[-1]
                     while chained_move:
-                        self.log(
-                            f"[Ply {self.ply_count}] "
-                            f"{'Edit' if chained_move.is_edit else 'Move'}: "
-                            f"{chained_move}"
+                        move_type = (
+                            'Edit' if chained_move.is_edit
+                            else 'Drop' if chained_move.movement_type == movement.DropMovement
+                            else 'Move'
                         )
+                        self.log(f"[Ply {self.ply_count}] {move_type}: {chained_move}")
                         chained_move = chained_move.chained_move
                         if chained_move:
                             chained_move.piece.move(chained_move)
@@ -3114,11 +3238,11 @@ class Board(Window):
                     move.set(pos_from=pos, pos_to=pos, piece=self.get_piece(pos))
                     side = self.get_promotion_side(move.piece)
                     if len(self.edit_promotions[side]) == 1:
-                        move.set(promotion=self.edit_promotions[side][0](
-                            board=self,
-                            board_pos=move.pos_to,
-                            side=side,
-                        ))
+                        promotion = self.edit_promotions[side][0]
+                        if isinstance(promotion, Piece):
+                            move.set(promotion=promotion.of(promotion.side or side).on(pos))
+                        else:
+                            move.set(promotion=promotion(board=self, board_pos=move.pos_to, side=side))
                     elif len(self.edit_promotions[side]) > 1:
                         move.set(promotion=Unset)
                 else:
@@ -3140,8 +3264,20 @@ class Board(Window):
                 self.select_piece(next_selected_square)
             return
         if held_buttons & MOUSE_BUTTON_RIGHT:
-            self.deselect_piece()
-            return
+            if not self.custom_drops:
+                self.deselect_piece()
+                return
+            if self.game_over:
+                self.deselect_piece()
+                return
+            if self.promotion_piece:
+                return
+            pos = self.get_board_position((x, y))
+            if not self.not_on_board(pos) and (piece := self.get_piece(pos)).is_empty():
+                move = Move(pos_from=pos, pos_to=pos, movement_type=movement.DropMovement, piece=piece, promotion=Unset)
+                self.try_drop(pos)
+                if self.promotion_piece:
+                    self.move_history.append(move)
         if held_buttons & MOUSE_BUTTON_LEFT:
             if self.game_over:
                 self.deselect_piece()
@@ -4032,12 +4168,18 @@ class Board(Window):
             if not move:
                 debug_log_data.append(f"  {i}: (Pass) None")
             else:
-                debug_log_data.append(f"  {i}: ({'Edit' if move.is_edit else 'Move'}) {move}")
+                move_type = (
+                    'Edit' if move.is_edit else 'Drop' if move.movement_type == movement.DropMovement else 'Move'
+                )
+                debug_log_data.append(f"  {i}: ({move_type}) {move}")
                 j = 0
                 while move.chained_move:
                     move = move.chained_move
                     j += 1
-                    debug_log_data.append(f"  {i}.{j}: ({'Edit' if move.is_edit else 'Move'}) {move}")
+                    move_type = (
+                        'Edit' if move.is_edit else 'Drop' if move.movement_type == movement.DropMovement else 'Move'
+                    )
+                    debug_log_data.append(f"  {i}.{j}: ({move_type}) {move}")
         if not self.move_history:
             debug_log_data[-1] += " None"
         debug_log_data.append(f"Future action history ({len(self.future_move_history)}):")
@@ -4045,12 +4187,18 @@ class Board(Window):
             if not move:
                 debug_log_data.append(f"  {i}: (Pass) None")
             else:
-                debug_log_data.append(f"  {i}: ({'Edit' if move.is_edit else 'Move'}) {move}")
+                move_type = (
+                    'Edit' if move.is_edit else 'Drop' if move.movement_type == movement.DropMovement else 'Move'
+                )
+                debug_log_data.append(f"  {i}: ({move_type}) {move}")
                 j = 0
                 while move.chained_move:
                     move = move.chained_move
                     j += 1
-                    debug_log_data.append(f"  {i}.{j}: ({'Edit' if move.is_edit else 'Move'}) {move}")
+                    move_type = (
+                        'Edit' if move.is_edit else 'Drop' if move.movement_type == movement.DropMovement else 'Move'
+                    )
+                    debug_log_data.append(f"  {i}.{j}: ({move_type}) {move}")
         if not self.future_move_history:
             debug_log_data[-1] += " None"
         empty = True

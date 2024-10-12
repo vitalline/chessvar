@@ -1,17 +1,17 @@
 from __future__ import annotations
 
 from copy import copy
-from typing import TYPE_CHECKING, Type
+from typing import TYPE_CHECKING
 
 from arcade import Color, Sprite, load_texture
 
 from chess.pieces.side import Side
+from chess.movement.movement import BaseMovement
 from chess.util import Default, get_texture_path
 
 if TYPE_CHECKING:
     from chess.board import Board
     from chess.movement.move import Move
-    from chess.movement.movement import BaseMovement
     from chess.movement.util import Position
 
 
@@ -67,11 +67,16 @@ class Piece(Sprite):
                             promotions = promotion_squares[move.pos_to]
                             if promotions:
                                 for promotion in promotions:
-                                    yield copy(move).set(promotion=promotion(
-                                        board=self.board,
-                                        board_pos=self.board_pos,
-                                        side=self.side,
-                                    ))
+                                    if isinstance(promotion, Piece):
+                                        yield copy(move).set(
+                                            promotion=promotion.of(promotion.side or self.side).on(move.pos_to)
+                                        )
+                                    else:
+                                        yield copy(move).set(promotion=promotion(
+                                            board=self.board,
+                                            board_pos=move.pos_to,
+                                            side=self.side,
+                                        ))
                                 continue
                 yield move
         return ()
@@ -80,10 +85,13 @@ class Piece(Sprite):
         return f"{self.side} {'???' if self.is_hidden else self.name}".strip()
 
     def __copy__(self):
+        return self.of(self.side)
+
+    def of(self, side: Side) -> Piece:
         clone = type(self)(
             board=self.board,
             board_pos=self.board_pos,
-            side=self.side,
+            side=side,
         )
         clone.movement = copy(self.movement)
         clone.scale = self.scale
@@ -96,6 +104,18 @@ class Piece(Sprite):
         if pos is not None:
             clone.position = self.board.get_screen_position(pos)
         return clone
+
+    def matches(self, other: Piece) -> bool:
+        return (
+            type(self) is type(other)
+            and self.side == other.side
+            and self.is_hidden == other.is_hidden
+            and (
+                self.movement.total_moves == other.movement.total_moves
+                if isinstance(self.movement, BaseMovement) else
+                self.movement == other.movement
+            )
+        )
 
     @property
     def texture_path(self) -> str:

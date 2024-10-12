@@ -71,8 +71,7 @@ class Move(object):
             and type(self.piece) is type(other.piece)
             and type(self.captured_piece) is type(other.captured_piece)
             and type(self.swapped_piece) is type(other.swapped_piece)
-            and type(self.promotion) is type(other.promotion)
-            and (not self.promotion or self.promotion.is_hidden == other.promotion.is_hidden)
+            and (not self.promotion or self.promotion.matches(other.promotion))
             and (
                 self.chained_move.matches(other.chained_move)
                 if isinstance(self.chained_move, Move) else

@@ -331,6 +331,11 @@ class AutoRangedAutoCaptureRiderMovement(RangedAutoCaptureRiderMovement):
         self.mark(move.pos_from, piece)
 
 
+class DropMovement(BaseMovement):
+    # used to mark piece drops (Move.movement_type == DropMovement)
+    pass
+
+
 class CastlingMovement(BaseMovement):
     def __init__(
         self,
