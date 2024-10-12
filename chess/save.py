@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from base64 import b64decode, b64encode
+from copy import copy
 from importlib import import_module
 from random import Random
 from typing import TYPE_CHECKING, Type, Any
@@ -8,7 +9,9 @@ from typing import TYPE_CHECKING, Type, Any
 from chess.movement.move import Move
 from chess.movement.movement import BaseMovement
 from chess.pieces.side import Side
+from chess.movement.util import Position
 from chess.movement.util import to_algebraic as toa, from_algebraic as fra
+from chess.movement.util import to_algebraic_map as tom, from_algebraic_map as frm
 from chess.pieces import piece as piece_module
 from chess.pieces.piece import Piece
 from chess.pieces.groups.util import NonMovingPiece, NoPiece
@@ -23,6 +26,81 @@ UNSET_STRING = '*'
 SUFFIXES = ('Movement', 'Rider')
 
 CUSTOM_PREFIX = '_custom_'
+
+
+AnyJsonType = str | int | float | bool | None
+AnyJson = dict | list | AnyJsonType
+
+
+def condense(data: AnyJson, alias_dict: dict, recursive: bool = False) -> AnyJson:
+    def make_tuple(thing: AnyJson) -> tuple | AnyJsonType:
+        if isinstance(thing, dict):
+            return tuple((k, make_tuple(thing[k])) for k in thing)
+        if isinstance(thing, list):
+            return tuple(make_tuple(x) for x in thing)
+        return thing
+
+    tuple_dict = {make_tuple(v): k for k, v in alias_dict.items()}
+
+    def find_alias(thing: AnyJson, tuple_thing: tuple | AnyJsonType) -> AnyJson:
+        if tuple_thing in tuple_dict:
+            return tuple_dict[tuple_thing]
+        if isinstance(thing, dict):
+            return {tuple_dict.get(k, k): find_alias(thing[k], v) for k, v in tuple_thing}
+        if isinstance(thing, list):
+            return [find_alias(x, tx) for x, tx in zip(thing, tuple_thing)]
+        return thing
+
+    old_data = None
+
+    while old_data != data:
+        old_data, data = data, find_alias(data, make_tuple(data))
+        if not recursive:
+            break
+
+    return data
+
+
+def expand(data: AnyJson, alias_dict: dict, recursive: bool = False) -> AnyJson:
+    if recursive:
+        old_data = None
+        while old_data != data:
+            old_data, data = data, expand(data, alias_dict)
+        return data
+
+    if isinstance(data, dict):
+        return {alias_dict.get(k, k): expand(v, alias_dict) for k, v in data.items()}
+    if isinstance(data, list):
+        return [expand(x, alias_dict) for x in data]
+    if isinstance(data, str) and data in alias_dict:
+        return alias_dict[data]
+    return data
+
+
+def condense_algebraic(data: dict[Position, AnyJson], width: int, height: int) -> dict[str, AnyJson]:
+    mapping = tom(list(data), width, height)
+    result = {}
+    for notation, poss in mapping.items():
+        if not poss:
+            continue
+        value = data[poss[0]]
+        for pos in poss[1:]:
+            if data[pos] != value:
+                for pos2 in poss:
+                    result[toa(pos2)] = data[pos2]
+                break
+        else:
+            result[notation] = value
+    return result
+
+
+def expand_algebraic(data: dict[str, AnyJson], width: int, height: int) -> dict[Position, AnyJson]:
+    mapping = frm(list(data), width, height)
+    result = {}
+    for pos, notation in mapping.items():
+        result[pos] = copy(data[notation])
+    return result
+
 
 
 def save_piece_type(piece_type: Type[Piece] | frozenset | None) -> str | None:

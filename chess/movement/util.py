@@ -137,47 +137,52 @@ def from_algebraic(pos: str) -> Position | None:
     # the board is represented as a list of lists, so the rank is the outer list and goes first when indexing
 
 
-def to_algebraic_list(poss: list[Position], width: int, height: int) -> list[str]:
+def to_algebraic_map(poss: list[Position], width: int, height: int) -> dict[str, list[Position]]:
     cols = {col for col in range(width)}
     rows = {row for row in range(height)}
     remain = set(poss)
-    result = set()
+    result = {}
     by_row = {row: set() for row in rows}
     for pos in poss:  # find all files listed for each rank
         by_row[pos[0]].add(pos[1])
     for row in rows:
         if by_row[row] == cols:  # if all positions for the nth rank are listed
-            result.add(f'*{row + 1}')  # add '*n' to the result and remove them from the remaining positions
-            remain.difference_update((row, col) for col in cols)
+            # add '*n' to the result and remove them from the remaining positions
+            row_poss = [(row, col) for col in cols]
+            result[f'*{row + 1}'] = row_poss
+            remain.difference_update(row_poss)
     if not remain:  # if all listed positions were discarded, return the result
         if result == {f'*{row + 1}' for row in rows}:  # unless all positions for every rank were listed
-            return ['*']  # in which case, return '*' to represent all possible positions
-        return sorted(result)
+            # in which case, return '*' to represent all possible positions
+            return {'*': sorted(poss)}
+        return {k: sorted(result[k]) for k in sorted(result)}
     by_col = {col: set() for col in cols}
     for pos in poss:  # find all ranks listed for each file
         by_col[pos[1]].add(pos[0])
     for col in cols:
         if by_col[col] == rows:  # if all positions for the l file are listed
-            result.add(f'{to_alpha(col + 1)}*')  # add 'l*' to the result and remove them from the remaining positions
-            remain.difference_update((row, col) for row in rows)
-    result.update(to_algebraic(pos) for pos in remain)  # add the remaining positions to the result
-    return sorted(result)
+            # add 'l*' to the result and remove them from the remaining positions
+            col_poss = [(row, col) for row in rows]
+            result[f'{to_alpha(col + 1)}*'] = col_poss
+            remain.difference_update(col_poss)
+    result |= {to_algebraic(pos): [pos] for pos in remain}  # add the remaining positions to the result
+    return {k: sorted(result[k]) for k in sorted(result)}
 
 
-def from_algebraic_list(poss: list[str], width: int, height: int) -> list[Position]:
-    result = set()
+def from_algebraic_map(poss: list[str], width: int, height: int) -> dict[Position, str]:
+    result = {}
     for pos in poss:
         if pos == UNKNOWN_COORDINATE_STRING:
             continue
         pos = pos.lower()
         if pos[0] == '*' and pos[-1] == '*':  # '*' (or '**') means all positions
-            result.update((row, col) for row in range(height) for col in range(width))
+            result |= {(row, col): pos for row in range(height) for col in range(width)}
         elif pos[0] == '*':  # '*n' means all positions in the nth rank
             row = int(pos[1:]) - 1
-            result.update((row, col) for col in range(width))
+            result |= {(row, col): pos for col in range(width)}
         elif pos[-1] == '*':  # 'l*' means all positions in the l file
             col = from_alpha(pos[:-1]) - 1
-            result.update((row, col) for row in range(height))
+            result |= {(row, col): pos for row in range(height)}
         else:
-            result.add(from_algebraic(pos))
-    return sorted(result)
+            result[from_algebraic(pos)] = pos
+    return {k: result[k] for k in sorted(result)}  # type: ignore

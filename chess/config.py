@@ -22,6 +22,7 @@ DEFAULT_CONFIG = {
         'update_roll_seed': True,
         'block_ids': '',
         'block_ids_chaos': '',
+        'recursive_aliases': True,
         'save_indent': '',
         'save_update_mode': 0,
         'partial_save': False,

@@ -25,7 +25,6 @@ from chess.movement import movement
 from chess.movement.move import Move
 from chess.movement.util import Position, add, to_alpha as b26
 from chess.movement.util import to_algebraic as toa, from_algebraic as fra
-from chess.movement.util import to_algebraic_list as toal, from_algebraic_list as fral
 from chess.pieces.groups import classic as fide
 from chess.pieces.groups import amazon as am, amontillado as ao, asymmetry as ay, avian as av
 from chess.pieces.groups import backward as bw, beast as bs, breakfast as bk, burn as br, buzz as bz
@@ -47,6 +46,8 @@ from chess.pieces.groups import zebra as zb
 from chess.pieces.groups.util import NoPiece, Obstacle, Block, Wall
 from chess.pieces.piece import Piece, QuasiRoyalPiece, RoyalPiece
 from chess.pieces.side import Side
+from chess.save import condense, expand
+from chess.save import condense_algebraic as cnd_alg, expand_algebraic as exp_alg
 from chess.save import load_move, load_piece, load_rng, load_piece_type, load_custom_type
 from chess.save import save_move, save_piece, save_rng, save_piece_type, save_custom_type
 from chess.util import Default, Unset, base_dir
@@ -485,7 +486,8 @@ class Board(Window):
         self.penultima_pieces = {Side.WHITE: {}, Side.BLACK: {}}  # piece textures that are used for penultima mode
         self.custom_pieces = {}  # custom piece types
         self.custom_layout = {}  # custom starting layout of the board
-        self.custom_promotions = {}  # custom promotion options, as {side: {from: {to: [pos]}}}
+        self.custom_promotions = {}  # custom promotion options
+        self.alias_dict = {}  # dictionary of aliases for save data
         self.moves = {Side.WHITE: {}, Side.BLACK: {}}  # dictionary of valid moves from any square
         self.chain_moves = {Side.WHITE: {}, Side.BLACK: {}}  # dictionary of moves chained from a certain move (from/to)
         self.chain_start = None  # move that started the current chain (if any)
@@ -765,8 +767,9 @@ class Board(Window):
         self.update_status()
 
     def dump_board(self, partial: bool = False) -> str:
+        wh = self.board_width, self.board_height
         data = {
-            'board_size': [self.board_width, self.board_height],
+            'board_size': [*wh],
             'window_size': list(self.windowed_size),
             'square_size': self.windowed_square_size,
             'flip_mode': self.flip_mode,
@@ -782,17 +785,19 @@ class Board(Window):
             'sets': {
                 side.value: [save_piece_type(t) for t in piece_set] for side, piece_set in self.piece_sets.items()
             },
-            'pieces': {
-                toa(p.board_pos): save_piece(p.on(None))
+            'pieces': cnd_alg({
+                p.board_pos: save_piece(p.on(None))
                 for pieces in [*self.movable_pieces.values(), self.obstacles] for p in pieces
-            },
+            }, *wh),
             'custom': {k: save_custom_type(v) for k, v in self.custom_pieces.items()},
-            'layout': {toa(pos): save_piece(p.on(None)) for pos, p in self.custom_layout.items()},
+            'layout': cnd_alg({pos: save_piece(p.on(None)) for pos, p in self.custom_layout.items()}, *wh),
             'promotions': {
                 side.value: {
-                    save_piece_type(f): {
-                        save_piece_type(t): toal(l, self.board_width, self.board_height) for t, l in s.items()
-                    } for f, s in d.items()
+                    save_piece_type(f): cnd_alg({
+                        p: [
+                            (save_piece if isinstance(t, Piece) else save_piece_type)(t) for t in l
+                        ] for p, l in s.items()
+                    }, *wh) for f, s in d.items()
                 } for side, d in self.custom_promotions.items()
             },
             'moves': [save_move(m) for m in self.move_history],
@@ -834,6 +839,8 @@ class Board(Window):
                 data[f"{k}_state"] = save_rng(rng)
         if partial and self.load_dict is not None:
             data = {k: v for k, v in data.items() if k in self.load_dict}
+        if self.alias_dict:
+            data = {'alias': self.alias_dict, **condense(data, self.alias_dict, self.board_config['recursive_aliases'])}
         indent = self.board_config['save_indent']
         if indent is None:
             return dumps(data, separators=(',', ':'), ensure_ascii=False)
@@ -868,10 +875,17 @@ class Board(Window):
             for sprite in sprite_list:
                 sprite_list.remove(sprite)
 
+        self.alias_dict = data.get('alias', {})
+        if 'alias' in data:
+            del data['alias']
+        if self.alias_dict:
+            data = expand(data, self.alias_dict, self.board_config['recursive_aliases'])
+
         # might have to add more error checking to saving/loading, even if at the cost of slight redundancy.
         # who knows when someone decides to introduce a breaking change and absolutely destroy all the saves
         board_size = tuple(data.get('board_size', (self.board_width, self.board_height)))
         self.resize_board(*board_size)
+        wh = self.board_width, self.board_height
 
         window_size = data.get('window_size')
         square_size = data.get('square_size')
@@ -936,7 +950,9 @@ class Board(Window):
         self.custom_promotions = {
             Side(int(v)): {
                 load_piece_type(f, c): {
-                    load_piece_type(t, c): fral(l, self.board_width, self.board_height) for t, l in s.items()
+                    p: [
+                        (load_piece_type(t, c) if isinstance(t, str) else load_piece(t, self, c)) for t in l
+                    ] for p, l in exp_alg(s, *wh).items()
                 } for f, s in d.items()
             } for v, d in data.get('promotions', {}).items()
         }
@@ -971,7 +987,7 @@ class Board(Window):
         self.reset_edit_promotions()
         self.reset_penultima_pieces()
 
-        self.custom_layout = {(p := fra(k)): load_piece(v, self, c).on(p) for k, v in data.get('layout', {}).items()}
+        self.custom_layout = {p: load_piece(v, self, c).on(p) for p, v in exp_alg(data.get('layout', {}), *wh).items()}
 
         ply_count = data.get('ply', self.ply_count)
         self.turn_side = Side(data.get('side', self.turn_side))
@@ -1008,14 +1024,14 @@ class Board(Window):
         if self.roll_rng is None:
             self.roll_rng = Random(self.roll_seed)
 
-        pieces = data.get('pieces', {})
+        pieces = exp_alg(data.get('pieces', {}), *wh)
         self.pieces = []
 
         for row in range(self.board_height):
             self.pieces += [[]]
 
         for row, col in product(range(self.board_height), range(self.board_width)):
-            piece_data = pieces.get(toa((row, col)))
+            piece_data = pieces.get((row, col))
             self.pieces[row].append(
                 NoPiece(self, (row, col)) if piece_data is None
                 else load_piece(piece_data, self, c).on((row, col))
@@ -1146,18 +1162,10 @@ class Board(Window):
     def reset_promotions(self, piece_sets: dict[Side, list[Type[Piece]]] | None = None) -> None:
         if piece_sets is None:
             piece_sets = self.piece_sets
-        self.promotions = {}
         if self.custom_promotions:
-            for side in self.custom_promotions:
-                self.promotions[side] = {}
-                for piece in self.custom_promotions[side]:
-                    self.promotions[side][piece] = {}
-                    for to_piece in self.custom_promotions[side][piece]:
-                        for pos in self.custom_promotions[side][piece][to_piece]:
-                            if pos not in self.promotions[side][piece]:
-                                self.promotions[side][piece][pos] = []
-                            self.promotions[side][piece][pos].append(to_piece)
+            self.promotions = deepcopy(self.custom_promotions)
             return
+        self.promotions = {}
         promotion_squares = {
             Side.WHITE: [(self.board_height - 1, i) for i in range(self.board_width)],
             Side.BLACK: [(0, i) for i in range(self.board_width)],
