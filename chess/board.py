@@ -1243,32 +1243,33 @@ class Board(Window):
         }
         for side in piece_sets:
             self.drops[side] = {}
-        drops = {}
         for side in piece_sets:
-            drops[side] = {}
-            drops[side][fide.Pawn] = {}
+            if not piece_sets[side]:
+                continue
+            self.drops[side] = {}
+            self.drops[side][fide.Pawn] = {}
             pawn = fide.Pawn(self)
             pawn.movement.set_moves(1)
             for pos in pawn_drop_squares[side]:
-                drops[side][fide.Pawn][pos] = pawn
+                self.drops[side][fide.Pawn][pos] = pawn
             for pos in pawn_drop_squares_2[side]:
-                drops[side][fide.Pawn][pos] = fide.Pawn
+                self.drops[side][fide.Pawn][pos] = fide.Pawn
             piece_type = piece_sets[side][0]
+            self.drops[side][piece_type] = {}
             piece = piece_type(self)
             piece.movement.set_moves(1)
             for pos in drop_squares[side]:
-                drops[side][piece_type][pos] = piece
+                self.drops[side][piece_type][pos] = piece
             for piece_type in piece_sets[side][1:-1]:
-                if piece_type not in drops[side] and not issubclass(piece_type, RoyalPiece):
-                    drops[side][piece_type] = {}
-                    for pos in drop_squares[side]:
-                        drops[side][piece_type][pos] = piece_type
-            if piece_sets[side][-1] not in drops[side]:
+                if piece_type not in self.drops[side] and not issubclass(piece_type, RoyalPiece):
+                    self.drops[side][piece_type] = {pos: piece_type for pos in drop_squares[side]}
+            if piece_sets[side][-1] not in self.drops[side]:
                 piece_type = piece_sets[side][-1]
+                self.drops[side][piece_type] = {}
                 piece = piece_type(self)
                 piece.movement.set_moves(1)
                 for pos in drop_squares[side]:
-                    drops[side][piece_type][pos] = piece
+                    self.drops[side][piece_type][pos] = piece
 
     def reset_promotions(self, piece_sets: dict[Side, list[Type[Piece]]] | None = None) -> None:
         if self.custom_promotions:
@@ -1282,6 +1283,8 @@ class Board(Window):
             Side.BLACK: [(0, i) for i in range(self.board_width)],
         }
         for side in promotion_squares:
+            if not piece_sets[side]:
+                continue
             promotions = []
             used_piece_set = set()
             for pieces in (
@@ -4241,7 +4244,7 @@ class Board(Window):
             debug_log_data.append(f"  {toa(pos)} {pos}: {piece}{suffix}")
         if not self.custom_layout:
             debug_log_data[-1] += " None"
-        data = self.load_dict.get('promotions', {})
+        data = (self.load_dict or {}).get('promotions', {})
         for side in self.piece_set_ids:
             promotions = self.custom_promotions.get(side, {})
             debug_log_data.append(f"Custom promotions for {side} ({len(promotions)}):")
@@ -4272,7 +4275,7 @@ class Board(Window):
                     debug_log_data[-1] += " None"
             if not promotions:
                 debug_log_data[-1] += " None"
-        data = self.load_dict.get('drops', {})
+        data = (self.load_dict or {}).get('drops', {})
         for side in self.piece_set_ids:
             drops = self.custom_drops.get(side, {})
             debug_log_data.append(f"Drop rules for {side} ({len(drops)}):")
