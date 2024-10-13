@@ -1243,7 +1243,7 @@ class Board(Window):
         }
         for drop_side in piece_sets:
             drops = {}
-            for side in piece_sets:
+            for side in (drop_side, drop_side.opponent()):
                 if not piece_sets[side]:
                     continue
                 drops[fide.Pawn] = {}
@@ -2598,7 +2598,8 @@ class Board(Window):
         side_drops = self.drops[self.turn_side]
         drop_list = []
         drop_type_list = []
-        for piece_type in self.captured_pieces[self.turn_side]:
+        drop_indexes = {k: i for i, k in enumerate(side_drops)}
+        for piece_type in sorted(self.captured_pieces[self.turn_side], key=lambda x: drop_indexes.get(x, 0)):
             if piece_type not in side_drops:
                 continue
             drop_squares = side_drops[piece_type]
