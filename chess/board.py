@@ -2625,6 +2625,7 @@ class Board(Window):
         promotion_piece = self.promotion_piece
         if move.promotion:
             self.promotion_piece = True
+            move.promotion.promoted_from = move.promotion.promoted_from or move.piece.promoted_from or type(move.piece)
             self.replace(move.piece, move.promotion)
             self.update_promotion_auto_captures(move)
             self.promotion_piece = promotion_piece
