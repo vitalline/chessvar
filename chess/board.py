@@ -25,6 +25,7 @@ from chess.movement import movement
 from chess.movement.move import Move
 from chess.movement.util import Position, add, to_alpha as b26
 from chess.movement.util import to_algebraic as toa, from_algebraic as fra
+from chess.movement.util import from_algebraic_map as frm
 from chess.pieces.groups import classic as fide
 from chess.pieces.groups import amazon as am, amontillado as ao, asymmetry as ay, avian as av
 from chess.pieces.groups import backward as bw, beast as bs, breakfast as bk, burn as br, buzz as bz
@@ -810,13 +811,13 @@ class Board(Window):
                     }, *wh) for f, s in d.items()
                 } for side, d in self.custom_drops.items()
             },
-            'captured': {
-                side.value: [save_piece_type(p) for p in pieces]
-                for side, pieces in self.captured_pieces.items() if pieces
-            },
             'extra': {
                 side.value: [save_piece_type(p) for p in pieces]
                 for side, pieces in self.custom_extra_drops.items()
+            },
+            'captured': {
+                side.value: [save_piece_type(p) for p in pieces]
+                for side, pieces in self.captured_pieces.items() if pieces
             },
             'moves': [save_move(m) for m in self.move_history],
             'future': [save_move(m) for m in self.future_move_history[::-1]],
@@ -4144,16 +4145,6 @@ class Board(Window):
                 }""")
             if not self.auto_capture_markers[side]:
                 debug_log_data[-1] += " None"
-            debug_log_data.append(f"{side} promotions ({len(self.promotions[side])}):")
-            for piece in self.promotions[side]:
-                debug_log_data.append(f"  {piece.name} ({len(self.promotions[side][piece])}):")
-                for pos in self.promotions[side][piece]:
-                    piece_list = ', '.join(to_piece.name for to_piece in self.promotions[side][piece][pos])
-                    debug_log_data.append(f"    {toa(pos)} {pos}: {piece_list if piece_list else 'None'}")
-                if not self.promotions[side][piece]:
-                    debug_log_data[-1] += " None"
-            if not self.promotions[side]:
-                debug_log_data[-1] += " None"
             piece_list = ', '.join(piece.name for piece in self.edit_promotions[side])
             debug_log_data.append(
                 f"{side} replacements ({len(self.edit_promotions[side])}): {piece_list if piece_list else 'None'}"
@@ -4169,12 +4160,83 @@ class Board(Window):
             suffixes = []
             if piece.movement and piece.movement.total_moves:
                 suffixes.append(f"Moves: {piece.movement.total_moves}")
+            if piece.promoted_from:
+                suffixes.append(f"Promoted from: {piece.promoted_from.name}")
             if piece.is_hidden is False:
                 suffixes.append('Never hide')
             suffix = f" ({', '.join(suffixes)})" if suffixes else ''
             debug_log_data.append(f"  {toa(pos)} {pos}: {piece}{suffix}")
         if not self.custom_layout:
             debug_log_data[-1] += " None"
+        data = self.load_dict.get('promotions', {})
+        for side in self.piece_set_ids:
+            promotions = self.custom_promotions.get(side, {})
+            debug_log_data.append(f"Custom promotions for {side} ({len(promotions)}):")
+            for piece in promotions:
+                debug_log_data.append(f"  {piece.name} ({len(promotions[piece])}):")
+                compressed = data.get(str(side.value), {}).get(save_piece_type(piece), {})
+                from_mapping = frm(list(compressed), self.width, self.height)
+                mapping = {}
+                for pos, value in from_mapping.items():
+                    if value not in mapping:
+                        mapping[value] = pos
+                for value, pos in mapping.items():
+                    piece_list = []
+                    for to_piece in promotions[piece][pos]:
+                        suffixes = []
+                        if isinstance(to_piece, Piece):
+                            if to_piece.movement and to_piece.movement.total_moves:
+                                suffixes.append(f"Moves: {to_piece.movement.total_moves}")
+                            if to_piece.promoted_from:
+                                suffixes.append(f"Promoted from: {to_piece.promoted_from.name}")
+                            if to_piece.is_hidden is False:
+                                suffixes.append('Never hide')
+                        suffix = f" ({', '.join(suffixes)})" if suffixes else ''
+                        piece_list.append(f"{to_piece.name}{suffix}")
+                    piece_list = ', '.join(string for string in piece_list)
+                    debug_log_data.append(f"    {value} {fra(value)}: {piece_list if piece_list else 'None'}")
+                if not promotions[piece]:
+                    debug_log_data[-1] += " None"
+            if not promotions:
+                debug_log_data[-1] += " None"
+        data = self.load_dict.get('drops', {})
+        for side in self.piece_set_ids:
+            drops = self.custom_drops.get(side, {})
+            debug_log_data.append(f"Drop rules for {side} ({len(drops)}):")
+            for piece in drops:
+                debug_log_data.append(f"  {piece.name} ({len(drops[piece])}):")
+                compressed = data.get(str(side.value), {}).get(save_piece_type(piece), {})
+                from_mapping = frm(list(compressed), self.width, self.height)
+                mapping = {}
+                for pos, value in from_mapping.items():
+                    if value not in mapping:
+                        mapping[value] = pos
+                for value, pos in mapping.items():
+                    to_piece = drops[piece][pos]
+                    suffixes = []
+                    if isinstance(to_piece, Piece):
+                        if to_piece.movement and to_piece.movement.total_moves:
+                            suffixes.append(f"Moves: {to_piece.movement.total_moves}")
+                        if to_piece.promoted_from:
+                            suffixes.append(f"Promoted from: {to_piece.promoted_from.name}")
+                        if to_piece.is_hidden is False:
+                            suffixes.append('Never hide')
+                    suffix = f" ({', '.join(suffixes)})" if suffixes else ''
+                    debug_log_data.append(f"    {value} {fra(value)}: {to_piece.name}{suffix}")
+                if not drops[piece]:
+                    debug_log_data[-1] += " None"
+            if not drops:
+                debug_log_data[-1] += " None"
+        for side in self.custom_extra_drops:
+            debug_log_data.append(
+                f"Starting drops of {side} ({len(self.custom_extra_drops[side])}): "
+                f"{', '.join(piece.name for piece in self.custom_extra_drops[side]) or 'None'}"
+            )
+        for side in self.captured_pieces:
+            debug_log_data.append(
+                f"Drops of {side} ({len(self.captured_pieces[side])}): "
+                f"{', '.join(piece.name for piece in self.captured_pieces[side]) or 'None'}"
+            )
         en_passant_pos = toa(self.en_passant_target.board_pos) if self.en_passant_target else 'None'
         debug_log_data.append(f"En passant target: {en_passant_pos}")
         en_passant_squares = ', '.join(toa(xy) for xy in sorted(self.en_passant_markers)) or 'None'
