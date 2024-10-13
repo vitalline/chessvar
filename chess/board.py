@@ -2569,23 +2569,23 @@ class Board(Window):
                 self.set_caption(f"[Ply {self.ply_count}] {self.turn_side} to move")
 
     def try_drop(self, move: Move) -> None:
-        if not self.use_drops:
-            return
         if self.turn_side not in self.drops:
             return
         if not self.captured_pieces[self.turn_side]:
             return
-        promotion_piece = self.promotion_piece
         if move.promotion:
             if move.placed_piece is not None:
                 for i, piece in enumerate(self.captured_pieces[self.turn_side][::-1]):
                     if piece == move.placed_piece:
                         self.captured_pieces[self.turn_side].pop(-(i + 1))
                         break
+            promotion_piece = self.promotion_piece
             self.promotion_piece = True
             self.replace(move.piece, move.promotion)
             self.update_promotion_auto_captures(move)
             self.promotion_piece = promotion_piece
+            return
+        if not self.use_drops:
             return
         side_drops = self.drops[self.turn_side]
         drop_list = []
@@ -3892,11 +3892,9 @@ class Board(Window):
                     self.log(f"[Ply {self.ply_count}] Info: Drops enabled")
                 else:
                     self.log(f"[Ply {self.ply_count}] Info: Drops disabled")
-                if old_drops and self.promotion_piece and not self.promotion_piece.is_empty():
+                if old_drops and not self.edit_mode and self.promotion_piece and self.promotion_piece.is_empty():
                     self.undo_last_finished_move()
                     self.update_caption()
-                self.future_move_history = []  # we don't know if we can redo the future moves anymore, so we clear them
-                self.advance_turn()
         if symbol == key.M:  # Moves
             if modifiers & key.MOD_ALT:  # Clear future move history
                 self.log(f"[Ply {self.ply_count}] Info: Future move history cleared", False)
