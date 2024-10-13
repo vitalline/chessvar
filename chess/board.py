@@ -1903,13 +1903,14 @@ class Board(Window):
             piece_poss = self.auto_capture_markers[side][move.pos_to]
             piece_pos = sorted(list(piece_poss))[0]
             piece = self.get_piece(piece_pos)
-            if piece.side == side and piece.side.captures(move.piece.side):
+            move_piece = self.get_piece(move.pos_to)
+            if piece.side == side and piece.side.captures(move_piece.side):
                 chained_move = Move(
                     piece=piece,
                     movement_type=type(piece.movement),
                     pos_from=piece_pos,
                     pos_to=piece_pos,
-                    captured_piece=move.piece,
+                    captured_piece=move_piece,
                 )
                 move.chained_move = chained_move
 
