@@ -88,6 +88,9 @@ class Piece(Sprite):
     def __copy__(self):
         return self.of(self.side)
 
+    def __deepcopy__(self, memo):
+        return self.__copy__()
+
     def of(self, side: Side) -> Piece:
         clone = type(self)(
             board=self.board,
