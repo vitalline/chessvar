@@ -2133,7 +2133,7 @@ class Board(Window):
             # piece was added to the board, update it and add it to the sprite list
             self.update_piece(move.piece)
             self.piece_sprite_list.append(move.piece)
-        if self.use_drops and move.piece.side in self.drops and not move.is_edit:
+        if move.piece.side in self.drops and not move.is_edit:
             if move.captured_piece is not None and move.piece.side in self.captured_pieces:
                 capture_type = move.captured_piece.promoted_from or type(move.captured_piece)
                 if capture_type in self.drops[move.piece.side]:
@@ -2187,7 +2187,7 @@ class Board(Window):
             self.update_piece(move.captured_piece)  # update the piece sprite to reflect current piece hiding mode
             self.pieces[capture_pos[0]][capture_pos[1]] = move.captured_piece
             self.piece_sprite_list.append(move.captured_piece)
-        if self.use_drops and move.piece.side in self.drops and not move.is_edit:
+        if move.piece.side in self.drops and not move.is_edit:
             if move.captured_piece is not None and move.piece.side in self.captured_pieces:
                 capture_type = move.captured_piece.promoted_from or type(move.captured_piece)
                 if capture_type in self.drops[move.piece.side]:
@@ -2566,6 +2566,8 @@ class Board(Window):
                 self.set_caption(f"[Ply {self.ply_count}] {self.turn_side} to move")
 
     def try_drop(self, move: Move) -> None:
+        if not self.use_drops:
+            return
         if self.turn_side not in self.drops:
             return
         if not self.captured_pieces[self.turn_side]:
@@ -3887,6 +3889,9 @@ class Board(Window):
                     self.log(f"[Ply {self.ply_count}] Info: Drops enabled")
                 else:
                     self.log(f"[Ply {self.ply_count}] Info: Drops disabled")
+                if old_drops and self.promotion_piece and not self.promotion_piece.is_empty():
+                    self.undo_last_finished_move()
+                    self.update_caption()
                 self.future_move_history = []  # we don't know if we can redo the future moves anymore, so we clear them
                 self.advance_turn()
         if symbol == key.M:  # Moves
