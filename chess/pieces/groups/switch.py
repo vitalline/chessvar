@@ -8,9 +8,9 @@ class Panda(Piece):
     file_name = 'W[W-DD]'
     asset_folder = 'switch'
 
-    def __init__(self, board, board_pos, side, **kwargs):
+    def __init__(self, board, **kwargs):
         super().__init__(
-            board, board_pos, side,
+            board,
             movement.MultiMovement(board, [
                 movement.BentMovement(board, [
                     movement.RiderMovement(board, [(i, j, 1)]),
@@ -26,9 +26,9 @@ class Marquis(Piece):
     file_name = 'NW'
     asset_folder = 'switch'
 
-    def __init__(self, board, board_pos, side, **kwargs):
+    def __init__(self, board, **kwargs):
         super().__init__(
-            board, board_pos, side,
+            board,
             movement.RiderMovement(board, rot([(1, 0, 1), (1, 2, 1), (2, 1, 1)])),
             **kwargs
         )
@@ -40,9 +40,9 @@ class Bear(Piece):
     asset_folder = 'switch'
     colorbound = True
 
-    def __init__(self, board, board_pos, side, **kwargs):
+    def __init__(self, board, **kwargs):
         super().__init__(
-            board, board_pos, side,
+            board,
             movement.MultiMovement(board, [
                 movement.BentMovement(board, [
                     movement.RiderMovement(board, [(i, j, 1)]),
@@ -58,9 +58,9 @@ class Earl(Piece):
     file_name = 'K[W-DD][F-AA]'
     asset_folder = 'switch'
 
-    def __init__(self, board, board_pos, side, **kwargs):
+    def __init__(self, board, **kwargs):
         super().__init__(
-            board, board_pos, side,
+            board,
             movement.MultiMovement(board, [
                 movement.BentMovement(board, [
                     movement.RiderMovement(board, [(i, j, 1)]),

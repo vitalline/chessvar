@@ -8,9 +8,9 @@ class LRhino(Piece):
     file_name = 'KaflK'
     asset_folder = 'fizz'
 
-    def __init__(self, board, board_pos, side, **kwargs):
+    def __init__(self, board, **kwargs):
         super().__init__(
-            board, board_pos, side,
+            board,
             movement.MultiMovement(board, [
                 movement.BentMovement(board, [
                     movement.RiderMovement(board, [(*ij, 1)]),
@@ -29,9 +29,9 @@ class RRhino(Piece):
     file_name = 'KafrK'
     asset_folder = 'fizz'
 
-    def __init__(self, board, board_pos, side, **kwargs):
+    def __init__(self, board, **kwargs):
         super().__init__(
-            board, board_pos, side,
+            board,
             movement.MultiMovement(board, [
                 movement.BentMovement(board, [
                     movement.RiderMovement(board, [(*ij, 1)]),
@@ -50,9 +50,9 @@ class Wyvern(Piece):
     file_name = 'WhhyafsW'
     asset_folder = 'fizz'
 
-    def __init__(self, board, board_pos, side, **kwargs):
+    def __init__(self, board, **kwargs):
         super().__init__(
-            board, board_pos, side,
+            board,
             movement.MultiMovement(board, [
                 movement.BentMovement(board, [
                     movement.RiderMovement(board, [(i, j, 1)]),
@@ -68,9 +68,9 @@ class Crabinal(Piece):
     file_name = 'ffbsNhhB'
     asset_folder = 'fizz'
 
-    def __init__(self, board, board_pos, side, **kwargs):
+    def __init__(self, board, **kwargs):
         super().__init__(
-            board, board_pos, side,
+            board,
             movement.MultiMovement(board, [
                 movement.RiderMovement(board, symv([(2, 1, 1), (-1, 2, 1)])),
                 movement.HalflingRiderMovement(board, rot([(1, 1)]))
@@ -84,9 +84,9 @@ class EagleScout(Piece):
     file_name = 'WzB'
     asset_folder = 'fizz'
 
-    def __init__(self, board, board_pos, side, **kwargs):
+    def __init__(self, board, **kwargs):
         super().__init__(
-            board, board_pos, side,
+            board,
             movement.MultiMovement(board, [movement.RiderMovement(board, rot([(1, 0, 1)]))] + [
                 movement.RepeatMovement(board, [
                     movement.RiderMovement(board, [(i, j, 1)]),

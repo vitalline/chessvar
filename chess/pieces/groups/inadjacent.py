@@ -8,9 +8,9 @@ class Bireme(Piece):
     file_name = 'D[D-R]'
     asset_folder = 'inadjacent'
 
-    def __init__(self, board, board_pos, side, **kwargs):
+    def __init__(self, board, **kwargs):
         super().__init__(
-            board, board_pos, side,
+            board,
             movement.MultiMovement(board, [
                 movement.BentMovement(board, [
                     movement.RiderMovement(board, [(2 * i, 2 * j, 1)]),
@@ -26,7 +26,7 @@ class Tigon(Piece):
     file_name = 'nCnZ'
     asset_folder = 'inadjacent'
 
-    def __init__(self, board, board_pos, side, **kwargs):
+    def __init__(self, board, **kwargs):
         movements = []
         for i, j in rot([(1, 0)]):
             for k in (1, -1):
@@ -39,7 +39,7 @@ class Tigon(Piece):
                         ], 2),
                     ])
         super().__init__(
-            board, board_pos, side,
+            board,
             movement.MultiMovement(board, movements),
             **kwargs
         )
@@ -51,9 +51,9 @@ class Bicycle(Piece):
     asset_folder = 'inadjacent'
     colorbound = True
 
-    def __init__(self, board, board_pos, side, **kwargs):
+    def __init__(self, board, **kwargs):
         super().__init__(
-            board, board_pos, side,
+            board,
             movement.MultiMovement(board, [
                 movement.BentMovement(board, [
                     movement.RiderMovement(board, [(2 * i, 2 * j, 1)]),
@@ -69,9 +69,9 @@ class Biplane(Piece):
     file_name = 'D[D-R]A[A-B]'
     asset_folder = 'inadjacent'
 
-    def __init__(self, board, board_pos, side, **kwargs):
+    def __init__(self, board, **kwargs):
         super().__init__(
-            board, board_pos, side,
+            board,
             movement.MultiMovement(board, [
                 movement.BentMovement(board, [
                     movement.RiderMovement(board, [(2 * i, 2 * j, 1)]),

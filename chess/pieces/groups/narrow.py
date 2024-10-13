@@ -8,9 +8,9 @@ class Deerfly(Piece):
     file_name = 'vRK'
     asset_folder = 'narrow'
 
-    def __init__(self, board, board_pos, side, **kwargs):
+    def __init__(self, board, **kwargs):
         super().__init__(
-            board, board_pos, side,
+            board,
             movement.RiderMovement(board, rot([(1, 0, 1), (1, 1, 1)]) + symh([(1, 0)])),
             **kwargs
         )
@@ -21,9 +21,9 @@ class Ship(Piece):
     file_name = 'mpsyasW'
     asset_folder = 'narrow'
 
-    def __init__(self, board, board_pos, side, **kwargs):
+    def __init__(self, board, **kwargs):
         super().__init__(
-            board, board_pos, side,
+            board,
             movement.MultiMovement(board, [
                 movement.BentMovement(board, [
                     movement.RiderMovement(board, [(i or k, j or k, 1)]),
@@ -40,9 +40,9 @@ class Filescout(Piece):
     asset_folder = 'narrow'
     colorbound = True
 
-    def __init__(self, board, board_pos, side, **kwargs):
+    def __init__(self, board, **kwargs):
         super().__init__(
-            board, board_pos, side,
+            board,
             movement.MultiMovement(board, [movement.RiderMovement(board, symv([(0, 2, 1)]))] + [
                 movement.RepeatMovement(board, [
                     movement.RiderMovement(board, [(i, j, 1)]),
@@ -58,9 +58,9 @@ class Horsefly(Piece):
     file_name = 'vRNK'
     asset_folder = 'narrow'
 
-    def __init__(self, board, board_pos, side, **kwargs):
+    def __init__(self, board, **kwargs):
         super().__init__(
-            board, board_pos, side,
+            board,
             movement.RiderMovement(board, rot([(1, 0, 1), (1, 1, 1), (1, 2, 1), (2, 1, 1)]) + symh([(1, 0)])),
             **kwargs
         )

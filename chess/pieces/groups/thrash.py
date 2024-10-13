@@ -8,9 +8,9 @@ class Trident(Piece):
     file_name = 'WDH'
     asset_folder = 'thrash'
 
-    def __init__(self, board, board_pos, side, **kwargs):
+    def __init__(self, board, **kwargs):
         super().__init__(
-            board, board_pos, side,
+            board,
             movement.RiderMovement(board, rot([(1, 0, 1), (2, 0, 1), (3, 0, 1)])),
             **kwargs
         )
@@ -21,9 +21,9 @@ class Nipper(Piece):
     file_name = 'NG'
     asset_folder = 'thrash'
 
-    def __init__(self, board, board_pos, side, **kwargs):
+    def __init__(self, board, **kwargs):
         super().__init__(
-            board, board_pos, side,
+            board,
             movement.RiderMovement(board, rot([(1, 2, 1), (2, 1, 1), (3, 3, 1)])),
             **kwargs
         )
@@ -34,9 +34,9 @@ class Bullfrog(Piece):
     file_name = 'FAH'
     asset_folder = 'thrash'
 
-    def __init__(self, board, board_pos, side, **kwargs):
+    def __init__(self, board, **kwargs):
         super().__init__(
-            board, board_pos, side,
+            board,
             movement.RiderMovement(board, rot([(1, 1, 1), (2, 2, 1), (3, 0, 1)])),
             **kwargs
         )
@@ -47,9 +47,9 @@ class Duchess(Piece):
     file_name = 'KAGDH'
     asset_folder = 'thrash'
 
-    def __init__(self, board, board_pos, side, **kwargs):
+    def __init__(self, board, **kwargs):
         super().__init__(
-            board, board_pos, side,
+            board,
             movement.RiderMovement(board, rot([(1, 0, 1), (1, 1, 1), (2, 0, 1), (2, 2, 1), (3, 0, 1), (3, 3, 1)])),
             **kwargs
         )

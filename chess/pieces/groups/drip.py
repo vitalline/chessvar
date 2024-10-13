@@ -9,9 +9,9 @@ class Lobefin(Piece):
     asset_folder = 'drip'
     colorbound = True
 
-    def __init__(self, board, board_pos, side, **kwargs):
+    def __init__(self, board, **kwargs):
         super().__init__(
-            board, board_pos, side,
+            board,
             movement.RiderMovement(board, rot([(2, 0, 1)]) + symv([(2, 2), (-1, 1)])),
             **kwargs
         )
@@ -22,9 +22,9 @@ class CrabRdr(Piece):
     file_name = 'ffbsNN'
     asset_folder = 'drip'
 
-    def __init__(self, board, board_pos, side, **kwargs):
+    def __init__(self, board, **kwargs):
         super().__init__(
-            board, board_pos, side,
+            board,
             movement.RiderMovement(board, symv([(2, 1), (-1, 2)])),
             **kwargs
         )
@@ -35,9 +35,9 @@ class Sandbar(Piece):
     file_name = 'WfDfsbbNN'
     asset_folder = 'drip'
 
-    def __init__(self, board, board_pos, side, **kwargs):
+    def __init__(self, board, **kwargs):
         super().__init__(
-            board, board_pos, side,
+            board,
             movement.RiderMovement(board, symv([(1, 2), (-2, 1)]) + rot([(1, 0, 1)]) + [(2, 0, 1)]),
             **kwargs
         )
@@ -48,9 +48,9 @@ class Oyster(Piece):
     file_name = 'WfDffbsNNfAAbB'
     asset_folder = 'drip'
 
-    def __init__(self, board, board_pos, side, **kwargs):
+    def __init__(self, board, **kwargs):
         super().__init__(
-            board, board_pos, side,
+            board,
             movement.RiderMovement(board, symv([(2, 1), (2, 2), (-1, 1), (-1, 2)]) + rot([(1, 0, 1)]) + [(2, 0, 1)]),
             **kwargs
         )

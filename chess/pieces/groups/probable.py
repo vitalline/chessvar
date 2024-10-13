@@ -8,9 +8,9 @@ class Veteran(Piece):
     file_name = '{R,KAD}'
     asset_folder = 'probable'
 
-    def __init__(self, board, board_pos, side, **kwargs):
+    def __init__(self, board, **kwargs):
         super().__init__(
-            board, board_pos, side,
+            board,
             movement.ProbabilisticMovement(board, [
                 movement.RiderMovement(board, rot([(1, 0)])),
                 movement.RiderMovement(board, rot([(1, 0, 1), (1, 1, 1), (2, 0, 1), (2, 2, 1)]))
@@ -24,9 +24,9 @@ class RedPanda(Piece):
     file_name = '{W[W-DD],N}'
     asset_folder = 'probable'
 
-    def __init__(self, board, board_pos, side, **kwargs):
+    def __init__(self, board, **kwargs):
         super().__init__(
-            board, board_pos, side,
+            board,
             movement.ProbabilisticMovement(board, [
                 movement.MultiMovement(board, [
                     movement.BentMovement(board, [
@@ -46,9 +46,9 @@ class Tempofad(Piece):
     asset_folder = 'probable'
     colorbound = True
 
-    def __init__(self, board, board_pos, side, **kwargs):
+    def __init__(self, board, **kwargs):
         super().__init__(
-            board, board_pos, side,
+            board,
             movement.ProbabilisticMovement(board, [
                 movement.RiderMovement(board, rot([(1, 1)])),
                 movement.RiderMovement(board, rot([(1, 1, 1), (2, 0, 1), (2, 2, 1)]))
@@ -62,9 +62,9 @@ class WaterBuffalo(Piece):
     file_name = '{Q,NCZ}'
     asset_folder = 'probable'
 
-    def __init__(self, board, board_pos, side, **kwargs):
+    def __init__(self, board, **kwargs):
         super().__init__(
-            board, board_pos, side,
+            board,
             movement.ProbabilisticMovement(board, [
                 movement.RiderMovement(board, rot([(1, 0), (1, 1)])),
                 movement.RiderMovement(board, rot([(1, 2, 1), (1, 3, 1), (2, 1, 1), (2, 3, 1), (3, 1, 1), (3, 2, 1)]))

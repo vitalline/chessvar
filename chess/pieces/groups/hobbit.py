@@ -8,9 +8,9 @@ class Heart(Piece):
     file_name = 'hhRA'
     asset_folder = 'hobbit'
 
-    def __init__(self, board, board_pos, side, **kwargs):
+    def __init__(self, board, **kwargs):
         super().__init__(
-            board, board_pos, side,
+            board,
             movement.MultiMovement(board, [
                 movement.RiderMovement(board, rot([(2, 2, 1)])),
                 movement.HalflingRiderMovement(board, rot([(1, 0)]))
@@ -24,9 +24,9 @@ class Drake(Piece):
     file_name = 'FhhyafsF'
     asset_folder = 'hobbit'
 
-    def __init__(self, board, board_pos, side, **kwargs):
+    def __init__(self, board, **kwargs):
         super().__init__(
-            board, board_pos, side,
+            board,
             movement.MultiMovement(board, [
                 movement.BentMovement(board, [
                     movement.RiderMovement(board, [(i or k, j or k, 1)]),
@@ -42,9 +42,9 @@ class Barcinal(Piece):
     file_name = 'fsbbNhhB'
     asset_folder = 'hobbit'
 
-    def __init__(self, board, board_pos, side, **kwargs):
+    def __init__(self, board, **kwargs):
         super().__init__(
-            board, board_pos, side,
+            board,
             movement.MultiMovement(board, [
                 movement.RiderMovement(board, symv([(1, 2, 1), (-2, 1, 1)])),
                 movement.HalflingRiderMovement(board, rot([(1, 1)]))
@@ -58,9 +58,9 @@ class Hannibal(Piece):
     file_name = 'hhNNhhQ'
     asset_folder = 'hobbit'
 
-    def __init__(self, board, board_pos, side, **kwargs):
+    def __init__(self, board, **kwargs):
         super().__init__(
-            board, board_pos, side,
+            board,
             movement.HalflingRiderMovement(board, rot([(1, 0), (1, 1), (1, 2), (2, 1)])),
             **kwargs
         )

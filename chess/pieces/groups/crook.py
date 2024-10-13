@@ -8,7 +8,7 @@ class LionCub(Piece):
     file_name = 'WmaWamW'
     asset_folder = 'crook'
 
-    def __init__(self, board, board_pos, side, **kwargs):
+    def __init__(self, board, **kwargs):
         movements = []
         for i, j in rot([(1, 0)]):
             movements.append(
@@ -32,7 +32,7 @@ class LionCub(Piece):
                 ])
             )
         super().__init__(
-            board, board_pos, side,
+            board,
             movement.MultiMovement(board, movements),
             **kwargs
         )
@@ -43,9 +43,9 @@ class Rhino(Piece):
     file_name = 'WafsW'
     asset_folder = 'crook'
 
-    def __init__(self, board, board_pos, side, **kwargs):
+    def __init__(self, board, **kwargs):
         super().__init__(
-            board, board_pos, side,
+            board,
             movement.MultiMovement(board, [
                 movement.BentMovement(board, [
                     movement.RiderMovement(board, [(i, j, 1)]),
@@ -62,9 +62,9 @@ class Boyscout(Piece):
     asset_folder = 'crook'
     colorbound = True
 
-    def __init__(self, board, board_pos, side, **kwargs):
+    def __init__(self, board, **kwargs):
         super().__init__(
-            board, board_pos, side,
+            board,
             movement.MultiMovement(board, [
                 movement.RepeatMovement(board, [
                     movement.RiderMovement(board, [(i, j, 1)]),
@@ -80,9 +80,9 @@ class Griffon(Piece):
     file_name = 'FyafsF'
     asset_folder = 'crook'
 
-    def __init__(self, board, board_pos, side, **kwargs):
+    def __init__(self, board, **kwargs):
         super().__init__(
-            board, board_pos, side,
+            board,
             movement.MultiMovement(board, [
                 movement.BentMovement(board, [
                     movement.RiderMovement(board, [(i or k, j or k, 1)]),

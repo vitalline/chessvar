@@ -8,9 +8,9 @@ class Paladin(Piece):
     file_name = 'NmWcF'
     asset_folder = 'pawn'
 
-    def __init__(self, board, board_pos, side, **kwargs):
+    def __init__(self, board, **kwargs):
         super().__init__(
-            board, board_pos, side,
+            board,
             movement.MultiMovement(
                 board,
                 move_or_capture=[movement.RiderMovement(board, rot([(1, 2, 1), (2, 1, 1)]))],
@@ -26,9 +26,9 @@ class Guarddog(Piece):
     file_name = 'mfRcfBfsbbNN'
     asset_folder = 'pawn'
 
-    def __init__(self, board, board_pos, side, **kwargs):
+    def __init__(self, board, **kwargs):
         super().__init__(
-            board, board_pos, side,
+            board,
             movement.MultiMovement(
                 board,
                 move_or_capture=[movement.RiderMovement(board, symv([(1, 2), (-2, 1)]))],
@@ -44,9 +44,9 @@ class Stewardess(Piece):
     file_name = 'mRcB'
     asset_folder = 'pawn'
 
-    def __init__(self, board, board_pos, side, **kwargs):
+    def __init__(self, board, **kwargs):
         super().__init__(
-            board, board_pos, side,
+            board,
             movement.MultiMovement(
                 board,
                 move=[movement.RiderMovement(board, rot([(1, 0)]))],
@@ -61,9 +61,9 @@ class Dowager(Piece):
     file_name = 'mRcBffbsNN'
     asset_folder = 'pawn'
 
-    def __init__(self, board, board_pos, side, **kwargs):
+    def __init__(self, board, **kwargs):
         super().__init__(
-            board, board_pos, side,
+            board,
             movement.MultiMovement(
                 board,
                 move_or_capture=[movement.RiderMovement(board, symv([(2, 1), (-1, 2)]))],

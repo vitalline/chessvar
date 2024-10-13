@@ -102,7 +102,6 @@ def expand_algebraic(data: dict[str, AnyJson], width: int, height: int) -> dict[
     return result
 
 
-
 def save_piece_type(piece_type: Type[Piece] | frozenset | None) -> str | None:
     if piece_type is None:
         return None
@@ -169,6 +168,7 @@ def save_piece(piece: Piece | frozenset | None) -> dict | str | None:
         'cls': save_piece_type(type(piece)),
         'pos': toa(piece.board_pos) if piece.board_pos else None,
         'side': piece.side.value if not isinstance(piece, NonMovingPiece) else None,
+        'from': save_piece_type(piece.promoted_from) if piece.promoted_from else None,
         'moves': piece.movement.total_moves if piece.movement else None,
         'show': True if piece.is_hidden is False else None,
     }.items() if v}
@@ -180,14 +180,15 @@ def load_piece(data: dict | str | None, board: Board, from_dict: dict | None = N
     if data == UNSET_STRING:
         return Unset
     if isinstance(data, str):
-        return NoPiece(board, fra(data))
+        return NoPiece(board, pos=fra(data))
     side = Side(data.get('side', 0))
     piece_type = load_piece_type(data.get('cls'), from_dict) or NoPiece
     piece = piece_type(
         board=board,
-        board_pos=fra(data['pos']) if 'pos' in data else None,  # type: ignore
+        pos=fra(data['pos']) if 'pos' in data else None,  # type: ignore
         side=side,
     )
+    piece.promoted_from = load_piece_type(data.get('from'), from_dict)
     piece.is_hidden = False if data.get('show') is True else None
     if piece.movement:
         piece.movement.set_moves(data.get('moves', 0))
@@ -278,12 +279,8 @@ def load_custom_type(data: dict | None, name: str) -> type[Piece] | None:
         args['movement_data'] = data['movement']
     cls = type(CUSTOM_PREFIX + name, (base,), args)
 
-    def init(self, board, board_pos, side, **kwargs):
-        base.__init__(
-            self, board, board_pos, side,
-            load_movement(getattr(self, 'movement_data', None), board),
-            **kwargs
-        )
+    def init(self, board, **kwargs):
+        base.__init__(self, board, load_movement(getattr(self, 'movement_data', None), board), **kwargs)
 
     cls.__init__ = init
     return cls  # type: ignore
@@ -313,6 +310,7 @@ def save_move(move: Move | frozenset | None) -> dict | str | None:
         'piece': save_piece(piece),
         'captured': save_piece(capture),
         'swapped': save_piece(swapped),
+        'drop': save_piece_type(move.placed_piece),
         'promotion': save_piece(promotion),
         'chain': save_move(move.chained_move),
         'edit': move.is_edit,
@@ -328,7 +326,7 @@ def load_move(data: dict | str | None, board: Board, from_dict: dict | None = No
     pos_to = fra(data['to']) if 'to' in data else None
     piece = load_piece(data.get('piece'), board, from_dict)
     if not piece:
-        piece = NoPiece(board, pos_to or pos_from)
+        piece = NoPiece(board, pos=pos_to or pos_from)
     elif not piece.board_pos:
         piece.board_pos = pos_to or pos_from
     capture = load_piece(data.get('captured'), board, from_dict)
@@ -344,6 +342,7 @@ def load_move(data: dict | str | None, board: Board, from_dict: dict | None = No
         piece=piece,
         captured_piece=capture,
         swapped_piece=swapped,
+        placed_piece=load_piece_type(data.get('drop'), from_dict),
         promotion=load_piece(data.get('promotion'), board, from_dict),
         chained_move=load_move(data.get('chain'), board, from_dict),
         is_edit=data.get('edit', False),

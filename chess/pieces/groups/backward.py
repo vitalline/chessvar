@@ -8,9 +8,9 @@ class Whelk(Piece):
     file_name = 'fWfDsbR'
     asset_folder = 'backward'
 
-    def __init__(self, board, board_pos, side, **kwargs):
+    def __init__(self, board, **kwargs):
         super().__init__(
-            board, board_pos, side,
+            board,
             movement.RiderMovement(board, symv([(1, 0, 1), (2, 0, 1), (0, 1), (-1, 0)])),
             **kwargs
         )
@@ -21,9 +21,9 @@ class Walrus(Piece):
     file_name = 'fNfRbhQ'
     asset_folder = 'backward'
 
-    def __init__(self, board, board_pos, side, **kwargs):
+    def __init__(self, board, **kwargs):
         super().__init__(
-            board, board_pos, side,
+            board,
             movement.RiderMovement(board, symv([(1, 0), (2, 1, 1), (-1, 0), (-1, 1)])),
             **kwargs
         )
@@ -35,9 +35,9 @@ class Seagull(Piece):
     asset_folder = 'backward'
     colorbound = True
 
-    def __init__(self, board, board_pos, side, **kwargs):
+    def __init__(self, board, **kwargs):
         super().__init__(
-            board, board_pos, side,
+            board,
             movement.MultiMovement(board, [
                 movement.RiderMovement(board, symv([(1, 1, 1), (2, 2, 1), (-1, 1)]))
             ] + [
@@ -59,9 +59,9 @@ class Shark(Piece):
     file_name = 'RfhNbB'
     asset_folder = 'backward'
 
-    def __init__(self, board, board_pos, side, **kwargs):
+    def __init__(self, board, **kwargs):
         super().__init__(
-            board, board_pos, side,
+            board,
             movement.RiderMovement(board, rot([(1, 0)]) + symv([(1, 2, 1), (2, 1, 1), (-1, 1)])),
             **kwargs
         )

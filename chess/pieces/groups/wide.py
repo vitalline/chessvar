@@ -8,9 +8,9 @@ class Ogre(Piece):
     file_name = 'vNvWsR'
     asset_folder = 'wide'
 
-    def __init__(self, board, board_pos, side, **kwargs):
+    def __init__(self, board, **kwargs):
         super().__init__(
-            board, board_pos, side,
+            board,
             movement.RiderMovement(board, sym([(0, 1), (1, 0, 1), (2, 1, 1)])),
             **kwargs
         )
@@ -21,9 +21,9 @@ class Sidesail(Piece):
     file_name = 'mpvyasWafsF'
     asset_folder = 'wide'
 
-    def __init__(self, board, board_pos, side, **kwargs):
+    def __init__(self, board, **kwargs):
         super().__init__(
-            board, board_pos, side,
+            board,
             movement.MultiMovement(board, [
                 movement.BentMovement(board, [
                     movement.RiderMovement(board, [(i or k, j or k, 1)]),
@@ -45,9 +45,9 @@ class Sidewinder(Piece):
     asset_folder = 'wide'
     colorbound = True
 
-    def __init__(self, board, board_pos, side, **kwargs):
+    def __init__(self, board, **kwargs):
         super().__init__(
-            board, board_pos, side,
+            board,
             movement.MultiMovement(board, [movement.RiderMovement(board, symh([(2, 0, 1)]))] + [
                 movement.RepeatMovement(board, [
                     movement.RiderMovement(board, [(i, j, 1)]),
@@ -63,9 +63,9 @@ class Ogress(Piece):
     file_name = 'NKsR'
     asset_folder = 'wide'
 
-    def __init__(self, board, board_pos, side, **kwargs):
+    def __init__(self, board, **kwargs):
         super().__init__(
-            board, board_pos, side,
+            board,
             movement.RiderMovement(board, sym([(0, 1), (1, 0, 1), (1, 1, 1), (1, 2, 1), (2, 1, 1)])),
             **kwargs
         )

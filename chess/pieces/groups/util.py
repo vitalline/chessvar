@@ -8,10 +8,10 @@ class NonMovingPiece(Piece):
     asset_folder = 'util'
     default_side = Side.NONE
 
-    def __init__(self, board, board_pos, **kwargs):
+    def __init__(self, board, **kwargs):
         kwargs['side'] = self.default_side
         kwargs['movement'] = None
-        super().__init__(board, board_pos, **kwargs)
+        super().__init__(board, **kwargs)
 
     def is_empty(self):
         return True
@@ -25,8 +25,8 @@ class Obstacle(NonMovingPiece):
     name = '(Obstacle)'
     file_name = 'square'
 
-    def __init__(self, board, board_pos, **kwargs):
-        super().__init__(board, board_pos, **kwargs)
+    def __init__(self, board, **kwargs):
+        super().__init__(board, **kwargs)
         self.color = board.color_scheme.get('wall_color', board.color_scheme['background_color'])
 
     def is_empty(self):

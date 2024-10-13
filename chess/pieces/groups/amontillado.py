@@ -8,9 +8,9 @@ class Hasdrubal(Piece):
     file_name = 'fsbbNNhhR'
     asset_folder = 'amontillado'
 
-    def __init__(self, board, board_pos, side, **kwargs):
+    def __init__(self, board, **kwargs):
         super().__init__(
-            board, board_pos, side,
+            board,
             movement.MultiMovement(board, [
                 movement.RiderMovement(board, symv([(1, 2), (-2, 1)])),
                 movement.HalflingRiderMovement(board, rot([(1, 0)]))
@@ -24,9 +24,9 @@ class Barcfil(Piece):
     file_name = 'AfsbbN'
     asset_folder = 'amontillado'
 
-    def __init__(self, board, board_pos, side, **kwargs):
+    def __init__(self, board, **kwargs):
         super().__init__(
-            board, board_pos, side,
+            board,
             movement.RiderMovement(board, symv([(1, 2, 1), (2, 2, 1), (-2, 1, 1), (-2, 2, 1)])),
             **kwargs
         )
@@ -38,9 +38,9 @@ class Bed(Piece):
     asset_folder = 'amontillado'
     colorbound = True
 
-    def __init__(self, board, board_pos, side, **kwargs):
+    def __init__(self, board, **kwargs):
         super().__init__(
-            board, board_pos, side,
+            board,
             movement.MultiMovement(board, [
                 movement.RiderMovement(board, rot([(2, 0, 1)])),
                 movement.HalflingRiderMovement(board, rot([(1, 1)]))
@@ -54,9 +54,9 @@ class Hamilcar(Piece):
     file_name = 'fsbbNNffbsNhhQ'
     asset_folder = 'amontillado'
 
-    def __init__(self, board, board_pos, side, **kwargs):
+    def __init__(self, board, **kwargs):
         super().__init__(
-            board, board_pos, side,
+            board,
             movement.MultiMovement(board, [
                 movement.RiderMovement(board, symv([(1, 2), (-2, 1), (2, 1, 1), (-1, 2, 1)])),
                 movement.HalflingRiderMovement(board, rot([(1, 0), (1, 1)]))

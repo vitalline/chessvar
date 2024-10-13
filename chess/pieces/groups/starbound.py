@@ -8,9 +8,9 @@ class Star(Piece):
     file_name = 'sfRbB'
     asset_folder = 'starbound'
 
-    def __init__(self, board, board_pos, side, **kwargs):
+    def __init__(self, board, **kwargs):
         super().__init__(
-            board, board_pos, side,
+            board,
             movement.RiderMovement(board, symv([(1, 0), (0, 1), (-1, 1)])),
             **kwargs
         )
@@ -21,9 +21,9 @@ class Lancer(Piece):
     file_name = 'KfR'
     asset_folder = 'starbound'
 
-    def __init__(self, board, board_pos, side, **kwargs):
+    def __init__(self, board, **kwargs):
         super().__init__(
-            board, board_pos, side,
+            board,
             movement.RiderMovement(board, symv([(1, 0), (1, 1, 1), (0, 1, 1), (-1, 1, 1), (-1, 0, 1)])),
             **kwargs
         )
@@ -34,7 +34,7 @@ class SineRdr(Piece):
     file_name = 'fFmfafFfafmFmfaqFfaqmFsRbB'
     asset_folder = 'starbound'
 
-    def __init__(self, board, board_pos, side, **kwargs):
+    def __init__(self, board, **kwargs):
         movements = [movement.RiderMovement(board, symv([(0, 1), (-1, 1)]))]
         for i, j in rot([(1, 1)]):
             movements.append(
@@ -54,7 +54,7 @@ class SineRdr(Piece):
                 ])
             )
         super().__init__(
-            board, board_pos, side,
+            board,
             movement.MultiMovement(board, movements),
             **kwargs
         )
@@ -65,7 +65,7 @@ class Turneagle(Piece):
     file_name = 'FmcaFR'
     asset_folder = 'starbound'
 
-    def __init__(self, board, board_pos, side, **kwargs):
+    def __init__(self, board, **kwargs):
         movements = [movement.RiderMovement(board, rot([(1, 0)]))]
         for i, j in rot([(1, 1)]):
             movements.append(
@@ -89,7 +89,7 @@ class Turneagle(Piece):
                 ])
             )
         super().__init__(
-            board, board_pos, side,
+            board,
             movement.MultiMovement(board, movements),
             **kwargs
         )

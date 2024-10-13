@@ -9,9 +9,9 @@ class ElkRdr(Piece):
     file_name = '(NNw,Rb)'
     asset_folder = 'color'
 
-    def __init__(self, board, board_pos, side, **kwargs):
+    def __init__(self, board, **kwargs):
         super().__init__(
-            board, board_pos, side,
+            board,
             movement.ColorMovement(
                 board,
                 light=[movement.RiderMovement(board, rot([(1, 2), (2, 1)]))],
@@ -26,9 +26,9 @@ class CaribRdr(Piece):
     file_name = '(Rw,NNb)'
     asset_folder = 'color'
 
-    def __init__(self, board, board_pos, side, **kwargs):
+    def __init__(self, board, **kwargs):
         super().__init__(
-            board, board_pos, side,
+            board,
             movement.ColorMovement(
                 board,
                 light=[movement.RiderMovement(board, rot([(1, 0)]))],
@@ -43,9 +43,9 @@ class DCannon(Piece):
     file_name = '(mRcpRw,Nb)'
     asset_folder = 'color'
 
-    def __init__(self, board, board_pos, side, **kwargs):
+    def __init__(self, board, **kwargs):
         super().__init__(
-            board, board_pos, side,
+            board,
             movement.ColorMovement(
                 board,
                 light=[movement.MultiMovement(
@@ -64,9 +64,9 @@ class Nightlight(Piece):
     file_name = '(fBbhNw,FW[W-DD]b)'
     asset_folder = 'color'
 
-    def __init__(self, board, board_pos, side, **kwargs):
+    def __init__(self, board, **kwargs):
         super().__init__(
-            board, board_pos, side,
+            board,
             movement.ColorMovement(
                 board,
                 light=[movement.RiderMovement(board, symv([(-1, 2, 1), (-2, 1, 1), (1, 1)]))],
@@ -86,15 +86,15 @@ class Nanqueen(Piece):
     file_name = '(Qs,NNKd)'
     asset_folder = 'color'
 
-    def __init__(self, board, board_pos, side, **kwargs):
+    def __init__(self, board, **kwargs):
         same_color_movement = movement.RiderMovement(board, rot([(1, 0), (1, 1)]))
         different_color_movement = movement.RiderMovement(board, rot([(1, 0, 1), (1, 1, 1), (1, 2), (2, 1)]))
         super().__init__(
-            board, board_pos, side,
+            board,
             movement.ColorMovement(
                 board,
-                light=[same_color_movement if side == Side.WHITE else different_color_movement],
-                dark=[same_color_movement if side == Side.BLACK else different_color_movement]
+                light=[same_color_movement if kwargs['side'] == Side.WHITE else different_color_movement],
+                dark=[same_color_movement if kwargs['side'] == Side.BLACK else different_color_movement]
             ),
             **kwargs
         )

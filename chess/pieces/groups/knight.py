@@ -8,9 +8,9 @@ class Forerook(Piece):
     file_name = 'fsRbhK'
     asset_folder = 'knight'
 
-    def __init__(self, board, board_pos, side, **kwargs):
+    def __init__(self, board, **kwargs):
         super().__init__(
-            board, board_pos, side,
+            board,
             movement.RiderMovement(board, symv([(1, 0), (0, 1), (-1, 0, 1), (-1, 1, 1)])),
             **kwargs
         )
@@ -21,9 +21,9 @@ class Fibnif(Piece):
     file_name = 'fbNF'
     asset_folder = 'knight'
 
-    def __init__(self, board, board_pos, side, **kwargs):
+    def __init__(self, board, **kwargs):
         super().__init__(
-            board, board_pos, side,
+            board,
             movement.RiderMovement(board, sym([(1, 1, 1), (2, 1, 1)])),
             **kwargs
         )
@@ -34,9 +34,9 @@ class Foreknight(Piece):
     file_name = 'fNbhsK'
     asset_folder = 'knight'
 
-    def __init__(self, board, board_pos, side, **kwargs):
+    def __init__(self, board, **kwargs):
         super().__init__(
-            board, board_pos, side,
+            board,
             movement.RiderMovement(board, symv([(2, 1, 1), (1, 2, 1), (0, 1, 1), (-1, 0, 1), (-1, 1, 1)])),
             **kwargs
         )
@@ -47,9 +47,9 @@ class Colonel(Piece):
     file_name = 'fhNfsRK'
     asset_folder = 'knight'
 
-    def __init__(self, board, board_pos, side, **kwargs):
+    def __init__(self, board, **kwargs):
         super().__init__(
-            board, board_pos, side,
+            board,
             movement.RiderMovement(
                 board, sym([(1, 1, 1)]) + symv([(2, 1, 1), (1, 2, 1), (1, 0), (0, 1), (-1, 0, 1), (-1, 1, 1)])
             ),

@@ -8,9 +8,9 @@ class LQue(Piece):
     file_name = 'sRflbrB'
     asset_folder = 'asymmetry'
 
-    def __init__(self, board, board_pos, side, **kwargs):
+    def __init__(self, board, **kwargs):
         super().__init__(
-            board, board_pos, side,
+            board,
             movement.RiderMovement(board, rot2([(0, -1), (1, -1)])),
             **kwargs
         )
@@ -21,9 +21,9 @@ class RQue(Piece):
     file_name = 'sRfrblB'
     asset_folder = 'asymmetry'
 
-    def __init__(self, board, board_pos, side, **kwargs):
+    def __init__(self, board, **kwargs):
         super().__init__(
-            board, board_pos, side,
+            board,
             movement.RiderMovement(board, rot2([(0, 1), (1, 1)])),
             **kwargs
         )
@@ -34,9 +34,9 @@ class Knish(Piece):
     file_name = '(lBrhNl,rBlhNr)'
     asset_folder = 'asymmetry'
 
-    def __init__(self, board, board_pos, side, **kwargs):
+    def __init__(self, board, **kwargs):
         super().__init__(
-            board, board_pos, side,
+            board,
             movement.SideMovement(
                 board,
                 left=[movement.RiderMovement(board, symh([(1, -1), (1, 2, 1), (2, 1, 1)]))],
@@ -52,9 +52,9 @@ class Blizzard(Piece):
     asset_folder = 'asymmetry'
     colorbound = True
 
-    def __init__(self, board, board_pos, side, **kwargs):
+    def __init__(self, board, **kwargs):
         super().__init__(
-            board, board_pos, side,
+            board,
             movement.SideMovement(
                 board,
                 left=[movement.RiderMovement(board, rot2([(1, -1), (1, 1, 1), (1, 3, 1), (3, 1, 1)]))],
@@ -69,9 +69,9 @@ class Chanqueen(Piece):
     file_name = '(RlBrhNl,RrBlhNr)'
     asset_folder = 'asymmetry'
 
-    def __init__(self, board, board_pos, side, **kwargs):
+    def __init__(self, board, **kwargs):
         super().__init__(
-            board, board_pos, side,
+            board,
             movement.SideMovement(
                 board,
                 left=[movement.RiderMovement(board, rot([(1, 0)]) + symh([(1, -1), (1, 2, 1), (2, 1, 1)]))],

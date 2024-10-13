@@ -8,7 +8,7 @@ class Padwar(Piece):
     file_name = 'WaaW'
     asset_folder = 'martian'
 
-    def __init__(self, board, board_pos, side, **kwargs):
+    def __init__(self, board, **kwargs):
         movements = [movement.RiderMovement(board, rot([(1, 0, 1)]))]
         for i, j in rot([(1, 0)]):
             for k, l in rot([(1, 0)]):
@@ -23,7 +23,7 @@ class Padwar(Piece):
                         ], 2)
                     )
         super().__init__(
-            board, board_pos, side,
+            board,
             movement.MultiMovement(board, movements),
             **kwargs
         )
@@ -34,9 +34,9 @@ class Marker(Piece):
     file_name = 'avsK'
     asset_folder = 'martian'
 
-    def __init__(self, board, board_pos, side, **kwargs):
+    def __init__(self, board, **kwargs):
         super().__init__(
-            board, board_pos, side,
+            board,
             movement.MultiMovement(board, [
                 movement.BentMovement(board, [
                     movement.RiderMovement(board, rot([(1, i, 1)])),
@@ -53,7 +53,7 @@ class Walker(Piece):
     asset_folder = 'martian'
     colorbound = True
 
-    def __init__(self, board, board_pos, side, **kwargs):
+    def __init__(self, board, **kwargs):
         movements = [movement.RiderMovement(board, rot([(1, 1, 1)]))]
         for i, j in rot([(1, 1)]):
             for k, l in rot([(1, 1)]):
@@ -68,7 +68,7 @@ class Walker(Piece):
                         ], 2)
                     )
         super().__init__(
-            board, board_pos, side,
+            board,
             movement.MultiMovement(board, movements),
             **kwargs
         )
@@ -79,7 +79,7 @@ class Chief(Piece):
     file_name = 'KnDnNnA'
     asset_folder = 'martian'
 
-    def __init__(self, board, board_pos, side, **kwargs):
+    def __init__(self, board, **kwargs):
         movements = []
         for i, j in rot([(1, 0)]):
             for k in (1, -1):
@@ -92,7 +92,7 @@ class Chief(Piece):
                         ]),
                     ])
         super().__init__(
-            board, board_pos, side,
+            board,
             movement.MultiMovement(board, movements),
             **kwargs
         )

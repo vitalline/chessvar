@@ -8,9 +8,9 @@ class Fork(Piece):
     file_name = 'R4'
     asset_folder = 'rookie'
 
-    def __init__(self, board, board_pos, side, **kwargs):
+    def __init__(self, board, **kwargs):
         super().__init__(
-            board, board_pos, side,
+            board,
             movement.RiderMovement(board, rot([(1, 0, 4)])),
             **kwargs
         )
@@ -21,9 +21,9 @@ class Woodrook(Piece):
     file_name = 'WD'
     asset_folder = 'rookie'
 
-    def __init__(self, board, board_pos, side, **kwargs):
+    def __init__(self, board, **kwargs):
         super().__init__(
-            board, board_pos, side,
+            board,
             movement.RiderMovement(board, rot([(1, 0, 1), (2, 0, 1)])),
             **kwargs
         )
@@ -34,9 +34,9 @@ class Dove(Piece):
     file_name = 'HFD'
     asset_folder = 'rookie'
 
-    def __init__(self, board, board_pos, side, **kwargs):
+    def __init__(self, board, **kwargs):
         super().__init__(
-            board, board_pos, side,
+            board,
             movement.RiderMovement(board, rot([(1, 1, 1), (2, 0, 1), (3, 0, 1)])),
             **kwargs
         )
@@ -47,9 +47,9 @@ class Chancellor(Piece):
     file_name = 'RN'
     asset_folder = 'rookie'
 
-    def __init__(self, board, board_pos, side, **kwargs):
+    def __init__(self, board, **kwargs):
         super().__init__(
-            board, board_pos, side,
+            board,
             movement.RiderMovement(board, rot([(1, 0), (1, 2, 1), (2, 1, 1)])),
             **kwargs
         )

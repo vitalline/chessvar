@@ -23,15 +23,16 @@ class Piece(Sprite):
     def __init__(
         self,
         board: Board,
-        board_pos: Position | None = None,
-        side: Side = Side.NONE,
         movement: BaseMovement | None = None,
+        pos: Position | None = None,
+        side: Side = Side.NONE,
         **kwargs
     ):
         self.board = board
-        self.board_pos = board_pos
-        self.side = side
         self.movement = movement
+        self.board_pos = pos
+        self.side = side
+        self.promoted_from = None
         self.flipped_horizontally = False
         self.flipped_vertically = False
         self.is_hidden = None
@@ -66,17 +67,17 @@ class Piece(Sprite):
                         if move.pos_to in promotion_squares:
                             promotions = promotion_squares[move.pos_to]
                             if promotions:
-                                for promotion in promotions:
-                                    if isinstance(promotion, Piece):
-                                        yield copy(move).set(
-                                            promotion=promotion.of(promotion.side or self.side).on(move.pos_to)
-                                        )
+                                for piece in promotions:
+                                    if isinstance(piece, Piece):
+                                        piece = piece.of(piece.side or self.side).on(move.pos_to)
                                     else:
-                                        yield copy(move).set(promotion=promotion(
+                                        piece = piece(
                                             board=self.board,
                                             board_pos=move.pos_to,
                                             side=self.side,
-                                        ))
+                                        )
+                                    piece.promoted_from = piece.promoted_from or self.promoted_from or type(self)
+                                    yield copy(move).set(promotion=piece)
                                 continue
                 yield move
         return ()
@@ -90,10 +91,11 @@ class Piece(Sprite):
     def of(self, side: Side) -> Piece:
         clone = type(self)(
             board=self.board,
-            board_pos=self.board_pos,
+            pos=self.board_pos,
             side=side,
         )
         clone.movement = copy(self.movement)
+        clone.promoted_from = self.promoted_from
         clone.scale = self.scale
         clone.is_hidden = self.is_hidden
         return clone
@@ -169,24 +171,8 @@ class Piece(Sprite):
 
 
 class QuasiRoyalPiece(Piece):
-    def __init__(
-        self,
-        board: Board,
-        board_pos: Position | None = None,
-        side: Side = Side.NONE,
-        movement: BaseMovement | None = None,
-        **kwargs
-    ):
-        super().__init__(board, board_pos, side, movement, **kwargs)
+    pass
 
 
 class RoyalPiece(QuasiRoyalPiece):
-    def __init__(
-        self,
-        board: Board,
-        board_pos: Position | None = None,
-        side: Side = Side.NONE,
-        movement: BaseMovement | None = None,
-        **kwargs
-    ):
-        super().__init__(board, board_pos, side, movement, **kwargs)
+    pass

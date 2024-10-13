@@ -9,10 +9,9 @@ class Bede(Piece):
     asset_folder = 'colorbound'
     colorbound = True
 
-    def __init__(self, board, board_pos, side, **kwargs):
-
+    def __init__(self, board, **kwargs):
         super().__init__(
-            board, board_pos, side,
+            board,
             movement.RiderMovement(board, rot([(1, 1), (2, 0, 1)])),
             **kwargs
         )
@@ -23,9 +22,9 @@ class Waffle(Piece):
     file_name = 'WA'
     asset_folder = 'colorbound'
 
-    def __init__(self, board, board_pos, side, **kwargs):
+    def __init__(self, board, **kwargs):
         super().__init__(
-            board, board_pos, side,
+            board,
             movement.RiderMovement(board, rot([(1, 0, 1), (2, 2, 1)])),
             **kwargs
         )
@@ -37,9 +36,9 @@ class Fad(Piece):
     asset_folder = 'colorbound'
     colorbound = True
 
-    def __init__(self, board, board_pos, side, **kwargs):
+    def __init__(self, board, **kwargs):
         super().__init__(
-            board, board_pos, side,
+            board,
             movement.RiderMovement(board, rot([(1, 1, 1), (2, 0, 1), (2, 2, 1)])),
             **kwargs
         )
@@ -50,9 +49,9 @@ class Archbishop(Piece):
     file_name = 'BN'
     asset_folder = 'colorbound'
 
-    def __init__(self, board, board_pos, side, **kwargs):
+    def __init__(self, board, **kwargs):
         super().__init__(
-            board, board_pos, side,
+            board,
             movement.RiderMovement(board, rot([(1, 1), (1, 2, 1), (2, 1, 1)])),
             **kwargs
         )
@@ -66,9 +65,9 @@ class King(RoyalPiece):
     file_name = 'K'
     asset_folder = 'classic'
 
-    def __init__(self, board, board_pos, side, **kwargs):
+    def __init__(self, board, **kwargs):
         super().__init__(
-            board, board_pos, side,
+            board,
             movement.MultiMovement(
                 board, [
                     movement.RiderMovement(board, rot([(1, 0, 1), (1, 1, 1)])),

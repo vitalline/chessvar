@@ -19,6 +19,7 @@ class Move(object):
         piece: Piece | None = None,
         captured_piece: Piece | None = None,
         swapped_piece: Piece | None = None,
+        placed_piece: Type[Piece] | None = None,
         promotion: Piece | frozenset | None = None,
         chained_move: Move | frozenset | None = None,
         is_edit: bool = False
@@ -29,6 +30,7 @@ class Move(object):
         self.piece = piece
         self.captured_piece = captured_piece
         self.swapped_piece = swapped_piece
+        self.placed_piece = placed_piece
         self.promotion = promotion
         self.chained_move = chained_move
         self.is_edit = is_edit
@@ -41,6 +43,7 @@ class Move(object):
         piece: Piece | None = None,
         captured_piece: Piece | None = None,
         swapped_piece: Piece | None = None,
+        placed_piece: Type[Piece] | None = None,
         promotion: Piece | type(Default) | None = None,
         chained_move: Move | type(Default) | None = None,
         is_edit: bool | None = None
@@ -51,6 +54,7 @@ class Move(object):
         self.movement_type = movement_type or self.movement_type
         self.captured_piece = captured_piece or self.captured_piece
         self.swapped_piece = swapped_piece or self.swapped_piece
+        self.placed_piece = placed_piece or self.placed_piece
         self.promotion = (
             promotion if promotion not in {None, Default}
             else None if promotion is Default else self.promotion
@@ -71,6 +75,7 @@ class Move(object):
             and type(self.piece) is type(other.piece)
             and type(self.captured_piece) is type(other.captured_piece)
             and type(self.swapped_piece) is type(other.swapped_piece)
+            and self.placed_piece is other.placed_piece
             and (not self.promotion or self.promotion.matches(other.promotion))
             and (
                 self.chained_move.matches(other.chained_move)
@@ -88,6 +93,7 @@ class Move(object):
             self.piece,
             self.captured_piece,
             self.swapped_piece,
+            self.placed_piece,
             self.promotion,
             self.chained_move,
             self.is_edit
@@ -101,6 +107,7 @@ class Move(object):
             self.piece.__copy__() if self.piece else self.piece,
             self.captured_piece.__copy__() if self.captured_piece else self.captured_piece,
             self.swapped_piece.__copy__() if self.swapped_piece else self.swapped_piece,
+            self.placed_piece,
             self.promotion.__copy__() if self.promotion else self.promotion,
             self.chained_move.__deepcopy__(memo) if self.chained_move else self.chained_move,
             self.is_edit

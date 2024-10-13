@@ -8,9 +8,9 @@ class Bard(Piece):
     file_name = 'DfsbbNN'
     asset_folder = 'nocturnal'
 
-    def __init__(self, board, board_pos, side, **kwargs):
+    def __init__(self, board, **kwargs):
         super().__init__(
-            board, board_pos, side,
+            board,
             movement.RiderMovement(board, rot([(2, 0, 1)]) + symv([(1, 2), (-2, 1)])),
             **kwargs
         )
@@ -21,9 +21,9 @@ class Nightsling(Piece):
     file_name = 'NmNNcpNN'
     asset_folder = 'nocturnal'
 
-    def __init__(self, board, board_pos, side, **kwargs):
+    def __init__(self, board, **kwargs):
         super().__init__(
-            board, board_pos, side,
+            board,
             movement.MultiMovement(
                 board,
                 move=[
@@ -43,9 +43,9 @@ class MoaRdr(Piece):
     file_name = 'afs(afzafz)F'
     asset_folder = 'nocturnal'
 
-    def __init__(self, board, board_pos, side, **kwargs):
+    def __init__(self, board, **kwargs):
         super().__init__(
-            board, board_pos, side,
+            board,
             movement.MultiMovement(board, [
                 movement.RepeatMovement(board, [
                     movement.RiderMovement(board, [(i or k, j or k, 1)]),
@@ -61,9 +61,9 @@ class Nanking(Piece):
     file_name = 'NNK'
     asset_folder = 'nocturnal'
 
-    def __init__(self, board, board_pos, side, **kwargs):
+    def __init__(self, board, **kwargs):
         super().__init__(
-            board, board_pos, side,
+            board,
             movement.RiderMovement(board, rot([(1, 0, 1), (1, 1, 1), (1, 2), (2, 1)])),
             **kwargs
         )

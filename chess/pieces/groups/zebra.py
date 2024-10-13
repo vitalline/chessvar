@@ -8,9 +8,9 @@ class Eliphas(Piece):
     file_name = 'WafsWafsafW'
     asset_folder = 'zebra'
 
-    def __init__(self, board, board_pos, side, **kwargs):
+    def __init__(self, board, **kwargs):
         super().__init__(
-            board, board_pos, side,
+            board,
             movement.MultiMovement(board, [
                 movement.BentMovement(board, [
                     movement.RiderMovement(board, [(i, j, 1)]),
@@ -26,9 +26,9 @@ class Sorcerer(Piece):
     file_name = 'ZW'
     asset_folder = 'zebra'
 
-    def __init__(self, board, board_pos, side, **kwargs):
+    def __init__(self, board, **kwargs):
         super().__init__(
-            board, board_pos, side,
+            board,
             movement.RiderMovement(board, rot([(1, 0, 1), (2, 3, 1), (3, 2, 1)])),
             **kwargs
         )
@@ -39,9 +39,9 @@ class Adze(Piece):
     file_name = 'ZA'
     asset_folder = 'zebra'
 
-    def __init__(self, board, board_pos, side, **kwargs):
+    def __init__(self, board, **kwargs):
         super().__init__(
-            board, board_pos, side,
+            board,
             movement.RiderMovement(board, rot([(2, 2, 1), (2, 3, 1), (3, 2, 1)])),
             **kwargs
         )
@@ -52,9 +52,9 @@ class IMarauder(Piece):
     file_name = 'Fafs(afz)F'
     asset_folder = 'zebra'
 
-    def __init__(self, board, board_pos, side, **kwargs):
+    def __init__(self, board, **kwargs):
         super().__init__(
-            board, board_pos, side,
+            board,
             movement.MultiMovement(board, [
                 movement.RepeatMovement(board, [
                     movement.RiderMovement(board, [(i or k, j or k, 1)]),

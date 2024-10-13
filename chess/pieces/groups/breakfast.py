@@ -7,10 +7,9 @@ class Belwaffle(Piece):
     name = 'Belwaffle'
     file_name = 'pRWA'
     asset_folder = 'breakfast'
-
-    def __init__(self, board, board_pos, side, **kwargs):
+    def __init__(self, board, **kwargs):
         super().__init__(
-            board, board_pos, side,
+            board,
             movement.MultiMovement(board, [
                 movement.RiderMovement(board, rot([(1, 0, 1), (2, 2, 1)])),
                 movement.CannonRiderMovement(board, rot([(1, 0)]))
@@ -24,9 +23,9 @@ class Pancake(Piece):
     file_name = 'pNNK'
     asset_folder = 'breakfast'
 
-    def __init__(self, board, board_pos, side, **kwargs):
+    def __init__(self, board, **kwargs):
         super().__init__(
-            board, board_pos, side,
+            board,
             movement.MultiMovement(board, [
                 movement.RiderMovement(board, rot([(1, 0, 1), (1, 1, 1)])),
                 movement.CannonRiderMovement(board, rot([(1, 2), (2, 1)]))
@@ -41,9 +40,9 @@ class Bacon(Piece):
     asset_folder = 'breakfast'
     colorbound = True
 
-    def __init__(self, board, board_pos, side, **kwargs):
+    def __init__(self, board, **kwargs):
         super().__init__(
-            board, board_pos, side,
+            board,
             movement.MultiMovement(board, [
                 movement.RiderMovement(board, rot([(1, 1, 1), (2, 0, 1)])),
                 movement.CannonRiderMovement(board, rot([(1, 1)]))
@@ -57,9 +56,9 @@ class Omelet(Piece):
     file_name = 'pQK'
     asset_folder = 'breakfast'
 
-    def __init__(self, board, board_pos, side, **kwargs):
+    def __init__(self, board, **kwargs):
         super().__init__(
-            board, board_pos, side,
+            board,
             movement.MultiMovement(board, [
                 movement.RiderMovement(board, rot([(1, 0, 1), (1, 1, 1)])),
                 movement.CannonRiderMovement(board, rot([(1, 0), (1, 1)]))

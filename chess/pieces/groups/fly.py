@@ -8,9 +8,9 @@ class Quetzal(Piece):
     file_name = 'pQ'
     asset_folder = 'fly'
 
-    def __init__(self, board, board_pos, side, **kwargs):
+    def __init__(self, board, **kwargs):
         super().__init__(
-            board, board_pos, side,
+            board,
             movement.CannonRiderMovement(board, rot([(1, 0), (1, 1)])),
             **kwargs
         )
@@ -21,9 +21,9 @@ class Owl(Piece):
     file_name = 'WAA'
     asset_folder = 'fly'
 
-    def __init__(self, board, board_pos, side, **kwargs):
+    def __init__(self, board, **kwargs):
         super().__init__(
-            board, board_pos, side,
+            board,
             movement.RiderMovement(board, rot([(1, 0, 1), (2, 2)])),
             **kwargs
         )
@@ -35,9 +35,9 @@ class Hoatzin(Piece):
     asset_folder = 'fly'
     colorbound = True
 
-    def __init__(self, board, board_pos, side, **kwargs):
+    def __init__(self, board, **kwargs):
         super().__init__(
-            board, board_pos, side,
+            board,
             movement.MultiMovement(board, [
                 movement.BentMovement(board, [
                     movement.RiderMovement(board, [(i or k, j or k, 1)]),
@@ -53,9 +53,9 @@ class Eagle(Piece):
     file_name = 'RbBfFfAcfafF'
     asset_folder = 'fly'
 
-    def __init__(self, board, board_pos, side, **kwargs):
+    def __init__(self, board, **kwargs):
         super().__init__(
-            board, board_pos, side,
+            board,
             movement.MultiMovement(board, [
                 movement.RiderMovement(board, rot([(1, 0)]) + symv([(-1, 1), (1, 1, 1), (2, 2, 1)]))
             ] + [

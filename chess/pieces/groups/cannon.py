@@ -8,9 +8,9 @@ class Howitzer(Piece):
     file_name = 'WssRmpR'
     asset_folder = 'cannon'
 
-    def __init__(self, board, board_pos, side, **kwargs):
+    def __init__(self, board, **kwargs):
         super().__init__(
-            board, board_pos, side,
+            board,
             movement.MultiMovement(
                 board,
                 move_or_capture=[
@@ -29,9 +29,9 @@ class Mortar(Piece):
     file_name = 'WssRcpR'
     asset_folder = 'cannon'
 
-    def __init__(self, board, board_pos, side, **kwargs):
+    def __init__(self, board, **kwargs):
         super().__init__(
-            board, board_pos, side,
+            board,
             movement.MultiMovement(
                 board,
                 move_or_capture=[
@@ -51,9 +51,9 @@ class Napoleon(Piece):
     file_name = 'fbNW'
     asset_folder = 'cannon'
 
-    def __init__(self, board, board_pos, side, **kwargs):
+    def __init__(self, board, **kwargs):
         super().__init__(
-            board, board_pos, side,
+            board,
             movement.RiderMovement(board, rot([(1, 0, 1)]) + sym([(2, 1, 1)])),
             **kwargs
         )
@@ -65,9 +65,9 @@ class Carronade(Piece):
     asset_folder = 'cannon'
     colorbound = True
 
-    def __init__(self, board, board_pos, side, **kwargs):
+    def __init__(self, board, **kwargs):
         super().__init__(
-            board, board_pos, side,
+            board,
             movement.MultiMovement(board, [
                 # movement.RiderMovement(board, rot([(1, 1, 1)])),
                 movement.SpaciousRiderMovement(board, rot([(1, 1)])),
@@ -82,9 +82,9 @@ class Bertha(Piece):
     file_name = 'WssQpQ'
     asset_folder = 'cannon'
 
-    def __init__(self, board, board_pos, side, **kwargs):
+    def __init__(self, board, **kwargs):
         super().__init__(
-            board, board_pos, side,
+            board,
             movement.MultiMovement(board, [
                 movement.RiderMovement(board, rot([(1, 0, 1)])),
                 # movement.RiderMovement(board, rot([(1, 1, 1)])),

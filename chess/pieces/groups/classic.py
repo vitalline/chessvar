@@ -8,9 +8,9 @@ class Rook(Piece):
     file_name = 'R'
     asset_folder = 'classic'
 
-    def __init__(self, board, board_pos, side, **kwargs):
+    def __init__(self, board, **kwargs):
         super().__init__(
-            board, board_pos, side,
+            board,
             movement.RiderMovement(board, rot([(1, 0)])),
             **kwargs
         )
@@ -21,9 +21,9 @@ class Knight(Piece):
     file_name = 'N'
     asset_folder = 'classic'
 
-    def __init__(self, board, board_pos, side, **kwargs):
+    def __init__(self, board, **kwargs):
         super().__init__(
-            board, board_pos, side,
+            board,
             movement.RiderMovement(board, rot([(1, 2, 1), (2, 1, 1)])),
             **kwargs
         )
@@ -35,9 +35,9 @@ class Bishop(Piece):
     asset_folder = 'classic'
     colorbound = True
 
-    def __init__(self, board, board_pos, side, **kwargs):
+    def __init__(self, board, **kwargs):
         super().__init__(
-            board, board_pos, side,
+            board,
             movement.RiderMovement(board, rot([(1, 1)])),
             **kwargs
         )
@@ -48,9 +48,9 @@ class Queen(Piece):
     file_name = 'Q'
     asset_folder = 'classic'
 
-    def __init__(self, board, board_pos, side, **kwargs):
+    def __init__(self, board, **kwargs):
         super().__init__(
-            board, board_pos, side,
+            board,
             movement.RiderMovement(board, rot([(1, 0), (1, 1)])),
             **kwargs
         )
@@ -61,9 +61,9 @@ class King(RoyalPiece):
     file_name = 'K'
     asset_folder = 'classic'
 
-    def __init__(self, board, board_pos, side, **kwargs):
+    def __init__(self, board, **kwargs):
         super().__init__(
-            board, board_pos, side,
+            board,
             movement.MultiMovement(
                 board, [
                     movement.RiderMovement(board, rot([(1, 0, 1), (1, 1, 1)])),
@@ -86,9 +86,9 @@ class Pawn(Piece):
     file_name = 'P'
     asset_folder = 'classic'
 
-    def __init__(self, board, board_pos, side, **kwargs):
+    def __init__(self, board, **kwargs):
         super().__init__(
-            board, board_pos, side,
+            board,
             movement.MultiMovement(
                 board,
                 move=[

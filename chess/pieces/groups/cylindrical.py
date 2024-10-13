@@ -8,9 +8,9 @@ class Waffle(Piece):
     file_name = 'oWoA'
     asset_folder = 'cylindrical'
 
-    def __init__(self, board, board_pos, side, **kwargs):
+    def __init__(self, board, **kwargs):
         super().__init__(
-            board, board_pos, side,
+            board,
             movement.CylindricalRiderMovement(board, rot([(1, 0, 1), (2, 2, 1)])),
             **kwargs
         )
@@ -21,9 +21,9 @@ class Knight(Piece):
     file_name = 'oN'
     asset_folder = 'cylindrical'
 
-    def __init__(self, board, board_pos, side, **kwargs):
+    def __init__(self, board, **kwargs):
         super().__init__(
-            board, board_pos, side,
+            board,
             movement.CylindricalRiderMovement(board, rot([(1, 2, 1), (2, 1, 1)])),
             **kwargs
         )
@@ -35,9 +35,9 @@ class Bishop(Piece):
     asset_folder = 'cylindrical'
     colorbound = True
 
-    def __init__(self, board, board_pos, side, **kwargs):
+    def __init__(self, board, **kwargs):
         super().__init__(
-            board, board_pos, side,
+            board,
             movement.CylindricalRiderMovement(board, rot([(1, 1)])),
             **kwargs
         )
@@ -48,9 +48,9 @@ class Chancellor(Piece):
     file_name = 'oRoN'
     asset_folder = 'cylindrical'
 
-    def __init__(self, board, board_pos, side, **kwargs):
+    def __init__(self, board, **kwargs):
         super().__init__(
-            board, board_pos, side,
+            board,
             movement.CylindricalRiderMovement(board, rot([(1, 0), (1, 2, 1), (2, 1, 1)])),
             **kwargs
         )
