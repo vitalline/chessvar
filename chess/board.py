@@ -458,6 +458,7 @@ class Board(Window):
         self.set_rng = None  # random number generator for piece set selection
         self.turn_side = Side.WHITE  # side whose turn it is
         self.check_side = Side.NONE  # side that is currently in check
+        self.use_drops = self.board_config['use_drops']  # whether pieces can be dropped
         self.use_check = self.board_config['use_check']  # whether to check for check after each move
         self.royal_piece_mode = self.board_config['royal_mode'] % 3  # 0: normal, 1: force royal, 2: force quasi-royal
         self.should_hide_pieces = self.board_config['hide_pieces'] % 3  # 0: don't hide, 1: hide all, 2: penultima mode
@@ -475,6 +476,7 @@ class Board(Window):
         self.chaos_mode = self.board_config['chaos_mode']  # 0: no, 1: match pos, 2: match pos asym, 3: any, 4: any asym
         self.chaos_sets = {}  # piece sets generated in chaos mode
         self.piece_sets = {Side.WHITE: [], Side.BLACK: []}  # types of pieces each side starts with
+        self.drops = {Side.WHITE: {}, Side.BLACK: {}}  # drop options, as {side: {was: {pos: as}}}
         self.promotions = {Side.WHITE: {}, Side.BLACK: {}}  # promotion options, as {side: {from: {pos: [to]}}}
         self.edit_promotions = {Side.WHITE: [], Side.BLACK: []}  # types of pieces each side can place in edit mode
         self.movable_pieces = {Side.WHITE: [], Side.BLACK: []}  # pieces that can be moved by each side
@@ -489,7 +491,7 @@ class Board(Window):
         self.custom_pieces = {}  # custom piece types
         self.custom_layout = {}  # custom starting layout of the board
         self.custom_promotions = {}  # custom promotion options
-        self.custom_drops = {}  # custom drop options, as {side: {was: {pos: as}}}
+        self.custom_drops = {}  # custom drop options
         self.custom_extra_drops = {}  # custom extra drops, as {side: [was]}
         self.captured_pieces = {Side.WHITE: [], Side.BLACK: []}  # pieces captured by each side
         self.alias_dict = {}  # dictionary of aliases for save data
@@ -682,7 +684,7 @@ class Board(Window):
         self.clear_en_passant()
         self.clear_castling_ep()
         self.clear_auto_capture_markers()
-        self.reset_drops()
+        self.reset_captures()
 
         self.turn_side = Side.WHITE
         self.game_over = False
@@ -720,6 +722,7 @@ class Board(Window):
             self.roll_history = []
             self.future_move_history = []
             self.probabilistic_piece_history = []
+            self.reset_drops()
             self.reset_promotions()
             self.reset_edit_promotions()
             self.reset_penultima_pieces()
@@ -839,6 +842,7 @@ class Board(Window):
             'edit_promotion': self.edit_piece_set_id,
             'hide_pieces': self.should_hide_pieces,
             'hide_moves': self.should_hide_moves,
+            'use_drops': self.use_drops,
             'use_check': self.use_check,
             'royal_mode': self.royal_piece_mode,
             'chaos_mode': self.chaos_mode,
@@ -943,6 +947,7 @@ class Board(Window):
 
         self.should_hide_pieces = data.get('hide_pieces', self.should_hide_pieces)
         self.should_hide_moves = data.get('hide_moves', self.should_hide_moves)
+        self.use_drops = data.get('use_drops', self.use_drops)
         self.use_check = data.get('use_check', self.use_check)
         self.royal_piece_mode = data.get('royal_mode', self.royal_piece_mode)
         self.chaos_mode = data.get('chaos_mode', self.chaos_mode)
@@ -994,7 +999,7 @@ class Board(Window):
                 if side not in self.captured_pieces:
                     self.captured_pieces[side] = []
         else:
-            self.reset_drops()
+            self.reset_captures()
 
         self.chaos_sets = {}
         self.piece_set_ids |= {Side(int(k)): v for k, v in data.get('set_ids', {}).items()}
@@ -1022,6 +1027,7 @@ class Board(Window):
             self.piece_sets = {side: saved_piece_sets[side] for side in self.piece_sets}
             self.piece_set_names = {side: get_set_name(self.piece_sets[side]) for side in self.piece_sets}
 
+        self.reset_drops()
         self.reset_promotions()
         self.reset_edit_promotions()
         self.reset_penultima_pieces()
@@ -1156,7 +1162,7 @@ class Board(Window):
         self.clear_en_passant()
         self.clear_castling_ep()
         self.clear_auto_capture_markers()
-        self.reset_drops()
+        self.reset_captures()
 
         self.turn_side = Side.WHITE
         self.game_over = False
@@ -1180,6 +1186,7 @@ class Board(Window):
         self.roll_history = []
         self.future_move_history = []
         self.probabilistic_piece_history = []
+        self.reset_drops()
         self.reset_promotions()
         self.reset_edit_promotions()
         self.reset_penultima_pieces()
@@ -1209,11 +1216,59 @@ class Board(Window):
         self.custom_layout = {}
         self.custom_promotions = {}
 
-    def reset_drops(self) -> None:
+    def reset_captures(self) -> None:
         self.captured_pieces = {Side.WHITE: [], Side.BLACK: []}
         for side in self.captured_pieces:
             if side in self.custom_extra_drops:
                 self.captured_pieces[side].extend(self.custom_extra_drops[side])
+
+    def reset_drops(self, piece_sets: dict[Side, list[Type[Piece]]] | None = None) -> None:
+        if self.custom_drops:
+            self.drops = deepcopy(self.custom_drops)
+            return
+        if piece_sets is None:
+            piece_sets = self.piece_sets
+        self.drops = {}
+        drop_squares = {
+            Side.WHITE: [(i, j) for i in range(self.board_height) for j in range(self.board_width)],
+            Side.BLACK: [(i, j) for i in range(self.board_height) for j in range(self.board_width)],
+        }
+        pawn_drop_squares = {
+            Side.WHITE: [(i, j) for i in range(2, self.board_height) for j in range(self.board_width)],
+            Side.BLACK: [(i, j) for i in range(0, self.board_height - 2) for j in range(self.board_width)],
+        }
+        pawn_drop_squares_2 = {
+            Side.WHITE: [(1, j) for j in range(self.board_width)],
+            Side.BLACK: [(self.board_height - 2, j) for j in range(self.board_width)],
+        }
+        for side in piece_sets:
+            self.drops[side] = {}
+        drops = {}
+        for side in piece_sets:
+            drops[side] = {}
+            drops[side][fide.Pawn] = {}
+            pawn = fide.Pawn(self)
+            pawn.movement.set_moves(1)
+            for pos in pawn_drop_squares[side]:
+                drops[side][fide.Pawn][pos] = pawn
+            for pos in pawn_drop_squares_2[side]:
+                drops[side][fide.Pawn][pos] = fide.Pawn
+            piece_type = piece_sets[side][0]
+            piece = piece_type(self)
+            piece.movement.set_moves(1)
+            for pos in drop_squares[side]:
+                drops[side][piece_type][pos] = piece
+            for piece_type in piece_sets[side][1:-1]:
+                if piece_type not in drops[side] and not issubclass(piece_type, RoyalPiece):
+                    drops[side][piece_type] = {}
+                    for pos in drop_squares[side]:
+                        drops[side][piece_type][pos] = piece_type
+            if piece_sets[side][-1] not in drops[side]:
+                piece_type = piece_sets[side][-1]
+                piece = piece_type(self)
+                piece.movement.set_moves(1)
+                for pos in drop_squares[side]:
+                    drops[side][piece_type][pos] = piece
 
     def reset_promotions(self, piece_sets: dict[Side, list[Type[Piece]]] | None = None) -> None:
         if self.custom_promotions:
@@ -2078,10 +2133,10 @@ class Board(Window):
             # piece was added to the board, update it and add it to the sprite list
             self.update_piece(move.piece)
             self.piece_sprite_list.append(move.piece)
-        if self.custom_drops and move.piece.side in self.custom_drops and not move.is_edit:
+        if self.use_drops and move.piece.side in self.drops and not move.is_edit:
             if move.captured_piece is not None and move.piece.side in self.captured_pieces:
                 capture_type = move.captured_piece.promoted_from or type(move.captured_piece)
-                if capture_type in self.custom_drops[move.piece.side]:
+                if capture_type in self.drops[move.piece.side]:
                     # droppable piece was captured, add it to the roster of captured pieces
                     self.captured_pieces[move.piece.side].append(capture_type)
         if (
@@ -2132,10 +2187,10 @@ class Board(Window):
             self.update_piece(move.captured_piece)  # update the piece sprite to reflect current piece hiding mode
             self.pieces[capture_pos[0]][capture_pos[1]] = move.captured_piece
             self.piece_sprite_list.append(move.captured_piece)
-        if self.custom_drops and move.piece.side in self.custom_drops and not move.is_edit:
+        if self.use_drops and move.piece.side in self.drops and not move.is_edit:
             if move.captured_piece is not None and move.piece.side in self.captured_pieces:
                 capture_type = move.captured_piece.promoted_from or type(move.captured_piece)
-                if capture_type in self.custom_drops[move.piece.side]:
+                if capture_type in self.drops[move.piece.side]:
                     # droppable piece was captured, remove it from the roster of captured pieces
                     for i, piece in enumerate(self.captured_pieces[move.piece.side][::-1]):
                         if piece == capture_type:
@@ -2195,7 +2250,7 @@ class Board(Window):
                 if chained_move.promotion is not None:
                     if chained_move.placed_piece is not None:
                         turn_side = Side.WHITE if self.ply_count % 2 == 1 else Side.BLACK
-                        if chained_move.placed_piece in self.custom_drops[turn_side]:
+                        if chained_move.placed_piece in self.drops[turn_side]:
                             self.captured_pieces[turn_side].append(chained_move.placed_piece)
                     if not chained_move.piece.is_empty():
                         self.update_piece(chained_move.piece)
@@ -2511,7 +2566,7 @@ class Board(Window):
                 self.set_caption(f"[Ply {self.ply_count}] {self.turn_side} to move")
 
     def try_drop(self, move: Move) -> None:
-        if self.turn_side not in self.custom_drops:
+        if self.turn_side not in self.drops:
             return
         if not self.captured_pieces[self.turn_side]:
             return
@@ -2527,7 +2582,7 @@ class Board(Window):
             self.update_promotion_auto_captures(move)
             self.promotion_piece = promotion_piece
             return
-        side_drops = self.custom_drops[self.turn_side]
+        side_drops = self.drops[self.turn_side]
         drop_list = []
         drop_type_list = []
         for piece_type in self.captured_pieces[self.turn_side]:
@@ -2983,6 +3038,7 @@ class Board(Window):
             sprite.scale = self.square_size / sprite.texture.width
             self.board_sprite_list.append(sprite)
 
+        self.reset_drops()
         self.reset_promotions()
 
         for row in range(len(self.pieces), self.board_height):
@@ -3305,7 +3361,7 @@ class Board(Window):
                 self.select_piece(next_selected_square)
             return
         if held_buttons & MOUSE_BUTTON_RIGHT:
-            if not self.custom_drops:
+            if not self.drops:
                 self.deselect_piece()
                 return
             if self.game_over:
@@ -3800,9 +3856,12 @@ class Board(Window):
                 self.log(f"[Ply {self.ply_count}] Info: Using {which} color scheme (ID {self.color_index})", False)
                 self.color_scheme = colors[self.color_index]
                 self.update_colors()
-        if symbol == key.H:  # Hide
+        if symbol == key.H:
             old_should_hide_pieces = self.should_hide_pieces
-            if modifiers & key.MOD_ACCEL and modifiers & key.MOD_SHIFT:  # Show
+            old_drops = self.use_drops
+            if modifiers & key.MOD_ALT:  # Toggle drops (Crazyhouse mode)
+                self.use_drops = not self.use_drops
+            elif modifiers & key.MOD_ACCEL and modifiers & key.MOD_SHIFT:  # Show
                 self.should_hide_pieces = 0
             elif modifiers & key.MOD_SHIFT:  # Hide
                 self.should_hide_pieces = 1
@@ -3823,6 +3882,13 @@ class Board(Window):
                     self.should_hide_pieces = old_should_hide_pieces
                 self.update_pieces()
                 self.show_moves()
+            if old_drops != self.use_drops:
+                if self.use_drops:
+                    self.log(f"[Ply {self.ply_count}] Info: Drops enabled")
+                else:
+                    self.log(f"[Ply {self.ply_count}] Info: Drops disabled")
+                self.future_move_history = []  # we don't know if we can redo the future moves anymore, so we clear them
+                self.advance_turn()
         if symbol == key.M:  # Moves
             if modifiers & key.MOD_ALT:  # Clear future move history
                 self.log(f"[Ply {self.ply_count}] Info: Future move history cleared", False)
@@ -4069,11 +4135,13 @@ class Board(Window):
         config['edit_id'] = self.edit_piece_set_id
         config['hide_pieces'] = self.should_hide_pieces
         config['hide_moves'] = self.should_hide_moves
+        config['use_drops'] = self.use_drops
+        config['use_check'] = self.use_check
         config['royal_mode'] = self.royal_piece_mode
+        config['chaos_mode'] = self.chaos_mode
+        config['chaos_seed'] = self.chaos_seed
         config['set_seed'] = self.set_seed
         config['roll_seed'] = self.roll_seed
-        config['chaos_seed'] = self.chaos_seed
-        config['chaos_mode'] = self.chaos_mode
         config['verbose'] = self.verbose
         config.save(get_filename('config', 'ini'))
 
@@ -4249,6 +4317,8 @@ class Board(Window):
         debug_log_data.append(f"Hide pieces: {self.should_hide_pieces} - {piece_modes[self.should_hide_pieces]}")
         move_modes = {None: "Default", False: "Shown", True: "Hidden"}
         debug_log_data.append(f"Hide moves: {self.should_hide_moves} - {move_modes[self.should_hide_moves]}")
+        drop_modes = {k: f"Pieces {v} be dropped on the board" for k, v in {False: "cannot", True: "can"}.items()}
+        debug_log_data.append(f"Use drops: {self.use_drops} - {drop_modes[self.use_drops]}")
         check_modes = {False: "Capture the royal piece to win", True: "Checkmate the royal piece to win"}
         debug_log_data.append(f"Use check: {self.use_check} - {check_modes[self.use_check]}")
         royal_modes = {0: "Default", 1: "Force royal (Threaten Any)", 2: "Force quasi-royal (Threaten Last)"}

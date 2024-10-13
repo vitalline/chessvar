@@ -60,6 +60,7 @@ Ctrl + Shift + G: cycle graphics mode backward (-1)
 Ctrl + H: hide pieces (Penultima mode)
 Shift + H: hide pieces (pieceblind mode)
 Ctrl + Shift + H: show pieces
+Alt + H: toggle crazyhouse mode
 Ctrl + M: show move markers
 Shift + M: hide move markers
 Ctrl + Shift + M: show move markers if pieces are shown, hide otherwise
