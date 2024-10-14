@@ -356,8 +356,14 @@ class CastlingMovement(BaseMovement):
     def moves(self, pos_from: Position, piece: Piece, theoretical: bool = False):
         if self.total_moves:
             return ()
+        pos_to = add(pos_from, piece.side.direction(self.direction))
+        if self.board.not_on_board(pos_to):
+            return ()
         other_piece_pos = add(pos_from, piece.side.direction(self.other_piece))
         if self.board.not_on_board(other_piece_pos):
+            return ()
+        other_piece_pos_to = add(other_piece_pos, piece.side.direction(self.other_direction))
+        if self.board.not_on_board(other_piece_pos_to):
             return ()
         other_piece = self.board.get_piece(other_piece_pos)
         if other_piece.is_empty():
@@ -371,8 +377,7 @@ class CastlingMovement(BaseMovement):
                 pos = add(pos_from, gap_offset)
                 if not self.board.not_a_piece(pos):
                     return ()
-        self_move = Move(pos_from, add(pos_from, piece.side.direction(self.direction)), type(self))
-        other_piece_pos_to = add(other_piece_pos, piece.side.direction(self.other_direction))
+        self_move = Move(pos_from, pos_to, type(self))
         other_move = Move(other_piece_pos, other_piece_pos_to, type(self), other_piece)
         return self_move.set(chained_move=other_move),
 
