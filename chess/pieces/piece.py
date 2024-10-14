@@ -7,12 +7,12 @@ from arcade import Color, Sprite, load_texture
 
 from chess.pieces.side import Side
 from chess.pieces.util import Slow, Fast, Immune, Royal, QuasiRoyal
-from chess.movement.movement import BaseMovement
 from chess.util import Default, get_texture_path
 
 if TYPE_CHECKING:
     from chess.board import Board
     from chess.movement.move import Move
+    from chess.movement.movement import BaseMovement
     from chess.movement.util import Position
 
 
@@ -117,9 +117,8 @@ class Piece(Sprite):
             and self.side == other.side
             and self.is_hidden == other.is_hidden
             and (
-                self.movement.total_moves == other.movement.total_moves
-                if isinstance(self.movement, BaseMovement) else
-                self.movement == other.movement
+                self.movement == other.movement and self.movement is None
+                or other.movement is not None and self.movement.total_moves == other.movement.total_moves
             )
         )
 

@@ -4296,6 +4296,8 @@ class Board(Window):
                     for to_piece in promotions[piece][pos]:
                         suffixes = []
                         if isinstance(to_piece, Piece):
+                            if to_piece.side not in {side, Side.NONE}:
+                                suffixes.append(f"Side: {to_piece.side}")
                             if to_piece.movement and to_piece.movement.total_moves:
                                 suffixes.append(f"Moves: {to_piece.movement.total_moves}")
                             if to_piece.promoted_from:
@@ -4326,6 +4328,8 @@ class Board(Window):
                     to_piece = drops[piece][pos]
                     suffixes = []
                     if isinstance(to_piece, Piece):
+                        if to_piece.side not in {side, Side.NONE}:
+                            suffixes.append(f"Side: {to_piece.side}")
                         if to_piece.movement and to_piece.movement.total_moves:
                             suffixes.append(f"Moves: {to_piece.movement.total_moves}")
                         if to_piece.promoted_from:

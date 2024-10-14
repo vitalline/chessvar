@@ -3,11 +3,12 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Type
 
 from chess.movement.util import Position, to_algebraic as toa
+from chess.pieces.piece import Piece
+from chess.pieces.side import Side
 from chess.util import Default, Unset
 
 if TYPE_CHECKING:
     from chess.movement.movement import BaseMovement
-    from chess.pieces.piece import Piece
 
 
 class Move(object):
@@ -154,6 +155,8 @@ class Move(object):
             elif self.promotion:
                 if self.promotion.is_hidden:
                     string += ", promotes to ???"
+                elif isinstance(self.promotion, Piece) and self.promotion.side not in {self.piece.side, Side.NONE}:
+                    string += f", promotes to {self.promotion}"
                 else:
                     string += f", promotes to {self.promotion.name}"
         return string
