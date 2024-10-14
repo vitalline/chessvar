@@ -1089,7 +1089,7 @@ class Board(Window):
 
         if self.move_history:
             last_move = self.move_history[-1]
-            if last_move and not (last_move.is_edit or issubclass(last_move.movement_type, movement.DropMovement)):
+            if last_move and last_move.is_edit != 1 and last_move.movement_type != movement.DropMovement:
                 last_move.piece.movement.reload(last_move, last_move.piece)
 
         self.load_pieces()
@@ -1138,13 +1138,14 @@ class Board(Window):
         if self.promotion_piece:
             piece = self.promotion_piece
             self.end_promotion()
-            if self.edit_mode:
-                self.start_promotion(piece, self.edit_promotions[self.get_promotion_side(piece)])
-            elif self.move_history and self.move_history[-1].piece.board_pos == piece.board_pos:
-                if piece.is_empty():
-                    self.try_drop(self.move_history[-1])
-                else:
-                    self.try_promotion(self.move_history[-1])
+            if self.move_history and self.move_history[-1]:
+                if self.move_history[-1].is_edit == 1:
+                    self.start_promotion(piece, self.edit_promotions[self.get_promotion_side(piece)])
+                elif self.move_history[-1].piece.board_pos == piece.board_pos:
+                    if piece.is_empty():
+                        self.try_drop(self.move_history[-1])
+                    else:
+                        self.try_promotion(self.move_history[-1])
         else:
             if not with_history and not self.edit_mode:
                 self.update_status()
@@ -2045,7 +2046,7 @@ class Board(Window):
                     break
                 if self.promotion_piece is None:
                     self.log(f"[Ply {self.ply_count}] Edit: {self.move_history[-1]}")
-            elif issubclass(next_move.movement_type, movement.DropMovement):
+            elif next_move.movement_type == movement.DropMovement:
                 pos = next_move.pos_to
                 if not self.not_on_board(pos) and self.get_piece(pos).is_empty():
                     if next_move.promotion is Unset:
@@ -2164,25 +2165,24 @@ class Board(Window):
             # piece was added to the board, update it and add it to the sprite list
             self.update_piece(move.piece)
             self.piece_sprite_list.append(move.piece)
-        if move.piece.side in self.drops and not move.is_edit:
-            if move.captured_piece is not None and move.piece.side in self.captured_pieces:
-                capture_type = move.captured_piece.promoted_from or type(move.captured_piece)
+        if move.piece.side in self.drops and not move.is_edit == 1:
+            captured_piece = move.piece if move.pos_to is None else move.captured_piece
+            if captured_piece is not None and move.piece.side in self.captured_pieces:
+                capture_type = captured_piece.promoted_from or type(captured_piece)
                 if capture_type in self.drops[move.piece.side]:
                     # droppable piece was captured, add it to the roster of captured pieces
                     self.captured_pieces[move.piece.side].append(capture_type)
-        if (
-            not (move.is_edit or issubclass(move.movement_type, movement.DropMovement))
-            or (move.pos_from == move.pos_to and move.promotion is None)
-        ):
+        if move.is_edit != 1 and move.movement_type != movement.DropMovement:
             # call movement.update() to update movement state after the move (e.g. pawn double move, castling rights)
             move.piece.movement.update(move, move.piece)
-        if not move.is_edit:
+        if move.is_edit != 1:
             if move.piece.is_empty():
                 # check if a piece can be dropped
                 self.try_drop(move)
             else:
                 if (
-                    not self.use_check
+                    not move.is_edit
+                    and not self.use_check
                     and issubclass(type(move.piece), Slow)
                     and move.piece in self.royal_pieces[move.piece.side]
                 ):
@@ -2203,7 +2203,7 @@ class Board(Window):
             if move.pos_to is None or move.promotion is not None:
                 # existing piece was removed from the board (possibly promoted to a different piece type)
                 if not self.is_trickster_mode():  # reset_trickster_mode() does not reset removed pieces
-                    move.piece.angle = 0           # so instead we have to do it manually as a workaround
+                    move.piece.angle = 0          # so instead we have to do it manually as a workaround
             if not move.piece.is_empty():
                 # update the piece sprite to reflect current piece hiding mode
                 self.update_piece(move.piece)
@@ -2211,6 +2211,8 @@ class Board(Window):
                 # existing piece was moved, restore it on the square it was moved from
                 self.pieces[move.pos_from[0]][move.pos_from[1]] = move.piece
                 self.piece_sprite_list.append(move.piece)
+        elif move.is_edit == 2:
+            move.set(piece=self.get_piece(move.pos_to))
         if move.captured_piece is not None:
             # piece was captured, restore it on the square it was captured on
             capture_pos = move.captured_piece.board_pos
@@ -2224,9 +2226,10 @@ class Board(Window):
             self.update_piece(move.captured_piece)  # update the piece sprite to reflect current piece hiding mode
             self.pieces[capture_pos[0]][capture_pos[1]] = move.captured_piece
             self.piece_sprite_list.append(move.captured_piece)
-        if move.piece.side in self.drops and not move.is_edit:
-            if move.captured_piece is not None and move.piece.side in self.captured_pieces:
-                capture_type = move.captured_piece.promoted_from or type(move.captured_piece)
+        if move.piece.side in self.drops and move.is_edit != 1:
+            captured_piece = move.piece if move.pos_to is None else move.captured_piece
+            if captured_piece is not None and move.piece.side in self.captured_pieces:
+                capture_type = captured_piece.promoted_from or type(captured_piece)
                 if capture_type in self.drops[move.piece.side]:
                     # droppable piece was captured, remove it from the roster of captured pieces
                     for i, piece in enumerate(self.captured_pieces[move.piece.side][::-1]):
@@ -2246,10 +2249,7 @@ class Board(Window):
                 self.update_piece(move.swapped_piece)  # update the piece sprite to reflect current piece hiding mode
                 self.pieces[move.pos_to[0]][move.pos_to[1]] = move.swapped_piece
                 self.piece_sprite_list.append(move.swapped_piece)
-        if (
-            not (move.is_edit or issubclass(move.movement_type, movement.DropMovement))
-            or (move.pos_from == move.pos_to and move.promotion is None)
-        ):
+        if move.is_edit != 1 and move.movement_type != movement.DropMovement:
             # call movement.undo() to restore movement state before the move (e.g. pawn double move, castling rights)
             move.piece.movement.undo(move, move.piece)
 
@@ -2305,10 +2305,7 @@ class Board(Window):
             self.log(f"[Ply {self.ply_count}] Undo: Pass: {self.turn_side} to move")
         if self.move_history:
             move = self.move_history[-1]
-            if move is not None and (
-                not (move.is_edit or issubclass(move.movement_type, movement.DropMovement))
-                or (move.pos_from == move.pos_to and move.promotion is None)
-            ):
+            if move is not None and move.is_edit != 1 and move.movement_type != movement.DropMovement:
                 move.piece.movement.reload(move, move.piece)
         future_move_history = self.future_move_history.copy()
         if self.chain_start is None:
@@ -2526,7 +2523,10 @@ class Board(Window):
                             message += f"Piece from {piece_groups[self.edit_piece_set_id]['name']}"
                     else:
                         message += f"New piece"
-                message += f" appears on {toa(piece.board_pos)}"
+                if not self.edit_mode or (self.move_history and ((m := self.move_history[-1]) and m.is_edit != 1)):
+                    message += f" is placed on {toa(piece.board_pos)}"
+                else:
+                    message += f" appears on {toa(piece.board_pos)}"
                 self.set_caption(message)
                 return
             message = f"[Ply {self.ply_count}] {piece} on {toa(piece.board_pos)}"
@@ -2556,7 +2556,7 @@ class Board(Window):
                     pos_from=selected_square,
                     pos_to=hovered_square,
                     piece=piece,
-                    is_edit=self.edit_mode,
+                    is_edit=int(self.edit_mode),
                 )
                 self.set_caption(f"[Ply {self.ply_count}] {move}")
                 return
@@ -2713,7 +2713,7 @@ class Board(Window):
                 promotion = type(promotion)
             else:
                 promotion_piece = promotion(board=self, pos=pos, side=side)
-            if not self.edit_mode and not piece.is_empty():
+            if not self.edit_mode or (self.move_history and ((m := self.move_history[-1]) and m.is_edit != 1)):
                 promotion_piece.promoted_from = promotion_piece.promoted_from or piece.promoted_from or type(piece)
             if self.edit_mode and is_prefix_of('custom', self.edit_piece_set_id):
                 promotion_piece.reload(is_hidden=False, flipped_horizontally=False)
@@ -3331,7 +3331,7 @@ class Board(Window):
             if self.not_on_board(pos):
                 return
             next_selected_square = None
-            move = Move(is_edit=True)
+            move = Move(is_edit=1)
             if held_buttons & MOUSE_BUTTON_LEFT:
                 if not self.selected_square:
                     return
@@ -3340,7 +3340,12 @@ class Board(Window):
                         self.deselect_piece()
                     self.reset_position(self.get_piece(pos))
                     return
-                if modifiers & key.MOD_ACCEL:
+                if modifiers & key.MOD_ALT:
+                    if self.not_a_piece(pos):
+                        self.deselect_piece()
+                        return
+                    move.set(pos_from=pos, pos_to=None, piece=self.get_piece(pos), is_edit=2)
+                elif modifiers & key.MOD_ACCEL:
                     self.reset_position(self.get_piece(self.selected_square))
                     piece = copy(self.get_piece(self.selected_square))
                     piece.board_pos = None
@@ -3367,13 +3372,32 @@ class Board(Window):
                 if self.clicked_square != pos:
                     self.deselect_piece()
                     return
-                if modifiers & key.MOD_ACCEL:
+                if modifiers & key.MOD_ALT:
+                    move.set(pos_from=pos, pos_to=pos, piece=self.get_piece(pos), is_edit=2)
+                    if move.piece.is_empty():
+                        move.set(pos_from=None, movement_type=movement.DropMovement, promotion=Unset)
+                    else:
+                        side = self.get_promotion_side(move.piece)
+                        if len(self.edit_promotions[side]) == 1:
+                            piece = self.edit_promotions[side][0]
+                            if isinstance(piece, Piece):
+                                piece = piece.of(piece.side or side).on(pos)
+                            else:
+                                p = piece(board=self, pos=move.pos_to, side=side)
+                                p.promoted_from = p.promoted_from or ((mp := move.piece).promoted_from or type(mp))
+                                piece = p
+                            move.set(promotion=piece)
+                        elif len(self.edit_promotions[side]) > 1:
+                            move.set(promotion=Unset)
+                elif modifiers & key.MOD_ACCEL:
                     if self.not_a_piece(pos):
                         self.deselect_piece()
                         return
-                    move.set(pos_from=pos, pos_to=pos, piece=self.get_piece(pos))
+                    move.set(pos_from=pos, pos_to=pos, piece=self.get_piece(pos), is_edit=2)
                 elif modifiers & key.MOD_SHIFT:
                     move.set(pos_from=pos, pos_to=pos, piece=self.get_piece(pos))
+                    if move.piece.is_empty():
+                        move.set(pos_from=None)
                     side = self.get_promotion_side(move.piece)
                     if len(self.edit_promotions[side]) == 1:
                         piece = self.edit_promotions[side][0]

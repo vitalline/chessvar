@@ -88,9 +88,11 @@ controls (edit mode):
 LMB, Enter: select piece, move selected piece (click or drag)
 Shift + LMB/Enter: swap piece with selected piece
 Ctrl + LMB/Enter: copy selected piece
+Alt + LMB/Enter: move selected piece to drop bank
 RMB, Backspace: remove piece
 Shift + RMB/Backspace: replace piece
 Ctrl + RMB/Backspace: revoke first move of a piece
+Alt + RMB/Backspace: promote or drop piece
 
 source:
 https://www.reddit.com/r/chessvariants/comments/190l46o/2024_chess_with_different_armies_thread/

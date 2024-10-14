@@ -356,7 +356,7 @@ def load_move(data: dict | str | None, board: Board, from_dict: dict | None = No
         placed_piece=load_piece_type(data.get('drop'), from_dict),
         promotion=load_piece(data.get('promotion'), board, from_dict),
         chained_move=load_move(data.get('chain'), board, from_dict),
-        is_edit=data.get('edit', False),
+        is_edit=data.get('edit', 0),
     )
 
 

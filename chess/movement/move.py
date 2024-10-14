@@ -23,7 +23,7 @@ class Move(object):
         placed_piece: Type[Piece] | None = None,
         promotion: Piece | frozenset | None = None,
         chained_move: Move | frozenset | None = None,
-        is_edit: bool = False
+        is_edit: int = 0
     ):
         self.pos_from = pos_from
         self.pos_to = pos_to
@@ -45,9 +45,9 @@ class Move(object):
         captured_piece: Piece | None = None,
         swapped_piece: Piece | None = None,
         placed_piece: Type[Piece] | None = None,
-        promotion: Piece | type(Default) | None = None,
-        chained_move: Move | type(Default) | None = None,
-        is_edit: bool | None = None
+        promotion: Piece | frozenset | type(Default) | None = None,
+        chained_move: Move | frozenset | type(Default) | None = None,
+        is_edit: int | None = None
     ) -> Move:
         self.pos_from = pos_from or self.pos_from
         self.pos_to = pos_to or self.pos_to
@@ -117,25 +117,36 @@ class Move(object):
     def __str__(self) -> str:
         board = self.piece.board
         moved = self.pos_from != self.pos_to
+        comma = ','
         if self.pos_from is not None and self.pos_to is not None and moved:
             if self.is_edit:
                 string = f"on {toa(self.pos_from)} is moved to {toa(self.pos_to)}"
             else:
                 string = f"on {toa(self.pos_from)} goes to {toa(self.pos_to)}"
         elif self.pos_from is None or (self.piece and self.piece.is_empty() and not moved):
-            if self.promotion is Unset:
-                string = f"wants something to appear on {toa(self.pos_to)}"
+            if self.movement_type is not None and self.movement_type.__name__ == 'DropMovement':
+                if self.promotion is Unset:
+                    string = f"wants to place something on {toa(self.pos_to)}"
+                else:
+                    string = f"is placed on {toa(self.pos_to)}"
             else:
-                string = f"appears on {toa(self.pos_to)}"
+                if self.promotion is Unset:
+                    string = f"wants something to appear on {toa(self.pos_to)}"
+                else:
+                    string = f"appears on {toa(self.pos_to)}"
         elif self.pos_to is None:
             string = f"disappears from {toa(self.pos_from)}"
         elif not moved:
-            string = f"decides to stay on {toa(self.pos_from)}"
+            if self.is_edit == 2:
+                string = f"stays on {toa(self.pos_from)}"
+            else:
+                string = f"on {toa(self.pos_from)}"
+                comma = ''
         else:
             string = "does something very mysterious"
         if self.piece:
             if self.piece.is_empty() and not (self.promotion and not moved):
-                side = board.get_promotion_side(self.piece)
+                side = board.get_promotion_side(self.piece) if self.is_edit == 1 else board.turn_side
                 string = f"{side} {string}"
             elif self.piece.is_empty():
                 string = f"{self.promotion} {string}"
@@ -144,19 +155,29 @@ class Move(object):
         else:
             string = f"Piece {string}"
         if self.captured_piece:
-            string += f", takes {self.captured_piece}"
+            string += f"{comma} takes {self.captured_piece}"
             if self.captured_piece.board_pos != self.pos_to:
                 string += f" on {toa(self.captured_piece.board_pos)}"
+            comma = ','
         if self.swapped_piece:
-            string += f", swaps with {self.swapped_piece}"
+            string += f"{comma} swaps with {self.swapped_piece}"
+            comma = ','
         if self.pos_from is not None and not (self.piece and self.piece.is_empty() and not moved) and self.piece:
             if self.promotion is Unset:
-                string += f", tries to promote"
-            elif self.promotion:
-                if self.promotion.is_hidden:
-                    string += ", promotes to ???"
-                elif isinstance(self.promotion, Piece) and self.promotion.side not in {self.piece.side, Side.NONE}:
-                    string += f", promotes to {self.promotion}"
+                if self.is_edit == 1:
+                    string += f"{comma} is promoted"
                 else:
-                    string += f", promotes to {self.promotion.name}"
+                    string += f"{comma} tries to promote"
+            elif self.promotion:
+                if self.is_edit == 1:
+                    promotes = f"is promoted"
+                else:
+                    promotes = f"promotes"
+                if self.promotion.is_hidden:
+                    string += f"{comma} {promotes} to ???"
+                elif isinstance(self.promotion, Piece) and self.promotion.side not in {self.piece.side, Side.NONE}:
+                    string += f"{comma} {promotes} to {self.promotion}"
+                else:
+                    string += f"{comma} {promotes} to {self.promotion.name}"
+            comma = ','
         return string
