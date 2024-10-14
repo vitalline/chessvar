@@ -1,4 +1,4 @@
-from chess.pieces.piece import Piece
+from chess.pieces.piece import Piece, ImmunePiece
 from chess.pieces.side import Side
 
 
@@ -24,6 +24,7 @@ class NoPiece(NonMovingPiece):
 class Obstacle(NonMovingPiece):
     name = '(Obstacle)'
     file_name = 'square'
+    default_side = Side.NEUTRAL
 
     def __init__(self, board, **kwargs):
         super().__init__(board, **kwargs)
@@ -36,10 +37,8 @@ class Obstacle(NonMovingPiece):
 class Block(Obstacle):
     name = 'Block'
     file_name = 'block'
-    default_side = Side.NEUTRAL
 
 
-class Wall(Obstacle):
+class Wall(Obstacle, ImmunePiece):
     name = 'Wall'
     file_name = 'wall'
-    default_side = Side.IMMUNE

@@ -6,7 +6,7 @@ from typing import TYPE_CHECKING
 
 from chess.movement.move import Move
 from chess.movement.util import AnyDirection, Direction, Position, add, sub, mul, ddiv
-from chess.pieces.side import Side
+from chess.pieces.util import Immune
 
 if TYPE_CHECKING:
     from chess.board import Board
@@ -96,7 +96,7 @@ class BaseDirectionalMovement(BaseMovement):
                 if self.skip_condition(move, direction, piece, theoretical):
                     continue
                 if not theoretical and move.pos_to in self.board.castling_ep_markers:
-                    yield Move(move.pos_from, self.board.castling_ep_target.board_pos, CastlingEnPassantMovement)
+                    yield Move(move.pos_from, self.board.castling_ep_target.board_pos, RoyalEnPassantMovement)
                 yield move
                 self.steps = steps  # this is a hacky way to make sure the step count stays correct after the yield
                 # this is because the step count will be reset to 0 if self.moves() is called before the next yield
@@ -124,11 +124,11 @@ class RiderMovement(BaseDirectionalMovement):
             or move.pos_from == next_pos_to
             or len(direction) > 2 and direction[2] and self.steps >= direction[2]
             or not theoretical and (
-                (piece.side.blocked_by((next_piece := self.board.get_piece(next_pos_to)).side) and piece != next_piece)
-                or (piece.side.captures(self.board.get_side(move.pos_to)) and move.pos_from != move.pos_to)
+                (piece.blocked_by((next_piece := self.board.get_piece(next_pos_to))) and piece != next_piece)
+                or (piece.captures(self.board.get_piece(move.pos_to)) and move.pos_from != move.pos_to)
             )
             or theoretical and (
-                (next_piece := self.board.get_piece(next_pos_to)).side == Side.IMMUNE and next_piece.movement is None
+                isinstance((next_piece := self.board.get_piece(next_pos_to)), Immune) and next_piece.movement is None
             )
         )
 
@@ -279,7 +279,7 @@ class RangedAutoCaptureRiderMovement(RiderMovement):
             captures = {}
             for capture in super().moves(move.pos_to, piece):
                 captured_piece = self.board.get_piece(capture.pos_to)
-                if piece.side.captures(captured_piece.side):
+                if piece.captures(captured_piece):
                     captures[capture.pos_to] = copy(capture)
                     captures[capture.pos_to].set(piece=piece, pos_to=move.pos_to, captured_piece=captured_piece)
             last_chain_move = move
@@ -401,8 +401,8 @@ class CastlingMovement(BaseMovement):
         )
 
 
-class CastlingEnPassantMovement(BaseMovement):
-    # used to mark en passant captures of a king had that just castled (Move.movement_type == CastlingEnPassantMovement)
+class RoyalEnPassantMovement(BaseMovement):
+    # used to mark en passant captures of royals that moved through check (Move.movement_type == RoyalEnPassantMovement)
     pass
 
 
@@ -576,6 +576,9 @@ class ChainMovement(BaseMultiMovement):
                     yield copy(chained_move).set(pos_from=move.pos_from)
         else:
             for move in self.movements[index].moves(pos_from, piece, theoretical):
+                if move.movement_type == RoyalEnPassantMovement:
+                    yield move
+                    continue
                 self.board.update_move(move)  # this is most likely SUPER inefficient but i've spent about a day on this
                 self.board.move(move)  # and i'm not about to spend another day trying to figure out how to make it FAST
                 chain_options = []  # also what this does is it makes sure the board state is updated after each chained
@@ -612,7 +615,7 @@ class MultiMovement(BaseMultiMovement):
             for movement in self.move_or_capture + self.capture:
                 for move in movement.moves(pos_from, piece, theoretical):
                     captured_piece = move.captured_piece or self.board.get_piece(move.pos_to)
-                    if piece.side.captures(captured_piece.side):
+                    if piece.captures(captured_piece):
                         yield copy(move)
 
     def __copy_args__(self):

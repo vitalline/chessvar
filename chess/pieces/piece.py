@@ -6,6 +6,7 @@ from typing import TYPE_CHECKING
 from arcade import Color, Sprite, load_texture
 
 from chess.pieces.side import Side
+from chess.pieces.util import Slow, Fast, Immune, Royal, QuasiRoyal
 from chess.movement.movement import BaseMovement
 from chess.util import Default, get_texture_path
 
@@ -122,6 +123,28 @@ class Piece(Sprite):
             )
         )
 
+    def blocked_by(self, what: Piece):
+        if not what:
+            return False
+        match self.side:
+            case Side.ANY:
+                return False
+            case Side.NONE:
+                return True
+            case _:
+                return self.side is what.side or isinstance(what, Immune)
+
+    def captures(self, what: Piece):
+        if not what:
+            return False
+        match self.side:
+            case Side.ANY:
+                return True
+            case Side.NONE:
+                return False
+            case _:
+                return what.side not in {Side.NONE, self.side} and not isinstance(what, Immune)
+
     @property
     def texture_path(self) -> str:
         return f"assets/{self.texture_folder}/{self.texture_side.file_prefix()}{self.texture_name}.png"
@@ -173,9 +196,23 @@ class Piece(Sprite):
             self.reload(side=side)
 
 
-class QuasiRoyalPiece(Piece):
+class QuasiRoyalPiece(Piece, QuasiRoyal, Slow):
     pass
 
+class RoyalPiece(Piece, Royal, Slow):
+    pass
 
-class RoyalPiece(QuasiRoyalPiece):
+class SlowQuasiRoyalPiece(Piece, QuasiRoyal, Slow):
+    pass
+
+class SlowRoyalPiece(Piece, Royal, Slow):
+    pass
+
+class FastQuasiRoyalPiece(Piece, QuasiRoyal, Fast):
+    pass
+
+class FastRoyalPiece(Piece, Royal, Fast):
+    pass
+
+class ImmunePiece(Piece, Immune):
     pass

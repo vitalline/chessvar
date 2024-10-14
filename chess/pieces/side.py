@@ -9,9 +9,8 @@ class Side(Enum):
     NONE = 0
     WHITE = 1
     BLACK = 2
-    NEUTRAL = 10
-    IMMUNE = 11
     ANY = -1
+    NEUTRAL = -2
 
     def __bool__(self):
         return self is not Side.NONE
@@ -24,24 +23,6 @@ class Side(Enum):
                 return Side.WHITE
             case _:
                 return self
-
-    def blocked_by(self, what: Side):
-        match self:
-            case Side.ANY:
-                return False
-            case Side.NONE:
-                return True
-            case _:
-                return self is what or what in {Side.IMMUNE}
-
-    def captures(self, what: Side):
-        match self:
-            case Side.ANY:
-                return True
-            case Side.NONE:
-                return False
-            case _:
-                return self is not what and what not in {Side.NONE, Side.IMMUNE}
 
     def direction(self, dpos: AnyDirection | int | None = None) -> AnyDirection | int:
         match self:
@@ -62,8 +43,6 @@ class Side(Enum):
                 return "Black"
             case Side.NEUTRAL:
                 return "Neutral"
-            case Side.IMMUNE:
-                return "Indestructible"
             case Side.ANY:
                 return "Universal"
             case _:

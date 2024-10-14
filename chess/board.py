@@ -45,8 +45,9 @@ from chess.pieces.groups import thrash as th
 from chess.pieces.groups import wide as wd
 from chess.pieces.groups import zebra as zb
 from chess.pieces.groups.util import NoPiece, Obstacle, Block, Wall
-from chess.pieces.piece import Piece, QuasiRoyalPiece, RoyalPiece
+from chess.pieces.piece import Piece
 from chess.pieces.side import Side
+from chess.pieces.util import QuasiRoyal, Royal, Slow
 from chess.save import condense, expand
 from chess.save import condense_algebraic as cnd_alg, expand_algebraic as exp_alg
 from chess.save import load_move, load_piece, load_rng, load_piece_type, load_custom_type
@@ -1260,7 +1261,7 @@ class Board(Window):
                 for pos in drop_squares[side]:
                     drops[piece_type][pos] = piece
                 for piece_type in piece_sets[side][1:-1]:
-                    if piece_type not in drops and not issubclass(piece_type, RoyalPiece):
+                    if piece_type not in drops and not issubclass(piece_type, Royal):
                         drops[piece_type] = {pos: piece_type for pos in drop_squares[side]}
                 if piece_sets[side][-1] not in drops:
                     piece_type = piece_sets[side][-1]
@@ -1293,7 +1294,7 @@ class Board(Window):
             ):
                 promotion_types = []
                 for piece in pieces:
-                    if piece not in used_piece_set and not issubclass(piece, RoyalPiece):
+                    if piece not in used_piece_set and not issubclass(piece, Royal):
                         used_piece_set.add(piece)
                         promotion_types.append(piece)
                 promotions.extend(promotion_types[::-1])
@@ -1454,16 +1455,17 @@ class Board(Window):
         self.obstacles = []
         for row, col in product(range(self.board_height), range(self.board_width)):
             piece = self.get_piece((row, col))
-            if piece.side in self.movable_pieces and not piece.is_empty():
-                self.movable_pieces[piece.side].append(piece)
-                if isinstance(piece, RoyalPiece):
-                    self.royal_pieces[piece.side].append(piece)
-                elif isinstance(piece, QuasiRoyalPiece):
-                    self.quasi_royal_pieces[piece.side].append(piece)
+            side = piece.side
+            if side in self.movable_pieces and not piece.is_empty():
+                self.movable_pieces[side].append(piece)
+                if isinstance(piece, Royal):
+                    self.royal_pieces[side].append(piece)
+                elif isinstance(piece, QuasiRoyal):
+                    self.quasi_royal_pieces[side].append(piece)
                 if isinstance(piece.movement, movement.ProbabilisticMovement):
-                    self.probabilistic_pieces[piece.side].append(piece)
+                    self.probabilistic_pieces[side].append(piece)
                 if isinstance(piece.movement, movement.AutoRangedAutoCaptureRiderMovement):
-                    self.auto_ranged_pieces[piece.side].append(piece)
+                    self.auto_ranged_pieces[side].append(piece)
             elif isinstance(piece, Obstacle):
                 self.obstacles.append(piece)
         if self.royal_piece_mode == 1:  # Force royal pieces
@@ -1598,7 +1600,7 @@ class Board(Window):
                     capture = chained_move.captured_piece
                     if capture and capture.side == turn_side:
                         # NB: quasi-royal pieces are treated as royal if only one remains!
-                        royal_capture = isinstance(capture, RoyalPiece) or isinstance(capture, QuasiRoyalPiece)
+                        royal_capture = isinstance(capture, Royal) or isinstance(capture, QuasiRoyal)
                         if self.royal_piece_mode == 0 and royal_capture:
                             # treat as royal capture iff no strictly royal pieces exist
                             royal_capture = not self.royal_pieces[turn_side]
@@ -1628,7 +1630,17 @@ class Board(Window):
                         self.promotion_piece = None
                     move_chain = [move]
                     chained_move = move.chained_move
-                    while chained_move:
+                    end_early = False
+                    if (
+                        self.use_check and chained_move
+                        and issubclass(type(move.piece), Slow)
+                        and move.piece in royal_pieces[turn_side]
+                    ):
+                        self.load_check(turn_side)
+                        if self.check_side == turn_side:
+                            if self.use_check:
+                                end_early = True
+                    while not end_early and chained_move:
                         self.update_move(chained_move)
                         self.move(chained_move)
                         if chained_move.promotion:
@@ -1640,8 +1652,18 @@ class Board(Window):
                         else:
                             self.update_auto_capture_markers(chained_move)
                         move_chain.append(chained_move)
-                        chained_move = chained_move.chained_move
-                    self.load_check(turn_side)
+                        if (
+                            self.use_check and chained_move.chained_move
+                            and issubclass(type(chained_move.piece), Slow)
+                            and chained_move.piece in royal_pieces[turn_side]
+                        ):
+                            self.load_check(turn_side)
+                            if self.check_side == turn_side:
+                                end_early = True
+                        if not end_early:
+                            chained_move = chained_move.chained_move
+                    if not end_early:
+                        self.load_check(turn_side)
                     if self.use_check:
                         for chained_move in move_chain:
                             if chained_move.captured_piece in royal_pieces[turn_side]:
@@ -1666,6 +1688,8 @@ class Board(Window):
                         self.undo(chained_move)
                         self.revert_auto_capture_markers(chained_move)
                     self.check_side = check_side
+                    self.clear_en_passant()
+                    self.clear_castling_ep()
                     if en_passant_target is not None:
                         for marker in en_passant_markers:
                             self.mark_en_passant(en_passant_target.board_pos, marker)
@@ -1872,8 +1896,6 @@ class Board(Window):
                 move.set(captured_piece=new_piece)
 
     def mark_en_passant(self, piece_pos: Position, marker_pos: Position) -> None:
-        if self.en_passant_target is not None and self.en_passant_target.board_pos != piece_pos:
-            self.clear_en_passant()
         self.en_passant_target = self.get_piece(piece_pos)
         self.en_passant_markers.add(marker_pos)
 
@@ -1882,8 +1904,6 @@ class Board(Window):
         self.en_passant_markers = set()
 
     def mark_castling_ep(self, piece_pos: Position, marker_pos: Position) -> None:
-        if self.castling_ep_target is not None and self.castling_ep_target.board_pos != piece_pos:
-            self.clear_castling_ep()
         self.castling_ep_target = self.get_piece(piece_pos)
         self.castling_ep_markers.add(marker_pos)
 
@@ -1904,7 +1924,7 @@ class Board(Window):
             piece_pos = sorted(list(piece_poss))[0]
             piece = self.get_piece(piece_pos)
             move_piece = self.get_piece(move.pos_to) if move.piece.is_empty() else move.piece
-            if piece.side == side and piece.side.captures(move_piece.side):
+            if piece.side == side and piece.captures(move_piece):
                 chained_move = Move(
                     piece=piece,
                     movement_type=type(piece.movement),
@@ -2161,6 +2181,12 @@ class Board(Window):
                 # check if a piece can be dropped
                 self.try_drop(move)
             else:
+                if (
+                    not self.use_check
+                    and issubclass(type(move.piece), Slow)
+                    and move.piece in self.royal_pieces[move.piece.side]
+                ):
+                    self.mark_castling_ep(move.piece.board_pos, move.pos_to)
                 # check if the piece needs to be promoted
                 self.try_promotion(move)
 
@@ -2691,7 +2717,7 @@ class Board(Window):
                 promotion_piece.promoted_from = promotion_piece.promoted_from or piece.promoted_from or type(piece)
             if self.edit_mode and is_prefix_of('custom', self.edit_piece_set_id):
                 promotion_piece.reload(is_hidden=False, flipped_horizontally=False)
-            elif issubclass(promotion, RoyalPiece) and promotion not in self.piece_sets[side]:
+            elif issubclass(promotion, Royal) and promotion not in self.piece_sets[side]:
                 if self.edit_mode and self.edit_piece_set_id is not None:
                     promotion_piece.is_hidden = False
                 self.update_piece(promotion_piece, asset_folder='other')
@@ -2914,7 +2940,8 @@ class Board(Window):
             if isinstance(piece, Piece) and not piece.is_empty():
                 if self.edit_mode and is_prefix_of('custom', self.edit_piece_set_id):
                     piece.reload(is_hidden=False, flipped_horizontally=False)
-                elif isinstance(piece, RoyalPiece) and type(piece) not in self.piece_sets[piece.side]:
+                # that issubclass call is there because PyCharm doesn't recognize that piece is a Piece
+                elif issubclass(type(piece), Royal) and type(piece) not in self.piece_sets[piece.side]:
                     self.update_piece(piece, asset_folder='other')
                 elif not self.edit_mode or self.edit_piece_set_id is None:
                     self.update_piece(piece, penultima_flip=True)

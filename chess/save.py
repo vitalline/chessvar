@@ -6,6 +6,7 @@ from importlib import import_module
 from random import Random
 from typing import TYPE_CHECKING, Type, Any
 
+from chess.movement import movement as movement_module
 from chess.movement.move import Move
 from chess.movement.movement import BaseMovement
 from chess.pieces.side import Side
@@ -23,7 +24,8 @@ if TYPE_CHECKING:
 
 UNSET_STRING = '*'
 
-SUFFIXES = ('Movement', 'Rider')
+MOVEMENT_SUFFIXES = ('Movement', 'Rider')
+PIECE_SUFFIXES = ('Piece',)
 
 CUSTOM_PREFIX = '_custom_'
 
@@ -110,7 +112,11 @@ def save_piece_type(piece_type: Type[Piece] | frozenset | None) -> str | None:
     if piece_type.__name__.startswith(CUSTOM_PREFIX):
         return piece_type.__name__.removeprefix(CUSTOM_PREFIX)
     if piece_type.__module__ == piece_module.__name__:
-        return piece_type.__name__
+        name = piece_type.__name__
+        for suffix in PIECE_SUFFIXES:
+            if name.endswith(suffix, 1):
+                name = name[:-len(suffix)]
+        return name
     return f"{piece_type.__module__.rsplit('.', 1)[-1]}.{piece_type.__name__}"
 
 
@@ -124,7 +130,12 @@ def load_piece_type(data: str | None, from_dict: dict | None = None) -> Type[Pie
     parts = data.split('.', 1)
     try:
         if len(parts) == 1:
-            return getattr(piece_module, data)
+            for i in range(len(PIECE_SUFFIXES) + 1):
+                name = data + ''.join(PIECE_SUFFIXES[:i][::-1])
+                piece_type = getattr(piece_module, name, None)
+                if piece_type:
+                    return piece_type
+            return None
         return getattr(import_module(f"chess.pieces.groups.{parts[0]}"), parts[1])
     except ImportError:
         return None
@@ -138,7 +149,7 @@ def save_movement_type(movement_type: Type[BaseMovement] | frozenset | None) -> 
     if movement_type is Unset:
         return UNSET_STRING
     name = movement_type.__name__
-    for suffix in SUFFIXES:
+    for suffix in MOVEMENT_SUFFIXES:
         if name.endswith(suffix, 1):
             name = name[:-len(suffix)]
     return name
@@ -149,9 +160,9 @@ def load_movement_type(data: str | None) -> Type[BaseMovement] | frozenset | Non
         return None
     if data == UNSET_STRING:
         return Unset
-    for i in range(len(SUFFIXES) + 1):
-        name = data + ''.join(SUFFIXES[:i][::-1])
-        movement_type = getattr(import_module('chess.movement.movement'), name, None)
+    for i in range(len(MOVEMENT_SUFFIXES) + 1):
+        name = data + ''.join(MOVEMENT_SUFFIXES[:i][::-1])
+        movement_type = getattr(movement_module, name, None)
         if movement_type:
             return movement_type
     return None
