@@ -1908,6 +1908,8 @@ class Board(Window):
             self.update_caption()
 
     def update_board(self, move: Move) -> None:
+        if move.chained_move is not None:
+            return
         if self.en_passant_target is not None and move.piece.side == self.en_passant_target.side.opponent():
             self.clear_en_passant()
         if self.castling_ep_target is not None and move.piece.side == self.castling_ep_target.side.opponent():

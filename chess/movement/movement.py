@@ -7,6 +7,7 @@ from typing import TYPE_CHECKING
 from chess.movement.move import Move
 from chess.movement.util import AnyDirection, Direction, Position, add, sub, mul, ddiv
 from chess.pieces.util import Immune
+from chess.util import Unset
 
 if TYPE_CHECKING:
     from chess.board import Board
@@ -582,7 +583,7 @@ class ChainMovement(BaseMultiMovement):
                 move_chain = []
                 chained_move = move
                 while chained_move:
-                    move_chain.append(chained_move)
+                    move_chain.append(copy(chained_move).set(chained_move=Unset))
                     chained_move = chained_move.chained_move
                 for chained_move in move_chain:
                     self.board.update_move(chained_move)
