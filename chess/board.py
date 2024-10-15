@@ -1084,10 +1084,14 @@ class Board(Window):
         self.chain_start = load_move(data.get('chain_start'), self, c)
         if self.move_history and self.move_history[-1] and self.move_history[-1].matches(self.chain_start):
             self.chain_start = self.move_history[-1]
-        cm = data.get('chain_moves', [])
+        chained_move = self.chain_start
+        poss = []
+        while chained_move:
+            poss.extend((chained_move.pos_from, chained_move.pos_to))
+            chained_move = chained_move.chained_move
         self.chain_moves = {
             self.chain_start.piece.side: {
-                (self.chain_start.pos_from, self.chain_start.pos_to): [load_move(m, self, c) for m in cm]
+                (tuple(poss)): [load_move(m, self, c) for m in data.get('chain_moves', [])]
             }, self.chain_start.piece.side.opponent(): {}
         } if self.chain_start else {}
 
@@ -1602,10 +1606,15 @@ class Board(Window):
             self.display_moves[turn_side] = True
             if self.moves_queried.get(turn_side, False):
                 continue
-            chain_moves = (
-                self.chain_moves.get(turn_side, {}).get((last_chain_move.pos_from, last_chain_move.pos_to))
-                if last_chain_move is not None else None
-            )
+            if last_chain_move:
+                chained_move = self.chain_start
+                poss = []
+                while chained_move:
+                    poss.extend((chained_move.pos_from, chained_move.pos_to))
+                    chained_move = chained_move.chained_move
+                chain_moves = self.chain_moves.get(turn_side, {}).get(tuple(poss))
+            else:
+                chain_moves = None
             self.moves[turn_side] = {}
             self.chain_moves[turn_side] = {}
             while len(self.roll_history) < self.ply_count:
@@ -1725,19 +1734,22 @@ class Board(Window):
                         if pos_from == pos_to and move.captured_piece is not None:
                             pos_to = move.captured_piece.board_pos
                         self.moves[turn_side].setdefault(pos_from, {}).setdefault(pos_to, []).append(move)
+                        chained_move = self.chain_start
+                        poss = []
+                        while chained_move:
+                            poss.extend((chained_move.pos_from, chained_move.pos_to))
+                            chained_move = chained_move.chained_move
                         chained_move = move
                         while chained_move and chained_move.chained_move and (
                             issubclass(chained_move.movement_type, movement.CastlingMovement)
                             and chained_move.chained_move.pos_from != move.pos_to
                             or isinstance(chained_move.piece.movement, movement.RangedAutoCaptureRiderMovement)
                         ):
+                            poss.extend((chained_move.pos_from, chained_move.pos_to))
                             chained_move = chained_move.chained_move
+                        poss.extend((chained_move.pos_from, chained_move.pos_to))
                         if chained_move.chained_move:
-                            (
-                                self.chain_moves[turn_side]
-                                .setdefault((move.pos_from, move.pos_to), [])
-                                .append(chained_move.chained_move)
-                            )
+                            self.chain_moves[turn_side].setdefault(tuple(poss), []).append(chained_move.chained_move)
                     for chained_move in move_chain[::-1]:
                         self.undo(chained_move)
                         self.revert_auto_capture_markers(chained_move)
@@ -1813,17 +1825,21 @@ class Board(Window):
                 if move_data not in move_data_set:
                     move_data_set.add(move_data)
                     move = copy(move)
+                    chained_move = self.chain_start
+                    poss = []
+                    while chained_move:
+                        poss.extend((chained_move.pos_from, chained_move.pos_to))
+                        chained_move = chained_move.chained_move
                     chained_move = move
                     while chained_move and chained_move.chained_move and (
                         issubclass(chained_move.movement_type, movement.CastlingMovement)
                         and chained_move.chained_move.pos_from != move.pos_to
                         or isinstance(chained_move.piece.movement, movement.RangedAutoCaptureRiderMovement)
                     ):
+                        poss.extend((chained_move.pos_from, chained_move.pos_to))
                         chained_move = chained_move.chained_move
-                    if (
-                        chained_move.chained_move or
-                        self.chain_moves.get(self.turn_side, {}).get((move.pos_from, move.pos_to))
-                    ):
+                    poss.extend((chained_move.pos_from, chained_move.pos_to))
+                    if chained_move.chained_move or self.chain_moves.get(self.turn_side, {}).get(tuple(poss)):
                         chained_move.chained_move = Unset  # do not chain moves, we are only counting one-move sequences
                     moves[turn_side].setdefault(move.pos_from, []).append(move)
         return moves
@@ -1870,16 +1886,15 @@ class Board(Window):
                 pos_from, pos_to = move.pos_from, move.pos_to
                 last_move = move
                 captures = []
-                current_pos = pos_to
                 while last_move.chained_move:
                     if last_move.captured_piece:
                         captures.append(last_move.captured_piece.board_pos)
-                    if move.pos_from == current_pos:
-                        current_pos = last_move.pos_to
+                    if last_move.pos_from == pos_to:
+                        pos_to = last_move.pos_to
                     last_move = last_move.chained_move
-                if last_move.pos_from == current_pos:
-                    current_pos = last_move.pos_to
-                pos_to = current_pos
+                if last_move.pos_from == pos_to:
+                    pos_to = last_move.pos_to
+                pos_to = pos_to
                 if last_move.captured_piece:
                     captures.append(last_move.captured_piece.board_pos)
                 if pos_from is not None and pos_from != pos_to:
@@ -2146,17 +2161,21 @@ class Board(Window):
                 self.update_move(move)
                 if next_move.promotion is not None:
                     move.promotion = next_move.promotion
+                chained_move = self.chain_start
+                poss = []
+                while chained_move:
+                    poss.extend((chained_move.pos_from, chained_move.pos_to))
+                    chained_move = chained_move.chained_move
                 chained_move = move
                 while chained_move and chained_move.chained_move and (
                     issubclass(chained_move.movement_type, movement.CastlingMovement)
                     and chained_move.chained_move.pos_from != move.pos_to
                     or isinstance(chained_move.piece.movement, movement.RangedAutoCaptureRiderMovement)
                 ):
+                    poss.extend((chained_move.pos_from, chained_move.pos_to))
                     chained_move = chained_move.chained_move
-                if (
-                    chained_move.chained_move or
-                    self.chain_moves.get(self.turn_side, {}).get((move.pos_from, move.pos_to))
-                ):
+                poss.extend((chained_move.pos_from, chained_move.pos_to))
+                if chained_move.chained_move or self.chain_moves.get(self.turn_side, {}).get(tuple(poss)):
                     chained_move.chained_move = Unset  # do not chain moves because we're updating every move separately
                 self.update_auto_capture_markers(move)
                 self.update_auto_captures(move, self.turn_side.opponent())
@@ -2178,7 +2197,7 @@ class Board(Window):
                     while last_move.chained_move:
                         last_move = last_move.chained_move
                     last_move.chained_move = deepcopy(move)
-                if move.chained_move is Unset and not self.promotion_piece:
+                if next_move.chained_move is Unset and not self.promotion_piece:
                     self.load_moves()
                     chained = True
                 else:
@@ -2529,9 +2548,14 @@ class Board(Window):
                     last_history_move = last_history_move.chained_move
                 last_history_move.chained_move = deepcopy(last_move)
         # do not pop move from future history because compare_history() will do it for us
+        chained_move = self.chain_start
+        poss = []
+        while chained_move:
+            poss.extend((chained_move.pos_from, chained_move.pos_to))
+            chained_move = chained_move.chained_move
         if (
             last_chain_move is None or last_chain_move.chained_move is None
-            or not self.chain_moves.get(self.turn_side, {}).get((last_chain_move.pos_from, last_chain_move.pos_to))
+            or not self.chain_moves.get(self.turn_side, {}).get(tuple(poss))
         ):
             self.chain_start = None
             if self.promotion_piece is None:
@@ -2539,8 +2563,16 @@ class Board(Window):
                 self.compare_history()
             self.advance_turn()
         elif last_chain_move.chained_move is Unset:
+            last_history_move = self.chain_start
+            current_pos = last_history_move.pos_to
+            while last_history_move.chained_move:
+                if last_history_move.pos_from == current_pos:
+                    current_pos = last_history_move.pos_to
+                last_history_move = last_history_move.chained_move
+            if last_history_move.pos_from == current_pos:
+                current_pos = last_history_move.pos_to
             self.load_moves()
-            self.select_piece(last_chain_move.pos_to)
+            self.select_piece(current_pos)
 
     def undo_last_finished_move(self) -> None:
         self.undo_last_move()
@@ -2677,19 +2709,27 @@ class Board(Window):
                 move = deepcopy(move)
                 if move.promotion is not None:
                     move.promotion = Unset
+                chained_move = self.chain_start
+                poss = []
+                while chained_move:
+                    poss.extend((chained_move.pos_from, chained_move.pos_to))
+                    chained_move = chained_move.chained_move
                 chained_move = move
                 while chained_move and chained_move.chained_move and (
                     issubclass(chained_move.movement_type, movement.CastlingMovement)
                     and chained_move.chained_move.pos_from != move.pos_to
-                    # let's not show auto-captures because space in the caption is VERY limited
-                    # or isinstance(chained_move.piece.movement, movement.RangedAutoCaptureRiderMovement)
+                    or isinstance(chained_move.piece.movement, movement.RangedAutoCaptureRiderMovement)
                 ):
+                    # let's also not show all auto-captures because space in the caption is VERY limited
+                    if isinstance(chained_move.piece.movement, movement.RangedAutoCaptureRiderMovement):
+                        chained_move.chained_move = Unset
+                        break
+                    poss.extend((chained_move.pos_from, chained_move.pos_to))
                     chained_move = chained_move.chained_move
-                if (
-                    chained_move.chained_move or
-                    self.chain_moves.get(self.turn_side, {}).get((move.pos_from, move.pos_to))
-                ):
-                    chained_move.chained_move = Unset  # do not chain moves because we are only showing selectable moves
+                if chained_move.chained_move is not Unset:
+                    poss.extend((chained_move.pos_from, chained_move.pos_to))
+                    if chained_move.chained_move or self.chain_moves.get(self.turn_side, {}).get(tuple(poss)):
+                        chained_move.chained_move = Unset  # don't chain moves since we're only showing selectable moves
                 moves = []
                 while move:
                     moves.append(move)
@@ -3584,17 +3624,21 @@ class Board(Window):
                 self.update_move(move)
                 if move.promotion is not None:
                     move.promotion = Unset  # do not auto-promote because we are selecting promotion type manually
+                chained_move = self.chain_start
+                poss = []
+                while chained_move:
+                    poss.extend((chained_move.pos_from, chained_move.pos_to))
+                    chained_move = chained_move.chained_move
                 chained_move = move
                 while chained_move and chained_move.chained_move and (
                     issubclass(chained_move.movement_type, movement.CastlingMovement)
                     and chained_move.chained_move.pos_from != move.pos_to
                     or isinstance(chained_move.piece.movement, movement.RangedAutoCaptureRiderMovement)
                 ):
+                    poss.extend((chained_move.pos_from, chained_move.pos_to))
                     chained_move = chained_move.chained_move
-                if (
-                    chained_move.chained_move or
-                    self.chain_moves.get(self.turn_side, {}).get((move.pos_from, move.pos_to))
-                ):
+                poss.extend((chained_move.pos_from, chained_move.pos_to))
+                if chained_move.chained_move or self.chain_moves.get(self.turn_side, {}).get(tuple(poss)):
                     chained_move.chained_move = Unset  # do not chain moves since we are selecting chained move manually
                     is_final = False
                 else:
