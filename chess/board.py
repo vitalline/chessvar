@@ -1604,6 +1604,38 @@ class Board(Window):
         en_passant_markers = self.en_passant_markers.copy()
         castling_ep_target = self.castling_ep_target
         castling_ep_markers = self.castling_ep_markers.copy()
+        for turn_side in [Side.WHITE, Side.BLACK]:
+            if self.move_history and (
+                not self.use_check or (
+                    self.move_history[-1] and
+                    self.move_history[-1].movement_type == movement.DropMovement and
+                    isinstance(self.move_history[-1].promotion, Piece) and
+                    isinstance(self.move_history[-1].promotion.movement, movement.RangedAutoCaptureRiderMovement)
+                )
+            ):
+                # we need to check if there's a move in the move history that could be a capture
+                royal_capture = False  # of one of the opposing pieces that are treated as royal
+                chained_move = self.move_history[-1]  # checking the last move's sufficient here
+                while chained_move:  # NB: could be None but if it is the loop is skipped anyway
+                    capture = chained_move.captured_piece
+                    if capture and capture.side == turn_side:
+                        # NB: quasi-royal pieces are treated as royal if only one remains!
+                        royal_capture = isinstance(capture, Royal) or isinstance(capture, QuasiRoyal)
+                        if self.royal_piece_mode == 0 and royal_capture:
+                            # treat as royal capture iff no strictly royal pieces exist
+                            royal_capture = not self.royal_pieces[turn_side]
+                        elif self.royal_piece_mode == 2 and royal_capture:
+                            # treat as royal capture iff no quasi or royal pieces exist
+                            royal_capture = not self.royal_pieces[turn_side] and not self.quasi_royal_pieces[turn_side]
+                        if royal_capture:
+                            break
+                    chained_move = chained_move.chained_move
+                if royal_capture:
+                    check_side = turn_side
+                    self.moves[turn_side] = {}
+                    self.moves_queried[turn_side] = True
+                    self.game_over = True
+                    continue
         last_chain_move = self.chain_start
         if last_chain_move:
             chained_move = last_chain_move
@@ -1661,37 +1693,6 @@ class Board(Window):
                             if isinstance(piece.movement, movement.ProbabilisticMovement):
                                 self.roll_history[self.ply_count - 1][pos] = piece.movement.roll()
                     self.probabilistic_piece_history[self.ply_count - 1] = signature
-            if self.move_history and (
-                not self.use_check or (
-                    self.move_history[-1] and
-                    self.move_history[-1].movement_type == movement.DropMovement and
-                    isinstance(self.move_history[-1].promotion, Piece) and
-                    isinstance(self.move_history[-1].promotion.movement, movement.RangedAutoCaptureRiderMovement)
-                )
-            ):
-                # we need to check if there's a move in the move history that could be a capture
-                royal_capture = False  # of one of the opposing pieces that are treated as royal
-                chained_move = self.move_history[-1]  # checking the last move's sufficient here
-                while chained_move:  # NB: could be None but if it is the loop is skipped anyway
-                    capture = chained_move.captured_piece
-                    if capture and capture.side == turn_side:
-                        # NB: quasi-royal pieces are treated as royal if only one remains!
-                        royal_capture = isinstance(capture, Royal) or isinstance(capture, QuasiRoyal)
-                        if self.royal_piece_mode == 0 and royal_capture:
-                            # treat as royal capture iff no strictly royal pieces exist
-                            royal_capture = not self.royal_pieces[turn_side]
-                        elif self.royal_piece_mode == 2 and royal_capture:
-                            # treat as royal capture iff no quasi or royal pieces exist
-                            royal_capture = not self.royal_pieces[turn_side] and not self.quasi_royal_pieces[turn_side]
-                        if royal_capture:
-                            break
-                    chained_move = chained_move.chained_move
-                if royal_capture:
-                    check_side = self.turn_side
-                    self.moves[self.turn_side] = {}
-                    self.moves_queried[self.turn_side] = True
-                    self.game_over = True
-                    continue
             for piece in movable_pieces[turn_side] if chain_moves is None else [last_chain_move.piece]:
                 if self.turn_pieces is not None and type(piece) not in self.turn_pieces:
                     continue
