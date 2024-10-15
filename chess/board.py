@@ -461,7 +461,9 @@ class Board(Window):
         self.roll_rng = None  # random number generator for probabilistic movement
         self.set_seed = None  # seed for piece set selection
         self.set_rng = None  # random number generator for piece set selection
-        self.turn_side = Side.WHITE  # side whose turn it is
+        self.turn_order = [Side.WHITE, Side.BLACK]  # order of turns
+        self.turn_side = self.turn_order[0]  # side whose turn it is
+        self.turn_pieces = None  # pieces that can be moved this turn
         self.check_side = Side.NONE  # side that is currently in check
         self.use_drops = self.board_config['use_drops']  # whether pieces can be dropped
         self.use_check = self.board_config['use_check']  # whether to check for check after each move
@@ -525,6 +527,9 @@ class Board(Window):
         self.promotion_area_sprite_list = SpriteList()  # sprites for the promotion area background tiles
         self.promotion_piece_sprite_list = SpriteList()  # sprites for the possible promotion pieces
         self.save_interval = 0  # time since the last autosave
+
+        if isinstance(self.turn_side, list):
+            self.turn_side, self.turn_pieces = self.turn_side[0], set(self.turn_side[1])
 
         # load piece set ids from the config
         for side in self.piece_set_ids:
@@ -691,7 +696,12 @@ class Board(Window):
         self.clear_auto_capture_markers()
         self.reset_captures()
 
-        self.turn_side = Side.WHITE
+        self.turn_side = self.turn_order[0]
+        if isinstance(self.turn_side, list):
+            self.turn_side, self.turn_pieces = self.turn_side[0], set(self.turn_side[1])
+        else:
+            self.turn_pieces = None
+
         self.game_over = False
         self.edit_mode = False
         self.chain_start = None
@@ -842,7 +852,12 @@ class Board(Window):
                 for m in moves
             ] if self.chain_start else [],
             'ply': self.ply_count,
-            'side': self.turn_side.value,
+            'side': (self.ply_count - 1) % len(self.turn_order) + 1,
+            'order': [
+                [s[0].value, sorted(save_piece_type(t) for t in s[1])]
+                if isinstance(s, list) else s.value
+                for s in self.turn_order
+            ],
             'edit': self.edit_mode,
             'edit_promotion': self.edit_piece_set_id,
             'hide_pieces': self.should_hide_pieces,
@@ -1040,7 +1055,19 @@ class Board(Window):
         self.custom_layout = {p: load_piece(v, self, c).on(p) for p, v in exp_alg(data.get('layout', {}), *wh).items()}
 
         ply_count = data.get('ply', self.ply_count)
-        self.turn_side = Side(data.get('side', self.turn_side))
+        self.turn_order = [
+            [Side(int(s[0])), [load_piece_type(t, c) for t in s[1]]]
+            if isinstance(s, list) else Side(int(s))
+            for s in data.get('order', [])
+        ]
+        if not self.turn_order:
+            self.turn_order = [Side.WHITE, Side.BLACK]
+        turn_side = self.turn_order[data.get('side', (self.ply_count - 1) % len(self.turn_order) + 1) - 1]
+        if isinstance(turn_side, list):
+            self.turn_side, self.turn_pieces = turn_side[0], set(turn_side[1])
+        else:
+            self.turn_pieces = None
+
         self.move_history = [load_move(d, self, c) for d in data.get('moves', [])]
         self.future_move_history = [load_move(d, self, c) for d in data.get('future', [])[::-1]]
 
@@ -1170,7 +1197,12 @@ class Board(Window):
         self.clear_auto_capture_markers()
         self.reset_captures()
 
-        self.turn_side = Side.WHITE
+        self.turn_side = self.turn_order[0]
+        if isinstance(self.turn_side, list):
+            self.turn_side, self.turn_pieces = self.turn_side[0], set(self.turn_side[1])
+        else:
+            self.turn_pieces = None
+
         self.game_over = False
         self.chain_start = None
         self.promotion_piece = None
@@ -1600,6 +1632,7 @@ class Board(Window):
                     self.probabilistic_piece_history[self.ply_count - 1] = signature
             if self.move_history and (
                 not self.use_check or (
+                    self.move_history[-1] and
                     self.move_history[-1].movement_type == movement.DropMovement and
                     isinstance(self.move_history[-1].promotion, Piece) and
                     isinstance(self.move_history[-1].promotion.movement, movement.RangedAutoCaptureRiderMovement)
@@ -1629,6 +1662,8 @@ class Board(Window):
                     self.game_over = True
                     continue
             for piece in movable_pieces[turn_side] if chain_moves is None else [last_chain_move.piece]:
+                if self.turn_pieces is not None and type(piece) not in self.turn_pieces:
+                    continue
                 for move in piece.moves() if chain_moves is None else chain_moves:
                     self.update_move(move)
                     self.update_auto_capture_markers(move)
@@ -2061,7 +2096,13 @@ class Board(Window):
             chained = False
             if next_move is None:
                 self.move_history.append(None)
-                self.log(f"[Ply {self.ply_count}] Pass: {self.turn_side.opponent()} to move")
+                turn_side = self.turn_order[self.ply_count % len(self.turn_order)]
+                if isinstance(turn_side, list):
+                    turn_pieces = f" ({', '.join(sorted(piece.name for piece in turn_side[1]))})"
+                    turn_side = turn_side[0]
+                else:
+                    turn_pieces = ''
+                self.log(f"[Ply {self.ply_count}] Pass: {turn_side} to move{turn_pieces}")
                 self.ply_count += 1
                 self.clear_en_passant()
                 self.clear_castling_ep()
@@ -2296,7 +2337,7 @@ class Board(Window):
             if self.move_history and self.future_move_history:
                 past, future = self.move_history[-1], self.future_move_history[-1]
                 if (
-                    past.pos_from == future.pos_from and past.pos_to == future.pos_to
+                    past and future and past.pos_from == future.pos_from and past.pos_to == future.pos_to
                     and not (past.captured_piece is not None and future.swapped_piece is not None)
                     and not (past.swapped_piece is not None and future.captured_piece is not None)
                     and future.promotion is not None
@@ -2326,7 +2367,9 @@ class Board(Window):
                 self.revert_auto_capture_markers(chained_move)
                 if chained_move.promotion is not None:
                     if chained_move.placed_piece is not None:
-                        turn_side = Side.WHITE if self.ply_count % 2 == 1 else Side.BLACK
+                        turn_side = self.turn_order[self.ply_count % len(self.turn_order)]
+                        if isinstance(turn_side, list):
+                            turn_side = turn_side[0]
                         if chained_move.placed_piece in self.drops[turn_side]:
                             self.captured_pieces[turn_side].append(chained_move.placed_piece)
                     if not chained_move.piece.is_empty():
@@ -2342,7 +2385,13 @@ class Board(Window):
                 self.log(f"[Ply {self.ply_count}] Undo: {move_type}: {logged_move}")
                 in_promotion = False
         else:
-            self.log(f"[Ply {self.ply_count}] Undo: Pass: {self.turn_side} to move")
+            turn_side = self.turn_order[(self.ply_count - 1) % len(self.turn_order)]
+            if isinstance(turn_side, list):
+                turn_pieces = f" ({', '.join(sorted(piece.name for piece in turn_side[1]))})"
+                turn_side = turn_side[0]
+            else:
+                turn_pieces = ''
+            self.log(f"[Ply {self.ply_count}] Undo: Pass: {turn_side} to move{turn_pieces}")
         if self.move_history:
             move = self.move_history[-1]
             if move is not None and move.is_edit != 1 and move.movement_type != movement.DropMovement:
@@ -2375,7 +2424,7 @@ class Board(Window):
             if self.move_history and self.future_move_history:
                 past, future = self.move_history[-1], self.future_move_history[-1]
                 if (
-                    past.pos_from == future.pos_from and past.pos_to == future.pos_to
+                    past and future and past.pos_from == future.pos_from and past.pos_to == future.pos_to
                     and not (past.captured_piece is not None and future.swapped_piece is not None)
                     and not (past.swapped_piece is not None and future.captured_piece is not None)
                     and future.promotion
@@ -2425,7 +2474,13 @@ class Board(Window):
                 return
         last_chain_move = last_move
         if self.future_move_history[-1] is None:
-            self.log(f"[Ply {self.ply_count}] Redo: Pass: {self.turn_side.opponent()} to move")
+            turn_side = self.turn_order[self.ply_count % len(self.turn_order)]
+            if isinstance(turn_side, list):
+                turn_pieces = f" ({', '.join(sorted(piece.name for piece in turn_side[1]))})"
+                turn_side = turn_side[0]
+            else:
+                turn_pieces = ''
+            self.log(f"[Ply {self.ply_count}] Redo: Pass: {turn_side} to move{turn_pieces}")
             self.clear_en_passant()
             self.clear_castling_ep()
             self.move_history.append(deepcopy(last_move))
@@ -2516,7 +2571,11 @@ class Board(Window):
             self.load_pieces()  # loading the new piece positions in order to update the board state
             self.color_pieces()  # reverting the piece colors to normal in case they were changed
             return  # let's not advance the turn while editing the board to hopefully make things easier for everyone
-        self.turn_side = Side.WHITE if self.ply_count % 2 == 1 else Side.BLACK
+        self.turn_side = self.turn_order[(self.ply_count - 1) % len(self.turn_order)]
+        if isinstance(self.turn_side, list):
+            self.turn_side, self.turn_pieces = self.turn_side[0], set(self.turn_side[1])
+        else:
+            self.turn_pieces = None
         self.update_status()
 
     def update_status(self) -> None:
@@ -2658,7 +2717,11 @@ class Board(Window):
             if self.check_side:
                 self.set_caption(f"[Ply {self.ply_count}] {self.check_side} is in check!")
             else:
-                self.set_caption(f"[Ply {self.ply_count}] {self.turn_side} to move")
+                if self.turn_pieces is not None:
+                    turn_pieces = f" ({', '.join(sorted(piece.name for piece in self.turn_pieces))})"
+                else:
+                    turn_pieces = ''
+                self.set_caption(f"[Ply {self.ply_count}] {self.turn_side} to move{turn_pieces}")
 
     def try_drop(self, move: Move) -> None:
         if self.turn_side not in self.drops:
@@ -3759,9 +3822,15 @@ class Board(Window):
                 self.reset_custom_data()
                 self.reset_board()
             elif modifiers & key.MOD_ACCEL and not modifiers & key.MOD_SHIFT:  # White is in control
-                if self.turn_side != Side.WHITE and not self.chain_start:
+                while self.turn_side != Side.WHITE and not self.chain_start:
                     self.move_history.append(None)
-                    self.log(f"[Ply {self.ply_count}] Pass: {Side.WHITE} to move")
+                    turn_side = self.turn_order[self.ply_count % len(self.turn_order)]
+                    if isinstance(turn_side, list):
+                        turn_pieces = f" ({', '.join(sorted(piece.name for piece in turn_side[1]))})"
+                        turn_side = turn_side[0]
+                    else:
+                        turn_pieces = ''
+                    self.log(f"[Ply {self.ply_count}] Pass: {turn_side} to move{turn_pieces}")
                     self.ply_count += 1
                     self.clear_en_passant()
                     self.clear_castling_ep()
@@ -3802,9 +3871,15 @@ class Board(Window):
                 self.reset_custom_data()
                 self.reset_board()
             elif modifiers & key.MOD_ACCEL and not modifiers & key.MOD_SHIFT:  # Black is in control
-                if self.turn_side != Side.BLACK and not self.chain_start:
+                while self.turn_side != Side.BLACK and not self.chain_start:
                     self.move_history.append(None)
-                    self.log(f"[Ply {self.ply_count}] Pass: {Side.BLACK} to move")
+                    turn_side = self.turn_order[self.ply_count % len(self.turn_order)]
+                    if isinstance(turn_side, list):
+                        turn_pieces = f" ({', '.join(sorted(piece.name for piece in turn_side[1]))})"
+                        turn_side = turn_side[0]
+                    else:
+                        turn_pieces = ''
+                    self.log(f"[Ply {self.ply_count}] Pass: {turn_side} to move{turn_pieces}")
                     self.ply_count += 1
                     self.clear_en_passant()
                     self.clear_castling_ep()
@@ -3847,7 +3922,13 @@ class Board(Window):
                 self.reset_board()
             elif modifiers & key.MOD_ACCEL and not modifiers & key.MOD_SHIFT and not self.chain_start:  # Next player
                 self.move_history.append(None)
-                self.log(f"[Ply {self.ply_count}] Pass: {self.turn_side.opponent()} to move")
+                turn_side = self.turn_order[self.ply_count % len(self.turn_order)]
+                if isinstance(turn_side, list):
+                    turn_pieces = f" ({', '.join(sorted(piece.name for piece in turn_side[1]))})"
+                    turn_side = turn_side[0]
+                else:
+                    turn_pieces = ''
+                self.log(f"[Ply {self.ply_count}] Pass: {turn_side} to move{turn_pieces}")
                 self.ply_count += 1
                 self.clear_en_passant()
                 self.clear_castling_ep()
@@ -4472,7 +4553,11 @@ class Board(Window):
         }
         debug_log_data.append(f"Chaos mode: {self.chaos_mode} - {chaos_modes[self.chaos_mode]}")
         debug_log_data.append(f"Board mode: {'Edit' if self.edit_mode else 'Play'}")
-        debug_log_data.append(f"Turn side: {self.turn_side if self.turn_side else 'None'}")
+        if self.turn_pieces:
+            turn_pieces = f" ({', '.join(sorted(piece.name for piece in self.turn_pieces))})"
+        else:
+            turn_pieces = ''
+        self.log(f"Turn side: {self.turn_side if self.turn_side else 'None'}{turn_pieces}")
         debug_log_data.append(f"Current ply: {self.ply_count}")
         possible_moves = sum((sum(v.values(), []) for v in self.moves.get(self.turn_side, {}).values()), [])
         debug_log_data.append(f"Moves possible: {len(possible_moves)}")
