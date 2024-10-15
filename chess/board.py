@@ -3847,7 +3847,7 @@ class Board(Window):
                 old_id = self.edit_piece_set_id
                 if modifiers & key.MOD_ALT:  # Promote to custom pieces
                     self.edit_piece_set_id = 'wall' if modifiers & key.MOD_SHIFT else 'custom'
-                    which = {'custom': 'from custom', 'wall': 'wall'}[self.edit_piece_set_id]
+                    which = {'custom': 'custom', 'wall': 'obstacle'}[self.edit_piece_set_id]
                     self.log(f"[Ply {self.ply_count}] Info: Placing {which} pieces", False)
                 elif modifiers & key.MOD_SHIFT:  # Shift promotion piece set
                     if isinstance(self.edit_piece_set_id, int):
