@@ -467,6 +467,7 @@ class Board(Window):
         self.check_side = Side.NONE  # side that is currently in check
         self.use_drops = self.board_config['use_drops']  # whether pieces can be dropped
         self.use_check = self.board_config['use_check']  # whether to check for check after each move
+        self.stalemate_rule = 0  # 0: draw, 1: win for moving, -1: win for stalemated. can be {side: side is stalemated}
         self.royal_piece_mode = self.board_config['royal_mode'] % 3  # 0: normal, 1: force royal, 2: force quasi-royal
         self.should_hide_pieces = self.board_config['hide_pieces'] % 3  # 0: don't hide, 1: hide all, 2: penultima mode
         self.should_hide_moves = self.board_config['hide_moves']  # whether to hide the move markers; None uses above
@@ -528,8 +529,15 @@ class Board(Window):
         self.promotion_piece_sprite_list = SpriteList()  # sprites for the possible promotion pieces
         self.save_interval = 0  # time since the last autosave
 
+        # initialize turn order data for the first move
         if isinstance(self.turn_side, list):
             self.turn_side, self.turn_pieces = self.turn_side[0], set(self.turn_side[1])
+
+        # load stalemate rules from the config
+        if isinstance(self.board_config['stalemate'], dict):
+            self.stalemate_rule = {Side(k + 1): (v + 1) % 3 - 1 for k, v in self.board_config['stalemate'].items()}
+        else:
+            self.stalemate_rule = self.board_config['stalemate']
 
         # load piece set ids from the config
         for side in self.piece_set_ids:
@@ -864,6 +872,10 @@ class Board(Window):
             'hide_moves': self.should_hide_moves,
             'use_drops': self.use_drops,
             'use_check': self.use_check,
+            'stalemate': (
+                {side.value: rule for side, rule in self.stalemate_rule.items()}
+                if isinstance(self.stalemate_rule, dict) else self.stalemate_rule
+            ),
             'royal_mode': self.royal_piece_mode,
             'chaos_mode': self.chaos_mode,
             'chaos_seed': self.chaos_seed,
@@ -964,6 +976,12 @@ class Board(Window):
 
         self.board_config['block_ids'] = data.get('set_blocklist', self.board_config['block_ids'])
         self.board_config['block_ids_chaos'] = data.get('chaos_blocklist', self.board_config['block_ids_chaos'])
+
+        stalemate_data = data.get('stalemate')
+        if stalemate_data is not None:
+            self.stalemate_rule = {
+                Side(int(value)): (rule + 1) % 3 - 1 for value, rule in stalemate_data.items()
+            } if isinstance(stalemate_data, dict) else stalemate_data
 
         self.should_hide_pieces = data.get('hide_pieces', self.should_hide_pieces)
         self.should_hide_moves = data.get('hide_moves', self.should_hide_moves)
@@ -1793,7 +1811,22 @@ class Board(Window):
         self.auto_capture_markers = auto_capture_markers
         self.check_side = check_side
         if force_reload and not self.edit_mode and not self.moves.get(self.turn_side, {}):
-            self.game_over = True
+            drop_exists = False
+            if self.use_drops and self.turn_side in self.drops:
+                side_drops = self.drops[self.turn_side]
+                for piece_type in self.captured_pieces[self.turn_side]:
+                    if piece_type not in side_drops:
+                        continue
+                    if self.turn_pieces is not None and piece_type not in self.turn_pieces:
+                        continue
+                    for pos in side_drops[piece_type]:
+                        if self.get_piece(pos).is_empty():
+                            drop_exists = True
+                            break
+                    if drop_exists:
+                        break
+            if not drop_exists:
+                self.game_over = True
 
     def unique_moves(self, side: Side | None = None) -> dict[Side, dict[Position, list[Move]]]:
         if side is None:
@@ -2623,8 +2656,19 @@ class Board(Window):
                     # the current player's royal piece was captured, the game ends and the opponent wins
                     self.log(f"[Ply {self.ply_count}] Info: King captured! {self.check_side.opponent()} wins.")
             else:
-                # the current player was stalemated, the game ends in a draw
-                self.log(f"[Ply {self.ply_count}] Info: Stalemate! It's a draw.")
+                # the current player was stalemated, let's consult the rules to see if it's a draw or a win
+                if isinstance(self.stalemate_rule, dict):
+                    rule = self.stalemate_rule.get(self.turn_side, 0)
+                else:
+                    rule = self.stalemate_rule
+                if rule == 0:  # it's a draw
+                    self.log(f"[Ply {self.ply_count}] Info: Stalemate! It's a draw.")
+                elif rule == 1:  # stalemating player wins, stalemated player loses
+                    self.log(f"[Ply {self.ply_count}] Info: Stalemate! {self.turn_side.opponent()} wins.")
+                elif rule == -1:  # stalemating player loses, stalemated player wins
+                    self.log(f"[Ply {self.ply_count}] Info: Stalemate! {self.turn_side} wins.")
+                else:  # how did we get here?
+                    self.log(f"[Ply {self.ply_count}] Info: Stalemate! The result is undefined.")
         else:
             if self.check_side:
                 # the game is still going, but the current player is in check
@@ -2752,7 +2796,18 @@ class Board(Window):
                 else:
                     self.set_caption(f"[Ply {self.ply_count}] King captured! {self.check_side.opponent()} wins.")
             else:
-                self.set_caption(f"[Ply {self.ply_count}] Stalemate! It's a draw.")
+                if isinstance(self.stalemate_rule, dict):
+                    rule = self.stalemate_rule.get(self.turn_side, 0)
+                else:
+                    rule = self.stalemate_rule
+                if rule == 0:
+                    self.set_caption(f"[Ply {self.ply_count}] Stalemate! It's a draw.")
+                elif rule == 1:
+                    self.set_caption(f"[Ply {self.ply_count}] Stalemate! {self.turn_side.opponent()} wins.")
+                elif rule == -1:
+                    self.set_caption(f"[Ply {self.ply_count}] Stalemate! {self.turn_side} wins.")
+                else:
+                    self.set_caption(f"[Ply {self.ply_count}] Stalemate! The result is undefined.")
         else:
             if self.check_side:
                 self.set_caption(f"[Ply {self.ply_count}] {self.check_side} is in check!")
@@ -2788,6 +2843,8 @@ class Board(Window):
         drop_indexes = {k: i for i, k in enumerate(side_drops)}
         for piece_type in sorted(self.captured_pieces[self.turn_side], key=lambda x: drop_indexes.get(x, 0)):
             if piece_type not in side_drops:
+                continue
+            if self.turn_pieces is not None and piece_type not in self.turn_pieces:
                 continue
             drop_squares = side_drops[piece_type]
             if move.piece.board_pos not in drop_squares:
@@ -4231,16 +4288,19 @@ class Board(Window):
                 self.log(f"[Ply {self.ply_count}] Info: Saving debug information", False)
                 debug_log_data = self.debug_info()
                 self.save_log(debug_log_data, 'debug')
+                self.log(f"[Ply {self.ply_count}] Info: Debug information saved", False)
             if modifiers & key.MOD_SHIFT:  # Print debug log
                 self.log(f"[Ply {self.ply_count}] Info: Printing debug information", False)
                 debug_log_data = self.debug_info()
                 for string in debug_log_data:
                     print(f"[Debug] {string}")
+                self.log(f"[Ply {self.ply_count}] Info: Debug information printed", False)
             if modifiers & key.MOD_ALT:  # Save debug listings
                 self.log(f"[Ply {self.ply_count}] Info: Saving debug listings", False)
                 save_piece_data(self)
                 save_piece_sets()
                 save_piece_types()
+                self.log(f"[Ply {self.ply_count}] Info: Debug listings saved", False)
         if symbol == key.SLASH:  # (?) Random
             if self.edit_mode:
                 return
@@ -4398,6 +4458,10 @@ class Board(Window):
         config['hide_moves'] = self.should_hide_moves
         config['use_drops'] = self.use_drops
         config['use_check'] = self.use_check
+        config['stalemate'] = (
+            {side.value - 1: value % 3 for side, value in self.stalemate_rule.items()}
+            if isinstance(self.stalemate_rule, dict) else self.stalemate_rule
+        )
         config['royal_mode'] = self.royal_piece_mode
         config['chaos_mode'] = self.chaos_mode
         config['chaos_seed'] = self.chaos_seed
@@ -4586,6 +4650,13 @@ class Board(Window):
         debug_log_data.append(f"Use drops: {self.use_drops} - {drop_modes[self.use_drops]}")
         check_modes = {False: "Capture the royal piece to win", True: "Checkmate the royal piece to win"}
         debug_log_data.append(f"Use check: {self.use_check} - {check_modes[self.use_check]}")
+        stalemate_modes = {0: "draws", 1: "loses", -1: "wins"}
+        if isinstance(self.stalemate_rule, dict):
+            debug_log_data.append(f"Stalemate rules")
+            for side, mode in self.stalemate_rule.items():
+                debug_log_data.append(f"  {side} {stalemate_modes[mode]} when stalemated")
+        else:
+            debug_log_data.append(f"Stalemate rule: Player {stalemate_modes[self.stalemate_rule]} when stalemated")
         royal_modes = {0: "Default", 1: "Force royal (Threaten Any)", 2: "Force quasi-royal (Threaten Last)"}
         debug_log_data.append(f"Royal mode: {self.royal_piece_mode} - {royal_modes[self.royal_piece_mode]}")
         chaos_modes = {
@@ -4597,12 +4668,21 @@ class Board(Window):
         }
         debug_log_data.append(f"Chaos mode: {self.chaos_mode} - {chaos_modes[self.chaos_mode]}")
         debug_log_data.append(f"Board mode: {'Edit' if self.edit_mode else 'Play'}")
+        debug_log_data.append(f"Current ply: {self.ply_count}")
         if self.turn_pieces:
             turn_pieces = f" ({', '.join(sorted(piece.name for piece in self.turn_pieces))})"
         else:
             turn_pieces = ''
         self.log(f"Turn side: {self.turn_side if self.turn_side else 'None'}{turn_pieces}")
-        debug_log_data.append(f"Current ply: {self.ply_count}")
+        debug_log_data.append(f"Turn order ({len(self.turn_order)}):")
+        for i, data in enumerate(self.turn_order):
+            if isinstance(data, list):
+                turn_side = data[0]
+                turn_pieces = f" ({', '.join(sorted(piece.name for piece in data[1]))})"
+            else:
+                turn_side = data
+                turn_pieces = ''
+            self.log(f"  {i + 1}: {turn_side if turn_side else 'None'}{turn_pieces}")
         possible_moves = sum((sum(v.values(), []) for v in self.moves.get(self.turn_side, {}).values()), [])
         debug_log_data.append(f"Moves possible: {len(possible_moves)}")
         debug_log_data.append(f"Unique moves: {sum(len(i) for i in self.unique_moves()[self.turn_side].values())}")
@@ -4611,39 +4691,39 @@ class Board(Window):
         debug_log_data.append(f"Action history ({len(self.move_history)}):")
         for i, move in enumerate(self.move_history):
             if not move:
-                debug_log_data.append(f"  {i}: (Pass) None")
+                debug_log_data.append(f"  {i + 1}: (Pass) None")
             else:
                 move_type = (
                     'Edit' if move.is_edit else 'Drop' if move.movement_type == movement.DropMovement else 'Move'
                 )
-                debug_log_data.append(f"  {i}: ({move_type}) {move}")
+                debug_log_data.append(f"  {i + 1}: ({move_type}) {move}")
                 j = 0
                 while move.chained_move:
                     move = move.chained_move
-                    j += 1
                     move_type = (
                         'Edit' if move.is_edit else 'Drop' if move.movement_type == movement.DropMovement else 'Move'
                     )
-                    debug_log_data.append(f"  {i}.{j}: ({move_type}) {move}")
+                    debug_log_data.append(f"  {i + 1}.{j + 1}: ({move_type}) {move}")
+                    j += 1
         if not self.move_history:
             debug_log_data[-1] += " None"
         debug_log_data.append(f"Future action history ({len(self.future_move_history)}):")
         for i, move in enumerate(self.future_move_history[::-1], len(self.move_history)):
             if not move:
-                debug_log_data.append(f"  {i}: (Pass) None")
+                debug_log_data.append(f"  {i + 1}: (Pass) None")
             else:
                 move_type = (
                     'Edit' if move.is_edit else 'Drop' if move.movement_type == movement.DropMovement else 'Move'
                 )
-                debug_log_data.append(f"  {i}: ({move_type}) {move}")
+                debug_log_data.append(f"  {i + 1}: ({move_type}) {move}")
                 j = 0
                 while move.chained_move:
                     move = move.chained_move
-                    j += 1
                     move_type = (
                         'Edit' if move.is_edit else 'Drop' if move.movement_type == movement.DropMovement else 'Move'
                     )
-                    debug_log_data.append(f"  {i}.{j}: ({move_type}) {move}")
+                    debug_log_data.append(f"  {i + 1}.{j + 1}: ({move_type}) {move}")
+                    j += 1
         if not self.future_move_history:
             debug_log_data[-1] += " None"
         empty = True

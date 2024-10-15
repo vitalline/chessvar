@@ -4,7 +4,6 @@ from configparser import ConfigParser
 from os.path import isfile
 from typing import Any
 
-
 DEFAULT_CONFIG = {
     'Chess': {
         'color_id': 0,
@@ -15,6 +14,7 @@ DEFAULT_CONFIG = {
         'hide_moves': '',
         'use_drops': False,
         'use_check': True,
+        'stalemate': '0',
         'royal_mode': 0,
         'chaos_mode': 0,
         'chaos_seed': '',
@@ -55,6 +55,12 @@ class Config(dict):
                     self[item] = self.base_config.getboolean(section, item)
                 if type(DEFAULT_CONFIG.get(section, {}).get(item, {})) is int:
                     self[item] = self.base_config.getint(section, item)
+                if item == 'stalemate':
+                    if ',' in self.base_config[section][item]:
+                        l = [int(s) for i in self.base_config[section][item].split(',') if (s := i.strip()).isdigit()]
+                        self[item] = l[0] if len(l) == 1 else {i: v for i, v in enumerate(l)}
+                    else:
+                        self[item] = self.base_config.getint(section, item)
                 if item.startswith('block_'):
                     self[item] = [
                         int(s) for i in self.base_config[section][item].split(',') if (s := i.strip()).isdigit()
@@ -80,6 +86,10 @@ class Config(dict):
         for section in self.base_config:
             for item in self.base_config[section]:
                 self.base_config[section][item] = str(self[item])
+                if item == 'stalemate':
+                    if isinstance(self[item], dict):
+                        max_value = max(self[item].keys())
+                        self.base_config[section][item] = ', '.join(str(self[item].get(i, 0)) for i in range(max_value))
                 if item.startswith('block_'):
                     self.base_config[section][item] = ', '.join(str(s) for s in self[item])
                 if (
