@@ -1080,9 +1080,9 @@ class Board(Window):
         ]
         if not self.turn_order:
             self.turn_order = [Side.WHITE, Side.BLACK]
-        turn_side = self.turn_order[data.get('side', (self.ply_count - 1) % len(self.turn_order) + 1) - 1]
-        if isinstance(turn_side, list):
-            self.turn_side, self.turn_pieces = turn_side[0], set(turn_side[1])
+        self.turn_side = self.turn_order[data.get('side', (self.ply_count - 1) % len(self.turn_order) + 1) - 1]
+        if isinstance(self.turn_side, list):
+            self.turn_side, self.turn_pieces = self.turn_side[0], set(self.turn_side[1])
         else:
             self.turn_pieces = None
 
