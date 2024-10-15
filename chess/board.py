@@ -320,7 +320,7 @@ def print_piece_data(board: Board, fp: TextIO = stdout, side: Side = Side.WHITE)
         if i:
             fp.write(',\n')
         fp.write(f'  "{save_piece_type(t)}":')
-        p = t(board, None, side)  # type: ignore
+        p = t(board=board, side=side)  # type: ignore
         fp.write(dumps(save_custom_type(p), separators=(',', ':'), ensure_ascii=False))
     fp.write('\n}')
 
