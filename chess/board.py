@@ -2424,7 +2424,7 @@ class Board(Window):
                 self.revert_auto_capture_markers(chained_move)
                 if chained_move.promotion is not None:
                     if chained_move.placed_piece is not None:
-                        turn_side = self.turn_order[self.ply_count % len(self.turn_order)]
+                        turn_side = self.turn_order[(self.ply_count - 1) % len(self.turn_order)]
                         if isinstance(turn_side, list):
                             turn_side = turn_side[0]
                         if chained_move.placed_piece in self.drops[turn_side]:
@@ -3558,7 +3558,7 @@ class Board(Window):
             if held_buttons & MOUSE_BUTTON_LEFT:
                 if not self.selected_square:
                     return
-                if pos == self.selected_square:
+                if pos == self.selected_square and not modifiers & key.MOD_ALT:
                     if not self.square_was_clicked:
                         self.deselect_piece()
                     self.reset_position(self.get_piece(pos))
