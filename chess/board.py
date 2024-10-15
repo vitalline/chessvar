@@ -1177,7 +1177,11 @@ class Board(Window):
             if not success:
                 self.log(f"[Ply {self.ply_count}] Error: Failed to reload history!")
         else:
-            self.log(f"[Ply {self.ply_count}] Info: {self.turn_side} to move", False)
+            if self.turn_pieces is not None:
+                turn_pieces = f" ({', '.join(sorted(piece.name for piece in self.turn_pieces))})"
+            else:
+                turn_pieces = ''
+            self.log(f"[Ply {self.ply_count}] Info: {self.turn_side} to move{turn_pieces}", False)
         if self.edit_mode:
             self.log(f"[Ply {self.ply_count}] Mode: EDIT", False)
             self.moves = {side: {} for side in self.moves}
