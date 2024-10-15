@@ -1279,6 +1279,11 @@ class Board(Window):
         self.custom_pieces = {}
         self.custom_layout = {}
         self.custom_promotions = {}
+        if isinstance(self.board_config['stalemate'], dict):
+            self.stalemate_rule = {Side(k + 1): (v + 1) % 3 - 1 for k, v in self.board_config['stalemate'].items()}
+        else:
+            self.stalemate_rule = self.board_config['stalemate']
+        self.turn_order = [Side.WHITE, Side.BLACK]
 
     def reset_captures(self) -> None:
         self.captured_pieces = {Side.WHITE: [], Side.BLACK: []}
