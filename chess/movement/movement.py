@@ -579,13 +579,25 @@ class ChainMovement(BaseMultiMovement):
                 if move.movement_type == RoyalEnPassantMovement:
                     yield move
                     continue
-                self.board.update_move(move)  # this is most likely SUPER inefficient but i've spent about a day on this
-                self.board.move(move)  # and i'm not about to spend another day trying to figure out how to make it FAST
-                chain_options = []  # also what this does is it makes sure the board state is updated after each chained
-                for chained_move in self.moves(move.pos_to, piece, theoretical, index + 1):  # move so that the next can
-                    chain_options.append(copy(move).set(chained_move=chained_move))  # account for change of board state
-                self.board.undo(move)  # also let's not forget to undo the move before something unexpected could happen
-                yield from chain_options  # yielding from cache might be a weird thing to do but it works and i'm tired.
+                move_chain = []
+                chained_move = move
+                while chained_move:
+                    move_chain.append(chained_move)
+                    chained_move = chained_move.chained_move
+                for chained_move in move_chain:
+                    self.board.update_move(chained_move)
+                    self.board.move(chained_move)
+                chain_options = []
+                for last_chained_move in self.moves(move.pos_to, piece, theoretical, index + 1):
+                    copy_move = copy(move_chain[0])
+                    chained_copy = copy_move
+                    for chained_move in move_chain[1:]:
+                        chained_copy = chained_copy.set(chained_move=copy(chained_move)).chained_move
+                    chained_copy.set(chained_move=copy(last_chained_move))
+                    chain_options.append(copy_move)
+                for chained_move in move_chain[::-1]:
+                    self.board.undo(chained_move)
+                yield from chain_options
 
 
 class MultiMovement(BaseMultiMovement):

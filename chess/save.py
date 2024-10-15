@@ -133,7 +133,7 @@ def load_piece_type(data: str | None, from_dict: dict | None = None) -> Type[Pie
             for i in range(len(PIECE_SUFFIXES) + 1):
                 name = data + ''.join(PIECE_SUFFIXES[:i][::-1])
                 piece_type = getattr(piece_module, name, None)
-                if piece_type:
+                if piece_type and piece_type.__module__ == piece_module.__name__:
                     return piece_type
             return None
         return getattr(import_module(f"chess.pieces.groups.{parts[0]}"), parts[1])
