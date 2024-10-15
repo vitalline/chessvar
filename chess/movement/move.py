@@ -137,7 +137,7 @@ class Move(object):
         elif self.pos_to is None:
             string = f"disappears from {toa(self.pos_from)}"
         elif not moved:
-            if self.is_edit == 2:
+            if self.is_edit == 2 and not self.promotion:
                 string = f"stays on {toa(self.pos_from)}"
             else:
                 string = f"on {toa(self.pos_from)}"
@@ -170,9 +170,9 @@ class Move(object):
                     string += f"{comma} tries to promote"
             elif self.promotion:
                 if self.is_edit == 1:
-                    promotes = f"is promoted"
+                    promotes = "is promoted"
                 else:
-                    promotes = f"promotes"
+                    promotes = "promotes"
                 if self.promotion.is_hidden:
                     string += f"{comma} {promotes} to ???"
                 elif isinstance(self.promotion, Piece) and self.promotion.side not in {self.piece.side, Side.NONE}:

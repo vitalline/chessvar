@@ -310,6 +310,10 @@ def is_prefix_of(string: Any, prefix: Any) -> bool:
     return isinstance(string, str) and isinstance(prefix, str) and string.lower().startswith(prefix.lower())
 
 
+def is_prefix_in(strings: list[Any], prefix: Any) -> bool:
+    return any(is_prefix_of(string, prefix) for string in strings)
+
+
 def print_piece_data(board: Board, fp: TextIO = stdout, side: Side = Side.WHITE) -> None:
     fp.write('{\n')
     for i, t in enumerate(sorted(get_piece_types(side), key=lambda x: save_piece_type(x))):
@@ -2518,11 +2522,13 @@ class Board(Window):
                     message = f"[Ply {self.ply_count}] "
                     if self.edit_mode and self.edit_piece_set_id is not None:
                         if is_prefix_of('custom', self.edit_piece_set_id):
-                            message += f"Custom piece"
+                            message += "Custom piece"
+                        elif is_prefix_of('wall', self.edit_piece_set_id):
+                            message += "Obstacle"
                         else:
                             message += f"Piece from {piece_groups[self.edit_piece_set_id]['name']}"
                     else:
-                        message += f"New piece"
+                        message += "New piece"
                 if not self.edit_mode or (self.move_history and ((m := self.move_history[-1]) and m.is_edit != 1)):
                     message += f" is placed on {toa(piece.board_pos)}"
                 else:
@@ -2530,16 +2536,25 @@ class Board(Window):
                 self.set_caption(message)
                 return
             message = f"[Ply {self.ply_count}] {piece} on {toa(piece.board_pos)}"
+            if not self.edit_mode or (self.move_history and ((m := self.move_history[-1]) and m.is_edit != 1)):
+                message += " promotes"
+            else:
+                message += " is promoted"
             if hovered_square in self.promotion_area:
                 promotion = self.promotion_area[hovered_square]
-                message += f" promotes to {promotion}"
-            else:
-                message += " promotes"
-                if self.edit_mode and self.edit_piece_set_id is not None:
-                    if is_prefix_of('custom', self.edit_piece_set_id):
-                        message += f" to a custom piece"
-                    else:
-                        message += f" to {piece_groups[self.edit_piece_set_id]['name']}"
+                if promotion.is_hidden:
+                    message += " to ???"
+                elif isinstance(promotion, Piece) and promotion.side not in {piece.side, Side.NONE}:
+                    message += f" to {promotion}"
+                else:
+                    message += f" to {promotion.name}"
+            elif self.edit_mode and self.edit_piece_set_id is not None:
+                if is_prefix_of('custom', self.edit_piece_set_id):
+                    message += " to a custom piece"
+                elif is_prefix_of('wall', self.edit_piece_set_id):
+                    message += " to an obstacle"
+                else:
+                    message += f" to {piece_groups[self.edit_piece_set_id]['name']}"
             self.set_caption(message)
             return
         piece = self.get_piece(selected_square)
@@ -2715,7 +2730,7 @@ class Board(Window):
                 promotion_piece = promotion(board=self, pos=pos, side=side)
             if not self.edit_mode or (self.move_history and ((m := self.move_history[-1]) and m.is_edit != 1)):
                 promotion_piece.promoted_from = promotion_piece.promoted_from or piece.promoted_from or type(piece)
-            if self.edit_mode and is_prefix_of('custom', self.edit_piece_set_id):
+            if self.edit_mode and is_prefix_in(['custom', 'wall'], self.edit_piece_set_id):
                 promotion_piece.reload(is_hidden=False, flipped_horizontally=False)
             elif issubclass(promotion, Royal) and promotion not in self.piece_sets[side]:
                 if self.edit_mode and self.edit_piece_set_id is not None:
@@ -2739,7 +2754,6 @@ class Board(Window):
             self.promotion_piece_sprite_list.append(promotion_piece)
             self.promotion_area[pos] = promotion_piece
             self.promotion_area_drops[pos] = drop
-        self.update_caption()
 
     def apply_edit_promotion(self, move: Move) -> None:
         if move.is_edit and move.promotion is not None:
@@ -2747,6 +2761,7 @@ class Board(Window):
                 promotion_side = self.get_promotion_side(move.piece)
                 if len(self.edit_promotions[promotion_side]):
                     self.start_promotion(move.piece, self.edit_promotions[promotion_side])
+                    self.update_caption()
             else:
                 self.promotion_piece = True
                 self.replace(move.piece, move.promotion)
@@ -2938,7 +2953,7 @@ class Board(Window):
             self.update_piece(piece)
         for piece in self.promotion_piece_sprite_list:
             if isinstance(piece, Piece) and not piece.is_empty():
-                if self.edit_mode and is_prefix_of('custom', self.edit_piece_set_id):
+                if self.edit_mode and is_prefix_in(['custom', 'wall'], self.edit_piece_set_id):
                     piece.reload(is_hidden=False, flipped_horizontally=False)
                 # that issubclass call is there because PyCharm doesn't recognize that piece is a Piece
                 elif issubclass(type(piece), Royal) and type(piece) not in self.piece_sets[piece.side]:
@@ -3417,8 +3432,8 @@ class Board(Window):
                 return
             move.piece.move(move)
             self.update_auto_capture_markers(move)
-            self.apply_edit_promotion(move)
             self.move_history.append(deepcopy(move))
+            self.apply_edit_promotion(move)
             if not self.promotion_piece:
                 self.log(f"[Ply {self.ply_count}] Edit: {self.move_history[-1]}")
                 self.compare_history()
@@ -3445,6 +3460,7 @@ class Board(Window):
                 self.try_drop(move)
                 if self.promotion_piece:
                     self.move_history.append(move)
+                    self.update_caption()
         if held_buttons & MOUSE_BUTTON_LEFT:
             if self.game_over:
                 self.deselect_piece()
@@ -3860,6 +3876,7 @@ class Board(Window):
                         self.end_promotion()
                         if len(self.edit_promotions[promotion_side]):
                             self.start_promotion(promotion_piece, self.edit_promotions[promotion_side])
+                            self.update_caption()
         if symbol == key.O:  # Royal pieces
             old_mode = self.royal_piece_mode
             old_check = self.use_check

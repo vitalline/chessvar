@@ -16,6 +16,9 @@ class NonMovingPiece(Piece):
     def is_empty(self):
         return True
 
+    def __str__(self):
+        return '???' if self.is_hidden else self.name.strip()
+
 
 class NoPiece(NonMovingPiece):
     name = '(Nothing)'
