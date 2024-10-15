@@ -137,7 +137,7 @@ class Move(object):
         elif self.pos_to is None:
             string = f"disappears from {toa(self.pos_from)}"
         elif not moved:
-            if self.is_edit == 2 and not self.promotion:
+            if self.is_edit == 2 and self.promotion is None:
                 string = f"stays on {toa(self.pos_from)}"
             else:
                 string = f"on {toa(self.pos_from)}"
