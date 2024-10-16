@@ -1309,7 +1309,6 @@ class Board(Window):
         else:
             self.stalemate_rule = self.board_config['stalemate']
         self.turn_order = [Side.WHITE, Side.BLACK]
-        self.resize_board(default_width, default_height)
 
     def reset_captures(self) -> None:
         self.captured_pieces = {Side.WHITE: [], Side.BLACK: []}
@@ -1450,9 +1449,15 @@ class Board(Window):
                     trimmed_set.pop()
                 if not trimmed_set:
                     continue
+                textures = copy(penultima_textures)
+                if len(trimmed_set) > len(textures):
+                    continue
+                if len(trimmed_set) < len(textures):
+                    offset = (len(trimmed_set) - len(textures)) / 2
+                    textures = textures[-floor(offset):ceil(offset)]
                 for i, piece in enumerate(trimmed_set):
-                    if penultima_textures[i]:
-                        texture = penultima_textures[i]
+                    if textures[i]:
+                        texture = textures[i]
                         if piece_side == player_side.opponent():
                             texture += 'O'
                         if i > 4 and piece != piece_sets[player_side][7 - i]:
