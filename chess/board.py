@@ -4,7 +4,7 @@ from copy import copy, deepcopy
 from datetime import datetime
 from itertools import product, zip_longest
 from json import dumps, loads, JSONDecodeError
-from math import ceil, sqrt
+from math import ceil, floor, sqrt
 from os import makedirs, name as os_name, system
 from os.path import dirname, isfile, join
 from random import Random
@@ -244,16 +244,6 @@ penultima_textures = [f'ghost{s}' if s else None for s in ('R', 'N', 'B', 'Q', N
 default_width = 8
 default_height = 8
 
-pawn_row: list[Type[Piece]] = [fide.Pawn] * default_width
-empty_row: list[Type[Piece]] = [NoPiece] * default_width
-
-white_row = [Side.WHITE] * default_width
-black_row = [Side.BLACK] * default_width
-neutral_row = [Side.NONE] * default_width
-
-types = [white_row, pawn_row] + [empty_row] * (default_height - 4) + [pawn_row, black_row]
-sides = [white_row, white_row] + [neutral_row] * (default_height - 4) + [black_row, black_row]
-
 default_size = 50.0
 min_size = 25.0
 max_size = 100.0
@@ -287,16 +277,18 @@ def get_piece_types(side: Side = Side.WHITE) -> dict[Type[Piece], str]:
 
 def get_set(side: Side, set_id: int) -> list[Type[Piece]]:
     piece_group = piece_groups[set_id]
-    return piece_group.get(f"set_{side.key()[0]}", piece_group.get('set', empty_row))
+    return piece_group.get(f"set_{side.key()[0]}", piece_group.get('set', [NoPiece] * default_width))
 
 
 def get_set_name(piece_set: list[Type[Piece]]) -> str:
-    piece_name_order = [[0, 7], [1, 6], [2, 5], [3]]
+    piece_name_order = [[i, len(piece_set) - 1 - i] for i in range(len(piece_set) // 2 + 1)]
     piece_names = []
     for group in piece_name_order:
         name_order = []
         used_names = set()
         for pos in group:
+            if not piece_set[pos] or issubclass(piece_set[pos], (NoPiece, Royal)):
+                continue
             name = piece_set[pos].name
             if name not in used_names:
                 name_order.append(name)
@@ -496,6 +488,7 @@ class Board(Window):
         self.probabilistic_piece_history = []  # list of probabilistic piece positions for every ply
         self.obstacles = []  # list of obstacles (neutral pieces that block movement and cannot move)
         self.penultima_pieces = {Side.WHITE: {}, Side.BLACK: {}}  # piece textures that are used for penultima mode
+        self.custom_pawn = fide.Pawn  # custom pawn type
         self.custom_pieces = {}  # custom piece types
         self.custom_layout = {}  # custom starting layout of the board
         self.custom_promotions = {}  # custom promotion options
@@ -767,6 +760,16 @@ class Board(Window):
 
         self.pieces = []
 
+        pawn_row = [self.custom_pawn] * self.board_width
+        empty_row = [NoPiece] * self.board_width
+
+        white_row = [Side.WHITE] * self.board_width
+        black_row = [Side.BLACK] * self.board_width
+        neutral_row = [Side.NONE] * self.board_width
+
+        types = [white_row, pawn_row] + [empty_row] * (self.board_height - 4) + [pawn_row, black_row]
+        sides = [white_row, white_row] + [neutral_row] * (self.board_height - 4) + [black_row, black_row]
+
         for row in range(self.board_height):
             self.pieces += [[]]
 
@@ -781,7 +784,10 @@ class Board(Window):
                 piece_type = types[row][col]
                 piece_side = sides[row][col]
                 if isinstance(piece_type, Side):
-                    piece_type = self.piece_sets[piece_side][col]
+                    if col < len(self.piece_sets[piece_side]):
+                        piece_type = self.piece_sets[piece_side][col] or NoPiece
+                    else:
+                        piece_type = NoPiece
                 self.pieces[row].append(
                     piece_type(board=self, pos=(row, col), side=piece_side)
                 )
@@ -816,12 +822,14 @@ class Board(Window):
             'chaos_blocklist': self.board_config['block_ids_chaos'],
             'set_ids': {side.value: piece_set_id for side, piece_set_id in self.piece_set_ids.items()},
             'sets': {
-                side.value: [save_piece_type(t) for t in piece_set] for side, piece_set in self.piece_sets.items()
+                side.value: [save_piece_type(t) if t is not NoPiece else None for t in piece_set]
+                for side, piece_set in self.piece_sets.items()
             },
             'pieces': cnd_alg({
                 p.board_pos: save_piece(p.on(None))
                 for pieces in [*self.movable_pieces.values(), self.obstacles] for p in pieces
             }, *wh),
+            "pawn": save_piece_type(self.custom_pawn),
             'custom': {k: save_custom_type(v) for k, v in self.custom_pieces.items()},
             'layout': cnd_alg({pos: save_piece(p.on(None)) for pos, p in self.custom_layout.items()}, *wh),
             'promotions': {
@@ -1016,6 +1024,7 @@ class Board(Window):
         custom_data = data.get('custom', {})
         self.custom_pieces = {k: load_custom_type(v, k) for k, v in custom_data.items()}
         c = self.custom_pieces
+        self.custom_pawn = load_piece_type(data.get('pawn'), c) or self.custom_pawn
         self.custom_promotions = {
             Side(int(v)): {
                 load_piece_type(f, c): {
@@ -1287,6 +1296,7 @@ class Board(Window):
         self.custom_layout = {}
         self.custom_promotions = {}
         self.custom_extra_drops = {}
+        self.custom_pawn = fide.Pawn
         if self.color_index is None:
             self.color_index = 0
         self.color_scheme = colors[self.color_index]
@@ -1330,24 +1340,33 @@ class Board(Window):
             for side in (drop_side, drop_side.opponent()):
                 if not piece_sets[side]:
                     continue
-                drops[fide.Pawn] = {}
-                pawn = fide.Pawn(self)
+                trimmed_set = piece_sets[side].copy()
+                while issubclass(trimmed_set[0], NoPiece):
+                    trimmed_set.pop(0)
+                if not trimmed_set:
+                    continue
+                while issubclass(trimmed_set[-1], NoPiece):
+                    trimmed_set.pop()
+                if not trimmed_set:
+                    continue
+                drops[self.custom_pawn] = {}
+                pawn = self.custom_pawn(self)
                 pawn.movement.set_moves(1)
                 for pos in pawn_drop_squares[side]:
-                    drops[fide.Pawn][pos] = pawn
+                    drops[self.custom_pawn][pos] = pawn
                 for pos in pawn_drop_squares_2[side]:
-                    drops[fide.Pawn][pos] = fide.Pawn
-                piece_type = piece_sets[side][0]
+                    drops[self.custom_pawn][pos] = self.custom_pawn
+                piece_type = trimmed_set[0]
                 drops[piece_type] = {}
                 piece = piece_type(self)
                 piece.movement.set_moves(1)
                 for pos in drop_squares[side]:
                     drops[piece_type][pos] = piece
-                for piece_type in piece_sets[side][1:-1]:
-                    if piece_type not in drops and not issubclass(piece_type, Royal):
+                for piece_type in trimmed_set[1:-1]:
+                    if piece_type not in drops and not issubclass(piece_type, (NoPiece, Royal)):
                         drops[piece_type] = {pos: piece_type for pos in drop_squares[side]}
-                if piece_sets[side][-1] not in drops:
-                    piece_type = piece_sets[side][-1]
+                if trimmed_set[-1] not in drops:
+                    piece_type = trimmed_set[-1]
                     drops[piece_type] = {}
                     piece = piece_type(self)
                     piece.movement.set_moves(1)
@@ -1367,21 +1386,20 @@ class Board(Window):
             Side.BLACK: [(0, i) for i in range(self.board_width)],
         }
         for side in promotion_squares:
-            if not piece_sets[side]:
-                continue
             promotions = []
             used_piece_set = set()
+            split_index = self.board_width // 2
             for pieces in (
-                piece_sets[side][3::-1], piece_sets[side.opponent()][3::-1],
-                piece_sets[side][5:], piece_sets[side.opponent()][5:],
+                piece_sets[side][split_index - 1::-1], piece_sets[side.opponent()][split_index - 1::-1],
+                piece_sets[side][split_index + 1:], piece_sets[side.opponent()][split_index + 1:],
             ):
                 promotion_types = []
                 for piece in pieces:
-                    if piece not in used_piece_set and not issubclass(piece, Royal):
+                    if piece not in used_piece_set and not issubclass(piece, (NoPiece, Royal)):
                         used_piece_set.add(piece)
                         promotion_types.append(piece)
                 promotions.extend(promotion_types[::-1])
-            self.promotions[side] = {fide.Pawn: {pos: promotions.copy() for pos in promotion_squares[side]}}
+            self.promotions[side] = {self.custom_pawn: {pos: promotions.copy() for pos in promotion_squares[side]}}
 
     def reset_edit_promotions(self, piece_sets: dict[Side, list[Type[Piece]]] | None = None) -> None:
         if is_prefix_of('custom', self.edit_piece_set_id):
@@ -1401,14 +1419,15 @@ class Board(Window):
         self.edit_promotions = {side: [] for side in self.edit_promotions}
         for side in self.edit_promotions:
             used_piece_set = set()
+            split_index = self.board_width // 2
             for pieces in (
-                piece_sets[side][3::-1], piece_sets[side.opponent()][3::-1],
-                piece_sets[side][5:], piece_sets[side.opponent()][5:],
-                [piece_sets[side.opponent()][4], fide.Pawn, piece_sets[side][4]]
+                piece_sets[side][split_index - 1::-1], piece_sets[side.opponent()][split_index - 1::-1],
+                piece_sets[side][split_index + 1:], piece_sets[side.opponent()][split_index + 1:],
+                [piece_sets[side.opponent()][split_index], self.custom_pawn, piece_sets[side][split_index]]
             ):
                 promotion_types = []
                 for piece in pieces:
-                    if piece not in used_piece_set:
+                    if piece not in used_piece_set and not issubclass(piece, NoPiece):
                         used_piece_set.add(piece)
                         promotion_types.append(piece)
                 self.edit_promotions[side].extend(promotion_types[::-1])
@@ -1419,7 +1438,18 @@ class Board(Window):
         self.penultima_pieces = {side: {} for side in self.penultima_pieces}
         for player_side in self.penultima_pieces:
             for piece_side in (player_side, player_side.opponent()):
-                for i, piece in enumerate(piece_sets[piece_side]):
+                if not piece_sets[piece_side]:
+                    continue
+                trimmed_set = piece_sets[piece_side].copy()
+                while issubclass(trimmed_set[0], NoPiece):
+                    trimmed_set.pop(0)
+                if not trimmed_set:
+                    continue
+                while issubclass(trimmed_set[-1], NoPiece):
+                    trimmed_set.pop()
+                if not trimmed_set:
+                    continue
+                for i, piece in enumerate(trimmed_set):
                     if penultima_textures[i]:
                         texture = penultima_textures[i]
                         if piece_side == player_side.opponent():
@@ -1430,8 +1460,8 @@ class Board(Window):
                             self.penultima_pieces[player_side][piece] = texture
 
     def get_piece_sets(
-            self,
-            piece_set_ids: dict[Side, int] | int | None = None
+        self,
+        piece_set_ids: dict[Side, int] | int | None = None
     ) -> tuple[dict[Side, list[Type[Piece]]], dict[Side, str]]:
         if piece_set_ids is None:
             piece_set_ids = self.piece_set_ids
@@ -1443,19 +1473,26 @@ class Board(Window):
             if piece_set_ids[side] is None:
                 piece_sets[side] = self.piece_sets[side].copy()
                 piece_names[side] = self.piece_set_names[side]
-            elif piece_set_ids[side] < 0:
-                for i in range(-piece_set_ids[side]):
-                    if i + 1 not in self.chaos_sets:
-                        self.chaos_sets[i + 1] = self.get_chaos_set(side)
-                chaos_set = self.chaos_sets.get(-piece_set_ids[side], [empty_row, '-'])
-                piece_sets[side] = chaos_set[0].copy()
-                piece_names[side] = chaos_set[1]
             else:
-                piece_group = piece_groups[piece_set_ids[side]]
-                piece_sets[side] = get_set(side, piece_set_ids[side]).copy()
-                piece_names[side] = piece_group.get('name', '-')
+                if piece_set_ids[side] < 0:
+                    for i in range(-piece_set_ids[side]):
+                        if i + 1 not in self.chaos_sets:
+                            self.chaos_sets[i + 1] = self.get_chaos_set(side)
+                    chaos_set = self.chaos_sets.get(-piece_set_ids[side], [[NoPiece] * self.board_width, '-'])
+                    piece_sets[side] = chaos_set[0].copy()
+                    piece_names[side] = chaos_set[1]
+                else:
+                    piece_group = piece_groups[piece_set_ids[side]]
+                    piece_sets[side] = get_set(side, piece_set_ids[side]).copy()
+                    piece_names[side] = piece_group.get('name', '-')
+                if self.board_width != len(piece_sets[side]):
+                    offset = (self.board_width - len(piece_sets[side])) / 2
+                    if offset > 0:
+                        piece_sets[side] = [NoPiece] * floor(offset) + piece_sets[side] + [NoPiece] * ceil(offset)
+                    else:
+                        piece_sets[side] = piece_sets[side][-floor(offset):ceil(offset)]
             if not piece_sets[side]:
-                piece_sets[side] = empty_row.copy()
+                piece_sets[side] = [NoPiece] * self.board_width
                 piece_names[side] = '-'
         return piece_sets, piece_names
 
@@ -1471,7 +1508,7 @@ class Board(Window):
             random_set_poss = [[[0, 4, 7]], [[1, 6]], [[2, 5]], [[3]]]
         blocked_ids = set(self.board_config['block_ids_chaos'])
         piece_set_ids = list(i for i in range(len(piece_groups)) if i not in blocked_ids)
-        piece_set = empty_row.copy()
+        piece_set: list[type[Piece]] = [NoPiece] * default_width
         for i, group in enumerate(random_set_poss):
             random_set_ids = self.chaos_rng.sample(piece_set_ids, k=len(group))
             for j, poss in enumerate(group):
@@ -1492,7 +1529,7 @@ class Board(Window):
             random_set_poss = [[i] for i in range(8) if i != 4]
         else:
             random_set_poss = [[0, 7], [1, 6], [2, 5], [3]]
-        piece_set = empty_row.copy()
+        piece_set: list[type[Piece]] = [NoPiece] * default_width
         for i, group in enumerate(random_set_poss):
             set_id, set_pos = random_set_ids[i]
             for j, pos in enumerate(group):

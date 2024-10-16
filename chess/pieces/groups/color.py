@@ -89,12 +89,13 @@ class Nanqueen(Piece):
     def __init__(self, board, **kwargs):
         same_color_movement = movement.RiderMovement(board, rot([(1, 0), (1, 1)]))
         different_color_movement = movement.RiderMovement(board, rot([(1, 0, 1), (1, 1, 1), (1, 2), (2, 1)]))
+        start_pos = (0 if kwargs['side'] == Side.WHITE else board.board_height - 1, board.board_width // 2 - 1)
         super().__init__(
             board,
             movement.ColorMovement(
                 board,
-                light=[same_color_movement if kwargs['side'] == Side.WHITE else different_color_movement],
-                dark=[same_color_movement if kwargs['side'] == Side.BLACK else different_color_movement]
+                light=[same_color_movement if board.is_light_square(start_pos) else different_color_movement],
+                dark=[same_color_movement if board.is_dark_square(start_pos) else different_color_movement]
             ),
             **kwargs
         )

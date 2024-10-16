@@ -13,15 +13,19 @@ class NonMovingPiece(Piece):
         kwargs['movement'] = None
         super().__init__(board, **kwargs)
 
-    def is_empty(self):
-        return True
-
     def __str__(self):
         return '???' if self.is_hidden else self.name.strip()
+
+    def of(self, side: Side) -> Piece:
+        side = self.default_side
+        return super().of(side)
 
 
 class NoPiece(NonMovingPiece):
     name = '(Nothing)'
+
+    def is_empty(self):
+        return True
 
 
 class Obstacle(NonMovingPiece):
