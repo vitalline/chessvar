@@ -294,7 +294,7 @@ def get_set_name(piece_set: list[Type[Piece]]) -> str:
                 name_order.append(name)
                 used_names.add(name)
         piece_names.append('/'.join(name_order))
-    piece_set_name = ', '.join(piece_names)
+    piece_set_name = ', '.join(n for n in piece_names if n)
     return f"({piece_set_name})"
 
 
