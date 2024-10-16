@@ -941,6 +941,7 @@ class Board(Window):
             sprite_list.clear()
             for sprite in sprite_list:
                 sprite_list.remove(sprite)
+        self.pieces = []
 
         self.alias_dict = data.get('alias', {})
         if 'alias' in data:
