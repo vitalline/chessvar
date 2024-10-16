@@ -829,7 +829,7 @@ class Board(Window):
                 p.board_pos: save_piece(p.on(None))
                 for pieces in [*self.movable_pieces.values(), self.obstacles] for p in pieces
             }, *wh),
-            "pawn": save_piece_type(self.custom_pawn),
+            'pawn': save_piece_type(self.custom_pawn) if self.custom_pawn != fide.Pawn else None,
             'custom': {k: save_custom_type(v) for k, v in self.custom_pieces.items()},
             'layout': cnd_alg({pos: save_piece(p.on(None)) for pos, p in self.custom_layout.items()}, *wh),
             'promotions': {
@@ -1024,7 +1024,8 @@ class Board(Window):
         custom_data = data.get('custom', {})
         self.custom_pieces = {k: load_custom_type(v, k) for k, v in custom_data.items()}
         c = self.custom_pieces
-        self.custom_pawn = load_piece_type(data.get('pawn'), c) or self.custom_pawn
+        if 'pawn' in data:
+            self.custom_pawn = load_piece_type(data.get('pawn'), c) or fide.Pawn
         self.custom_promotions = {
             Side(int(v)): {
                 load_piece_type(f, c): {
@@ -4571,8 +4572,10 @@ class Board(Window):
     def debug_info(self) -> list[str]:
         debug_log_data = []  # noqa
         debug_log_data.append(f"Board size: {self.board_width}x{self.board_height}")
-        debug_log_data.append(f"Window size: {self.width}x{self.height}")
+        debug_log_data.append(f"Screen size: {self.width}x{self.height}")
         debug_log_data.append(f"Square size: {self.square_size}")
+        debug_log_data.append(f"Windowed screen size: {self.windowed_size[0]}x{self.windowed_size[1]}")
+        debug_log_data.append(f"Windowed square size: {self.windowed_square_size}")
         debug_log_data.append(f"Color scheme ID: {'-' if self.color_index is None else self.color_index}")
         debug_log_data.append("Color scheme:")
         color_scheme = deepcopy(self.color_scheme)  # just in case trickster mode messes with the color scheme RIGHT NOW
@@ -4646,6 +4649,10 @@ class Board(Window):
             debug_log_data.append(f"  '{piece}': {save_custom_type(data)}")
         if not self.custom_pieces:
             debug_log_data[-1] += " None"
+        if self.custom_pawn != fide.Pawn:
+            debug_log_data.append(f"Custom pawn: {self.custom_pawn.name} ({save_custom_type(self.custom_pawn)})")
+        else:
+            debug_log_data.append("Custom pawn: None")
         debug_log_data.append(f"Custom layout ({len(self.custom_layout)}):")
         for pos, piece in self.custom_layout.items():
             suffixes = []
