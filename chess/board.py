@@ -281,7 +281,7 @@ def get_set(side: Side, set_id: int) -> list[Type[Piece]]:
 
 
 def get_set_name(piece_set: list[Type[Piece]]) -> str:
-    piece_name_order = [[i, len(piece_set) - 1 - i] for i in range(len(piece_set) // 2 + 1)]
+    piece_name_order = [[i, len(piece_set) - 1 - i] for i in range(len(piece_set) // 2)]
     piece_names = []
     for group in piece_name_order:
         name_order = []
