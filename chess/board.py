@@ -2684,6 +2684,7 @@ class Board(Window):
         self.deselect_piece()
         # if we're promoting, we can't advance the turn yet
         if self.promotion_piece:
+            self.update_caption()
             return
         self.game_over = False
         self.action_count += 1
