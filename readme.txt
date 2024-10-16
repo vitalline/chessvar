@@ -13,6 +13,7 @@ Shift + R: start game with new random armies (different for each player)
 Ctrl + Shift + R: start game with a new random army (same for both players)
 Alt + R: reload last loaded game state
 Alt + Shift + R: reload last saved game state
+Ctrl + Alt + R: clear custom data and restart game
 Ctrl + C: save current configuration
 Shift + C: start game with new chaotic armies (different for each player)
 Ctrl + Shift + C: start game with a new chaotic army (same for both players)
@@ -23,12 +24,18 @@ Shift + X: start game with new extremely chaotic armies (different for each play
 Ctrl + Shift + X: start game with a new extremely chaotic army (same for both players)
 Alt + X: start game with new asymmetrical extremely chaotic armies (different for each player)
 Ctrl + Alt + X: start game with a new asymmetrical extremely chaotic army (same for both players)
-Ctrl + [-]: make window smaller (-5px/square)
-Shift + [-]: make window square (use smaller dimension)
-Ctrl + Shift + [-]: make window very small (25px/square)
-Ctrl + [=]: make window larger (+5px/square)
-Shift + [=]: make window square (use larger dimension)
-Ctrl + Shift + [=]: make window very large (100px/square)
+Ctrl + "[": remove last file
+Ctrl + Alt + "[": remove last rank
+Ctrl + "]": add extra file
+Ctrl + Alt + "]": add extra rank
+Ctrl + "\": reset board size
+Ctrl + Alt + "\": swap board dimensions
+Ctrl + "-": make window smaller (-5px/square)
+Shift + "-": make window square (use smaller dimension)
+Ctrl + Shift + "-": make window very small (25px/square)
+Ctrl + "=": make window larger (+5px/square)
+Shift + "=": make window square (use larger dimension)
+Ctrl + Shift + "=": make window very large (100px/square)
 Ctrl + 0: make window regular (50px/square)
 Ctrl + W: pass turn to white player (if it's not their turn)
 Shift + W: cycle white army forward (+1)
@@ -79,8 +86,8 @@ Alt + Shift + L: load saved game state and reload move history
 Ctrl + D: save debug log
 Shift + D: print debug log
 Alt + D: save debug listings
-Shift + [/]: select random piece (that can move)
-Ctrl + [/]: play random move (with selected piece if one exists)
+Shift + "/": select random piece (that can move)
+Ctrl + "/": play random move (with selected piece if one exists)
 Shift + E: empty board
 Ctrl + E: toggle board edit mode
 

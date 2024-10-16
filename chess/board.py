@@ -241,18 +241,18 @@ piece_groups: list[dict[str, str | list[Type[Piece]]]] = [
 
 penultima_textures = [f'ghost{s}' if s else None for s in ('R', 'N', 'B', 'Q', None, 'B', 'N', 'R')]
 
-board_width = 8
-board_height = 8
+default_width = 8
+default_height = 8
 
-pawn_row: list[Type[Piece]] = [fide.Pawn] * board_width
-empty_row: list[Type[Piece]] = [NoPiece] * board_width
+pawn_row: list[Type[Piece]] = [fide.Pawn] * default_width
+empty_row: list[Type[Piece]] = [NoPiece] * default_width
 
-white_row = [Side.WHITE] * board_width
-black_row = [Side.BLACK] * board_width
-neutral_row = [Side.NONE] * board_width
+white_row = [Side.WHITE] * default_width
+black_row = [Side.BLACK] * default_width
+neutral_row = [Side.NONE] * default_width
 
-types = [white_row, pawn_row] + [empty_row] * (board_height - 4) + [pawn_row, black_row]
-sides = [white_row, white_row] + [neutral_row] * (board_height - 4) + [black_row, black_row]
+types = [white_row, pawn_row] + [empty_row] * (default_height - 4) + [pawn_row, black_row]
+sides = [white_row, white_row] + [neutral_row] * (default_height - 4) + [black_row, black_row]
 
 default_size = 50.0
 min_size = 25.0
@@ -398,7 +398,7 @@ class Board(Window):
         if not isfile(config_path):
             self.board_config.save(config_path)
 
-        self.board_width, self.board_height = board_width, board_height
+        self.board_width, self.board_height = default_width, default_height
         self.square_size = default_size
 
         super().__init__(
@@ -584,18 +584,20 @@ class Board(Window):
         pos: tuple[float, float],
         size: float = 0,
         origin: tuple[float, float] | None = None,
+        board_size: tuple[int, int] | None = None,
         flip: bool | None = None
     ) -> Position:
         x, y = pos
         size = size or self.square_size
         origin = origin or self.origin
+        board_size = board_size or (self.board_width, self.board_height)
         flip = flip if flip is not None else self.flip_mode
         if flip:
-            col = round((origin[0] - x) / size + (self.board_width - 1) / 2)
-            row = round((origin[1] - y) / size + (self.board_height - 1) / 2)
+            col = round((origin[0] - x) / size + (board_size[0] - 1) / 2)
+            row = round((origin[1] - y) / size + (board_size[1] - 1) / 2)
         else:
-            col = round((x - origin[0]) / size + (self.board_width - 1) / 2)
-            row = round((y - origin[1]) / size + (self.board_height - 1) / 2)
+            col = round((x - origin[0]) / size + (board_size[0] - 1) / 2)
+            row = round((y - origin[1]) / size + (board_size[1] - 1) / 2)
         return row, col
 
     def get_screen_position(
@@ -603,18 +605,20 @@ class Board(Window):
         pos: tuple[float, float],
         size: float = 0,
         origin: tuple[float, float] | None = None,
+        board_size: tuple[int, int] | None = None,
         flip: bool | None = None
     ) -> tuple[float, float]:
         row, col = pos
         size = size or self.square_size
         origin = origin or self.origin
+        board_size = board_size or (self.board_width, self.board_height)
         flip = flip if flip is not None else self.flip_mode
         if flip:
-            x = origin[0] - (col - (self.board_width - 1) / 2) * size
-            y = origin[1] - (row - (self.board_height - 1) / 2) * size
+            x = origin[0] - (col - (board_size[0] - 1) / 2) * size
+            y = origin[1] - (row - (board_size[1] - 1) / 2) * size
         else:
-            x = (col - (self.board_width - 1) / 2) * size + origin[0]
-            y = (row - (self.board_height - 1) / 2) * size + origin[1]
+            x = (col - (board_size[0] - 1) / 2) * size + origin[0]
+            y = (row - (board_size[1] - 1) / 2) * size + origin[1]
         return x, y
 
     # From now on we shall unanimously assume that the first coordinate corresponds to row number (AKA vertical axis).
@@ -948,7 +952,10 @@ class Board(Window):
             self.resize(*window_size)
         elif square_size is not None:
             self.resize(round((self.board_width + 2) * square_size), round((self.board_height + 2) * square_size))
-        self.update_sprites(data.get('flip_mode', self.flip_mode))
+        old_flip_mode = self.flip_mode
+        new_flip_mode = data.get('flip_mode', self.flip_mode)
+        if new_flip_mode != old_flip_mode:
+            self.flip_board()
         if window_size is not None and square_size is not None and self.square_size != square_size:
             self.log(
                 f"[Ply {self.ply_count}] Error: Square size does not match "
@@ -1279,11 +1286,19 @@ class Board(Window):
         self.custom_pieces = {}
         self.custom_layout = {}
         self.custom_promotions = {}
+        self.custom_extra_drops = {}
+        if self.color_index is None:
+            self.color_index = 0
+        self.color_scheme = colors[self.color_index]
+        for side in self.piece_set_ids:
+            if self.piece_set_ids[side] is None:
+                self.piece_set_ids[side] = 0
         if isinstance(self.board_config['stalemate'], dict):
             self.stalemate_rule = {Side(k + 1): (v + 1) % 3 - 1 for k, v in self.board_config['stalemate'].items()}
         else:
             self.stalemate_rule = self.board_config['stalemate']
         self.turn_order = [Side.WHITE, Side.BLACK]
+        self.resize_board(default_width, default_height)
 
     def reset_captures(self) -> None:
         self.captured_pieces = {Side.WHITE: [], Side.BLACK: []}
@@ -3177,26 +3192,28 @@ class Board(Window):
                     piece.reload(is_hidden=False, flipped_horizontally=False)
 
     def update_sprite(
-        self, sprite: Sprite, from_size: float, from_origin: tuple[float, float], from_flip_mode: bool
+        self,
+        sprite: Sprite,
+        from_size: float,
+        from_origin: tuple[float, float],
+        from_board_size: tuple[int, int],
+        from_flip_mode: bool
     ) -> None:
         old_position = sprite.position
         sprite.scale = self.square_size / sprite.texture.width
         sprite.position = self.get_screen_position(self.get_board_position(
-            old_position, from_size, from_origin, from_flip_mode
+            old_position, from_size, from_origin, from_board_size, from_flip_mode
         ))
 
-    def update_sprites(self, flip_mode: bool) -> None:
-        old_size = self.square_size
-        self.square_size = min(self.width / (self.board_width + 2), self.height / (self.board_height + 2))
-        old_origin = self.origin
-        self.origin = self.width / 2, self.height / 2
-        old_flip_mode = self.flip_mode
-        self.flip_mode = flip_mode
-        old_selected_square = self.selected_square
-        self.update_sprite(self.highlight, old_size, old_origin, old_flip_mode)
-        self.update_sprite(self.selection, old_size, old_origin, old_flip_mode)
+    def update_sprites(
+        self, size: float, origin: tuple[float, float], width: int, height: int, flip_mode: bool
+    ) -> None:
+        board_size = width, height
+        selected_square = self.selected_square
+        self.update_sprite(self.highlight, size, origin, board_size, flip_mode)
+        self.update_sprite(self.selection, size, origin, board_size, flip_mode)
         if self.active_piece is not None:
-            self.update_sprite(self.active_piece, old_size, old_origin, old_flip_mode)
+            self.update_sprite(self.active_piece, size, origin, board_size, flip_mode)
         for sprite_list in (
             self.board_sprite_list,
             self.move_sprite_list,
@@ -3205,25 +3222,28 @@ class Board(Window):
             self.promotion_piece_sprite_list,
         ):
             for sprite in sprite_list:
-                self.update_sprite(sprite, old_size, old_origin, old_flip_mode)
+                self.update_sprite(sprite, size, origin, board_size, flip_mode)
         for label in self.label_list:
-            old_position = label.position
+            position = label.position
             label.font_size = self.square_size / 2
             label.x, label.y = self.get_screen_position(
-                self.get_board_position(old_position, old_size, old_origin, old_flip_mode)
+                self.get_board_position(position, size, origin, board_size, flip_mode)
             )
         self.deselect_piece()
-        self.select_piece(old_selected_square)
+        self.select_piece(selected_square)
         if self.highlight_square:
             self.update_highlight(self.highlight_square)
             self.hovered_square = None
         else:
-            self.update_highlight(self.get_board_position(self.highlight.position, old_size, old_origin, old_flip_mode))
+            self.update_highlight(
+                self.get_board_position(self.highlight.position, size, origin, board_size, flip_mode)
+            )
         if self.skip_mouse_move == 2:
             self.skip_mouse_move = 1
 
     def flip_board(self) -> None:
-        self.update_sprites(not self.flip_mode)
+        self.flip_mode = not self.flip_mode
+        self.update_sprites(self.square_size, self.origin, self.board_width, self.board_height, not self.flip_mode)
 
     def is_trickster_mode(self) -> bool:
         return self.trickster_color_index != 0
@@ -3270,6 +3290,7 @@ class Board(Window):
 
         old_highlight = self.get_board_position(self.highlight.position) if self.highlight_square else None
         old_width, old_height = self.board_width, self.board_height
+        old_board_size = old_width, old_height
         self.board_width, self.board_height = width, height
 
         self.board_sprite_list.clear()
@@ -3288,23 +3309,25 @@ class Board(Window):
         for row in range(self.board_height):
             text = str(row + 1)
             width = round(self.square_size / 2 * len(text))
-            self.label_list.extend([
-                Text(text, *self.get_screen_position((row, -1)), width=width, **label_kwargs),
-                Text(text, *self.get_screen_position((row, self.board_width)), width=width, **label_kwargs)
-            ])
+            poss = [
+                self.get_screen_position((row, -1), board_size=old_board_size),
+                self.get_screen_position((row, self.board_width), board_size=old_board_size),
+            ]
+            self.label_list.extend(Text(text, *pos, width=width, **label_kwargs) for pos in poss)
 
         for col in range(self.board_width):
             text = b26(col + 1)
             width = round(self.square_size / 2 * len(text))
-            self.label_list.extend([
-                Text(text, *self.get_screen_position((-1, col)), width=width, **label_kwargs),
-                Text(text, *self.get_screen_position((self.board_height, col)), width=width, **label_kwargs),
-            ])
+            poss = [
+                self.get_screen_position((-1, col), board_size=old_board_size),
+                self.get_screen_position((self.board_height, col), board_size=old_board_size)
+            ]
+            self.label_list.extend(Text(text, *pos, width=width, **label_kwargs) for pos in poss)
 
         for row, col in product(range(self.board_height), range(self.board_width)):
             sprite = Sprite("assets/util/square.png")
             sprite.color = self.color_scheme[f"{'light' if self.is_light_square((row, col)) else 'dark'}_square_color"]
-            sprite.position = self.get_screen_position((row, col))
+            sprite.position = self.get_screen_position((row, col), board_size=old_board_size)
             sprite.scale = self.square_size / sprite.texture.width
             self.board_sprite_list.append(sprite)
 
@@ -3313,14 +3336,21 @@ class Board(Window):
 
         for row in range(len(self.pieces), self.board_height):
             self.pieces += [[]]
+        for row in range(self.board_height, len(self.pieces)):
+            for col in range(len(self.pieces[row])):
+                self.piece_sprite_list.remove(self.pieces[row][col])
+        self.pieces = self.pieces[:self.board_height]
         for row in range(self.board_height):
             for col in range(len(self.pieces[row]), self.board_width):
                 self.pieces[row].append(NoPiece(self, pos=(row, col)))
+                self.piece_sprite_list.append(self.pieces[row][col])
+            for col in range(self.board_width, len(self.pieces[row])):
+                self.piece_sprite_list.remove(self.pieces[row][col])
             self.pieces[row] = self.pieces[row][:self.board_width]
-        self.pieces = self.pieces[:self.board_height]
 
-        if self.game_loaded or self.board_width != board_width or self.board_height != board_height:
+        if self.game_loaded or self.board_width != default_width or self.board_height != default_height:
             self.log(f"[Ply {self.ply_count}] Info: Changed board size to {self.board_width}x{self.board_height}")
+            self.update_sprites(self.square_size, self.origin, old_width, old_height, self.flip_mode)
             self.resize(
                 self.width + self.square_size * (self.board_width - old_width),
                 self.height + self.square_size * (self.board_height - old_height)
@@ -3412,7 +3442,10 @@ class Board(Window):
     def on_resize(self, width: float, height: float) -> None:
         self.skip_mouse_move = 2
         super().on_resize(width, height)
-        self.update_sprites(self.flip_mode)
+        square_size, origin = self.square_size, self.origin
+        self.square_size = min(self.width / (self.board_width + 2), self.height / (self.board_height + 2))
+        self.origin = self.width / 2, self.height / 2
+        self.update_sprites(square_size, origin, self.board_width, self.board_height, self.flip_mode)
 
     def on_activate(self) -> None:
         if not self.is_active:
@@ -3822,7 +3855,12 @@ class Board(Window):
                     self.log(f"[Ply {self.ply_count}] Info: Save cancelled", False)
                 self.activate()
         if symbol == key.R:  # Restart
-            if modifiers & key.MOD_ALT:  # Reload save data
+            if modifiers & key.MOD_ALT and modifiers & key.MOD_ACCEL:  # Reset custom data
+                self.log(f"[Ply {self.ply_count}] Info: Clearing custom data")
+                self.reset_custom_data()
+                self.log(f"[Ply {self.ply_count}] Info: Starting new game", bool(self.should_hide_pieces))
+                self.reset_board()
+            elif modifiers & key.MOD_ALT:  # Reload save data
                 data = self.save_data if modifiers & key.MOD_SHIFT else self.load_data
                 if data is not None:
                     whence = 'saved to' if modifiers & key.MOD_SHIFT else 'loaded from'
@@ -3874,6 +3912,19 @@ class Board(Window):
                     self.clear_future_history(self.ply_count - 1)
                     self.log(f"[Ply {self.ply_count}] Info: Probabilistic pieces updated")
                     self.advance_turn()
+        if symbol == key.BRACKETLEFT and modifiers & key.MOD_ACCEL:  # Decrease board size
+            width = self.board_width - (0 if modifiers & key.MOD_ALT else 1)
+            height = self.board_height - (1 if modifiers & key.MOD_ALT else 0)
+            self.resize_board(width, height)
+        if symbol == key.BRACKETRIGHT and modifiers & key.MOD_ACCEL:  # Increase board size
+            width = self.board_width + (0 if modifiers & key.MOD_ALT else 1)
+            height = self.board_height + (1 if modifiers & key.MOD_ALT else 0)
+            self.resize_board(width, height)
+        if symbol == key.BACKSLASH and modifiers & key.MOD_ACCEL:
+            if modifiers & key.MOD_ALT:  # Invert board size
+                self.resize_board(self.board_height, self.board_width)
+            else:  # Reset board size
+                self.resize_board(default_width, default_height)
         if symbol == key.F11:  # Full screen (toggle)
             self.toggle_fullscreen()
         if symbol == key.MINUS and not self.fullscreen:  # (-) Decrease window size
