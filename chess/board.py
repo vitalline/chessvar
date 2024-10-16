@@ -241,9 +241,11 @@ piece_groups: list[dict[str, str | list[Type[Piece]]]] = [
 
 penultima_textures = [f'ghost{s}' if s else None for s in ('R', 'N', 'B', 'Q', None, 'B', 'N', 'R')]
 
-default_width = 8
-default_height = 8
+default_board_width = 8
+default_board_height = 8
 
+min_width = 150.0
+min_height = 75.0
 default_size = 50.0
 min_size = 25.0
 max_size = 100.0
@@ -277,7 +279,7 @@ def get_piece_types(side: Side = Side.WHITE) -> dict[Type[Piece], str]:
 
 def get_set(side: Side, set_id: int) -> list[Type[Piece]]:
     piece_group = piece_groups[set_id]
-    return piece_group.get(f"set_{side.key()[0]}", piece_group.get('set', [NoPiece] * default_width))
+    return piece_group.get(f"set_{side.key()[0]}", piece_group.get('set', [NoPiece] * default_board_width))
 
 
 def get_set_name(piece_set: list[Type[Piece]]) -> str:
@@ -390,7 +392,7 @@ class Board(Window):
         if not isfile(config_path):
             self.board_config.save(config_path)
 
-        self.board_width, self.board_height = default_width, default_height
+        self.board_width, self.board_height = default_board_width, default_board_height
         self.square_size = default_size
 
         super().__init__(
@@ -404,7 +406,7 @@ class Board(Window):
         )
 
         self.origin = self.width / 2, self.height / 2
-        self.set_minimum_size(round((self.board_width + 2) * min_size), round((self.board_height + 2) * min_size))
+        self.set_minimum_size(round(min_width), round(min_height))
 
         self.windowed_size = self.width, self.height
         self.windowed_square_size = self.square_size
@@ -1515,7 +1517,7 @@ class Board(Window):
             random_set_poss = [[[0, 4, 7]], [[1, 6]], [[2, 5]], [[3]]]
         blocked_ids = set(self.board_config['block_ids_chaos'])
         piece_set_ids = list(i for i in range(len(piece_groups)) if i not in blocked_ids)
-        piece_set: list[type[Piece]] = [NoPiece] * default_width
+        piece_set: list[type[Piece]] = [NoPiece] * default_board_width
         for i, group in enumerate(random_set_poss):
             random_set_ids = self.chaos_rng.sample(piece_set_ids, k=len(group))
             for j, poss in enumerate(group):
@@ -1536,7 +1538,7 @@ class Board(Window):
             random_set_poss = [[i] for i in range(8) if i != 4]
         else:
             random_set_poss = [[0, 7], [1, 6], [2, 5], [3]]
-        piece_set: list[type[Piece]] = [NoPiece] * default_width
+        piece_set: list[type[Piece]] = [NoPiece] * default_board_width
         for i, group in enumerate(random_set_poss):
             set_id, set_pos = random_set_ids[i]
             for j, pos in enumerate(group):
@@ -3395,7 +3397,7 @@ class Board(Window):
                 self.piece_sprite_list.remove(self.pieces[row][col])
             self.pieces[row] = self.pieces[row][:self.board_width]
 
-        if self.game_loaded or self.board_width != default_width or self.board_height != default_height:
+        if self.game_loaded or self.board_width != default_board_width or self.board_height != default_board_height:
             self.log(f"[Ply {self.ply_count}] Info: Changed board size to {self.board_width}x{self.board_height}")
             self.update_sprites(self.square_size, self.origin, old_width, old_height, self.flip_mode)
             self.resize(
@@ -3412,7 +3414,6 @@ class Board(Window):
         self.skip_mouse_move = 2
         old_width, old_height = self.width, self.height
         x, y = self.get_location()
-        min_width, min_height = (self.board_width + 2) * min_size, (self.board_height + 2) * min_size
         self.set_visible(False)
         self.set_size(round(max(width, min_width)), round(max(height, min_height)))
         self.log(f"[Ply {self.ply_count}] Info: Resized to {self.width}x{self.height}", False)
@@ -3974,7 +3975,7 @@ class Board(Window):
             if modifiers & key.MOD_ALT:  # Invert board size
                 self.resize_board(self.board_height, self.board_width)
             else:  # Reset board size
-                self.resize_board(default_width, default_height)
+                self.resize_board(default_board_width, default_board_height)
         if symbol == key.F11:  # Full screen (toggle)
             self.toggle_fullscreen()
         if symbol == key.MINUS and not self.fullscreen:  # (-) Decrease window size
