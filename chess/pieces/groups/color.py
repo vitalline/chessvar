@@ -83,7 +83,7 @@ class Nightlight(Piece):
 
 class Nanqueen(Piece):
     name = 'Nanqueen'
-    file_name = '(Qs,NNKd)'
+    file_name = '(Qi,NNKo)'
     asset_folder = 'color'
 
     def __init__(self, board, **kwargs):
