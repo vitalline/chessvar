@@ -4656,7 +4656,7 @@ class Board(Window):
         if not self.custom_pieces:
             debug_log_data[-1] += " None"
         if self.custom_pawn != fide.Pawn:
-            debug_log_data.append(f"Custom pawn: {self.custom_pawn.name} ({save_custom_type(self.custom_pawn)})")
+            debug_log_data.append(f"Custom pawn: {self.custom_pawn.name} ({save_piece_type(self.custom_pawn)})")
         else:
             debug_log_data.append("Custom pawn: None")
         debug_log_data.append(f"Custom layout ({len(self.custom_layout)}):")
