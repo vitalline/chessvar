@@ -2481,7 +2481,7 @@ class Board(Window):
                 chained_move = chained_move.chained_move
             for chained_move in move_chain[::-1]:
                 if (
-                    chained_move.is_edit == 2
+                    chained_move.is_edit != 1
                     and chained_move.pos_from == chained_move.pos_to
                     and chained_move.promotion is None
                 ):

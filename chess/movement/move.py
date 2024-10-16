@@ -118,7 +118,7 @@ class Move(object):
         board = self.piece.board
         moved = self.pos_from != self.pos_to
         comma = ','
-        if self.pos_from is not None and self.pos_to is not None and moved:
+        if self.pos_from is not None and self.pos_to is not None and moved and not self.swapped_piece:
             if self.is_edit:
                 string = f"on {toa(self.pos_from)} is moved to {toa(self.pos_to)}"
             else:
@@ -136,8 +136,8 @@ class Move(object):
                     string = f"appears on {toa(self.pos_to)}"
         elif self.pos_to is None:
             string = f"disappears from {toa(self.pos_from)}"
-        elif not moved:
-            if self.is_edit == 2 and self.promotion is None:
+        elif not moved or self.swapped_piece:
+            if self.captured_piece is None and self.swapped_piece is None and self.promotion is None:
                 string = f"stays on {toa(self.pos_from)}"
             else:
                 string = f"on {toa(self.pos_from)}"
@@ -160,7 +160,11 @@ class Move(object):
                 string += f" on {toa(self.captured_piece.board_pos)}"
             comma = ','
         if self.swapped_piece:
-            string += f"{comma} swaps with {self.swapped_piece}"
+            if self.is_edit == 1:
+                string += f"{comma} is swapped"
+            else:
+                string += f"{comma} swaps"
+            string = f"{string} with {self.swapped_piece} on {toa(self.pos_to)}"
             comma = ','
         if self.pos_from is not None and not (self.piece and self.piece.is_empty() and not moved) and self.piece:
             if self.promotion is Unset:
