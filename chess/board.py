@@ -3337,6 +3337,9 @@ class Board(Window):
         if self.game_loaded and self.board_width == width and self.board_height == height:
             return
 
+        if self.chain_start or self.promotion_piece:
+            self.undo_last_move()
+
         old_highlight = self.get_board_position(self.highlight.position) if self.highlight_square else None
         old_width, old_height = self.board_width, self.board_height
         old_board_size = old_width, old_height
@@ -3405,6 +3408,7 @@ class Board(Window):
                 self.height + self.square_size * (self.board_height - old_height)
             )
             self.update_highlight(old_highlight)
+            self.advance_turn()
 
     def resize(self, width: float, height: float) -> None:
         if self.fullscreen:
