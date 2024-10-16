@@ -61,24 +61,33 @@ class Piece(Sprite):
     def moves(self, theoretical: bool = False):
         if self.movement:
             for move in self.movement.moves(self.board_pos, self, theoretical):
+                chained_move = move
+                while chained_move.chained_move:
+                    chained_move = chained_move.chained_move
                 if self.side in self.board.promotions:
                     side_promotions = self.board.promotions[self.side]
                     if type(self) in side_promotions:
                         promotion_squares = side_promotions[type(self)]
-                        if move.pos_to in promotion_squares:
-                            promotions = promotion_squares[move.pos_to]
+                        if chained_move.pos_to in promotion_squares:
+                            promotions = promotion_squares[chained_move.pos_to]
                             if promotions:
                                 for piece in promotions:
                                     if isinstance(piece, Piece):
-                                        piece = piece.of(piece.side or self.side).on(move.pos_to)
+                                        piece = piece.of(piece.side or self.side).on(chained_move.pos_to)
                                     else:
                                         piece = piece(
                                             board=self.board,
-                                            board_pos=move.pos_to,
+                                            board_pos=chained_move.pos_to,
                                             side=self.side,
                                         )
                                     piece.promoted_from = piece.promoted_from or self.promoted_from or type(self)
-                                    yield copy(move).set(promotion=piece)
+                                    copy_move = copy(move)
+                                    chained_copy = copy_move
+                                    while chained_copy.chained_move:
+                                        chained_copy.set(chained_move=copy(chained_copy.chained_move))
+                                        chained_copy = chained_copy.chained_move
+                                    chained_copy.set(promotion=piece)
+                                    yield copy_move
                                 continue
                 yield move
         return ()

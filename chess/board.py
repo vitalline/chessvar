@@ -2920,6 +2920,8 @@ class Board(Window):
         self.start_promotion(self.get_piece(move.piece.board_pos), drop_list, drop_type_list)
 
     def try_promotion(self, move: Move) -> None:
+        if move.chained_move is not None:
+            return
         if move.piece.side not in self.promotions:
             return
         side_promotions = self.promotions[move.piece.side]
@@ -3532,18 +3534,21 @@ class Board(Window):
             pos = self.get_board_position((x, y))
             if self.promotion_piece:
                 if pos in self.promotion_area:
+                    chained_move = self.move_history[-1]
+                    while chained_move.chained_move:
+                        chained_move = chained_move.chained_move
                     if pos in self.promotion_area_drops and (drop := self.promotion_area_drops[pos]) is not None:
-                        self.move_history[-1].set(placed_piece=drop)
+                        chained_move.set(placed_piece=drop)
                         for i, piece in enumerate(self.captured_pieces[self.turn_side][::-1]):
                             if piece == drop:
                                 self.captured_pieces[self.turn_side].pop(-(i + 1))
                                 break
-                    self.move_history[-1].set(promotion=self.promotion_area[pos])
+                    chained_move.set(promotion=self.promotion_area[pos])
                     self.replace(self.promotion_piece, self.promotion_area[pos])
-                    self.update_auto_capture_markers(self.move_history[-1])
-                    self.update_promotion_auto_captures(self.move_history[-1])
+                    self.update_auto_capture_markers(chained_move)
+                    self.update_promotion_auto_captures(chained_move)
                     self.end_promotion()
-                    chained_move = self.move_history[-1]
+                    current_move = chained_move
                     while chained_move:
                         move_type = (
                             'Edit' if chained_move.is_edit
@@ -3556,7 +3561,7 @@ class Board(Window):
                             chained_move.piece.move(chained_move)
                             self.update_auto_capture_markers(chained_move)
                             chained_move.set(piece=copy(chained_move.piece))
-                    self.ply_count += not self.move_history[-1].is_edit
+                    self.ply_count += not current_move.is_edit
                     self.compare_history()
                     self.advance_turn()
                 return
