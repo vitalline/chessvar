@@ -1386,13 +1386,13 @@ class Board(Window):
             Side.WHITE: [(self.board_height - 1, i) for i in range(self.board_width)],
             Side.BLACK: [(0, i) for i in range(self.board_width)],
         }
+        split = {side: len(piece_sets[side]) // 2 for side in self.piece_sets}
         for side in promotion_squares:
             promotions = []
             used_piece_set = set()
-            split_index = self.board_width // 2
             for pieces in (
-                piece_sets[side][split_index - 1::-1], piece_sets[side.opponent()][split_index - 1::-1],
-                piece_sets[side][split_index + 1:], piece_sets[side.opponent()][split_index + 1:],
+                piece_sets[side][split[side] - 1::-1], piece_sets[side.opponent()][split[side.opponent()] - 1::-1],
+                piece_sets[side][split[side] + 1:], piece_sets[side.opponent()][split[side.opponent()] + 1:],
             ):
                 promotion_types = []
                 for piece in pieces:
@@ -1417,14 +1417,14 @@ class Board(Window):
                 piece_sets = self.piece_sets
             else:
                 piece_sets = self.get_piece_sets(self.edit_piece_set_id)[0]
-        self.edit_promotions = {side: [] for side in self.edit_promotions}
+        self.edit_promotions = {side: [] for side in self.piece_sets}
+        split = {side: len(piece_sets[side]) // 2 for side in self.piece_sets}
         for side in self.edit_promotions:
             used_piece_set = set()
-            split_index = self.board_width // 2
             for pieces in (
-                piece_sets[side][split_index - 1::-1], piece_sets[side.opponent()][split_index - 1::-1],
-                piece_sets[side][split_index + 1:], piece_sets[side.opponent()][split_index + 1:],
-                [piece_sets[side.opponent()][split_index], self.custom_pawn, piece_sets[side][split_index]]
+                piece_sets[side][split[side] - 1::-1], piece_sets[side.opponent()][split[side.opponent()] - 1::-1],
+                piece_sets[side][split[side] + 1:], piece_sets[side.opponent()][split[side.opponent()] + 1:],
+                [piece_sets[side.opponent()][split[side.opponent()]], self.custom_pawn, piece_sets[side][split[side]]],
             ):
                 promotion_types = []
                 for piece in pieces:
