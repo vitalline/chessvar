@@ -1,7 +1,7 @@
 controls:
 Mouse, Arrow keys: move selection
 LMB, Enter: select piece, move selected piece (click or drag)
-RMB, Backspace: deselect piece
+RMB, Backspace: deselect piece, drop piece (if drops are enabled)
 Tab: select next piece or square
 F11: toggle full screen
 Escape: exit application

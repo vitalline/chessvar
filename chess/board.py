@@ -2707,6 +2707,7 @@ class Board(Window):
         if self.edit_mode:
             self.load_pieces()  # loading the new piece positions in order to update the board state
             self.color_pieces()  # reverting the piece colors to normal in case they were changed
+            self.update_caption()  # updating the caption to reflect the edit that was just made
             return  # let's not advance the turn while editing the board to hopefully make things easier for everyone
         self.turn_side = self.turn_order[(self.ply_count - 1) % len(self.turn_order)]
         if isinstance(self.turn_side, list):
@@ -2907,7 +2908,7 @@ class Board(Window):
             self.update_promotion_auto_captures(move)
             self.promotion_piece = promotion_piece
             return
-        if not self.use_drops:
+        if not self.use_drops and not self.edit_mode:
             return
         side_drops = self.drops[self.turn_side]
         drop_list = []
@@ -2991,7 +2992,7 @@ class Board(Window):
                 new_col = col + col_increment
                 current_col = area_origin[1] + ((new_col + 1) // 2 * ((aim_left + new_col) % 2 * 2 - 1))
             area_squares.append((current_row, current_col))
-        side = self.get_promotion_side(piece) if self.edit_mode else (piece.side or self.turn_side)
+        side = self.get_promotion_side(piece) if self.edit_mode and not drops else (piece.side or self.turn_side)
         for promotion, drop, pos in zip_longest(promotions, drops, area_squares):
             background_sprite = Sprite("assets/util/square.png")
             background_sprite.color = self.color_scheme['promotion_area_color']
@@ -3033,7 +3034,7 @@ class Board(Window):
             self.promotion_area_drops[pos] = drop
 
     def apply_edit_promotion(self, move: Move) -> None:
-        if move.is_edit and move.promotion is not None:
+        if move.is_edit and move.movement_type != movement.DropMovement and move.promotion is not None:
             if move.promotion is Unset:
                 promotion_side = self.get_promotion_side(move.piece)
                 if len(self.edit_promotions[promotion_side]):
@@ -3600,17 +3601,15 @@ class Board(Window):
             self.clicked_square = pos
         if buttons & MOUSE_BUTTON_RIGHT:
             self.held_buttons = MOUSE_BUTTON_RIGHT
-            self.deselect_piece()
-            if self.promotion_piece and (self.edit_mode or not self.promotion_piece.is_empty()):
-                self.undo_last_finished_move()
-                self.update_caption()
+            pos = self.get_board_position((x, y))
+            if self.not_on_board(pos):
+                self.deselect_piece()
+                if self.promotion_piece:
+                    self.undo_last_finished_move()
+                    self.update_caption()
                 return
-            if self.edit_mode:
-                pos = self.get_board_position((x, y))
-                if self.not_on_board(pos):
-                    return
-                self.square_was_clicked = True
-                self.clicked_square = pos
+            self.square_was_clicked = True
+            self.clicked_square = pos
 
     def on_mouse_motion(self, x: int, y: int, dx: int, dy: int) -> None:
         if not self.held_buttons:
@@ -3641,14 +3640,14 @@ class Board(Window):
         held_buttons = buttons & self.held_buttons
         self.held_buttons = 0
         if self.edit_mode:
-            if self.promotion_piece:
-                return
             pos = self.get_board_position((x, y))
             if self.not_on_board(pos):
                 return
             next_selected_square = None
             move = Move(is_edit=1)
             if held_buttons & MOUSE_BUTTON_LEFT:
+                if self.promotion_piece:
+                    return
                 if not self.selected_square:
                     return
                 if pos == self.selected_square and not modifiers & key.MOD_ALT:
@@ -3685,9 +3684,10 @@ class Board(Window):
                     if not self.not_a_piece(pos):
                         move.set(captured_piece=self.get_piece(pos))
             elif held_buttons & MOUSE_BUTTON_RIGHT:
-                if self.clicked_square != pos:
-                    self.deselect_piece()
-                    return
+                self.deselect_piece()
+                if self.promotion_piece:
+                    self.undo_last_finished_move()
+                    self.update_caption()
                 if modifiers & key.MOD_ALT:
                     move.set(pos_from=pos, pos_to=pos, piece=self.get_piece(pos), is_edit=2)
                     if move.piece.is_empty():
@@ -3732,6 +3732,8 @@ class Board(Window):
             else:
                 return
             move.piece.move(move)
+            if move.promotion is Unset and move.movement_type == movement.DropMovement and not self.promotion_piece:
+                return
             self.update_auto_capture_markers(move)
             self.move_history.append(deepcopy(move))
             self.apply_edit_promotion(move)
@@ -3743,18 +3745,16 @@ class Board(Window):
                 self.select_piece(next_selected_square)
             return
         if held_buttons & MOUSE_BUTTON_RIGHT:
-            if not self.drops:
-                self.deselect_piece()
-                return
-            if self.game_over:
-                self.deselect_piece()
-                return
+            self.deselect_piece()
             if self.promotion_piece:
-                if not self.edit_mode and self.promotion_piece.is_empty():
-                    self.undo_last_finished_move()
-                    self.update_caption()
+                self.undo_last_finished_move()
+                self.update_caption()
                 if not modifiers & key.MOD_SHIFT:
                     return
+            if not self.drops:
+                return
+            if self.game_over:
+                return
             pos = self.get_board_position((x, y))
             if not self.not_on_board(pos) and (piece := self.get_piece(pos)).is_empty():
                 move = Move(pos_from=pos, pos_to=pos, movement_type=movement.DropMovement, piece=piece, promotion=Unset)
@@ -4547,6 +4547,8 @@ class Board(Window):
             self.log(f"[Ply {self.ply_count}] Info: Using quasi-royal check rule (threaten last royal piece)")
         if not self.use_check:
             self.log(f"[Ply {self.ply_count}] Info: Checks disabled (capture the royal piece to win)")
+        if self.use_drops:
+            self.log(f"[Ply {self.ply_count}] Info: Drops enabled")
 
     def save_log(self, log_data: list[str] | None = None, log_name: str = 'log') -> None:
         if not log_data:
