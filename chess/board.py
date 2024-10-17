@@ -1365,7 +1365,7 @@ class Board(Window):
                 for pos in drop_squares[side]:
                     drops[piece_type][pos] = piece
                 for piece_type in trimmed_set[1:-1]:
-                    if piece_type not in drops and not issubclass(piece_type, (NoPiece, Royal)):
+                    if piece_type not in drops and not issubclass(piece_type, NoPiece):
                         drops[piece_type] = {pos: piece_type for pos in drop_squares[side]}
                 if trimmed_set[-1] not in drops:
                     piece_type = trimmed_set[-1]
@@ -4011,19 +4011,40 @@ class Board(Window):
             self.set_fullscreen(False)
             self.resize((self.board_width + 2) * default_size, (self.board_height + 2) * default_size)
         if symbol == key.E:
-            if modifiers & key.MOD_SHIFT:  # Empty board
-                self.empty_board()
-            if modifiers & key.MOD_ACCEL:  # Edit mode (toggle)
-                self.edit_mode = not self.edit_mode
-                self.log(f"[Ply {self.ply_count}] Mode: {'EDIT' if self.edit_mode else 'PLAY'}", False)
-                self.deselect_piece()
-                self.hide_moves()
-                self.advance_turn()
-                if self.edit_mode:
-                    self.moves = {side: {} for side in self.moves}
-                    self.chain_moves = {side: {} for side in self.chain_moves}
-                    self.theoretical_moves = {side: {} for side in self.theoretical_moves}
-                    self.show_moves()
+            if modifiers & key.MOD_ALT:  # Everything
+                self.save_config()
+                self.log(f"[Ply {self.ply_count}] Info: Configuration saved", False)
+                self.save_log()
+                self.log(f"[Ply {self.ply_count}] Info: Log file saved", False)
+                self.log(f"[Ply {self.ply_count}] Info: Saving debug information", False)
+                debug_log_data = self.debug_info()
+                self.save_log(debug_log_data, 'debug')
+                self.log(f"[Ply {self.ply_count}] Info: Debug information saved", False)
+                save_path = get_filename('save', 'json')
+                self.save(save_path)
+                if modifiers & key.MOD_ACCEL:
+                    self.save_log(self.verbose_data, 'verbose')
+                    self.log(f"[Ply {self.ply_count}] Info: Verbose log file saved", False)
+                if modifiers & key.MOD_SHIFT:
+                    self.log(f"[Ply {self.ply_count}] Info: Saving debug listings", False)
+                    save_piece_data(self)
+                    save_piece_sets()
+                    save_piece_types()
+                    self.log(f"[Ply {self.ply_count}] Info: Debug listings saved", False)
+            else:
+                if modifiers & key.MOD_SHIFT:  # Empty board
+                    self.empty_board()
+                if modifiers & key.MOD_ACCEL:  # Edit mode (toggle)
+                    self.edit_mode = not self.edit_mode
+                    self.log(f"[Ply {self.ply_count}] Mode: {'EDIT' if self.edit_mode else 'PLAY'}", False)
+                    self.deselect_piece()
+                    self.hide_moves()
+                    self.advance_turn()
+                    if self.edit_mode:
+                        self.moves = {side: {} for side in self.moves}
+                        self.chain_moves = {side: {} for side in self.chain_moves}
+                        self.theoretical_moves = {side: {} for side in self.theoretical_moves}
+                        self.show_moves()
         if symbol == key.W:  # White
             if modifiers & key.MOD_ALT:  # Reset white set to default
                 self.piece_set_ids[Side.WHITE] = 0
@@ -4231,10 +4252,12 @@ class Board(Window):
             old_check = self.use_check
             if modifiers & key.MOD_ALT:  # Toggle checks
                 self.use_check = not self.use_check
-            elif modifiers & key.MOD_SHIFT:  # Force royal mode (Shift: all quasi-royal, Ctrl+Shift: all royal)
-                self.royal_piece_mode = 1 if modifiers & key.MOD_ACCEL else 2
-            elif modifiers & key.MOD_ACCEL:  # Default royal mode (depends on piece superclass)
+            elif modifiers & key.MOD_ACCEL and modifiers & key.MOD_SHIFT:  # Default royal mode (depends on superclass)
                 self.royal_piece_mode = 0
+            elif modifiers & key.MOD_SHIFT:  # Royal mode (threaten any royal piece to check)
+                self.royal_piece_mode = 1
+            elif modifiers & key.MOD_ACCEL:  # Quasi-royal mode (threaten the last royal piece to check)
+                self.royal_piece_mode = 2
             if old_mode != self.royal_piece_mode:
                 if self.royal_piece_mode == 0:
                     self.log(f"[Ply {self.ply_count}] Info: Using default check rule (piece-dependent)")
