@@ -88,8 +88,8 @@ class Config(dict):
                 self.base_config[section][item] = str(self[item])
                 if item == 'stalemate':
                     if isinstance(self[item], dict):
-                        max_value = max(self[item].keys())
-                        self.base_config[section][item] = ', '.join(str(self[item].get(i, 0)) for i in range(max_value))
+                        range_max = max(self[item].keys()) + 1
+                        self.base_config[section][item] = ', '.join(str(self[item].get(i, 0)) for i in range(range_max))
                 if item.startswith('block_'):
                     self.base_config[section][item] = ', '.join(str(s) for s in self[item])
                 if (

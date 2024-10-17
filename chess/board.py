@@ -385,7 +385,6 @@ def select_save_name() -> str:
 
 
 class Board(Window):
-
     def __init__(self):
         # super boring initialization stuff (bluh bluh)
         self.board_config = Config(config_path)
@@ -2419,7 +2418,7 @@ class Board(Window):
                 # empty the square it was captured on (it was not emptied earlier because it was not the one moved to)
                 self.piece_sprite_list.remove(self.pieces[capture_pos[0]][capture_pos[1]])
             self.reset_position(move.captured_piece)
-            if not self.is_trickster_mode():  # reset_trickster_mode() does not reset removed pieces
+            if not self.is_trickster_mode():   # reset_trickster_mode() does not reset removed pieces
                 move.captured_piece.angle = 0  # so instead we have to do it manually as a workaround
             self.update_piece(move.captured_piece)  # update the piece sprite to reflect current piece hiding mode
             self.pieces[capture_pos[0]][capture_pos[1]] = move.captured_piece
