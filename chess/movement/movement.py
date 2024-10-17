@@ -383,12 +383,13 @@ class CastlingMovement(BaseMovement):
         return self_move.set(chained_move=other_move),
 
     def update(self, move: Move, piece: Piece):
-        direction = piece.side.direction(self.direction)
-        offset = sub(move.pos_to, move.pos_from)
-        if offset == direction:
-            for gap_offset in self.en_passant_gap:
-                pos = add(move.pos_from, gap_offset)
-                self.board.mark_castling_ep(move.pos_to, pos)
+        if move.movement_type == type(self):
+            direction = piece.side.direction(self.direction)
+            offset = sub(move.pos_to, move.pos_from)
+            if offset == direction:
+                for gap_offset in self.en_passant_gap:
+                    pos = add(move.pos_from, gap_offset)
+                    self.board.mark_castling_ep(move.pos_to, pos)
         super().update(move, piece)
 
     def undo(self, move: Move, piece: Piece):

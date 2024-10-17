@@ -135,7 +135,10 @@ class Move(object):
                 else:
                     string = f"appears on {toa(self.pos_to)}"
         elif self.pos_to is None:
-            string = f"disappears from {toa(self.pos_from)}"
+            if self.is_edit == 1:
+                string = f"disappears from {toa(self.pos_from)}"
+            else:
+                string = f"is taken from {toa(self.pos_from)}"
         elif not moved or self.swapped_piece:
             if self.captured_piece is None and self.swapped_piece is None and self.promotion is None:
                 string = f"stays on {toa(self.pos_from)}"
