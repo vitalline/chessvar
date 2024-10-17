@@ -282,14 +282,16 @@ def get_set(side: Side, set_id: int) -> list[Type[Piece]]:
     return piece_group.get(f"set_{side.key()[0]}", piece_group.get('set', [NoPiece] * default_board_width))
 
 
-def get_set_name(piece_set: list[Type[Piece]]) -> str:
-    piece_name_order = [[i, len(piece_set) - 1 - i] for i in range(len(piece_set) // 2)]
+def get_set_name(piece_set: list[Type[Piece]], include_royals: bool = False) -> str:
+    piece_name_order = [[i, len(piece_set) - 1 - i] for i in range(ceil(len(piece_set) / 2))]
     piece_names = []
     for group in piece_name_order:
         name_order = []
         used_names = set()
         for pos in group:
-            if not piece_set[pos] or issubclass(piece_set[pos], (NoPiece, Royal)):
+            if not piece_set[pos] or issubclass(piece_set[pos], NoPiece):
+                continue
+            if piece_set[pos] in {fide.King, cb.King} and pos == piece_name_order[-1][-1] and not include_royals:
                 continue
             name = piece_set[pos].name
             if name not in used_names:
@@ -1068,9 +1070,9 @@ class Board(Window):
         for side in self.piece_sets:
             if self.piece_set_ids[side] is None:
                 self.piece_sets[side] = saved_piece_sets[side]
-                self.piece_set_names[side] = get_set_name(self.piece_sets[side])
+                self.piece_set_names[side] = get_set_name(self.piece_sets[side], True)
                 continue
-            for i, pair in enumerate(zip(saved_piece_sets[side], self.piece_sets[side])):
+            for i, pair in enumerate(zip_longest(saved_piece_sets[side], self.piece_sets[side], fillvalue=NoPiece)):
                 if pair[0] != pair[1]:
                     # this can mean a few things, namely the RNG implementation changing or new sets/pieces being added.
                     # either way, we should at least try to load the old pieces defined in the save to recreate the game
@@ -1082,7 +1084,9 @@ class Board(Window):
                     update_sets = True
         if update_sets:
             self.piece_sets = {side: saved_piece_sets[side] for side in self.piece_sets}
-            self.piece_set_names = {side: get_set_name(self.piece_sets[side]) for side in self.piece_sets}
+            self.piece_set_names = {
+                side: get_set_name(self.piece_sets[side], self.piece_set_ids[side] is None) for side in self.piece_sets
+            }
 
         self.reset_drops()
         self.reset_promotions()
@@ -3408,7 +3412,6 @@ class Board(Window):
                 self.height + self.square_size * (self.board_height - old_height)
             )
             self.update_highlight(old_highlight)
-            self.advance_turn()
 
     def resize(self, width: float, height: float) -> None:
         if self.fullscreen:
@@ -3970,15 +3973,19 @@ class Board(Window):
             width = self.board_width - (0 if modifiers & key.MOD_ALT else 1)
             height = self.board_height - (1 if modifiers & key.MOD_ALT else 0)
             self.resize_board(width, height)
+            self.advance_turn()
         if symbol == key.BRACKETRIGHT and modifiers & key.MOD_ACCEL:  # Increase board size
             width = self.board_width + (0 if modifiers & key.MOD_ALT else 1)
             height = self.board_height + (1 if modifiers & key.MOD_ALT else 0)
             self.resize_board(width, height)
+            self.advance_turn()
         if symbol == key.BACKSLASH and modifiers & key.MOD_ACCEL:
             if modifiers & key.MOD_ALT:  # Invert board size
                 self.resize_board(self.board_height, self.board_width)
+                self.advance_turn()
             else:  # Reset board size
                 self.resize_board(default_board_width, default_board_height)
+                self.advance_turn()
         if symbol == key.F11:  # Full screen (toggle)
             self.toggle_fullscreen()
         if symbol == key.MINUS and not self.fullscreen:  # (-) Decrease window size
