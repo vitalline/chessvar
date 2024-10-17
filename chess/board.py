@@ -4795,7 +4795,7 @@ class Board(Window):
             turn_pieces = f" ({', '.join(sorted(piece.name for piece in self.turn_pieces))})"
         else:
             turn_pieces = ''
-        self.log(f"Turn side: {self.turn_side if self.turn_side else 'None'}{turn_pieces}")
+        debug_log_data.append(f"Turn side: {self.turn_side if self.turn_side else 'None'}{turn_pieces}")
         debug_log_data.append(f"Turn order ({len(self.turn_order)}):")
         for i, data in enumerate(self.turn_order):
             if isinstance(data, list):
@@ -4804,7 +4804,7 @@ class Board(Window):
             else:
                 turn_side = data
                 turn_pieces = ''
-            self.log(f"  {i + 1}: {turn_side if turn_side else 'None'}{turn_pieces}")
+            debug_log_data.append(f"  {i + 1}: {turn_side if turn_side else 'None'}{turn_pieces}")
         possible_moves = sum((sum(v.values(), []) for v in self.moves.get(self.turn_side, {}).values()), [])
         debug_log_data.append(f"Moves possible: {len(possible_moves)}")
         debug_log_data.append(f"Unique moves: {sum(len(i) for i in self.unique_moves()[self.turn_side].values())}")
