@@ -828,11 +828,11 @@ class Board(Window):
                 side.value: [save_piece_type(t) if t is not NoPiece else None for t in piece_set]
                 for side, piece_set in self.piece_sets.items()
             },
+            'pawn': save_piece_type(self.custom_pawn) if self.custom_pawn != fide.Pawn else None,
             'pieces': cnd_alg({
                 p.board_pos: save_piece(p.on(None))
                 for pieces in [*self.movable_pieces.values(), self.obstacles] for p in pieces
             }, *wh),
-            'pawn': save_piece_type(self.custom_pawn) if self.custom_pawn != fide.Pawn else None,
             'custom': {k: save_custom_type(v) for k, v in self.custom_pieces.items()},
             'layout': cnd_alg({pos: save_piece(p.on(None)) for pos, p in self.custom_layout.items()}, *wh),
             'promotions': {
