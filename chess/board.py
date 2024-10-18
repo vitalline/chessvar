@@ -2824,7 +2824,7 @@ class Board(Window):
                 move = self.find_move(selected_square, hovered_square)
             if move:
                 move = deepcopy(move)
-                if move.promotion is not None:
+                if move.promotion is not None and type(move.piece) != type(move.promotion):
                     move.promotion = Unset
                 chained_move = self.chain_start
                 poss = []

@@ -140,7 +140,8 @@ class Move(object):
             else:
                 string = f"is taken from {toa(self.pos_from)}"
         elif not moved or self.swapped_piece:
-            if self.captured_piece is None and self.swapped_piece is None and self.promotion is None:
+            promoted = self.promotion is Unset or self.promotion and type(self.piece) != type(self.promotion)
+            if self.captured_piece is None and self.swapped_piece is None and not promoted:
                 string = f"stays on {toa(self.pos_from)}"
             else:
                 string = f"on {toa(self.pos_from)}"
@@ -175,7 +176,7 @@ class Move(object):
                     string += f"{comma} is promoted"
                 else:
                     string += f"{comma} tries to promote"
-            elif self.promotion:
+            elif self.promotion and type(self.piece) != type(self.promotion):
                 if self.is_edit == 1:
                     promotes = "is promoted"
                 else:
