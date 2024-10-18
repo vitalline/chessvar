@@ -1342,7 +1342,13 @@ class Board(Window):
             Side.BLACK: [(self.board_height - 2, j) for j in range(self.board_width)],
         }
         for drop_side in piece_sets:
-            drops = {}
+            drops = {self.custom_pawn: {}}
+            pawn = self.custom_pawn(self)
+            pawn.movement.set_moves(1)
+            for pos in pawn_drop_squares[drop_side]:
+                drops[self.custom_pawn][pos] = pawn
+            for pos in pawn_drop_squares_2[drop_side]:
+                drops[self.custom_pawn][pos] = self.custom_pawn
             for side in (drop_side, drop_side.opponent()):
                 if not piece_sets[side]:
                     continue
@@ -1355,29 +1361,15 @@ class Board(Window):
                     trimmed_set.pop()
                 if not trimmed_set:
                     continue
-                drops[self.custom_pawn] = {}
-                pawn = self.custom_pawn(self)
-                pawn.movement.set_moves(1)
-                for pos in pawn_drop_squares[side]:
-                    drops[self.custom_pawn][pos] = pawn
-                for pos in pawn_drop_squares_2[side]:
-                    drops[self.custom_pawn][pos] = self.custom_pawn
-                piece_type = trimmed_set[0]
-                drops[piece_type] = {}
-                piece = piece_type(self)
-                piece.movement.set_moves(1)
-                for pos in drop_squares[side]:
-                    drops[piece_type][pos] = piece
-                for piece_type in trimmed_set[1:-1]:
+                for i, piece_type in enumerate(trimmed_set):
                     if piece_type not in drops and not issubclass(piece_type, NoPiece):
-                        drops[piece_type] = {pos: piece_type for pos in drop_squares[side]}
-                if trimmed_set[-1] not in drops:
-                    piece_type = trimmed_set[-1]
-                    drops[piece_type] = {}
-                    piece = piece_type(self)
-                    piece.movement.set_moves(1)
-                    for pos in drop_squares[side]:
-                        drops[piece_type][pos] = piece
+                        has_moved = i in {0, len(trimmed_set) - 1} or issubclass(piece_type, Royal)
+                        if has_moved:
+                            piece = piece_type(self)
+                            piece.movement.set_moves(1)
+                            drops[piece_type] = {pos: piece for pos in drop_squares[side]}
+                        else:
+                            drops[piece_type] = {pos: piece_type for pos in drop_squares[side]}
             self.drops[drop_side] = drops
 
     def reset_promotions(self, piece_sets: dict[Side, list[Type[Piece]]] | None = None) -> None:
@@ -4654,31 +4646,37 @@ class Board(Window):
         )
         for side in self.piece_set_ids:
             debug_log_data.append(f"{side} setup: {', '.join(piece.name for piece in self.piece_sets[side])}")
+        for side in self.piece_set_ids:
             debug_log_data.append(f"{side} pieces ({len(self.movable_pieces[side])}):")
             for piece in self.movable_pieces[side]:
                 debug_log_data.append(f'  {toa(piece.board_pos)} {piece.board_pos}: {piece.name}')
             if not self.movable_pieces[side]:
                 debug_log_data[-1] += " None"
+        for side in self.piece_set_ids:
             debug_log_data.append(f"{side} royal pieces ({len(self.royal_pieces[side])}):")
             for piece in self.royal_pieces[side]:
                 debug_log_data.append(f'  {toa(piece.board_pos)} {piece.board_pos}: {piece.name}')
             if not self.royal_pieces[side]:
                 debug_log_data[-1] += " None"
+        for side in self.piece_set_ids:
             debug_log_data.append(f"{side} quasi-royal pieces ({len(self.quasi_royal_pieces[side])}):")
             for piece in self.quasi_royal_pieces[side]:
                 debug_log_data.append(f'  {toa(piece.board_pos)} {piece.board_pos}: {piece.name}')
             if not self.quasi_royal_pieces[side]:
                 debug_log_data[-1] += " None"
+        for side in self.piece_set_ids:
             debug_log_data.append(f"{side} probabilistic pieces ({len(self.probabilistic_pieces[side])}):")
             for piece in self.probabilistic_pieces[side]:
                 debug_log_data.append(f'  {toa(piece.board_pos)} {piece.board_pos}: {piece.name}')
             if not self.probabilistic_pieces[side]:
                 debug_log_data[-1] += " None"
+        for side in self.piece_set_ids:
             debug_log_data.append(f"{side} auto-ranged pieces ({len(self.auto_ranged_pieces[side])}):")
             for piece in self.auto_ranged_pieces[side]:
                 debug_log_data.append(f'  {toa(piece.board_pos)} {piece.board_pos}: {piece.name}')
             if not self.auto_ranged_pieces[side]:
                 debug_log_data[-1] += " None"
+        for side in self.piece_set_ids:
             debug_log_data.append(f"{side} auto-capture squares ({len(self.auto_capture_markers[side])}):")
             for pos in sorted(self.auto_capture_markers[side]):
                 piece_poss = self.auto_capture_markers[side][pos]
@@ -4687,6 +4685,72 @@ class Board(Window):
                 }""")
             if not self.auto_capture_markers[side]:
                 debug_log_data[-1] += " None"
+        for side in self.piece_set_ids:
+            promotions = self.promotions.get(side, {})
+            debug_log_data.append(f"{side} promotion rules ({len(promotions)}):")
+            for piece in promotions:
+                debug_log_data.append(f"  {piece.name} ({len(promotions[piece])}):")
+                rows = set()
+                for pos in promotions[piece]:
+                    row = pos[0]
+                    if row in rows:
+                        continue
+                    rows.add(row)
+                if rows == set(range(self.board_height)):
+                    rows = {-1}
+                for row in sorted(rows):
+                    piece_list = []
+                    for to_piece in promotions[piece][(max(row, 0), 0)]:
+                        suffixes = []
+                        if isinstance(to_piece, Piece):
+                            if to_piece.side not in {side, Side.NONE}:
+                                suffixes.append(f"Side: {to_piece.side}")
+                            if to_piece.movement and to_piece.movement.total_moves:
+                                suffixes.append(f"Moves: {to_piece.movement.total_moves}")
+                            if to_piece.promoted_from:
+                                suffixes.append(f"Promoted from: {to_piece.promoted_from.name}")
+                            if to_piece.is_hidden is False:
+                                suffixes.append('Never hide')
+                        suffix = f" ({', '.join(suffixes)})" if suffixes else ''
+                        piece_list.append(f"{to_piece.name}{suffix}")
+                    piece_list = ', '.join(string for string in piece_list)
+                    debug_log_data.append(f"    {toa((row, -1))} {(row, -1)}: {piece_list if piece_list else 'None'}")
+                if not promotions[piece]:
+                    debug_log_data[-1] += " None"
+            if not promotions:
+                debug_log_data[-1] += " None"
+        for side in self.piece_set_ids:
+            drops = self.drops.get(side, {})
+            debug_log_data.append(f"{side} drop rules ({len(drops)}):")
+            for piece in drops:
+                debug_log_data.append(f"  {piece.name} ({len(drops[piece])}):")
+                rows = set()
+                for pos in drops[piece]:
+                    row = pos[0]
+                    if row in rows:
+                        continue
+                    rows.add(row)
+                if rows == set(range(self.board_height)):
+                    rows = {-1}
+                for row in sorted(rows):
+                    to_piece = drops[piece][(max(row, 0), 0)]
+                    suffixes = []
+                    if isinstance(to_piece, Piece):
+                        if to_piece.side not in {side, Side.NONE}:
+                            suffixes.append(f"Side: {to_piece.side}")
+                        if to_piece.movement and to_piece.movement.total_moves:
+                            suffixes.append(f"Moves: {to_piece.movement.total_moves}")
+                        if to_piece.promoted_from:
+                            suffixes.append(f"Promoted from: {to_piece.promoted_from.name}")
+                        if to_piece.is_hidden is False:
+                            suffixes.append('Never hide')
+                    suffix = f" ({', '.join(suffixes)})" if suffixes else ''
+                    debug_log_data.append(f"    {toa((row, -1))} {(row, -1)}: {to_piece.name}{suffix}")
+                if not drops[piece]:
+                    debug_log_data[-1] += " None"
+            if not drops:
+                debug_log_data[-1] += " None"
+        for side in self.piece_set_ids:
             piece_list = ', '.join(piece.name for piece in self.edit_promotions[side])
             debug_log_data.append(
                 f"{side} replacements ({len(self.edit_promotions[side])}): {piece_list if piece_list else 'None'}"
@@ -4717,7 +4781,7 @@ class Board(Window):
         data = (self.load_dict or {}).get('promotions', {})
         for side in self.piece_set_ids:
             promotions = self.custom_promotions.get(side, {})
-            debug_log_data.append(f"Custom promotions for {side} ({len(promotions)}):")
+            debug_log_data.append(f"{side} custom promotion rules ({len(promotions)}):")
             for piece in promotions:
                 debug_log_data.append(f"  {piece.name} ({len(promotions[piece])}):")
                 compressed = data.get(str(side.value), {}).get(save_piece_type(piece), {})
@@ -4750,7 +4814,7 @@ class Board(Window):
         data = (self.load_dict or {}).get('drops', {})
         for side in self.piece_set_ids:
             drops = self.custom_drops.get(side, {})
-            debug_log_data.append(f"Drop rules for {side} ({len(drops)}):")
+            debug_log_data.append(f"{side} custom drop rules ({len(drops)}):")
             for piece in drops:
                 debug_log_data.append(f"  {piece.name} ({len(drops[piece])}):")
                 compressed = data.get(str(side.value), {}).get(save_piece_type(piece), {})
@@ -4779,12 +4843,12 @@ class Board(Window):
                 debug_log_data[-1] += " None"
         for side in self.custom_extra_drops:
             debug_log_data.append(
-                f"Starting drops of {side} ({len(self.custom_extra_drops[side])}): "
+                f"{side} starting drops ({len(self.custom_extra_drops[side])}): "
                 f"{', '.join(piece.name for piece in self.custom_extra_drops[side]) or 'None'}"
             )
         for side in self.captured_pieces:
             debug_log_data.append(
-                f"Drops of {side} ({len(self.captured_pieces[side])}): "
+                f"{side} drops ({len(self.captured_pieces[side])}): "
                 f"{', '.join(piece.name for piece in self.captured_pieces[side]) or 'None'}"
             )
         en_passant_pos = toa(self.en_passant_target.board_pos) if self.en_passant_target else 'None'
@@ -4805,9 +4869,8 @@ class Board(Window):
         debug_log_data.append(f"Use check: {self.use_check} - {check_modes[self.use_check]}")
         stalemate_modes = {0: "draws", 1: "loses", -1: "wins"}
         if isinstance(self.stalemate_rule, dict):
-            debug_log_data.append(f"Stalemate rules")
             for side, mode in self.stalemate_rule.items():
-                debug_log_data.append(f"  {side} {stalemate_modes[mode]} when stalemated")
+                debug_log_data.append(f"Stalemate rule: {side} {stalemate_modes[mode]} when stalemated")
         else:
             debug_log_data.append(f"Stalemate rule: Player {stalemate_modes[self.stalemate_rule]} when stalemated")
         royal_modes = {0: "Default", 1: "Force royal (Threaten Any)", 2: "Force quasi-royal (Threaten Last)"}
