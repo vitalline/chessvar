@@ -2944,7 +2944,9 @@ class Board(Window):
         promotion_piece = self.promotion_piece
         if move.promotion:
             self.promotion_piece = True
-            move.promotion.promoted_from = move.promotion.promoted_from or move.piece.promoted_from or type(move.piece)
+            promoted_from = move.promotion.promoted_from or move.piece.promoted_from or type(move.piece)
+            if type(move.promotion) != promoted_from:
+                move.promotion.promoted_from = promoted_from
             self.replace(move.piece, move.promotion)
             self.update_promotion_auto_captures(move)
             self.promotion_piece = promotion_piece
@@ -2956,7 +2958,9 @@ class Board(Window):
                 promotion = promotion.of(promotion.side or move.piece.side).on(move.pos_to)
             else:
                 promotion = promotion(board=self, pos=move.piece.board_pos, side=move.piece.side)
-            promotion.promoted_from = promotion.promoted_from or move.piece.promoted_from or type(move.piece)
+            promoted_from = promotion.promoted_from or move.piece.promoted_from or type(move.piece)
+            if type(promotion) != promoted_from:
+                promotion.promoted_from = promoted_from
             move.set(promotion=promotion)
             self.replace(move.piece, move.promotion)
             self.update_promotion_auto_captures(move)
@@ -3007,7 +3011,9 @@ class Board(Window):
             else:
                 promotion_piece = promotion(board=self, pos=pos, side=side)
             if not self.edit_mode or (self.move_history and ((m := self.move_history[-1]) and m.is_edit != 1)):
-                promotion_piece.promoted_from = promotion_piece.promoted_from or piece.promoted_from or type(piece)
+                promoted_from = promotion_piece.promoted_from or piece.promoted_from or type(piece)
+                if type(promotion_piece) != promoted_from:
+                    promotion_piece.promoted_from = promoted_from
             if self.edit_mode and is_prefix_in(['custom', 'wall'], self.edit_piece_set_id):
                 promotion_piece.reload(is_hidden=False, flipped_horizontally=False)
             elif issubclass(promotion, Royal) and promotion not in self.piece_sets[side]:
@@ -3698,9 +3704,10 @@ class Board(Window):
                             if isinstance(piece, Piece):
                                 piece = piece.of(piece.side or side).on(pos)
                             else:
-                                p = piece(board=self, pos=move.pos_to, side=side)
-                                p.promoted_from = p.promoted_from or ((mp := move.piece).promoted_from or type(mp))
-                                piece = p
+                                piece = piece(board=self, pos=move.pos_to, side=side)
+                            promoted_from = piece.promoted_from or ((mp := move.piece).promoted_from or type(mp))
+                            if type(piece) != promoted_from:
+                                piece.promoted_from = promoted_from
                             move.set(promotion=piece)
                         elif len(self.edit_promotions[side]) > 1:
                             move.set(promotion=Unset)
