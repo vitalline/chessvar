@@ -422,6 +422,7 @@ class Board(Window):
         self.log_data = []  # list of important logged strings
         self.verbose_data = []  # list of all logged strings
         self.verbose = self.board_config['verbose']  # whether to use verbose data for console output
+        self.variant = ''  # name of the variant being played
         self.load_data = None  # last loaded data
         self.load_dict = None  # last loaded data, parsed from JSON
         self.load_path = None  # path to the last loaded data file
@@ -811,6 +812,7 @@ class Board(Window):
     def dump_board(self, partial: bool = False) -> str:
         wh = self.board_width, self.board_height
         data = {
+            'variant': self.variant,
             'board_size': [*wh],
             'window_size': list(self.windowed_size),
             'square_size': self.windowed_square_size,
@@ -951,6 +953,8 @@ class Board(Window):
             del data['alias']
         if self.alias_dict:
             data = expand(data, self.alias_dict, self.board_config['recursive_aliases'])
+
+        self.variant = data.get('variant', '')
 
         # might have to add more error checking to saving/loading, even if at the cost of slight redundancy.
         # who knows when someone decides to introduce a breaking change and absolutely destroy all the saves
@@ -1297,6 +1301,7 @@ class Board(Window):
         self.update_status()
 
     def reset_custom_data(self) -> None:
+        self.variant = ''
         self.alias_dict = {}
         self.custom_drops = {}
         self.custom_pieces = {}
@@ -4548,8 +4553,8 @@ class Board(Window):
             print(string)
 
     def log_armies(self):
-        if self.custom_layout:
-            self.log(f"[Ply {self.ply_count}] Game: Custom")
+        if self.variant or self.custom_layout:
+            self.log(f"[Ply {self.ply_count}] Game: {self.variant or 'Custom'}")
             return
         self.log(
             f"[Ply {self.ply_count}] Game: "
@@ -4635,6 +4640,7 @@ class Board(Window):
             f"Chaos ID blocklist ({len(self.board_config['block_ids_chaos'])}): "
             f"{', '.join(str(i) for i in self.board_config['block_ids_chaos']) or 'None'}"
         )
+        debug_log_data.append(f"Variant: {self.variant or 'None'}")
         side_id_strings = {
             side: '-' if set_id is None else f"{set_id:0{digits}d}"
             for side, set_id in self.piece_set_ids.items()
