@@ -20,7 +20,7 @@ Castling works as normal, with one exception when castling queenside: if the pie
 Pawns promote as normal, but can only be promoted to pieces that were on the board at the start of the game (owned by either player), excluding pawns and kings.
 
 NB: The notation used for the pieces is an extension of XBetza (itself an extension of Betza notation) as defined here: https://www.chessvariants.com/page/MSbetza-notation-extended
-The additional extension is used to notate some of the more complicated movement conditions, such as halfling pieces (hh*), automatic capture in a certain range (cc*), movement that depends on board half (*l,*r), square color (*w,*b), whether the square color matches the side (*s,*d), and movement that is randomly chosen between multiple options ({*,*,...}), where * represents arbitrary movement notation. In addition, the notation used for some of the pieces may change later, likely to something more readable (but nonetheless valid).
+The additional extension is used to notate some of the more complicated movement conditions, such as halfling pieces (hh*), automatic capture in a certain range (cc*), movement that depends on board half (*l,*r), square color (*w,*b), whether the square color matches the side of the piece (*s,*d) or the square that the piece initially started on (*i,*o), and movement that is randomly chosen between multiple options ({*,*,...}), where * represents arbitrary movement notation. In addition, the notation used for some of the pieces may change later, likely to something more readable (but nonetheless valid).
 
 Component pieces: These do not appear by themselves here but do appear as components for the compound pieces.
 
