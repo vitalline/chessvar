@@ -3410,10 +3410,23 @@ class Board(Window):
         if self.game_loaded or self.board_width != default_board_width or self.board_height != default_board_height:
             self.log(f"[Ply {self.ply_count}] Info: Changed board size to {self.board_width}x{self.board_height}")
             self.update_sprites(self.square_size, self.origin, old_width, old_height, self.flip_mode)
-            self.resize(
+            new_width, new_height = (
                 self.width + self.square_size * (self.board_width - old_width),
                 self.height + self.square_size * (self.board_height - old_height)
             )
+            if self.fullscreen:
+                board_size = self.board_width, self.board_height
+                square_size, origin = self.square_size, self.origin
+                self.windowed_size = tuple(
+                    self.windowed_size[i] + self.windowed_square_size * (board_size[i] - old_board_size[i])
+                    for i in range(2)
+                )
+                self.windowed_square_size = min(self.windowed_size[i] / (board_size[i] + 2) for i in range(2))
+                self.square_size = min(self.size[i] / (board_size[i] + 2) for i in range(2))
+                self.origin = self.width / 2, self.height / 2
+                self.update_sprites(square_size, origin, self.board_width, self.board_height, self.flip_mode)
+            else:
+                self.resize(new_width, new_height)
             self.update_highlight(old_highlight)
 
     def resize(self, width: float, height: float) -> None:
@@ -3437,11 +3450,16 @@ class Board(Window):
         if self.fullscreen:
             self.log(f"[Ply {self.ply_count}] Info: Fullscreen disabled", False)
             self.set_fullscreen(False)
+            if self.size != self.windowed_size:
+                self.resize(*self.windowed_size)
+            else:
+                self.log(f"[Ply {self.ply_count}] Info: Resized to {self.width}x{self.height}", False)
             return
         screens = get_screens()
         if len(screens) == 1:
             self.log(f"[Ply {self.ply_count}] Info: Fullscreen enabled", False)
             self.set_fullscreen()
+            self.log(f"[Ply {self.ply_count}] Info: Resized to {self.width}x{self.height}", False)
             return
         pos, size = self.get_location(), self.get_size()
         pos_min, pos_max = pos, add(pos, size)  # a bit of an unconventional usage of add() here but sure i guess
@@ -3456,6 +3474,7 @@ class Board(Window):
         screen = portions.index(max(portions))
         self.log(f"[Ply {self.ply_count}] Info: Fullscreen enabled on screen {screen + 1}", False)
         self.set_fullscreen(screen=screens[screen])
+        self.log(f"[Ply {self.ply_count}] Info: Resized to {self.width}x{self.height}", False)
 
     def set_visible(self, visible: bool = True) -> None:
         if self.board_config['save_update_mode'] < 0 and self.load_data is None:
