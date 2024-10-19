@@ -44,7 +44,7 @@ class Sausage(Piece):
 
 class Meatball(Piece):
     name = 'Meatball'
-    file_name = 'FWADfN'
+    file_name = 'KADfN'
     asset_folder = 'pizza'
 
     def __init__(self, board, **kwargs):

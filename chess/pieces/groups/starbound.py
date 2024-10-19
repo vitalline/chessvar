@@ -35,27 +35,22 @@ class SineRdr(Piece):
     asset_folder = 'starbound'
 
     def __init__(self, board, **kwargs):
-        movements = [movement.RiderMovement(board, symv([(0, 1), (-1, 1)]))]
-        for i, j in rot([(1, 1)]):
-            movements.append(
-                movement.BentMovement(board, [
-                    movement.RiderMovement(board, [(1, i, 1)]),
-                    movement.RiderMovement(board, [(1, j, 1)])
-                ])
-            )
-            movements.append(
-                movement.ChainMovement(board, [
-                    movement.MultiMovement(board, capture=[
-                        movement.RiderMovement(board, [(1, i, 1)])
-                    ]),
-                    movement.MultiMovement(board, move=[
-                        movement.RiderMovement(board, [(1, j, 1), (0, 0)])
-                    ])
-                ])
-            )
         super().__init__(
             board,
-            movement.MultiMovement(board, movements),
+            movement.MultiMovement(board, [movement.RiderMovement(board, symv([(0, 1), (-1, 1)]))] + [
+                movement.BentMovement(board, [
+                    movement.RiderMovement(board, symv([(1, 1, 1)])) for _ in range(2)
+                ])
+            ] + [
+                movement.ChainMovement(board, [
+                    movement.MultiMovement(board, capture=[
+                        movement.RiderMovement(board, symv([(1, 1, 1)]))
+                    ]),
+                    movement.MultiMovement(board, move=[
+                        movement.RiderMovement(board, symv([(1, 1, 1)]) + [(0, 0)])
+                    ])
+                ])
+            ]),
             **kwargs
         )
 
@@ -66,17 +61,14 @@ class Turneagle(Piece):
     asset_folder = 'starbound'
 
     def __init__(self, board, **kwargs):
-        movements = [movement.RiderMovement(board, rot([(1, 0)]))]
-        for i, j in rot([(1, 1)]):
-            movements.append(
+        super().__init__(
+            board,
+            movement.MultiMovement(board, [movement.RiderMovement(board, rot([(1, 0)]))] + [
                 movement.BentMovement(board, [
                     movement.RiderMovement(board, [(i, j, 1)]),
-                    movement.RiderMovement(board, [
-                        (k, l, 1) for k, l in rot([(1, 1)]) if (i, j) != (-k, -l)
-                    ])
-                ])
-            )
-            movements.append(
+                    movement.RiderMovement(board, [(k, l, 1) for k, l in rot([(1, 1)]) if (i, j) != (-k, -l)])
+                ]) for i, j in rot([(1, 1)])
+            ] + [
                 movement.ChainMovement(board, [
                     movement.MultiMovement(board, capture=[
                         movement.RiderMovement(board, [(i, j, 1)])
@@ -86,10 +78,7 @@ class Turneagle(Piece):
                             (k, l, 1) for k, l in rot([(1, 1)]) + [(0, 0)] if (i, j) != (-k, -l)
                         ])
                     ])
-                ])
-            )
-        super().__init__(
-            board,
-            movement.MultiMovement(board, movements),
+                ]) for i, j in rot([(1, 1)])
+            ]),
             **kwargs
         )

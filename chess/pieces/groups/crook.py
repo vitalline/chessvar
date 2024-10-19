@@ -40,7 +40,7 @@ class LionCub(Piece):
 
 class Rhino(Piece):
     name = 'Rhino'
-    file_name = 'WafsW'
+    file_name = 'W[W-F]'
     asset_folder = 'crook'
 
     def __init__(self, board, **kwargs):
@@ -49,8 +49,8 @@ class Rhino(Piece):
             movement.MultiMovement(board, [
                 movement.BentMovement(board, [
                     movement.RiderMovement(board, [(i, j, 1)]),
-                    movement.RiderMovement(board, [(i or k, j or k, 1)])
-                ]) for i, j in rot([(1, 0)]) for k in (1, -1)
+                    movement.RiderMovement(board, [(i or k, j or k, 1) for k in (1, -1)])
+                ]) for i, j in rot([(1, 0)])
             ]),
             **kwargs
         )
@@ -68,8 +68,8 @@ class Boyscout(Piece):
             movement.MultiMovement(board, [
                 movement.RepeatMovement(board, [
                     movement.RiderMovement(board, [(i, j, 1)]),
-                    movement.RiderMovement(board, [(k, l, 1)])
-                ]) for i, j in rot([(1, 1)]) for k, l in [(-i, j), (i, -j)]
+                    movement.RiderMovement(board, [(k, l, 1) for k, l in [(-i, j), (i, -j)]])
+                ]) for i, j in rot([(1, 1)])
             ]),
             **kwargs
         )
@@ -77,7 +77,7 @@ class Boyscout(Piece):
 
 class Griffon(Piece):
     name = 'Griffon'
-    file_name = 'FyafsF'
+    file_name = 'F[F-R]'
     asset_folder = 'crook'
 
     def __init__(self, board, **kwargs):
@@ -85,9 +85,9 @@ class Griffon(Piece):
             board,
             movement.MultiMovement(board, [
                 movement.BentMovement(board, [
-                    movement.RiderMovement(board, [(i or k, j or k, 1)]),
-                    movement.RiderMovement(board, [(i, j)])
-                ]) for i, j in rot([(1, 0)]) for k in (1, -1)
+                    movement.RiderMovement(board, [(i, j, 1)]),
+                    movement.RiderMovement(board, [(i, 0), (0, j)])
+                ]) for i, j in rot([(1, 1)])
             ]),
             **kwargs
         )

@@ -36,17 +36,16 @@ class Stele(Piece):
     colorbound = True
 
     def __init__(self, board, **kwargs):
-        movements = []
-        for i, j in rot([(1, 1)]):
-            movements.append(
+        super().__init__(
+            board,
+            movement.MultiMovement(board, [
                 movement.BentMovement(board, [
                     movement.RiderMovement(board, [(i, j, 1)]),
                     movement.RiderMovement(board, [
                         (k, l, 1) for k, l in rot([(1, 1)]) if (i, j) != (-k, -l)
                     ])
-                ])
-            )
-            movements.append(
+                ]) for i, j in rot([(1, 1)])
+            ] + [
                 movement.ChainMovement(board, [
                     movement.MultiMovement(board, capture=[
                         movement.RiderMovement(board, [(i, j, 1)])
@@ -56,11 +55,8 @@ class Stele(Piece):
                             (k, l, 1) for k, l in rot([(1, 1)]) + [(0, 0)] if (i, j) != (-k, -l)
                         ])
                     ])
-                ])
-            )
-        super().__init__(
-            board,
-            movement.MultiMovement(board, movements),
+                ]) for i, j in rot([(1, 1)])
+            ]),
             **kwargs
         )
 
@@ -71,17 +67,16 @@ class Caryatid(Piece):
     asset_folder = 'stone'
 
     def __init__(self, board, **kwargs):
-        movements = []
-        for i, j in rot([(1, 0)]):
-            movements.append(
+        super().__init__(
+            board,
+            movement.MultiMovement(board, [
                 movement.BentMovement(board, [
                     movement.RiderMovement(board, [(i, j, 1)]),
                     movement.RiderMovement(board, [
                         (k, l, 1) for k, l in rot([(1, 0)]) if (i, j) != (-k, -l)
                     ])
-                ])
-            )
-            movements.append(
+                ]) for i, j in rot([(1, 0)])
+            ] + [
                 movement.ChainMovement(board, [
                     movement.MultiMovement(board, capture=[
                         movement.RiderMovement(board, [(i, j, 1)])
@@ -91,10 +86,7 @@ class Caryatid(Piece):
                             (k, l, 1) for k, l in rot([(1, 0)]) + [(0, 0)] if (i, j) != (-k, -l)
                         ])
                     ])
-                ])
-            )
-        super().__init__(
-            board,
-            movement.MultiMovement(board, movements),
+                ]) for i, j in rot([(1, 0)])
+            ]),
             **kwargs
         )

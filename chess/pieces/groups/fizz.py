@@ -47,7 +47,7 @@ class RRhino(Piece):
 
 class Wyvern(Piece):
     name = 'Wyvern'
-    file_name = 'WhhyafsW'
+    file_name = 'Whh[W-B]'
     asset_folder = 'fizz'
 
     def __init__(self, board, **kwargs):
@@ -56,8 +56,8 @@ class Wyvern(Piece):
             movement.MultiMovement(board, [
                 movement.BentMovement(board, [
                     movement.RiderMovement(board, [(i, j, 1)]),
-                    movement.HalflingRiderMovement(board, [(i or k, j or k)], 1)
-                ]) for i, j in rot([(1, 0)]) for k in (1, -1)
+                    movement.HalflingRiderMovement(board, [(i or k, j or k) for k in (1, -1)], 1)
+                ]) for i, j in rot([(1, 0)])
             ]),
             **kwargs
         )
@@ -90,8 +90,8 @@ class EagleScout(Piece):
             movement.MultiMovement(board, [movement.RiderMovement(board, rot([(1, 0, 1)]))] + [
                 movement.RepeatMovement(board, [
                     movement.RiderMovement(board, [(i, j, 1)]),
-                    movement.RiderMovement(board, [(k, l, 1)])
-                ]) for i, j in rot([(1, 1)]) for k, l in [(-i, j), (i, -j)]
+                    movement.RiderMovement(board, [(k, l, 1) for k, l in [(-i, j), (i, -j)]])
+                ]) for i, j in rot([(1, 1)])
             ]),
             **kwargs
         )

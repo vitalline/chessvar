@@ -48,9 +48,9 @@ class MoaRdr(Piece):
             board,
             movement.MultiMovement(board, [
                 movement.RepeatMovement(board, [
-                    movement.RiderMovement(board, [(i or k, j or k, 1)]),
-                    movement.RiderMovement(board, [(i, j, 1)])
-                ], 1) for i, j in rot([(1, 0)]) for k in (1, -1)
+                    movement.RiderMovement(board, [(i, j, 1)]),
+                    movement.RiderMovement(board, [(i, 0, 1), (0, j, 1)])
+                ], 1) for i, j in rot([(1, 1)])
             ]),
             **kwargs
         )

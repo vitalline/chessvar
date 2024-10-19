@@ -26,14 +26,14 @@ class Sidesail(Piece):
             board,
             movement.MultiMovement(board, [
                 movement.BentMovement(board, [
-                    movement.RiderMovement(board, [(i or k, j or k, 1)]),
+                    movement.RiderMovement(board, [(i or k, j or k, 1) for k in (1, -1)]),
                     movement.RiderMovement(board, [(i, j)])
-                ]) for i, j in symv([(0, 1)]) for k in (1, -1)
+                ]) for i, j in symv([(0, 1)])
             ] + [
                 movement.BentMovement(board, [
-                    movement.RiderMovement(board, [(i or k, j or k, 1)]),
+                    movement.RiderMovement(board, [(i or k, j or k, 1) for k in (1, -1)]),
                     movement.RiderMovement(board, [(i, j, 1)])
-                ]) for i, j in symh([(1, 0)]) for k in (1, -1)
+                ]) for i, j in symh([(1, 0)])
             ]),
             **kwargs
         )

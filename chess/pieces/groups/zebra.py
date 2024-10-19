@@ -5,7 +5,7 @@ from chess.pieces.piece import Piece
 
 class Eliphas(Piece):
     name = 'Eliphas'
-    file_name = 'WafsWafsafW'
+    file_name = 'W[W-F][W-F-F]'
     asset_folder = 'zebra'
 
     def __init__(self, board, **kwargs):
@@ -14,8 +14,8 @@ class Eliphas(Piece):
             movement.MultiMovement(board, [
                 movement.BentMovement(board, [
                     movement.RiderMovement(board, [(i, j, 1)]),
-                    movement.RiderMovement(board, [(i or k, j or k, 2)])
-                ]) for i, j in rot([(1, 0)]) for k in (1, -1)
+                    movement.RiderMovement(board, [(i or k, j or k, 2) for k in (1, -1)])
+                ]) for i, j in rot([(1, 0)])
             ]),
             **kwargs
         )

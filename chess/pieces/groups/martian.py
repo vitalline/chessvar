@@ -9,22 +9,17 @@ class Padwar(Piece):
     asset_folder = 'martian'
 
     def __init__(self, board, **kwargs):
-        movements = [movement.RiderMovement(board, rot([(1, 0, 1)]))]
-        for i, j in rot([(1, 0)]):
-            for k, l in rot([(1, 0)]):
-                if (i, j) != (-k, -l):
-                    movements.append(
-                        movement.BentMovement(board, [
-                            movement.RiderMovement(board, [(i, j, 1)]),
-                            movement.RiderMovement(board, [(k, l, 1)]),
-                            movement.RiderMovement(board, [
-                                (m, n, 1) for m, n in rot([(1, 0)]) if (m, n) != (-i, -j) and (m, n) != (-k, -l)
-                            ])
-                        ], 2)
-                    )
         super().__init__(
             board,
-            movement.MultiMovement(board, movements),
+            movement.MultiMovement(board, [movement.RiderMovement(board, rot([(1, 0, 1)]))] + [
+                movement.BentMovement(board, [
+                    movement.RiderMovement(board, [(i, j, 1)]),
+                    movement.RiderMovement(board, [(k, l, 1)]),
+                    movement.RiderMovement(board, [
+                        (m, n, 1) for m, n in rot([(1, 0)]) if (m, n) != (-i, -j) and (m, n) != (-k, -l)
+                    ])
+                ], 2) for i, j in rot([(1, 0)]) for k, l in rot([(1, 0)]) if (i, j) != (-k, -l)
+            ]),
             **kwargs
         )
 
@@ -54,22 +49,17 @@ class Walker(Piece):
     colorbound = True
 
     def __init__(self, board, **kwargs):
-        movements = [movement.RiderMovement(board, rot([(1, 1, 1)]))]
-        for i, j in rot([(1, 1)]):
-            for k, l in rot([(1, 1)]):
-                if (i, j) != (-k, -l):
-                    movements.append(
-                        movement.BentMovement(board, [
-                            movement.RiderMovement(board, [(i, j, 1)]),
-                            movement.RiderMovement(board, [(k, l, 1)]),
-                            movement.RiderMovement(board, [
-                                (m, n, 1) for m, n in rot([(1, 1)]) if (m, n) != (-i, -j) and (m, n) != (-k, -l)
-                            ])
-                        ], 2)
-                    )
         super().__init__(
             board,
-            movement.MultiMovement(board, movements),
+            movement.MultiMovement(board, [movement.RiderMovement(board, rot([(1, 1, 1)]))] + [
+                movement.BentMovement(board, [
+                    movement.RiderMovement(board, [(i, j, 1)]),
+                    movement.RiderMovement(board, [(k, l, 1)]),
+                    movement.RiderMovement(board, [
+                        (m, n, 1) for m, n in rot([(1, 1)]) if (m, n) != (-i, -j) and (m, n) != (-k, -l)
+                    ])
+                ], 2) for i, j in rot([(1, 1)]) for k, l in rot([(1, 1)]) if (i, j) != (-k, -l)
+            ]),
             **kwargs
         )
 
@@ -80,19 +70,18 @@ class Chief(Piece):
     asset_folder = 'martian'
 
     def __init__(self, board, **kwargs):
-        movements = []
-        for i, j in rot([(1, 0)]):
-            for k in (1, -1):
-                w = (i, j, 1)
-                f = (i or k, j or k, 1)
-                for directions in [(w, w), (w, f), (f, w), (f, f)]:
-                    movements.extend([
-                        movement.BentMovement(board, [
-                            movement.RiderMovement(board, [direction]) for direction in directions
-                        ]),
-                    ])
         super().__init__(
             board,
-            movement.MultiMovement(board, movements),
+            movement.MultiMovement(board, [
+                movement.BentMovement(board, [
+                    movement.RiderMovement(board, [(i, j, 1)]),
+                    movement.RiderMovement(board, [(i, j, 1), (i or 1, j or 1, 1), (i or -1, j or -1, 1)])
+                ]) for i, j in rot([(1, 0)])
+            ] + [
+                movement.BentMovement(board, [
+                    movement.RiderMovement(board, [(i, j, 1)]),
+                    movement.RiderMovement(board, [(i, j, 1), (i, 0, 1), (0, j, 1)])
+                ]) for i, j in rot([(1, 1)])
+            ]),
             **kwargs
         )

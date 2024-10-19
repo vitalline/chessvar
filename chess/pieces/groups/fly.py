@@ -40,9 +40,9 @@ class Hoatzin(Piece):
             board,
             movement.MultiMovement(board, [
                 movement.BentMovement(board, [
-                    movement.RiderMovement(board, [(i or k, j or k, 1)]),
-                    movement.RiderMovement(board, [(i * 2, j * 2)])
-                ]) for i, j in rot([(1, 0)]) for k in (1, -1)
+                    movement.RiderMovement(board, [(i, j, 1)]),
+                    movement.RiderMovement(board, [(2 * i, 0), (0, 2 * j)])
+                ]) for i, j in rot([(1, 1)])
             ]),
             **kwargs
         )
@@ -50,7 +50,7 @@ class Hoatzin(Piece):
 
 class Eagle(Piece):
     name = 'Eagle'
-    file_name = 'RbBfFfAcfafF'
+    file_name = 'RfFfAbBcfafF'
     asset_folder = 'fly'
 
     def __init__(self, board, **kwargs):

@@ -5,7 +5,7 @@ from chess.pieces.piece import Piece
 
 class Llama(Piece):
     name = 'Llama'
-    file_name = 'R2afafsW'
+    file_name = 'W2[W-W-F]'
     asset_folder = 'camel'
 
     def __init__(self, board, **kwargs):
@@ -14,8 +14,8 @@ class Llama(Piece):
             movement.MultiMovement(board, [
                 movement.BentMovement(board, [
                     movement.RiderMovement(board, [(i, j, 2)]),
-                    movement.RiderMovement(board, [(i or k, j or k, 1)])
-                ]) for i, j in rot([(1, 0)]) for k in (1, -1)
+                    movement.RiderMovement(board, [(i or k, j or k, 1) for k in (1, -1)])
+                ]) for i, j in rot([(1, 0)])
             ]),
             **kwargs
         )

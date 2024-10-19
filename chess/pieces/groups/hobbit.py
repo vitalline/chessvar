@@ -21,7 +21,7 @@ class Heart(Piece):
 
 class Drake(Piece):
     name = 'Drake'
-    file_name = 'FhhyafsF'
+    file_name = 'Fhh[F-R]'
     asset_folder = 'hobbit'
 
     def __init__(self, board, **kwargs):
@@ -29,9 +29,9 @@ class Drake(Piece):
             board,
             movement.MultiMovement(board, [
                 movement.BentMovement(board, [
-                    movement.RiderMovement(board, [(i or k, j or k, 1)]),
-                    movement.HalflingRiderMovement(board, [(i, j)], 1)
-                ]) for i, j in rot([(1, 0)]) for k in (1, -1)
+                    movement.RiderMovement(board, [(i, j, 1)]),
+                    movement.HalflingRiderMovement(board, [(i, 0), (0, j)], 1)
+                ]) for i, j in rot([(1, 1)])
             ]),
             **kwargs
         )

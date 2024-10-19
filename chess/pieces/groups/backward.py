@@ -31,7 +31,7 @@ class Walrus(Piece):
 
 class Seagull(Piece):
     name = 'Seagull'
-    file_name = 'fFfAsbBcfafF'
+    file_name = 'fFfAbBcfafF'
     asset_folder = 'backward'
     colorbound = True
 

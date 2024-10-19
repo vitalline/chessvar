@@ -26,9 +26,9 @@ class Ship(Piece):
             board,
             movement.MultiMovement(board, [
                 movement.BentMovement(board, [
-                    movement.RiderMovement(board, [(i or k, j or k, 1)]),
+                    movement.RiderMovement(board, [(i or k, j or k, 1) for k in (1, -1)]),
                     movement.RiderMovement(board, [(i, j)])
-                ]) for i, j in symh([(1, 0)]) for k in (1, -1)
+                ]) for i, j in symh([(1, 0)])
             ]),
             **kwargs
         )
@@ -36,7 +36,7 @@ class Ship(Piece):
 
 class Filescout(Piece):
     name = 'Filescout'
-    file_name = 'Fmpsasafq(az)WsD'
+    file_name = 'Fmpvasabz(az)WsD'
     asset_folder = 'narrow'
     colorbound = True
 

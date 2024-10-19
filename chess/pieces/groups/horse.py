@@ -13,8 +13,8 @@ class Naysayer(Piece):
             board,
             movement.MultiMovement(board, [movement.RiderMovement(board, rot([(1, 0, 3, 3)]))] + [
                 movement.RepeatMovement(board, [
-                    movement.RiderMovement(board, [(i, j, 2, 2)])
-                ]) for i, j in rot([(1, 1)])
+                    movement.RiderMovement(board, [(i, j, 2, 2) for i, j in rot([(1, 1)])])
+                ])
             ]),
             **kwargs
         )
@@ -31,8 +31,8 @@ class HorseRdr(Piece):
             movement.MultiMovement(board, [
                 movement.RepeatMovement(board, [
                     movement.RiderMovement(board, [(i, j, 1)]),
-                    movement.RiderMovement(board, [(i or k, j or k, 1)])
-                ], 1) for i, j in rot([(1, 0)]) for k in (1, -1)
+                    movement.RiderMovement(board, [(i or k, j or k, 1) for k in (1, -1)])
+                ], 1) for i, j in rot([(1, 0)])
             ]),
             **kwargs
         )
@@ -40,7 +40,7 @@ class HorseRdr(Piece):
 
 class Tapir(Piece):
     name = 'Tapir'
-    file_name = 'afsWnA'
+    file_name = '[W-F]nA'
     asset_folder = 'horse'
 
     def __init__(self, board, **kwargs):
@@ -49,8 +49,8 @@ class Tapir(Piece):
             movement.MultiMovement(board, [movement.RiderMovement(board, rot([(1, 1, 2, 2)]))] + [
                 movement.BentMovement(board, [
                     movement.RiderMovement(board, [(i, j, 1)]),
-                    movement.RiderMovement(board, [(i or k, j or k, 1)])
-                ], 1) for i, j in rot([(1, 0)]) for k in (1, -1)
+                    movement.RiderMovement(board, [(i or k, j or k, 1) for k in (1, -1)])
+                ], 1) for i, j in rot([(1, 0)])
             ]),
             **kwargs
         )
@@ -67,8 +67,8 @@ class Marauder(Piece):
             movement.MultiMovement(board, [
                 movement.RepeatMovement(board, [
                     movement.RiderMovement(board, [(i, j, 1)]),
-                    movement.RiderMovement(board, [(i or k, j or k, 1)])
-                ]) for i, j in rot([(1, 0)]) for k in (1, -1)
+                    movement.RiderMovement(board, [(i, 0, 1), (0, j, 1)])
+                ]) for i, j in rot([(1, 1)])
             ]),
             **kwargs
         )

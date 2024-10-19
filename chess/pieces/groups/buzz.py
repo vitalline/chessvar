@@ -48,7 +48,7 @@ class Locust(Piece):
 
 class Mantis(Piece):
     name = 'Mantis'
-    file_name = 'BvNsDmpsafyasW'
+    file_name = 'BvNsD[sD-sR]'
     asset_folder = 'buzz'
 
     def __init__(self, board, **kwargs):
@@ -57,8 +57,8 @@ class Mantis(Piece):
             movement.MultiMovement(board, [movement.RiderMovement(board, sym([(1, 1), (2, 1, 1)]))] + [
                 movement.BentMovement(board, [
                     movement.RiderMovement(board, [(i, j, 1)]),
-                    movement.RiderMovement(board, [(k, l)])
-                ]) for i, j in symv([(0, 2)]) for k, l in symh([(1, 0)])
+                    movement.RiderMovement(board, [(k, l) for k, l in symh([(1, 0)])])
+                ]) for i, j in symv([(0, 2)])
             ]),
             **kwargs
         )
