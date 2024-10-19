@@ -535,6 +535,8 @@ class RepeatMovement(BaseMultiMovement):
             directions = movement.directions if is_new else [movement.directions[self.dir_indexes[index]]]
             for direction in directions:
                 if is_new:
+                    for i in range(index + 1, len(self.movements)):
+                        self.dir_indexes[i] = -1
                     self.dir_indexes[index] += 1
                 movement.directions = [direction]
                 move = None

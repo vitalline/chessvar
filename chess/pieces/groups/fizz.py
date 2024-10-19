@@ -89,9 +89,9 @@ class EagleScout(Piece):
             board,
             movement.MultiMovement(board, [movement.RiderMovement(board, rot([(1, 0, 1)]))] + [
                 movement.RepeatMovement(board, [
-                    movement.RiderMovement(board, [(i, j, 1)]),
-                    movement.RiderMovement(board, [(k, l, 1) for k, l in [(-i, j), (i, -j)]])
-                ]) for i, j in rot([(1, 1)])
+                    movement.RiderMovement(board, [(i, j, 1), (-i, -j, 1)]),
+                    movement.RiderMovement(board, [(i, -j, 1), (-i, j, 1)]),
+                ]) for i, j in symv([(1, 1)])
             ]),
             **kwargs
         )

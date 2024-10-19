@@ -1,5 +1,5 @@
 from chess.movement import movement
-from chess.movement.util import rot
+from chess.movement.util import rot, symv
 from chess.pieces.piece import Piece
 
 
@@ -67,9 +67,9 @@ class Boyscout(Piece):
             board,
             movement.MultiMovement(board, [
                 movement.RepeatMovement(board, [
-                    movement.RiderMovement(board, [(i, j, 1)]),
-                    movement.RiderMovement(board, [(k, l, 1) for k, l in [(-i, j), (i, -j)]])
-                ]) for i, j in rot([(1, 1)])
+                    movement.RiderMovement(board, [(i, j, 1), (-i, -j, 1)]),
+                    movement.RiderMovement(board, [(i, -j, 1), (-i, j, 1)]),
+                ]) for i, j in symv([(1, 1)])
             ]),
             **kwargs
         )
