@@ -30,6 +30,41 @@ def get_texture_path(path: str) -> str:
     return default_texture
 
 
+# Function to find the first method with a given name in the MRO of a given object. Used for dynamic super()-like calls.
+def dynamic_super(obj):
+    def get(method, cls=None):
+        if cls is None:
+            cls = type(obj)
+        elif not isinstance(obj, cls):
+            raise TypeError(f"Object {obj} is not an instance of {cls}")
+        for base in cls.__mro__:
+            if method in base.__dict__:
+                return lambda *args, **kwargs: base.__dict__[method](obj, *args, **kwargs)
+        raise AttributeError(f"Method '{method}' not found in MRO for {cls}")
+
+    class MROCache:
+        def __init__(self):
+            self.cache = {}
+
+        class MethodWrapper:
+            def __init__(self, cls=None):
+                self.cls = cls
+
+            def __getattr__(self, method):
+                setattr(self, method, get(method, self.cls))
+                return getattr(self, method)
+
+            def __getitem__(self, item):
+                return self.__getattr__(item)
+
+        def __getitem__(self, item):
+            if item not in self.cache:
+                self.cache[item] = self.MethodWrapper(item)
+            return self.cache[item]
+
+    return MROCache()
+
+
 # Context manager for temporarily disabling print statements. Anything in a "with no_print()" block will not be printed.
 class no_print:
     def __enter__(self):

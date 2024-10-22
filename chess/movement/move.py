@@ -1,14 +1,14 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Type
+from typing import TYPE_CHECKING
 
 from chess.movement.util import Position, to_algebraic as toa
-from chess.pieces.piece import Piece
 from chess.pieces.side import Side
 from chess.util import Default, Unset
 
 if TYPE_CHECKING:
     from chess.movement.movement import BaseMovement
+    from chess.pieces.piece import Piece
 
 
 class Move(object):
@@ -16,11 +16,11 @@ class Move(object):
         self,
         pos_from: Position | None = None,
         pos_to: Position | None = None,
-        movement_type: Type[BaseMovement] | None = None,
+        movement_type: type[BaseMovement] | None = None,
         piece: Piece | None = None,
         captured_piece: Piece | None = None,
         swapped_piece: Piece | None = None,
-        placed_piece: Type[Piece] | None = None,
+        placed_piece: type[Piece] | None = None,
         promotion: Piece | frozenset | None = None,
         chained_move: Move | frozenset | None = None,
         is_edit: int = 0
@@ -40,11 +40,11 @@ class Move(object):
         self,
         pos_from: Position | None = None,
         pos_to: Position | None = None,
-        movement_type: Type[BaseMovement] | None = None,
+        movement_type: type[BaseMovement] | None = None,
         piece: Piece | None = None,
         captured_piece: Piece | None = None,
         swapped_piece: Piece | None = None,
-        placed_piece: Type[Piece] | None = None,
+        placed_piece: type[Piece] | None = None,
         promotion: Piece | frozenset | type(Default) | None = None,
         chained_move: Move | frozenset | type(Default) | None = None,
         is_edit: int | None = None
@@ -140,7 +140,10 @@ class Move(object):
             else:
                 string = f"is taken from {toa(self.pos_from)}"
         elif not moved or self.swapped_piece:
-            promoted = self.promotion is Unset or self.promotion and type(self.piece) != type(self.promotion)
+            promoted = self.promotion is Unset or self.promotion and (
+                self.piece.name != self.promotion.name
+                or self.promotion.side not in {self.piece.side, Side.NONE}
+            )
             if self.captured_piece is None and self.swapped_piece is None and not promoted:
                 string = f"stays on {toa(self.pos_from)}"
             else:
@@ -176,7 +179,10 @@ class Move(object):
                     string += f"{comma} is promoted"
                 else:
                     string += f"{comma} tries to promote"
-            elif self.promotion and type(self.piece) != type(self.promotion):
+            elif self.promotion and (
+                self.piece.name != self.promotion.name
+                or self.promotion.side not in {self.piece.side, Side.NONE}
+            ):
                 if self.is_edit == 1:
                     promotes = "is promoted"
                 else:

@@ -4,7 +4,7 @@ from base64 import b64decode, b64encode
 from copy import copy
 from importlib import import_module
 from random import Random
-from typing import TYPE_CHECKING, Type, Any
+from typing import TYPE_CHECKING, Any
 
 from chess.movement import movement as movement_module
 from chess.movement.move import Move
@@ -13,7 +13,7 @@ from chess.pieces.side import Side
 from chess.movement.util import Position
 from chess.movement.util import to_algebraic as toa, from_algebraic as fra
 from chess.movement.util import to_algebraic_map as tom, from_algebraic_map as frm
-from chess.pieces import piece as piece_module
+from chess.pieces import type as type_module
 from chess.pieces.piece import Piece
 from chess.pieces.groups.util import NonMovingPiece, NoPiece
 from chess.util import Unset
@@ -24,10 +24,14 @@ if TYPE_CHECKING:
 
 UNSET_STRING = '*'
 
-MOVEMENT_SUFFIXES = ('Movement', 'Rider')
-PIECE_SUFFIXES = ('Piece',)
-
 CUSTOM_PREFIX = '_custom_'
+
+MOVEMENT_SUFFIXES = ('Movement', 'Rider')
+
+TYPE_CONFLICTS = {
+    type_module.Royal: {type_module.QuasiRoyal},
+    type_module.QuasiRoyal: {type_module.Royal},
+}
 
 
 AnyJsonType = str | int | float | bool | None
@@ -104,23 +108,17 @@ def expand_algebraic(data: dict[str, AnyJson], width: int, height: int) -> dict[
     return result
 
 
-def save_piece_type(piece_type: Type[Piece] | frozenset | None) -> str | None:
+def save_piece_type(piece_type: type[Piece] | frozenset | None) -> str | None:
     if piece_type is None:
         return None
     if piece_type is Unset:
         return UNSET_STRING
     if piece_type.__name__.startswith(CUSTOM_PREFIX):
         return piece_type.__name__.removeprefix(CUSTOM_PREFIX)
-    if piece_type.__module__ == piece_module.__name__:
-        name = piece_type.__name__
-        for suffix in PIECE_SUFFIXES:
-            if name.endswith(suffix, 1):
-                name = name[:-len(suffix)]
-        return name
     return f"{piece_type.__module__.rsplit('.', 1)[-1]}.{piece_type.__name__}"
 
 
-def load_piece_type(data: str | None, from_dict: dict | None = None) -> Type[Piece] | frozenset | None:
+def load_piece_type(data: str | None, from_dict: dict | None = None) -> type[Piece] | frozenset | None:
     if data is None:
         return None
     if data == UNSET_STRING:
@@ -129,13 +127,6 @@ def load_piece_type(data: str | None, from_dict: dict | None = None) -> Type[Pie
         return from_dict[data]
     parts = data.split('.', 1)
     try:
-        if len(parts) == 1:
-            for i in range(len(PIECE_SUFFIXES) + 1):
-                name = data + ''.join(PIECE_SUFFIXES[:i][::-1])
-                piece_type = getattr(piece_module, name, None)
-                if piece_type and piece_type.__module__ == piece_module.__name__:
-                    return piece_type
-            return None
         return getattr(import_module(f"chess.pieces.groups.{parts[0]}"), parts[1])
     except ImportError:
         return None
@@ -143,7 +134,7 @@ def load_piece_type(data: str | None, from_dict: dict | None = None) -> Type[Pie
         return None
 
 
-def save_movement_type(movement_type: Type[BaseMovement] | frozenset | None) -> str | None:
+def save_movement_type(movement_type: type[BaseMovement] | frozenset | None) -> str | None:
     if movement_type is None:
         return None
     if movement_type is Unset:
@@ -155,7 +146,7 @@ def save_movement_type(movement_type: Type[BaseMovement] | frozenset | None) -> 
     return name
 
 
-def load_movement_type(data: str | None) -> Type[BaseMovement] | frozenset | None:
+def load_movement_type(data: str | None) -> type[BaseMovement] | frozenset | None:
     if data is None:
         return None
     if data == UNSET_STRING:
@@ -260,9 +251,9 @@ def save_custom_type(piece: type[Piece] | Piece | None) -> dict | None:
     piece, piece_type = (piece, type(piece)) if isinstance(piece, Piece) else (None, piece)
     if not issubclass(piece_type, Piece):
         return None
-    base = piece_type.__base__
+    bases = piece_type.__bases__
     return {k: v for k, v in {
-        'cls': save_piece_type(base) if base is not Piece else None,
+        'cls': [base.__name__ for base in bases if base.__module__ == type_module],
         'name': piece_type.name,
         'file': piece_type.file_name,
         'path': piece_type.asset_folder,
@@ -274,9 +265,14 @@ def save_custom_type(piece: type[Piece] | Piece | None) -> dict | None:
 def load_custom_type(data: dict | None, name: str) -> type[Piece] | None:
     if data is None:
         return None
-    base = load_piece_type(data.get('cls')) or Piece
-    if not isinstance(base, type) or not issubclass(base, Piece):
-        return None
+    base_strings = data.get('cls')
+    base_set = set()
+    bases = [Piece]
+    for base_string in base_strings:
+        base = getattr(type_module, base_string, None)
+        if base and base not in base_set and not base_set.intersection(TYPE_CONFLICTS.get(base, set())):
+            base_set.add(base)
+            bases.append(base)
     args = {}
     if 'name' in data:
         args['name'] = data['name']
@@ -288,7 +284,7 @@ def load_custom_type(data: dict | None, name: str) -> type[Piece] | None:
         args['colorbound'] = data['cb']
     if 'movement' in data:
         args['movement_data'] = data['movement']
-    cls = type(CUSTOM_PREFIX + name, (base,), args)
+    cls = type(CUSTOM_PREFIX + name, tuple(bases), args)
 
     def init(self, board, **kwargs):
         base.__init__(self, board, load_movement(getattr(self, 'movement_data', None), board), **kwargs)

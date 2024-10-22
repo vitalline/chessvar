@@ -1,5 +1,6 @@
-from chess.pieces.piece import Piece, ImmunePiece
+from chess.pieces.piece import Piece
 from chess.pieces.side import Side
+from chess.pieces.type import Immune
 
 
 class NonMovingPiece(Piece):
@@ -46,6 +47,6 @@ class Block(Obstacle):
     file_name = 'block'
 
 
-class Wall(Obstacle, ImmunePiece):
+class Wall(Obstacle, Immune):
     name = 'Wall'
     file_name = 'wall'

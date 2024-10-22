@@ -6,7 +6,7 @@ from typing import TYPE_CHECKING
 
 from chess.movement.move import Move
 from chess.movement.util import AnyDirection, Direction, Position, add, sub, mul, ddiv
-from chess.pieces.util import Immune
+from chess.pieces.type import Immune
 from chess.util import Unset
 
 if TYPE_CHECKING:
@@ -125,8 +125,8 @@ class RiderMovement(BaseDirectionalMovement):
             or move.pos_from == next_pos_to
             or len(direction) > 2 and direction[2] and self.steps >= direction[2]
             or not theoretical and (
-                (piece.blocked_by((next_piece := self.board.get_piece(next_pos_to))) and piece != next_piece)
-                or (piece.captures(self.board.get_piece(move.pos_to)) and move.pos_from != move.pos_to)
+                piece.blocked_by(self.board.get_piece(next_pos_to))
+                or piece.captures(self.board.get_piece(move.pos_to))
             )
             or theoretical and (
                 isinstance((next_piece := self.board.get_piece(next_pos_to)), Immune) and next_piece.movement is None
@@ -159,7 +159,7 @@ class HalflingRiderMovement(RiderMovement):
 class CannonRiderMovement(RiderMovement):
     def __init__(self, board: Board, directions: list[AnyDirection] | None = None):
         super().__init__(board, directions)
-        self.jumped = None
+        self.jumped = -1
 
     def initialize_direction(self, direction: AnyDirection, pos_from: Position, piece: Piece) -> None:
         self.jumped = -1
@@ -177,7 +177,7 @@ class CannonRiderMovement(RiderMovement):
     def stop_condition(self, move: Move, direction: AnyDirection, piece: Piece, theoretical: bool = False) -> bool:
         if self.jumped == 0 and not theoretical:
             next_pos_to = self.transform(add(move.pos_to, direction[:2]))
-            if piece.side == (next_piece := self.board.get_piece(next_pos_to)).side and piece != next_piece:
+            if piece.blocked_by(self.board.get_piece(next_pos_to)):
                 return True
         return super().stop_condition(move, direction, piece, theoretical or self.jumped != 1)
 
@@ -710,7 +710,6 @@ class SideMovement(BaseMultiMovement):
 
 class ProbabilisticMovement(BaseMultiMovement):
     def moves(self, pos_from: Position, piece: Piece, theoretical: bool = False):
-        movements = []
         if theoretical:
             movements = self.movements
         else:

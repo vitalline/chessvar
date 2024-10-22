@@ -6,7 +6,7 @@ from typing import TYPE_CHECKING
 from arcade import Color, Sprite, load_texture
 
 from chess.pieces.side import Side
-from chess.pieces.util import Slow, Fast, Immune, Royal, QuasiRoyal
+from chess.pieces.type import Immune, Double
 from chess.util import Default, get_texture_path
 
 if TYPE_CHECKING:
@@ -136,13 +136,18 @@ class Piece(Sprite):
     def blocked_by(self, what: Piece):
         if not what:
             return False
+        if what == self:
+            return False
         match self.side:
             case Side.ANY:
                 return False
             case Side.NONE:
                 return True
             case _:
-                return self.side is what.side or isinstance(what, Immune)
+                return (
+                    self.side is what.side and not isinstance(self, Double)
+                    or isinstance(what, Immune)
+                )
 
     def captures(self, what: Piece):
         if not what:
@@ -153,7 +158,11 @@ class Piece(Sprite):
             case Side.NONE:
                 return False
             case _:
-                return what.side not in {Side.NONE, self.side} and not isinstance(what, Immune)
+                return (
+                    what.side is not Side.NONE
+                    and (self.side is not what.side or isinstance(self, Double))
+                    and not isinstance(what, Immune)
+                )
 
     @property
     def texture_path(self) -> str:
@@ -204,25 +213,3 @@ class Piece(Sprite):
         self.color = color
         if side != self.texture_side:  # if side was defined and does not match the current texture
             self.reload(side=side)
-
-
-class QuasiRoyalPiece(Piece, QuasiRoyal, Slow):
-    pass
-
-class RoyalPiece(Piece, Royal, Slow):
-    pass
-
-class SlowQuasiRoyalPiece(Piece, QuasiRoyal, Slow):
-    pass
-
-class SlowRoyalPiece(Piece, Royal, Slow):
-    pass
-
-class FastQuasiRoyalPiece(Piece, QuasiRoyal, Fast):
-    pass
-
-class FastRoyalPiece(Piece, Royal, Fast):
-    pass
-
-class ImmunePiece(Piece, Immune):
-    pass

@@ -11,7 +11,7 @@ from random import Random
 from sys import argv, stdout
 from tkinter import filedialog
 from traceback import print_exc
-from typing import Any, Type, TextIO
+from typing import Any, TextIO
 
 from PIL.ImageColor import getrgb
 from arcade import key, MOUSE_BUTTON_LEFT, MOUSE_BUTTON_RIGHT, Text
@@ -47,14 +47,14 @@ from chess.pieces.groups import zebra as zb
 from chess.pieces.groups.util import NoPiece, Obstacle, Block, Wall
 from chess.pieces.piece import Piece
 from chess.pieces.side import Side
-from chess.pieces.util import QuasiRoyal, Royal, Slow
+from chess.pieces.type import Fast, QuasiRoyal, Royal
 from chess.save import condense, expand
 from chess.save import condense_algebraic as cnd_alg, expand_algebraic as exp_alg
 from chess.save import load_move, load_piece, load_rng, load_piece_type, load_custom_type
 from chess.save import save_move, save_piece, save_rng, save_piece_type, save_custom_type
 from chess.util import Default, Unset, base_dir
 
-piece_groups: list[dict[str, str | list[Type[Piece]]]] = [
+piece_groups: list[dict[str, str | list[type[Piece]]]] = [
     {
         'name': "Fabulous FIDEs",
         'set': [fide.Rook, fide.Knight, fide.Bishop, fide.Queen, fide.King, fide.Bishop, fide.Knight, fide.Rook],
@@ -268,7 +268,7 @@ def get_filename(
     return join(in_dir, f"{full_name}.{ext}")
 
 
-def get_piece_types(side: Side = Side.WHITE) -> dict[Type[Piece], str]:
+def get_piece_types(side: Side = Side.WHITE) -> dict[type[Piece], str]:
     piece_types = {
         get_set(side, i)[j]
         for i in range(len(piece_groups)) for j in [i for i in range(4)] + [7]
@@ -277,12 +277,12 @@ def get_piece_types(side: Side = Side.WHITE) -> dict[Type[Piece], str]:
     return {t: t.name + (' (CB)' if t.is_colorbound() or t == cb.King else '') for t in piece_types}
 
 
-def get_set(side: Side, set_id: int) -> list[Type[Piece]]:
+def get_set(side: Side, set_id: int) -> list[type[Piece]]:
     piece_group = piece_groups[set_id]
     return piece_group.get(f"set_{side.key()[0]}", piece_group.get('set', [NoPiece] * default_board_width))
 
 
-def get_set_name(piece_set: list[Type[Piece]], include_royals: bool = False) -> str:
+def get_set_name(piece_set: list[type[Piece]], include_royals: bool = False) -> str:
     piece_name_order = [[i, len(piece_set) - 1 - i] for i in range(ceil(len(piece_set) / 2))]
     piece_names = []
     for group in piece_name_order:
@@ -1327,7 +1327,7 @@ class Board(Window):
             if side in self.custom_extra_drops:
                 self.captured_pieces[side].extend(self.custom_extra_drops[side])
 
-    def reset_drops(self, piece_sets: dict[Side, list[Type[Piece]]] | None = None) -> None:
+    def reset_drops(self, piece_sets: dict[Side, list[type[Piece]]] | None = None) -> None:
         if self.custom_drops:
             self.drops = deepcopy(self.custom_drops)
             return
@@ -1377,7 +1377,7 @@ class Board(Window):
                             drops[piece_type] = {pos: piece_type for pos in drop_squares[side]}
             self.drops[drop_side] = drops
 
-    def reset_promotions(self, piece_sets: dict[Side, list[Type[Piece]]] | None = None) -> None:
+    def reset_promotions(self, piece_sets: dict[Side, list[type[Piece]]] | None = None) -> None:
         if self.custom_promotions:
             self.promotions = deepcopy(self.custom_promotions)
             return
@@ -1404,7 +1404,7 @@ class Board(Window):
                 promotions.extend(promotion_types[::-1])
             self.promotions[side] = {self.custom_pawn: {pos: promotions.copy() for pos in promotion_squares[side]}}
 
-    def reset_edit_promotions(self, piece_sets: dict[Side, list[Type[Piece]]] | None = None) -> None:
+    def reset_edit_promotions(self, piece_sets: dict[Side, list[type[Piece]]] | None = None) -> None:
         if is_prefix_of('custom', self.edit_piece_set_id):
             self.edit_promotions = {
                 side: [piece_type for _, piece_type in self.custom_pieces.items()] + [Block, Wall]
@@ -1435,7 +1435,7 @@ class Board(Window):
                         promotion_types.append(piece)
                 self.edit_promotions[side].extend(promotion_types[::-1])
 
-    def reset_penultima_pieces(self, piece_sets: dict[Side, list[Type[Piece]]] | None = None) -> None:
+    def reset_penultima_pieces(self, piece_sets: dict[Side, list[type[Piece]]] | None = None) -> None:
         if piece_sets is None:
             piece_sets = self.piece_sets
         self.penultima_pieces = {side: {} for side in self.penultima_pieces}
@@ -1471,7 +1471,7 @@ class Board(Window):
     def get_piece_sets(
         self,
         piece_set_ids: dict[Side, int] | int | None = None
-    ) -> tuple[dict[Side, list[Type[Piece]]], dict[Side, str]]:
+    ) -> tuple[dict[Side, list[type[Piece]]], dict[Side, str]]:
         if piece_set_ids is None:
             piece_set_ids = self.piece_set_ids
         elif isinstance(piece_set_ids, int):
@@ -1505,7 +1505,7 @@ class Board(Window):
                 piece_names[side] = '-'
         return piece_sets, piece_names
 
-    def get_random_set(self, side: Side, asymmetrical: bool = False) -> tuple[list[Type[Piece]], str]:
+    def get_random_set(self, side: Side, asymmetrical: bool = False) -> tuple[list[type[Piece]], str]:
         # random_set_poss: independent random choices
         # random_set_poss[]: unique randomly sampled armies
         # random_set_poss[][]: positions taken by the random army
@@ -1525,7 +1525,7 @@ class Board(Window):
                     piece_set[pos] = get_set(side, random_set_ids[j])[pos]
         return piece_set, get_set_name(piece_set)
 
-    def get_extremely_random_set(self, side: Side, asymmetrical: bool = False) -> tuple[list[Type[Piece]], str]:
+    def get_extremely_random_set(self, side: Side, asymmetrical: bool = False) -> tuple[list[type[Piece]], str]:
         blocked_ids = set(self.board_config['block_ids_chaos'])
         piece_set_ids = list(i for i in range(len(piece_groups)) if i not in blocked_ids)
         piece_pos_ids = [i for i in range(4)] + [7]
@@ -1550,7 +1550,7 @@ class Board(Window):
         piece_set[4] = cb.King if piece_set[0].is_colorbound() else fide.King
         return piece_set, get_set_name(piece_set)
 
-    def get_chaos_set(self, side: Side) -> tuple[list[Type[Piece]], str]:
+    def get_chaos_set(self, side: Side) -> tuple[list[type[Piece]], str]:
         asymmetrical = self.chaos_mode in {2, 4}
         if self.chaos_mode in {1, 2}:
             return self.get_random_set(side, asymmetrical)
@@ -1679,24 +1679,30 @@ class Board(Window):
                     isinstance(self.move_history[-1].promotion.movement, movement.RangedAutoCaptureRiderMovement)
                 )
             ):
-                # we need to check if there's a move in the move history that could be a capture
-                royal_capture = False  # of one of the opposing pieces that are treated as royal
+                # we need to check if there's a move in the move history that could be a loss
+                royal_loss = False  # of one of the opposing pieces that are treated as royal
                 chained_move = self.move_history[-1]  # checking the last move's sufficient here
                 while chained_move:  # NB: could be None but if it is the loop is skipped anyway
-                    capture = chained_move.captured_piece
-                    if capture and capture.side == turn_side:
+                    lost_piece = chained_move.captured_piece
+                    gained_piece = None
+                    if not lost_piece or lost_piece.side != turn_side:
+                        if chained_move.promotion:
+                            lost_piece = chained_move.piece
+                            gained_piece = chained_move.promotion
+                    royal_gain = isinstance(gained_piece, (Royal, QuasiRoyal))
+                    if lost_piece and lost_piece.side == turn_side and not royal_gain:
                         # NB: quasi-royal pieces are treated as royal if only one remains!
-                        royal_capture = isinstance(capture, Royal) or isinstance(capture, QuasiRoyal)
-                        if self.royal_piece_mode == 0 and royal_capture:
+                        royal_loss = isinstance(lost_piece, (Royal, QuasiRoyal))
+                        if self.royal_piece_mode == 0 and royal_loss:
                             # treat as royal capture iff no strictly royal pieces exist
-                            royal_capture = not self.royal_pieces[turn_side]
-                        elif self.royal_piece_mode == 2 and royal_capture:
+                            royal_loss = not self.royal_pieces[turn_side]
+                        elif self.royal_piece_mode == 2 and royal_loss:
                             # treat as royal capture iff no quasi or royal pieces exist
-                            royal_capture = not self.royal_pieces[turn_side] and not self.quasi_royal_pieces[turn_side]
-                        if royal_capture:
+                            royal_loss = not self.royal_pieces[turn_side] and not self.quasi_royal_pieces[turn_side]
+                        if royal_loss:
                             break
                     chained_move = chained_move.chained_move
-                if royal_capture:
+                if royal_loss:
                     check_side = turn_side
                     self.moves[turn_side] = {}
                     self.moves_queried[turn_side] = True
@@ -1778,7 +1784,7 @@ class Board(Window):
                     end_early = False
                     if (
                         self.use_check and chained_move
-                        and issubclass(type(move.piece), Slow)
+                        and not issubclass(type(move.piece), Fast)
                         and move.piece in royal_pieces[turn_side]
                     ):
                         self.load_check(turn_side)
@@ -1788,7 +1794,7 @@ class Board(Window):
                     while not end_early and chained_move:
                         self.update_move(chained_move)
                         self.move(chained_move)
-                        if chained_move.promotion:
+                        if isinstance(chained_move.promotion, Piece):
                             self.promotion_piece = True
                             self.replace(chained_move.piece, chained_move.promotion)
                             self.update_auto_capture_markers(chained_move)
@@ -1799,7 +1805,7 @@ class Board(Window):
                         move_chain.append(chained_move)
                         if (
                             self.use_check and chained_move.chained_move
-                            and issubclass(type(chained_move.piece), Slow)
+                            and not issubclass(type(chained_move.piece), Fast)
                             and chained_move.piece in royal_pieces[turn_side]
                         ):
                             self.load_check(turn_side)
@@ -1811,9 +1817,19 @@ class Board(Window):
                         self.load_check(turn_side)
                     if self.use_check:
                         for chained_move in move_chain:
-                            if chained_move.captured_piece in royal_pieces[turn_side]:
-                                self.check_side = turn_side
-                            if chained_move.captured_piece in royal_pieces[self.turn_side.opponent()]:
+                            royal_loss = False
+                            if isinstance(chained_move.captured_piece, (Royal, QuasiRoyal)):
+                                if chained_move.captured_piece in royal_pieces[turn_side]:
+                                    self.check_side = turn_side
+                                if chained_move.captured_piece in royal_pieces[self.turn_side.opponent()]:
+                                    royal_loss = True
+                            if not isinstance(chained_move.promotion, (Royal, QuasiRoyal)):
+                                if isinstance(chained_move.piece, (Royal, QuasiRoyal)):
+                                    if chained_move.piece in royal_pieces[turn_side]:
+                                        self.check_side = turn_side
+                                    if chained_move.piece in royal_pieces[self.turn_side.opponent()]:
+                                        royal_loss = True
+                            if royal_loss:
                                 check_side = self.turn_side.opponent()
                                 self.moves[self.turn_side.opponent()] = {}
                                 self.moves_queried[self.turn_side.opponent()] = True
@@ -2383,7 +2399,7 @@ class Board(Window):
                 if (
                     not move.is_edit
                     and not self.use_check
-                    and issubclass(type(move.piece), Slow)
+                    and not issubclass(type(move.piece), Fast)
                     and move.piece in self.royal_pieces[move.piece.side]
                 ):
                     self.mark_castling_ep(move.piece.board_pos, move.pos_to)
@@ -2969,7 +2985,7 @@ class Board(Window):
         self.start_promotion(move.piece, promotions)
 
     def start_promotion(
-        self, piece: Piece, promotions: list[Piece | Type[Piece]], drops: list[Type[Piece]] | None = None
+        self, piece: Piece, promotions: list[Piece | type[Piece]], drops: list[type[Piece]] | None = None
     ) -> None:
         if drops is None:
             drops = {}

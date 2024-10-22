@@ -1,0 +1,19 @@
+class Double(object):
+    # Pieces with this attribute can capture other pieces of their own side
+    pass
+
+class Immune(object):
+    # Pieces with this attribute cannot be captured
+    pass
+
+class Royal(object):
+    # Pieces with this attribute are subject to check and checkmate
+    pass
+
+class QuasiRoyal(object):
+    # Pieces with this attribute are considered royal if they are the only such piece of their side
+    pass
+
+class Fast(object):
+    # Royal pieces with this attribute cannot be captured en passant on squares they moved to during the last move chain
+    pass
