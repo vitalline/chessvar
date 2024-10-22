@@ -49,9 +49,10 @@ class BaseMovement(object):
 
 
 class BaseDirectionalMovement(BaseMovement):
-    def __init__(self, board: Board, directions: list[AnyDirection] | None = None):
+    def __init__(self, board: Board, directions: list[AnyDirection] | None = None, loop: bool = False):
         super().__init__(board)
         self.directions = directions or []
+        self.loop = loop
         self.steps = 0
 
     def initialize_direction(self, direction: AnyDirection, pos_from: Position, piece: Piece) -> None:
@@ -122,21 +123,21 @@ class RiderMovement(BaseDirectionalMovement):
         next_pos_to = self.transform(add(move.pos_from, mul(direction[:2], self.steps + 1)))
         return (
             self.board.not_on_board(next_pos_to)
-            or move.pos_from == next_pos_to
+            or ((move.pos_from == move.pos_to and self.steps) if self.loop else (move.pos_from == next_pos_to))
             or len(direction) > 2 and direction[2] and self.steps >= direction[2]
-            or not theoretical and (
+            or ((
+                isinstance((next_piece := self.board.get_piece(next_pos_to)), Immune)
+                and next_piece.movement is None
+            ) if theoretical else (
                 piece.blocked_by(self.board.get_piece(next_pos_to))
                 or piece.captures(self.board.get_piece(move.pos_to))
-            )
-            or theoretical and (
-                isinstance((next_piece := self.board.get_piece(next_pos_to)), Immune) and next_piece.movement is None
-            )
+            ))
         )
 
 
 class HalflingRiderMovement(RiderMovement):
-    def __init__(self, board: Board, directions: list[AnyDirection] | None = None, shift: int = 0):
-        super().__init__(board, directions)
+    def __init__(self, board: Board, directions: list[AnyDirection] | None = None, shift: int = 0, loop: bool = False):
+        super().__init__(board, directions, loop)
         self.shift = shift
         self.max_steps = 0
 
@@ -153,33 +154,74 @@ class HalflingRiderMovement(RiderMovement):
         return self.steps >= self.max_steps or super().stop_condition(move, direction, piece, theoretical)
 
     def __copy_args__(self):
-        return self.board, copy(self.directions), self.shift
+        return self.board, copy(self.directions), self.shift, self.loop
 
 
 class CannonRiderMovement(RiderMovement):
-    def __init__(self, board: Board, directions: list[AnyDirection] | None = None):
-        super().__init__(board, directions)
+    def __init__(
+        self, board: Board, directions: list[AnyDirection] | None = None, distance: int = 0, loop: bool = False
+    ):
+        super().__init__(board, directions, loop)
+        self.distance = distance
         self.jumped = -1
 
     def initialize_direction(self, direction: AnyDirection, pos_from: Position, piece: Piece) -> None:
         self.jumped = -1
 
     def advance_direction(self, move: Move, direction: AnyDirection, pos_from: Position, piece: Piece) -> None:
-        if self.jumped == -1:
+        if self.jumped < 0:
             if not self.board.not_a_piece(self.transform(move.pos_to)):
                 self.jumped = 0
-        elif self.jumped == 0:
-            self.jumped = 1
+        else:
+            self.jumped += 1
 
     def skip_condition(self, move: Move, direction: AnyDirection, piece: Piece, theoretical: bool = False) -> bool:
-        return super().skip_condition(move, direction, piece, theoretical) if self.jumped == 1 else not theoretical
+        return super().skip_condition(move, direction, piece, theoretical) if self.jumped > 0 else not theoretical
 
     def stop_condition(self, move: Move, direction: AnyDirection, piece: Piece, theoretical: bool = False) -> bool:
-        if self.jumped == 0 and not theoretical:
-            next_pos_to = self.transform(add(move.pos_to, direction[:2]))
-            if piece.blocked_by(self.board.get_piece(next_pos_to)):
+        if self.jumped < 0:
+            next_pos_to = self.transform(add(move.pos_from, mul(direction[:2], self.steps + 1)))
+            if not (self.loop and move.pos_from == next_pos_to) and piece.blocked_by(self.board.get_piece(next_pos_to)):
+                return False
+        elif self.jumped == 0 and not theoretical:
+            next_pos_to = self.transform(add(move.pos_from, mul(direction[:2], self.steps + 1)))
+            if not (self.loop and move.pos_from == next_pos_to) and piece.blocked_by(self.board.get_piece(next_pos_to)):
                 return True
-        return super().stop_condition(move, direction, piece, theoretical or self.jumped != 1)
+        elif self.distance and self.jumped >= self.distance:
+            return True
+        return super().stop_condition(move, direction, piece, theoretical or not self.jumped > 0)
+
+
+class HopperRiderMovement(CannonRiderMovement):
+    def __init__(
+        self, board: Board, directions: list[AnyDirection] | None = None, distance: int = 0, loop: bool = False
+    ):
+        super().__init__(board, directions, distance, loop)
+        self.capture = None
+
+    def initialize_direction(self, direction: AnyDirection, pos_from: Position, piece: Piece) -> None:
+        super().initialize_direction(direction, pos_from, piece)
+        self.capture = None
+
+    def advance_direction(self, move: Move, direction: AnyDirection, pos_from: Position, piece: Piece) -> None:
+        super().advance_direction(move, direction, pos_from, piece)
+        if self.jumped == 0:
+            capture = self.board.get_piece(move.pos_to)
+            if piece.captures(capture):
+                self.capture = capture
+
+    def stop_condition(self, move: Move, direction: AnyDirection, piece: Piece, theoretical: bool = False) -> bool:
+        if self.jumped >= 0 and not theoretical:
+            next_pos_to = self.transform(add(move.pos_from, mul(direction[:2], self.steps + 1)))
+            if not (self.loop and move.pos_from == next_pos_to) and not self.board.not_a_piece(next_pos_to):
+                return True
+        return super().stop_condition(move, direction, piece, theoretical)
+
+    def moves(self, pos_from: Position, piece: Piece, theoretical: bool = False):
+        for move in super().moves(pos_from, piece, theoretical):
+            if not theoretical and self.capture:
+                move.captured_piece = self.capture
+            yield move
 
 
 class SpaciousRiderMovement(RiderMovement):
@@ -188,7 +230,7 @@ class SpaciousRiderMovement(RiderMovement):
         return pos  # as much as i like the idea of a toroidal movement condition, it's just not practical for this game
 
     def skip_condition(self, move: Move, direction: AnyDirection, piece: Piece, theoretical: bool = False) -> bool:
-        next_pos_to = self.transform(add(move.pos_to, direction[:2]))
+        next_pos_to = self.transform(add(move.pos_from, mul(direction[:2], self.steps + 1)))
         check_space = self.spacious_transform(next_pos_to)
         check_state = check_space == self.spacious_transform(move.pos_from) or self.board.not_a_piece(check_space)
         return not check_state or super().skip_condition(move, direction, piece, theoretical)
@@ -241,16 +283,24 @@ class RankBouncingRiderMovement(BouncingRiderMovement):
         return pos[0], super().transform(pos)[1]
 
 
-class RangedCaptureRiderMovement(RiderMovement):
+class RangedMovement(BaseMovement):
     def moves(self, pos_from: Position, piece: Piece, theoretical: bool = False):
         for move in super().moves(pos_from, piece, theoretical):
-            move.movement_type = RiderMovement
+            move = copy(move)
             if not theoretical:
-                captured_piece = self.board.get_piece(move.pos_to)
+                captured_piece = move.captured_piece or self.board.get_piece(move.pos_to)
                 if not captured_piece.is_empty():
                     move.captured_piece = captured_piece
                     move.pos_to = move.pos_from
-                    move.movement_type = type(self)
+                    move.movement_type = RangedMovement
+            yield move
+
+
+class RangedCaptureRiderMovement(RangedMovement, RiderMovement):
+    def moves(self, pos_from: Position, piece: Piece, theoretical: bool = False):
+        for move in super().moves(pos_from, piece, theoretical):
+            if not move.captured_piece:
+                move.movement_type = RiderMovement
             yield move
 
     def skip_condition(self, move: Move, direction: AnyDirection, piece: Piece, theoretical: bool = False) -> bool:
@@ -504,7 +554,7 @@ class FirstMoveMovement(BaseMultiMovement):
         return self.board, copy(self.base_movements), copy(self.first_move_movements)
 
 
-class RepeatMovement(BaseMultiMovement):
+class RepeatBentMovement(BaseMultiMovement):
     def __init__(
         self,
         board: Board,
@@ -512,13 +562,15 @@ class RepeatMovement(BaseMultiMovement):
         start_index: int = 0,
         step_count: int = 0,
         skip_count: int = 0,
-        split: bool = False
+        split: bool = False,
+        loop: bool = False,
     ):
         super().__init__(board, movements)
         self.start_index = start_index
         self.step_count = step_count
         self.skip_count = skip_count
         self.split = split
+        self.loop = loop
         self.dir_indexes = [-1] * len(self.movements)
 
     def moves(self, pos_from: Position, piece: Piece, theoretical: bool = False, index: int = 0):
@@ -533,6 +585,7 @@ class RepeatMovement(BaseMultiMovement):
                 self.dir_indexes[index] = -1
             is_new = self.dir_indexes[index] < 0
             directions = movement.directions if is_new else [movement.directions[self.dir_indexes[index]]]
+            stop = False
             for direction in directions:
                 if is_new:
                     for i in range(index + 1, len(self.movements)):
@@ -541,11 +594,19 @@ class RepeatMovement(BaseMultiMovement):
                 movement.directions = [direction]
                 move = None
                 for move in movement.moves(pos_from, piece, theoretical):
+                    if move.movement_type != RoyalEnPassantMovement and any(direction[:2]):
+                        pos_to = move.pos_to
+                        if issubclass(move.movement_type, RangedMovement) and move.captured_piece:
+                            pos_to = move.captured_piece.board_pos
+                        if pos_to == pos_from:
+                            stop = True
                     move.movement_type = type(self)
-                    if self.start_index <= index and self.skip_count <= true_index:
+                    if self.start_index <= index and self.skip_count <= true_index and (not stop or self.loop):
                         yield copy(move)
+                    if stop:
+                        break
                 if (
-                    move is not None and len(direction) > 2 and direction[2] and
+                    not stop and move is not None and len(direction) > 2 and direction[2] and
                     move.pos_to == add(pos_from, piece.side.direction(mul(direction[:2], direction[2])))
                     and (theoretical or self.board.get_piece(move.pos_to).is_empty())
                 ):
@@ -555,15 +616,30 @@ class RepeatMovement(BaseMultiMovement):
             return ()
 
     def __copy_args__(self):
-        return self.board, deepcopy(self.movements), self.start_index, self.step_count, self.skip_count, self.split
+        return (
+            self.board, deepcopy(self.movements),
+            self.start_index, self.step_count, self.skip_count,
+            self.split, self.loop,
+        )
 
 
-class BentMovement(RepeatMovement):
-    def __init__(self, board: Board, movements: list[BaseDirectionalMovement] | None = None, start_index: int = 0):
-        super().__init__(board, movements, start_index, len(movements) if movements else 0)
+class RepeatMovement(RepeatBentMovement):
+    # Alias for RepeatBentMovement for backwards compatibility
+    pass
+
+
+class BentMovement(RepeatBentMovement):
+    def __init__(
+        self,
+        board: Board,
+        movements: list[BaseDirectionalMovement] | None = None,
+        start_index: int = 0,
+        loop: bool = False,
+    ):
+        super().__init__(board, movements, start_index, len(movements) if movements else 0, loop=loop)
 
     def __copy_args__(self):
-        return self.board, deepcopy(self.movements), self.start_index
+        return self.board, deepcopy(self.movements), self.start_index, self.loop
 
 
 class ChainMovement(BaseMultiMovement):
@@ -638,6 +714,11 @@ class MultiMovement(BaseMultiMovement):
 
     def __copy_args__(self):
         return self.board, deepcopy(self.move_or_capture), deepcopy(self.move), deepcopy(self.capture)
+
+
+
+class RangedMultiMovement(RangedMovement, MultiMovement):
+    pass
 
 
 class ColorMovement(BaseMultiMovement):

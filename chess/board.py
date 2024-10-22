@@ -887,7 +887,7 @@ class Board(Window):
                 for m in moves
             ] if self.chain_start else [],
             'ply': self.ply_count,
-            'side': self.get_turn(),
+            'turn': self.get_turn() + 1,
             'order': [
                 [side[0].value, [{k: v for k, v in {
                     'order': d.get('order'),
@@ -1133,7 +1133,7 @@ class Board(Window):
         ]
         self.reset_turn_order()
         turn_order = self.turn_order_start + self.turn_order
-        turn_side = data.get('side', self.get_turn(ply_count))
+        turn_side = data.get('turn', self.get_turn(ply_count))
         self.turn_side = turn_order[turn_side - 1]
         if isinstance(self.turn_side, list):
             self.turn_side, self.turn_rules = self.turn_side[0], self.turn_side[1]

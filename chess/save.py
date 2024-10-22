@@ -137,6 +137,8 @@ def save_movement_type(movement_type: type[BaseMovement] | frozenset | None) -> 
         return None
     if movement_type is Unset:
         return UNSET_STRING
+    if movement_type.__module__ == movement_module.__name__:
+        pass
     name = movement_type.__name__
     for suffix in MOVEMENT_SUFFIXES:
         if name.endswith(suffix, 1):
@@ -198,6 +200,23 @@ def load_piece(data: dict | str | None, board: Board, from_dict: dict | None) ->
     return piece
 
 
+def save_custom_movement_type(movement: type[BaseMovement]) -> list[str]:
+    if movement.__module__ == movement_module.__name__:
+        return [save_movement_type(movement)]
+    return [
+        save_movement_type(base)
+        for base in movement.__bases__
+        if issubclass(base, BaseMovement)
+        and base.__module__ == movement_module.__name__
+    ]
+
+
+def load_custom_movement_type(bases: dict[str, type[BaseMovement]]) -> type[BaseMovement]:
+    name = CUSTOM_PREFIX + '_'.join(bases)
+    bases = list(v for k, v in bases.items())
+    return type(name, (*bases, BaseMovement), {})  # type: ignore
+
+
 def save_movement(movement: BaseMovement | frozenset | None) -> list | str | None:
     save_key = lambda key: save_piece_type(key) if issubclass(key, type) and issubclass(key, Piece) else key
     def save_arg(arg: Any) -> Any:  # helper function for saving constructor arguments of a movement object:
@@ -221,7 +240,7 @@ def save_movement(movement: BaseMovement | frozenset | None) -> list | str | Non
     args = list(movement.__copy_args__()[1:])  # store arguments of the movement (except the board argument)
     while not args[-1]:  # some movement classes have optional __init__() arguments with falsy defaults that
         args.pop()  # aren't needed to reconstruct the movement, so we can remove the trailing ones and then
-    return [save_movement_type(type(movement))] + [save_arg(arg) for arg in args]  # save the data as a list
+    return save_custom_movement_type(type(movement)) + [save_arg(arg) for arg in args]  # save data as list.
 
 
 def load_movement(data: list | str | None, board: Board, from_dict: dict | None) -> BaseMovement | frozenset | None:
@@ -242,7 +261,15 @@ def load_movement(data: list | str | None, board: Board, from_dict: dict | None)
         return None  # if the data is UNSET_STRING, return Unset. similarly, it is the only case where we return Unset
     if data == UNSET_STRING:  # otherwise, we need to load the movement type and the rest of the arguments, so that we
         return Unset  # can create a new instance of the movement type with the arguments we just loaded. very simple.
-    return load_movement_type(data[0])(board, *[load_arg(arg) for arg in data[1:]])  # and that's it. we're done here.
+    bases, data_copy = {}, data.copy()  # oh boy, here comes the hard part. we need to load the movement classes first
+    for i, base_string in enumerate(data):  # for every base class string in front of the data list, we need to load a
+        if base := load_movement_type(base_string):  # movement class corresponding to that string. but if we can't do
+            bases[base_string] = base  # that for a certain string, we assume that the movement classes are all loaded
+            data_copy.pop(i)  # and that the rest are all arguments. so we remove the base strings from the data list,
+        else:  # until we encounter something that isn't a base string. that's when we know we are done with the bases
+            break  # and we can move on to loading the arguments. the bases are stored in a dict for easy access later
+    args = board, *[load_arg(arg) for arg in data_copy]  # we need to load the arguments alongside the board object...
+    return load_custom_movement_type(bases)(*args)  # and that's it. we are done. movement loaded successfully. maybe.
 
 
 def save_custom_type(piece: type[Piece] | Piece | None) -> dict | None:
@@ -253,7 +280,7 @@ def save_custom_type(piece: type[Piece] | Piece | None) -> dict | None:
         return None
     bases = piece_type.__bases__
     return {k: v for k, v in {
-        'cls': [base.__name__ for base in bases if base.__module__ == type_module],
+        'cls': [base.__name__ for base in bases if base.__module__ == type_module.__name__],
         'name': piece_type.name,
         'file': piece_type.file_name,
         'path': piece_type.asset_folder,
@@ -265,7 +292,7 @@ def save_custom_type(piece: type[Piece] | Piece | None) -> dict | None:
 def load_custom_type(data: dict | None, name: str) -> type[Piece] | None:
     if data is None:
         return None
-    base_strings = data.get('cls')
+    base_strings = data.get('cls', ())
     base_set = set()
     bases = [Piece]
     for base_string in base_strings:
@@ -287,7 +314,7 @@ def load_custom_type(data: dict | None, name: str) -> type[Piece] | None:
     cls = type(CUSTOM_PREFIX + name, tuple(bases), args)
 
     def init(self, board, **kwargs):
-        base.__init__(
+        bases[0].__init__(
             self, board,
             load_movement(getattr(self, 'movement_data', None), board, board.custom_pieces),
             **kwargs
