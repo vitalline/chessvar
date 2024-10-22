@@ -325,6 +325,7 @@ def save_move(move: Move | frozenset | None) -> dict | str | None:
         'promotion': save_piece(promotion),
         'chain': save_move(move.chained_move),
         'edit': move.is_edit,
+        'tag': move.tag,
     }.items() if v}
 
 
@@ -357,6 +358,7 @@ def load_move(data: dict | str | None, board: Board, from_dict: dict | None) -> 
         promotion=load_piece(data.get('promotion'), board, from_dict),
         chained_move=load_move(data.get('chain'), board, from_dict),
         is_edit=data.get('edit', 0),
+        tag=data.get('tag', None),
     )
 
 

@@ -642,8 +642,8 @@ class Board(Window):
         if ply_count is None:
             ply_count = self.ply_count
         return (
-            (ply_count - len(self.turn_order_start) - 1) % len(self.turn_order) + len(self.turn_order_start) + 1
-            if ply_count > len(self.turn_order_start) else ply_count
+            (ply_count - len(self.turn_order_start) - 1) % len(self.turn_order) + len(self.turn_order_start)
+            if ply_count > len(self.turn_order_start) else ply_count - 1
         )
 
     def get_promotion_side(self, piece: Piece):
@@ -2852,6 +2852,18 @@ class Board(Window):
             self.redo_last_move()
         self.redo_last_move()
 
+    def pass_turn(self) -> None:
+        self.move_history.append(None)
+        turn_side = (self.turn_order_start + self.turn_order)[self.get_turn()]
+        if isinstance(turn_side, list):
+            turn_side = turn_side[0]
+        self.log(f"[Ply {self.ply_count}] Pass: {turn_side} to move")
+        self.ply_count += 1
+        self.clear_en_passant()
+        self.clear_castling_ep()
+        self.compare_history()
+        self.advance_turn()
+
     def advance_turn(self) -> None:
         self.deselect_piece()
         # if we're promoting, we can't advance the turn yet
@@ -2873,7 +2885,7 @@ class Board(Window):
             self.color_pieces()  # reverting the piece colors to normal in case they were changed
             self.update_caption()  # updating the caption to reflect the edit that was just made
             return  # let's not advance the turn while editing the board to hopefully make things easier for everyone
-        self.turn_side = (self.turn_order_start + self.turn_order)[self.get_turn(self.ply_count - 1)]
+        self.turn_side = (self.turn_order_start + self.turn_order)[self.get_turn()]
         if isinstance(self.turn_side, list):
             self.turn_side, self.turn_rules = self.turn_side[0], self.turn_side[1]
         else:
@@ -3959,8 +3971,12 @@ class Board(Window):
             if self.selected_square is not None and (pos != self.selected_square or not self.piece_was_selected):
                 move = self.find_move(self.selected_square, pos)
                 if move is None:
-                    self.deselect_piece()
-                    return
+                    if self.moves[self.turn_side].get('pass'):
+                        self.pass_turn()
+                        return
+                    else:
+                        self.deselect_piece()
+                        return
                 self.update_move(move)
                 if move.promotion is not None:
                     move.promotion = Unset  # do not auto-promote because we are selecting promotion type manually
@@ -4250,19 +4266,7 @@ class Board(Window):
                 self.reset_board()
             elif modifiers & key.MOD_ACCEL and not modifiers & key.MOD_SHIFT:  # White is in control
                 while self.turn_side != Side.WHITE and not self.chain_start:
-                    self.move_history.append(None)
-                    turn_side = (self.turn_order_start + self.turn_order)[self.get_turn()]
-                    if isinstance(turn_side, list):
-                        turn_pieces = f" ({', '.join(sorted(piece.name for piece in turn_side[1]))})"
-                        turn_side = turn_side[0]
-                    else:
-                        turn_pieces = ''
-                    self.log(f"[Ply {self.ply_count}] Pass: {turn_side} to move{turn_pieces}")
-                    self.ply_count += 1
-                    self.clear_en_passant()
-                    self.clear_castling_ep()
-                    self.compare_history()
-                    self.advance_turn()
+                    self.pass_turn()
             elif modifiers & key.MOD_SHIFT:  # Shift white piece set
                 d = -1 if modifiers & key.MOD_ACCEL else 1
                 self.piece_set_ids[Side.WHITE] = (
@@ -4299,19 +4303,7 @@ class Board(Window):
                 self.reset_board()
             elif modifiers & key.MOD_ACCEL and not modifiers & key.MOD_SHIFT:  # Black is in control
                 while self.turn_side != Side.BLACK and not self.chain_start:
-                    self.move_history.append(None)
-                    turn_side = (self.turn_order_start + self.turn_order)[self.get_turn()]
-                    if isinstance(turn_side, list):
-                        turn_pieces = f" ({', '.join(sorted(piece.name for piece in turn_side[1]))})"
-                        turn_side = turn_side[0]
-                    else:
-                        turn_pieces = ''
-                    self.log(f"[Ply {self.ply_count}] Pass: {turn_side} to move{turn_pieces}")
-                    self.ply_count += 1
-                    self.clear_en_passant()
-                    self.clear_castling_ep()
-                    self.compare_history()
-                    self.advance_turn()
+                    self.pass_turn()
             elif modifiers & key.MOD_SHIFT:  # Shift black piece set
                 d = -1 if modifiers & key.MOD_ACCEL else 1
                 self.piece_set_ids[Side.BLACK] = (
@@ -4348,19 +4340,7 @@ class Board(Window):
                 self.reset_custom_data()
                 self.reset_board()
             elif modifiers & key.MOD_ACCEL and not modifiers & key.MOD_SHIFT and not self.chain_start:  # Next player
-                self.move_history.append(None)
-                turn_side = (self.turn_order_start + self.turn_order)[self.get_turn()]
-                if isinstance(turn_side, list):
-                    turn_pieces = f" ({', '.join(sorted(piece.name for piece in turn_side[1]))})"
-                    turn_side = turn_side[0]
-                else:
-                    turn_pieces = ''
-                self.log(f"[Ply {self.ply_count}] Pass: {turn_side} to move{turn_pieces}")
-                self.ply_count += 1
-                self.clear_en_passant()
-                self.clear_castling_ep()
-                self.compare_history()
-                self.advance_turn()
+                self.pass_turn()
             elif modifiers & key.MOD_SHIFT:
                 if (
                     self.piece_set_ids[Side.WHITE] == self.piece_set_ids[Side.BLACK]
@@ -5081,10 +5061,10 @@ class Board(Window):
         debug_log_data.append(f"Turn order ({len(self.custom_turn_order)}):")
         for i, data in enumerate(self.custom_turn_order):
             if isinstance(data, list):
-                turn_side = Side(int(data[0]))
+                turn_side = data[0]
                 turn_pieces = f" (NYI: {data[1]})"
             else:
-                turn_side = Side(int(data))
+                turn_side = data
                 turn_pieces = ''
             debug_log_data.append(f"  {i + 1}: {turn_side if turn_side else 'None'}{turn_pieces}")
         possible_moves = sum((sum(v.values(), []) for v in self.moves.get(self.turn_side, {}).values()), [])
