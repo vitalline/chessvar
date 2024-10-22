@@ -23,6 +23,7 @@ class Move(object):
         placed_piece: type[Piece] | None = None,
         promotion: Piece | frozenset | None = None,
         chained_move: Move | frozenset | None = None,
+        tag: str | None = None,
         is_edit: int = 0
     ):
         self.pos_from = pos_from
@@ -34,6 +35,7 @@ class Move(object):
         self.placed_piece = placed_piece
         self.promotion = promotion
         self.chained_move = chained_move
+        self.tag = tag
         self.is_edit = is_edit
 
     def set(
@@ -47,6 +49,7 @@ class Move(object):
         placed_piece: type[Piece] | None = None,
         promotion: Piece | frozenset | type(Default) | None = None,
         chained_move: Move | frozenset | type(Default) | None = None,
+        tag: str | None = None,
         is_edit: int | None = None
     ) -> Move:
         self.pos_from = pos_from or self.pos_from
@@ -64,6 +67,7 @@ class Move(object):
             chained_move if chained_move not in {None, Default}
             else None if chained_move is Default else self.chained_move
         )
+        self.tag = tag or self.tag
         self.is_edit = is_edit if is_edit is not None else self.is_edit
         return self
 
@@ -83,6 +87,7 @@ class Move(object):
                 if isinstance(self.chained_move, Move) else
                 self.chained_move == other.chained_move
             )
+            and self.tag == other.tag
             and self.is_edit == other.is_edit
         )
 
@@ -97,6 +102,7 @@ class Move(object):
             self.placed_piece,
             self.promotion,
             self.chained_move,
+            self.tag,
             self.is_edit
         )
 
@@ -111,6 +117,7 @@ class Move(object):
             self.placed_piece,
             self.promotion.__copy__() if self.promotion else self.promotion,
             self.chained_move.__deepcopy__(memo) if self.chained_move else self.chained_move,
+            self.tag,
             self.is_edit
         )
 
@@ -193,5 +200,4 @@ class Move(object):
                     string += f"{comma} {promotes} to {self.promotion}"
                 else:
                     string += f"{comma} {promotes} to {self.promotion.name}"
-            comma = ','
         return string

@@ -133,6 +133,27 @@ class Piece(Sprite):
             )
         )
 
+    def fits(self, match: str) -> bool:
+        if match == '*':
+            return True
+        if match == self.name:
+            return True
+        match_start = match[0] == '*'
+        match_end = match[-1] == '*'
+        match = match.strip('*')
+        match_middle = '*' in match
+        if match_middle:
+            keys = match.split('*')
+            indexes = [self.name.find(key) for key in keys]
+            if all(index >= 0 for index in indexes) and indexes == sorted(indexes):
+                return True
+        if match_start and match_end and match in self.name:
+            return True
+        if match_start and self.name.endswith(match):
+            return True
+        if match_end and self.name.startswith(match):
+            return True
+
     def blocked_by(self, what: Piece):
         if not what:
             return False

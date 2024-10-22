@@ -727,3 +727,56 @@ class ProbabilisticMovement(BaseMultiMovement):
 
     def roll(self):
         return self.board.roll_rng.randrange(len(self.movements))
+
+
+class BaseChoiceMovement(BaseMultiMovement):
+    def __init__(self, board: Board, movements: dict[type[Piece] | str | None, list[BaseMovement]] | None = None):
+        if movements is None:
+            movements = {}
+        self.movement_dict = movements
+        super().__init__(board, sum(movements.values(), []))
+
+    def __copy_args__(self):
+        return self.board, {piece_type: deepcopy(movements) for piece_type, movements in self.movement_dict.items()}
+
+
+class ChoiceMovement(BaseChoiceMovement):
+    def moves(self, pos_from: Position, piece: Piece, theoretical: bool = False):
+        if theoretical:
+            for movement in self.movements:
+                for move in movement.moves(pos_from, piece, theoretical):
+                    yield copy(move)
+        else:
+            for key in self.movement_dict:
+                for movement in self.movement_dict[key]:
+                    for move in movement.moves(pos_from, piece, theoretical):
+                        if key == '*':
+                            yield copy(move)
+                        else:
+                            to_piece = self.board.get_piece(move.pos_to)
+                            if not key:
+                                if to_piece.is_empty() or piece == to_piece:
+                                    yield copy(move)
+                            elif isinstance(key, type) and isinstance(to_piece, key):
+                                yield copy(move)
+                            elif isinstance(key, str):
+                                if key == to_piece.side.name:
+                                    yield copy(move)
+                                elif key.isdigit() and int(key) == to_piece.side.value:
+                                    yield copy(move)
+                                elif to_piece.fits(key):
+                                    yield copy(move)
+
+
+class TagMovement(BaseChoiceMovement):
+    def moves(self, pos_from: Position, piece: Piece, theoretical: bool = False):
+        if theoretical:
+            for movement in self.movements:
+                for move in movement.moves(pos_from, piece, theoretical):
+                    yield copy(move)
+        else:
+            for key in self.movement_dict:
+                for movement in self.movement_dict[key]:
+                    for move in movement.moves(pos_from, piece, theoretical):
+                        yield copy(move).set(tag=key or None)
+
