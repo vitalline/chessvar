@@ -1508,16 +1508,16 @@ class Board(Window):
                 fmt_rules = {}
                 for rule in rules:
                     data = fmt_rules
-                    data = data.setdefault(int(rule.get('order', 0)), {})
-                    data = data.setdefault(int(rule.get('state', 0)), {})
+                    data_order = data.setdefault(int(rule.get('order', 0)), {})
+                    data_state = data_order.setdefault(int(rule.get('state', 0)), {})
                     for last in rule.get('last', '*'):
-                        data = data.setdefault(last, {})
+                        data_last = data_state.setdefault(last, {})
                         for piece in rule.get('cls', '*'):
-                            data = data.setdefault(piece, {})
+                            data_cls = data_last.setdefault(piece, {})
                             for tag in rule.get('tag', '*'):
-                                data = data.setdefault(tag, {})
+                                data_tag = data_cls.setdefault(tag, {})
                                 for move_type in rule.get('type', 'mcd'):
-                                    data = data.setdefault(move_type, int(rule.get('check', 0)))
+                                    data_tag.setdefault(move_type, int(rule.get('check', 0)))
                 side = [side, fmt_rules]
             (self.turn_order if start_ended else self.turn_order_start).append(side)
         if self.turn_order_start and not self.turn_order and not start_ended:
