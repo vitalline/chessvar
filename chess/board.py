@@ -1124,7 +1124,7 @@ class Board(Window):
                 'cls': [load_piece_type(t, c) for t in d.get('cls', ())],
                 'tag': [t for t in d.get('tag', ())],
                 'last': [i for i in d.get('last', ())],
-                'type': d.get('type', 'mcd'),
+                'type': d.get('type', ''),
                 'state': d.get('state', 0),
                 'check': d.get('check', 0),
             }.items() if v} for d in side[1]]]
