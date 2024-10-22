@@ -1493,6 +1493,10 @@ class Board(Window):
                             self.penultima_pieces[player_side][piece] = texture
 
     def reset_turn_order(self) -> None:
+        if not self.custom_turn_order:
+            self.turn_order_start = []
+            self.turn_order = [Side.WHITE, Side.BLACK]
+            return
         self.turn_order_start, self.turn_order = [], []
         start_ended = False
         for i, side in enumerate(self.custom_turn_order):
@@ -1516,10 +1520,8 @@ class Board(Window):
                                     data = data.setdefault(move_type, int(rule.get('check', 0)))
                 side = [side, fmt_rules]
             (self.turn_order if start_ended else self.turn_order_start).append(side)
-        if not self.turn_order:
-            self.turn_order = [Side.WHITE, Side.BLACK]
-        if not self.turn_order_start:
-            self.turn_order_start = []
+        if self.turn_order_start and not self.turn_order and not start_ended:
+            self.turn_order_start, self.turn_order = self.turn_order, self.turn_order_start
 
     def get_piece_sets(
         self,
@@ -2148,7 +2150,11 @@ class Board(Window):
                     move_dict = self.moves.get(piece.side, {})
                 else:
                     move_dict = {}
-                for pos_to in move_dict.get(pos, {}):
+                pos_dict = move_dict.get(pos, {})
+                pos_list = list(pos_dict.keys())
+                if self.can_pass() and pos not in pos_dict:
+                    pos_list.append(pos)
+                for pos_to in pos_list:
                     if pos_to in move_sprites:
                         continue
                     sprite = Sprite(f"assets/util/{'move' if self.not_a_piece(pos_to) else 'capture'}.png")
@@ -2206,6 +2212,9 @@ class Board(Window):
 
     def hide_moves(self) -> None:
         self.move_sprite_list.clear()
+
+    def can_pass(self, side: Side = None) -> bool:
+        return self.moves.get(side or self.turn_side, {}).get('pass')
 
     def update_highlight(self, pos: Position | None) -> None:
         if self.clicked_square != pos:
@@ -3775,7 +3784,7 @@ class Board(Window):
                     self.advance_turn()
                 return
             if pos == self.selected_square:
-                if self.find_move(pos, pos) is None:
+                if self.find_move(pos, pos) is None and not self.can_pass():
                     self.deselect_piece()
                     return
             if self.selected_square is not None:
@@ -3783,7 +3792,7 @@ class Board(Window):
                     self.square_was_clicked = True
                     self.clicked_square = pos
                     return
-                if pos not in self.moves.get(self.turn_side, {}).get(self.selected_square, {}):
+                if pos not in self.moves.get(self.turn_side, {}).get(self.selected_square, {}) and not self.can_pass():
                     self.deselect_piece()
             if (
                 pos != self.selected_square
@@ -3971,7 +3980,7 @@ class Board(Window):
             if self.selected_square is not None and (pos != self.selected_square or not self.piece_was_selected):
                 move = self.find_move(self.selected_square, pos)
                 if move is None:
-                    if self.moves[self.turn_side].get('pass'):
+                    if pos == self.selected_square and self.can_pass():
                         self.pass_turn()
                         return
                     else:
@@ -4515,6 +4524,8 @@ class Board(Window):
                 if old_drops and not self.edit_mode and self.promotion_piece and self.promotion_piece.is_empty():
                     self.undo_last_finished_move()
                     self.update_caption()
+                self.future_move_history = []  # we don't know if we can redo the future moves anymore, so we clear them
+                self.advance_turn()
         if symbol == key.M:  # Moves
             if modifiers & key.MOD_ALT:  # Clear future move history
                 self.log(f"[Ply {self.ply_count}] Info: Future move history cleared", False)

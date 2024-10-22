@@ -196,7 +196,7 @@ class Move(object):
                     promotes = "promotes"
                 if self.promotion.is_hidden:
                     string += f"{comma} {promotes} to ???"
-                elif isinstance(self.promotion, Piece) and self.promotion.side not in {self.piece.side, Side.NONE}:
+                elif self.promotion and self.promotion.side not in {self.piece.side, Side.NONE}:
                     string += f"{comma} {promotes} to {self.promotion}"
                 else:
                     string += f"{comma} {promotes} to {self.promotion.name}"
