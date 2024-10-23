@@ -2228,6 +2228,65 @@ class Board(Window):
                 # check if the piece needs to be promoted
                 self.try_promotion(move)
 
+    def auto(self, move: Move) -> None:
+        self.update_auto_capture_markers(move)
+        self.update_auto_captures(move, self.turn_side.opponent())
+        chained_move = move
+        while chained_move:
+            chained_move.piece.move(chained_move)
+            self.update_auto_capture_markers(chained_move)
+            chained_move.set(piece=copy(chained_move.piece))
+            if self.promotion_piece is None:
+                self.log(f"[Ply {self.ply_count}] Move: {chained_move}")
+            chained_move = chained_move.chained_move
+        if self.chain_start is None:
+            self.chain_start = move
+            self.move_history.append(deepcopy(self.chain_start))
+        else:
+            last_move = self.chain_start
+            while last_move.chained_move:
+                last_move = last_move.chained_move
+            last_move.chained_move = move
+        if move.chained_move is Unset and not self.promotion_piece:
+            self.load_moves()
+            self.select_piece(move.pos_to)
+            if self.board_config['fast_chain'] and not self.game_over:
+                self.try_auto()
+        else:
+            self.chain_start = None
+            if self.promotion_piece is None:
+                self.ply_count += 1
+                self.compare_history()
+            self.advance_turn()
+
+    def try_auto(self) -> bool:
+        moves = self.moves[self.turn_side]
+        only_move = None
+        for pos_from in moves:
+            if isinstance(pos_from, str):
+                if only_move is None:
+                    only_move = pos_from
+                    continue
+                else:
+                    only_move = None
+                    break
+            for pos_to in moves[pos_from]:
+                for move in moves[pos_from][pos_to]:
+                    if not move:
+                        continue
+                    if only_move is None:
+                        only_move = move
+                    elif isinstance(only_move, str):
+                        only_move = None
+                        break
+                    elif not only_move.matches(move):
+                        only_move = None
+                        break
+        if isinstance(only_move, Move):
+            self.auto(only_move)
+            return True
+        return False
+
     def undo(self, move: Move) -> None:
         if move.pos_from != move.pos_to or move.promotion is not None:
             # piece was added, moved, removed, or promoted
@@ -2559,6 +2618,13 @@ class Board(Window):
             return  # let's not advance the turn while editing the board to hopefully make things easier for everyone
         self.turn_side, self.turn_rules = (self.turn_order_start + self.turn_order)[self.get_turn()]
         self.update_status()
+        if self.board_config['fast_moves'] and not self.game_over:
+            if self.try_auto():
+                return
+        if self.board_config['fast_turn_pass'] and not self.game_over:
+            if 'pass' in self.moves[self.turn_side] and len(self.moves[self.turn_side]) == 1:
+                self.pass_turn()
+                return
 
     def update_status(self) -> None:
         self.load_moves()  # this updates the check status as well
@@ -2767,6 +2833,23 @@ class Board(Window):
             drop_type_list.extend(piece_type for _ in drops)
         if not drop_list:
             return
+        if self.board_config['fast_drop'] and len(drop_list) == 1:
+            promotion_piece = self.promotion_piece
+            self.promotion_piece = True
+            drop = drop_list[0]
+            if isinstance(drop, Piece):
+                drop = drop.of(drop.side or self.turn_side).on(move.pos_to)
+            else:
+                drop = drop(board=self, pos=move.piece.board_pos, side=self.turn_side)
+            move.set(promotion=drop, placed_piece=drop_type_list[0])
+            for i, piece in enumerate(self.captured_pieces[self.turn_side][::-1]):
+                if piece == drop:
+                    self.captured_pieces[self.turn_side].pop(-(i + 1))
+                    break
+            self.replace(move.piece, move.promotion)
+            self.update_promotion_auto_captures(move)
+            self.promotion_piece = promotion_piece
+            return
         self.start_promotion(self.get_piece(move.piece.board_pos), drop_list, drop_type_list)
 
     def try_promotion(self, move: Move) -> None:
@@ -2791,7 +2874,7 @@ class Board(Window):
             self.update_promotion_auto_captures(move)
             self.promotion_piece = promotion_piece
             return
-        if len(promotions) == 1:
+        if self.board_config['fast_promotion'] and len(promotions) == 1:
             self.promotion_piece = True
             promotion = promotions[0]
             if isinstance(promotion, Piece):
@@ -3563,7 +3646,7 @@ class Board(Window):
                         move.set(pos_from=None, movement_type=movement.DropMovement, promotion=Unset)
                     else:
                         side = self.get_promotion_side(move.piece)
-                        if len(self.edit_promotions[side]) == 1:
+                        if self.board_config['fast_promotion'] and len(self.edit_promotions[side]) == 1:
                             piece = self.edit_promotions[side][0]
                             if isinstance(piece, Piece):
                                 piece = piece.of(piece.side or side).on(pos)
@@ -3585,7 +3668,7 @@ class Board(Window):
                     if move.piece.is_empty():
                         move.set(pos_from=None)
                     side = self.get_promotion_side(move.piece)
-                    if len(self.edit_promotions[side]) == 1:
+                    if self.board_config['fast_promotion'] and len(self.edit_promotions[side]) == 1:
                         piece = self.edit_promotions[side][0]
                         if isinstance(piece, Piece):
                             piece = piece.of(piece.side or side).on(pos)
@@ -3693,6 +3776,8 @@ class Board(Window):
                 if not is_final and not self.promotion_piece:
                     self.load_moves()
                     self.select_piece(move.pos_to)
+                    if self.board_config['fast_chain'] and not self.game_over:
+                        self.try_auto()
                 else:
                     self.chain_start = None
                     if self.promotion_piece is None:
@@ -4306,34 +4391,7 @@ class Board(Window):
                 if choices:
                     suffix = ' with selected piece' if self.selected_square else ''
                     self.log(f"[Ply {self.ply_count}] Info: Making a random move{suffix}", False)
-                    move = base_rng.choice(choices)
-                    self.update_auto_capture_markers(move)
-                    self.update_auto_captures(move, self.turn_side.opponent())
-                    chained_move = move
-                    while chained_move:
-                        chained_move.piece.move(chained_move)
-                        self.update_auto_capture_markers(chained_move)
-                        chained_move.set(piece=copy(chained_move.piece))
-                        if self.promotion_piece is None:
-                            self.log(f"[Ply {self.ply_count}] Move: {chained_move}")
-                        chained_move = chained_move.chained_move
-                    if self.chain_start is None:
-                        self.chain_start = move
-                        self.move_history.append(deepcopy(self.chain_start))
-                    else:
-                        last_move = self.chain_start
-                        while last_move.chained_move:
-                            last_move = last_move.chained_move
-                        last_move.chained_move = move
-                    if move.chained_move is Unset and not self.promotion_piece:
-                        self.load_moves()
-                        self.select_piece(move.pos_to)
-                    else:
-                        self.chain_start = None
-                        if self.promotion_piece is None:
-                            self.ply_count += 1
-                            self.compare_history()
-                        self.advance_turn()
+                    self.auto(base_rng.choice(choices))
 
     def on_key_release(self, symbol: int, modifiers: int) -> None:
         if not self.is_active:
