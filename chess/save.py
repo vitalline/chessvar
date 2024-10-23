@@ -38,6 +38,10 @@ AnyJsonType = str | int | float | bool | None
 AnyJson = dict | list | AnyJsonType
 
 
+unpack = lambda l: l[0] if len(l) == 1 else l
+repack = lambda l: l if isinstance(l, list) else [l]
+
+
 def condense(data: AnyJson, alias_dict: dict, recursive: bool = False) -> AnyJson:
     def make_tuple(thing: AnyJson) -> tuple | AnyJsonType:
         if isinstance(thing, dict):
@@ -280,9 +284,11 @@ def save_custom_type(piece: type[Piece] | Piece | None) -> dict | None:
     piece, piece_type = (piece, type(piece)) if isinstance(piece, Piece) else (None, piece)
     if not issubclass(piece_type, Piece):
         return None
-    bases = piece_type.__bases__
+    bases = [base.__name__ for base in piece_type.__bases__ if base.__module__ == type_module.__name__]
+    if len(bases) == 1:
+        bases = bases[0]
     return {k: v for k, v in {
-        'cls': [base.__name__ for base in bases if base.__module__ == type_module.__name__],
+        'cls': bases,
         'name': piece_type.name,
         'file': piece_type.file_name,
         'path': piece_type.asset_folder,
@@ -295,6 +301,8 @@ def load_custom_type(data: dict | None, name: str) -> type[Piece] | None:
     if data is None:
         return None
     base_strings = data.get('cls', ())
+    if isinstance(base_strings, str):
+        base_strings = [base_strings]
     base_set = set()
     bases = [Piece]
     for base_string in base_strings:

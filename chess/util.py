@@ -1,6 +1,10 @@
 import os
 import sys
 
+from datetime import datetime
+from tkinter import filedialog
+from typing import Any
+
 
 # Dummy value used to indicate reverting to default value in functions where None indicates retaining the current value.
 Default = object()
@@ -8,11 +12,57 @@ Default = object()
 # Dummy value used to indicate a value that has not been set and should be set to a non-None value (e.g. for promotion).
 Unset = frozenset()
 
+# Lambda function to return the sign of a number. Returns 1 for positive numbers, -1 for negative numbers, and 0 for 0.
+sign = lambda x: (x > 0) - (x < 0)
+
 # Path to the directory where the game is running.
 base_dir = os.path.abspath(os.curdir)
 
 # Placeholder texture path for non-existent files.
 default_texture = "assets/util/missingno.png"
+
+# Characters that are invalid in file names.
+invalid_chars = ':<>|"?*'
+
+# Translation table to replace invalid characters with underscores.
+invalid_chars_trans_table = str.maketrans(invalid_chars, '_' * len(invalid_chars))
+
+
+# Function to generate a file name based on a name, extension and timestamp (if not provided, the current time is used).
+def get_filename(
+    name: str, ext: str, in_dir: str = base_dir, ts: datetime | None = None, ts_format: str = "%Y-%m-%d_%H-%M-%S"
+) -> str:
+    name_args = [name, (ts or datetime.now()).strftime(ts_format)]
+    full_name = '_'.join(s for s in name_args if s).translate(invalid_chars_trans_table)
+    return os.path.join(in_dir, f"{full_name}.{ext}")
+
+
+# Function to check if a string is a prefix of another string, ignoring case.
+def is_prefix_of(string: Any, prefix: Any) -> bool:
+    return isinstance(string, str) and isinstance(prefix, str) and string.lower().startswith(prefix.lower())
+
+
+# Function to check if a string is a prefix of any string in a list, ignoring case.
+def is_prefix_in(strings: list[Any], prefix: Any) -> bool:
+    return any(is_prefix_of(string, prefix) for string in strings)
+
+
+# Function to select a file to open. Returns the path of the selected file.
+def select_save_data() -> str:
+    return filedialog.askopenfilename(
+        initialdir=base_dir,
+        filetypes=[("JSON save file", "*.json")],
+    )
+
+
+# Function to select a file to save. Returns the path of the selected file.
+def select_save_name() -> str:
+    return filedialog.asksaveasfilename(
+        initialdir=base_dir,
+        initialfile=get_filename('save', 'json', in_dir=''),
+        filetypes=[("JSON save file", "*.json")],
+        defaultextension='.json',
+    )
 
 
 # Function to find the correct texture path based on the provided path.

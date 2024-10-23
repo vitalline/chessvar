@@ -1,17 +1,14 @@
 from __future__ import annotations
 
 from copy import copy, deepcopy
-from datetime import datetime
 from itertools import product, zip_longest
 from json import dumps, loads, JSONDecodeError
-from math import ceil, floor, sqrt
+from math import ceil, floor, isqrt
 from os import makedirs, name as os_name, system
 from os.path import dirname, isfile, join
 from random import Random
-from sys import argv, stdout
-from tkinter import filedialog
+from sys import argv
 from traceback import print_exc
-from typing import Any, TextIO
 
 from PIL.ImageColor import getrgb
 from arcade import key, MOUSE_BUTTON_LEFT, MOUSE_BUTTON_RIGHT, Text
@@ -21,369 +18,26 @@ from arcade import get_screens, start_render
 from chess.color import colors, default_colors, trickster_colors
 from chess.color import average, darken, desaturate, lighten, saturate
 from chess.config import Config
+from chess.data import config_path, base_rng, max_seed, get_set, get_set_name, penultima_textures, piece_groups
+from chess.data import default_board_width, default_board_height, default_size, max_size, min_size, size_step
+from chess.data import min_width, min_height
+from chess.debug import debug_info, save_piece_data, save_piece_sets, save_piece_types
 from chess.movement import movement
 from chess.movement.move import Move
 from chess.movement.util import Position, add, to_alpha as b26
 from chess.movement.util import to_algebraic as toa, from_algebraic as fra
-from chess.movement.util import from_algebraic_map as frm
-from chess.pieces.groups import classic as fide
-from chess.pieces.groups import amazon as am, amontillado as ao, asymmetry as ay, avian as av
-from chess.pieces.groups import backward as bw, beast as bs, breakfast as bk, burn as br, buzz as bz
-from chess.pieces.groups import camel as ca, cannon as cn, color as co, colorbound as cb
-from chess.pieces.groups import crash as cs, crook as cr, cylindrical as cy
-from chess.pieces.groups import demirifle as de, drip as dr
-from chess.pieces.groups import fairy as fa, fizz as fi, fly as fl, forward as fw
-from chess.pieces.groups import hobbit as hb, horse as hs
-from chess.pieces.groups import inadjacent as ia, iron as ir
-from chess.pieces.groups import knight as kn
-from chess.pieces.groups import martian as mr, mash as ms, multimove as mu
-from chess.pieces.groups import narrow as na, nocturnal as no
-from chess.pieces.groups import pawn as pa, perimeter as pe, pizza as pz, probable as pr
-from chess.pieces.groups import rookie as rk
-from chess.pieces.groups import splash as sp, starbound as st, stone as so, switch as sw
-from chess.pieces.groups import thrash as th
-from chess.pieces.groups import wide as wd
-from chess.pieces.groups import zebra as zb
+from chess.pieces.groups.classic import Pawn, King
+from chess.pieces.groups.colorbound import King as ColorboundKing
 from chess.pieces.groups.util import NoPiece, Obstacle, Block, Wall
 from chess.pieces.piece import Piece
 from chess.pieces.side import Side
 from chess.pieces.type import Fast, QuasiRoyal, Royal
-from chess.save import condense, expand
+from chess.save import condense, expand, unpack, repack
 from chess.save import condense_algebraic as cnd_alg, expand_algebraic as exp_alg
-from chess.save import load_move, load_piece, load_rng, load_piece_type, load_custom_type
+from chess.save import load_move, load_piece, load_rng, load_piece_type, load_custom_type, load_movement_type
 from chess.save import save_move, save_piece, save_rng, save_piece_type, save_custom_type
-from chess.util import Default, Unset, base_dir
-
-piece_groups: list[dict[str, str | list[type[Piece]]]] = [
-    {
-        'name': "Fabulous FIDEs",
-        'set': [fide.Rook, fide.Knight, fide.Bishop, fide.Queen, fide.King, fide.Bishop, fide.Knight, fide.Rook],
-    },
-    {
-        'name': "Colorbound Clobberers",
-        'set': [cb.Bede, cb.Waffle, cb.Fad, cb.Archbishop, cb.King, cb.Fad, cb.Waffle, cb.Bede],
-    },
-    {
-        'name': "Remarkable Rookies",
-        'set': [rk.Fork, rk.Woodrook, rk.Dove, rk.Chancellor, fide.King, rk.Dove, rk.Woodrook, rk.Fork],
-    },
-    {
-        'name': "Nutty Knights",
-        'set': [kn.Forerook, kn.Fibnif, kn.Foreknight, kn.Colonel, fide.King, kn.Foreknight, kn.Fibnif, kn.Forerook],
-    },
-    {
-        'name': "Amazonian Armada",
-        'set': [am.Cannon, am.Camel, am.NightRdr, am.Amazon, fide.King, am.NightRdr, am.Camel, am.Cannon],
-    },
-    {
-        'name': "Amontillado Arbiters",
-        'set': [ao.Hasdrubal, ao.Barcfil, ao.Bed, ao.Hamilcar, fide.King, ao.Bed, ao.Barcfil, ao.Hasdrubal],
-    },
-    {
-        'name': "Asymmetrical Assaulters",
-        'set': [ay.RQue, ay.Knish, ay.Blizzard, ay.Chanqueen, fide.King, ay.Blizzard, ay.Knish, ay.LQue],
-    },
-    {
-        'name': "Avian Airforce",
-        'set': [av.Wader, av.Darter, av.Falcon, av.Kingfisher, fide.King, av.Falcon, av.Darter, av.Wader],
-    },
-    {
-        'name': "Backward Barnacles",
-        'set': [bw.Whelk, bw.Walrus, bw.Seagull, bw.Shark, fide.King, bw.Seagull, bw.Walrus, bw.Whelk],
-    },
-    {
-        'name': "Beautiful Beasts",
-        'set': [bs.Ouroboros, bs.Quagga, bs.Roc, bs.Buffalo, fide.King, bs.Roc, bs.Quagga, bs.Ouroboros],
-    },
-    {
-        'name': "Breakfast Blasters",
-        'set': [bk.Belwaffle, bk.Pancake, bk.Bacon, bk.Omelet, fide.King, bk.Bacon, bk.Pancake, bk.Belwaffle],
-    },
-    {
-        'name': "Burning Barbarians",
-        'set': [br.Champion, br.DraHorse, br.Wizard, br.DraKing, fide.King, br.Wizard, br.DraHorse, br.Champion],
-    },
-    {
-        'name': "Buzzing Busters",
-        'set': [bz.Mosquito, bz.Dragonfly, bz.Locust, bz.Mantis, fide.King, bz.Locust, bz.Dragonfly, bz.Mosquito],
-    },
-    {
-        'name': "Cartankerous Camelids",
-        'set': [ca.Llama, ca.Cashier, ca.Cabbage, ca.Warlock, fide.King, ca.Cabbage, ca.Cashier, ca.Llama],
-    },
-    {
-        'name': "Claustrophobic Cannoneers",
-        'set_w': [cn.Mortar, cn.Napoleon, cn.Carronade, cn.Bertha, fide.King, cn.Carronade, cn.Napoleon, cn.Howitzer],
-        'set_b': [cn.Howitzer, cn.Napoleon, cn.Carronade, cn.Bertha, fide.King, cn.Carronade, cn.Napoleon, cn.Mortar],
-    },
-    {
-        'name': "Colorful Characters",
-        'set_w': [co.ElkRdr, co.DCannon, co.Nightlight, co.Nanqueen, fide.King, co.Nightlight, co.DCannon, co.CaribRdr],
-        'set_b': [co.CaribRdr, co.DCannon, co.Nightlight, co.Nanqueen, fide.King, co.Nightlight, co.DCannon, co.ElkRdr],
-    },
-    {
-        'name': "Contrarian Crashers",
-        'set': [cs.Merlion, cs.Biskni, cs.IStewardess, cs.IPaladess, fide.King, cs.IStewardess, cs.Biskni, cs.Merlion],
-    },
-    {
-        'name': "Cruel Crooks",
-        'set': [cr.LionCub, cr.Rhino, cr.Boyscout, cr.Griffon, fide.King, cr.Boyscout, cr.Rhino, cr.LionCub],
-    },
-    {
-        'name': "Cylindrical Cinders",
-        'set': [cy.Waffle, cy.Knight, cy.Bishop, cy.Chancellor, fide.King, cy.Bishop, cy.Knight, cy.Waffle],
-    },
-    {
-        'name': "Demirifle Destroyers",
-        'set': [de.Snail, de.Crab, de.Lobster, de.Crabsnail, fide.King, de.Lobster, de.Crab, de.Snail],
-    },
-    {
-        'name': "Dripping Droogs",
-        'set': [dr.Lobefin, dr.CrabRdr, dr.Sandbar, dr.Oyster, cb.King, dr.Sandbar, dr.CrabRdr, dr.Lobefin],
-    },
-    {
-        'name': "Fearful Fairies",
-        'set': [fa.Frog, fa.Dullahan, fa.Elephant, fa.Unicorn, fide.King, fa.Elephant, fa.Dullahan, fa.Frog],
-    },
-    {
-        'name': "Fighting Fizzies",
-        'set': [fi.LRhino, fi.Wyvern, fi.Crabinal, fi.EagleScout, fide.King, fi.Crabinal, fi.Wyvern, fi.RRhino],
-    },
-    {
-        'name': "Flying Flagellants",
-        'set': [fl.Quetzal, fl.Owl, fl.Hoatzin, fl.Eagle, fide.King, fl.Hoatzin, fl.Owl, fl.Quetzal],
-    },
-    {
-        'name': "Forward Forgers",
-        'set': [fw.IvoryRook, fw.Knishop, fw.Bishight, fw.Forequeen, fide.King, fw.Bishight, fw.Knishop, fw.IvoryRook],
-    },
-    {
-        'name': "Horseback Harassers",
-        'set': [hs.Naysayer, hs.HorseRdr, hs.Tapir, hs.Marauder, fide.King, hs.Tapir, hs.HorseRdr, hs.Naysayer],
-    },
-    {
-        'name': "Hopping Hobbitses",
-        'set': [hb.Heart, hb.Drake, hb.Barcinal, hb.Hannibal, fide.King, hb.Barcinal, hb.Drake, hb.Heart],
-    },
-    {
-        'name': "Inadjacent Intimidators",
-        'set': [ia.Bireme, ia.Tigon, ia.Bicycle, ia.Biplane, fide.King, ia.Bicycle, ia.Tigon, ia.Bireme],
-    },
-    {
-        'name': "Irritant Irons",
-        'set': [ir.Musth, ir.Officer, ir.SilverRdr, ir.GoldRdr, fide.King, ir.SilverRdr, ir.Officer, ir.Musth],
-    },
-    {
-        'name': "Magnificent Multimovers",
-        'set': [mu.MachineRdr, mu.Allnight, mu.Tusker, mu.Hierophant, fide.King, mu.Tusker, mu.Allnight, mu.MachineRdr],
-    },
-    {
-        'name': "Martian Manglers",
-        'set': [mr.Padwar, mr.Marker, mr.Walker, mr.Chief, fide.King, mr.Walker, mr.Marker, mr.Padwar],
-    },
-    {
-        'name': "Meticulous Mashers",
-        'set': [ms.Forfer, ms.Scout, ms.Bandit, ms.Rancher, fide.King, ms.Bandit, ms.Scout, ms.Forfer],
-    },
-    {
-        'name': "Narrow Nightmares",
-        'set': [na.Deerfly, na.Ship, na.Filescout, na.Horsefly, fide.King, na.Filescout, na.Ship, na.Deerfly],
-    },
-    {
-        'name': "Nocturnal Naysayers",
-        'set': [no.Bard, no.Nightsling, no.MoaRdr, no.Nanking, fide.King, no.MoaRdr, no.Nightsling, no.Bard],
-    },
-    {
-        'name': "Pawnshop Praetorians",
-        'set': [pa.Paladin, pa.Guarddog, pa.Stewardess, pa.Dowager, fide.King, pa.Stewardess, pa.Guarddog, pa.Paladin],
-    },
-    {
-        'name': "Perimeter Prancers",
-        'set': [pe.Fencer, pe.Castle, pe.Kirin, pe.Fort, fide.King, pe.Kirin, pe.Castle, pe.Fencer],
-    },
-    {
-        'name': "Pizza Pounders",
-        'set': [pz.Pepperoni, pz.Mushroom, pz.Sausage, pz.Meatball, fide.King, pz.Sausage, pz.Mushroom, pz.Pepperoni],
-    },
-    {
-        'name': "Probable Prowlers",
-        'set': [pr.Veteran, pr.RedPanda, pr.Tempofad, pr.WaterBuffalo, fide.King, pr.Tempofad, pr.RedPanda, pr.Veteran],
-    },
-    {
-        'name': "Seeping Switchers",
-        'set': [sw.Panda, sw.Marquis, sw.Bear, sw.Earl, fide.King, sw.Bear, sw.Marquis, sw.Panda],
-    },
-    {
-        'name': "Starbound Sliders",
-        'set': [st.Star, st.Lancer, st.SineRdr, st.Turneagle, fide.King, st.SineRdr, st.Lancer, st.Star],
-    },
-    {
-        'name': "Stoic Stones",
-        'set': [so.Caecilian, so.Brick, so.Stele, so.Caryatid, fide.King, so.Stele, so.Brick, so.Caecilian],
-    },
-    {
-        'name': "Superior Splashers",
-        'set': [sp.Mammoth, sp.Gecko, sp.Deacon, sp.Brigadier, fide.King, sp.Deacon, sp.Gecko, sp.Mammoth],
-    },
-    {
-        'name': "Threeleaping Thrashers",
-        'set': [th.Trident, th.Nipper, th.Bullfrog, th.Duchess, fide.King, th.Bullfrog, th.Nipper, th.Trident],
-    },
-    {
-        'name': "Wide Wildmen",
-        'set': [wd.Ogre, wd.Sidesail, wd.Sidewinder, wd.Ogress, fide.King, wd.Sidewinder, wd.Sidesail, wd.Ogre],
-    },
-    {
-        'name': "Zany Zebroids",
-        'set': [zb.Eliphas, zb.Sorcerer, zb.Adze, zb.IMarauder, fide.King, zb.Adze, zb.Sorcerer, zb.Eliphas],
-    }
-]
-
-penultima_textures = [f'ghost{s}' if s else None for s in ('R', 'N', 'B', 'Q', None, 'B', 'N', 'R')]
-
-default_board_width = 8
-default_board_height = 8
-
-min_width = 150.0
-min_height = 75.0
-default_size = 50.0
-min_size = 25.0
-max_size = 100.0
-size_step = 5.0
-
-base_rng = Random()
-max_seed = 2 ** 32 - 1
-
-config_path = join(base_dir, 'config.ini')
-
-invalid_chars = ':<>|"?*'
-invalid_chars_trans_table = str.maketrans(invalid_chars, '_' * len(invalid_chars))
-
-
-def get_filename(
-    name: str, ext: str, in_dir: str = base_dir, ts: datetime | None = None, ts_format: str = "%Y-%m-%d_%H-%M-%S"
-) -> str:
-    name_args = [name, (ts or datetime.now()).strftime(ts_format)]
-    full_name = '_'.join(s for s in name_args if s).translate(invalid_chars_trans_table)
-    return join(in_dir, f"{full_name}.{ext}")
-
-
-def get_piece_types(side: Side = Side.WHITE) -> dict[type[Piece], str]:
-    piece_types = {
-        get_set(side, i)[j]
-        for i in range(len(piece_groups)) for j in [i for i in range(4)] + [7]
-        if j < 4 or get_set(side, i)[j] != get_set(side, i)[7 - j]
-    } | {fide.Pawn, fide.King, cb.King}
-    return {t: t.name + (' (CB)' if t.is_colorbound() or t == cb.King else '') for t in piece_types}
-
-
-def get_set(side: Side, set_id: int) -> list[type[Piece]]:
-    piece_group = piece_groups[set_id]
-    return piece_group.get(f"set_{side.key()[0]}", piece_group.get('set', [NoPiece] * default_board_width))
-
-
-def get_set_name(piece_set: list[type[Piece]], include_royals: bool = False) -> str:
-    piece_name_order = [[i, len(piece_set) - 1 - i] for i in range(ceil(len(piece_set) / 2))]
-    piece_names = []
-    for group in piece_name_order:
-        name_order = []
-        used_names = set()
-        for pos in group:
-            if not piece_set[pos] or issubclass(piece_set[pos], NoPiece):
-                continue
-            if piece_set[pos] in {fide.King, cb.King} and pos == piece_name_order[-1][-1] and not include_royals:
-                continue
-            name = piece_set[pos].name
-            if name not in used_names:
-                name_order.append(name)
-                used_names.add(name)
-        piece_names.append('/'.join(name_order))
-    piece_set_name = ', '.join(n for n in piece_names if n)
-    return f"({piece_set_name})"
-
-
-def is_prefix_of(string: Any, prefix: Any) -> bool:
-    return isinstance(string, str) and isinstance(prefix, str) and string.lower().startswith(prefix.lower())
-
-
-def is_prefix_in(strings: list[Any], prefix: Any) -> bool:
-    return any(is_prefix_of(string, prefix) for string in strings)
-
-
-def print_piece_data(board: Board, fp: TextIO = stdout, side: Side = Side.WHITE) -> None:
-    fp.write('{\n')
-    for i, t in enumerate(sorted(get_piece_types(side), key=lambda x: save_piece_type(x))):
-        if i:
-            fp.write(',\n')
-        fp.write(f'  "{save_piece_type(t)}":')
-        p = t(board=board, side=side)
-        fp.write(dumps(save_custom_type(p), separators=(',', ':'), ensure_ascii=False))
-    fp.write('\n}')
-
-
-def print_piece_sets(fp: TextIO = stdout) -> None:
-    piece_types = get_piece_types()
-    digits = len(str(len(piece_groups)))
-    for i, group in enumerate(piece_groups):
-        for side, piece_set in (
-            [(Side.NONE, group['set'])] if 'set' in group else
-            [(side, group[f"set_{side.key()[0]}"]) for side in (Side.WHITE, Side.BLACK)]
-        ):
-            name = group['name'] + (f" - {side}" if side else '')
-            fp.write(f"ID {i:0{digits}d}{side.key()[:1]}: {name} {get_set_name(piece_set)}\n")
-            fp.write(f"  [{', '.join(piece_types[piece] for piece in piece_set)}]\n")
-            fp.write(f"  <{', '.join(save_piece_type(piece) for piece in piece_set)}>\n")
-
-
-def print_piece_types(fp: TextIO = stdout, side: Side = Side.WHITE) -> None:
-    for name, path, file in sorted((n, save_piece_type(t), t.file_name) for t, n in get_piece_types(side).items()):
-        fp.write(f"{name}: {path}, {file}\n")
-
-
-def save_piece_data(board: Board, file_path: str = None) -> None:
-    with open(
-        file_path or
-        get_filename('debug_piece_data', 'json', ts_format=''),
-        mode='w',
-        encoding='utf-8',
-    ) as fp:
-        print_piece_data(board, fp)
-
-
-def save_piece_sets(file_path: str = None) -> None:
-    with open(
-        file_path or
-        get_filename('debug_piece_sets', 'txt', ts_format=''),
-        mode='w',
-        encoding='utf-8',
-    ) as fp:
-        print_piece_sets(fp)
-
-
-def save_piece_types(file_path: str = None, side: Side = Side.WHITE) -> None:
-    with open(
-        file_path or
-        get_filename('debug_piece_types', 'txt', ts_format=''),
-        mode='w',
-        encoding='utf-8',
-    ) as fp:
-        print_piece_types(fp, side)
-
-
-def select_save_data() -> str:
-    return filedialog.askopenfilename(
-        initialdir=base_dir,
-        filetypes=[("JSON save file", "*.json")],
-    )
-
-
-def select_save_name() -> str:
-    return filedialog.asksaveasfilename(
-        initialdir=base_dir,
-        initialfile=get_filename('save', 'json', in_dir=''),
-        filetypes=[("JSON save file", "*.json")],
-        defaultextension='.json',
-    )
+from chess.util import Default, Unset
+from chess.util import base_dir, get_filename, is_prefix_of, is_prefix_in, select_save_data, select_save_name
 
 
 class Board(Window):
@@ -458,8 +112,8 @@ class Board(Window):
         self.set_seed = None  # seed for piece set selection
         self.set_rng = None  # random number generator for piece set selection
         self.turn_order_start = []  # order of initial turns
-        self.turn_order = [Side.WHITE, Side.BLACK]  # order of turns
-        self.turn_side = (self.turn_order_start + self.turn_order)[0]  # side whose turn it is
+        self.turn_order = [(side, None) for side in (Side.WHITE, Side.BLACK)]  # order of turns
+        self.turn_side = None  # side whose turn it is
         self.turn_rules = None  # rules of movement for the current turn
         self.check_side = Side.NONE  # side that is currently in check
         self.use_drops = self.board_config['use_drops']  # whether pieces can be dropped
@@ -495,7 +149,7 @@ class Board(Window):
         self.penultima_pieces = {Side.WHITE: {}, Side.BLACK: {}}  # piece textures that are used for penultima mode
         self.past_custom_pieces = {}  # custom piece types that have been used before a reset of custom data
         self.custom_pieces = {}  # custom piece types
-        self.custom_pawn = fide.Pawn  # custom pawn type
+        self.custom_pawn = Pawn  # custom pawn type
         self.custom_layout = {}  # custom starting layout of the board
         self.custom_turn_order = []  # custom turn order options
         self.custom_promotions = {}  # custom promotion options
@@ -530,8 +184,7 @@ class Board(Window):
         self.save_interval = 0  # time since the last autosave
 
         # initialize turn order data for the first move
-        if isinstance(self.turn_side, list):
-            self.turn_side, self.turn_rules = self.turn_side[0], self.turn_side[1]
+        self.turn_side, self.turn_rules = (self.turn_order_start + self.turn_order)[0]
 
         # load stalemate rules from the config
         if isinstance(self.board_config['stalemate'], dict):
@@ -647,6 +300,10 @@ class Board(Window):
             if ply_count > len(self.turn_order_start) else ply_count - 1
         )
 
+    def get_order(self, rules: dict = None) -> list[int]:
+        rules = rules or self.turn_rules or {0}
+        return sorted(rules, reverse=True)
+
     def get_promotion_side(self, piece: Piece):
         return (
             piece.side if piece.side in {Side.WHITE, Side.BLACK} else
@@ -716,11 +373,7 @@ class Board(Window):
         self.clear_auto_capture_markers()
         self.reset_captures()
 
-        self.turn_side = (self.turn_order_start + self.turn_order)[0]
-        if isinstance(self.turn_side, list):
-            self.turn_side, self.turn_rules = self.turn_side[0], self.turn_side[1]
-        else:
-            self.turn_rules = None
+        self.turn_side, self.turn_rules = (self.turn_order_start + self.turn_order)[0]
 
         self.game_over = False
         self.edit_mode = False
@@ -841,7 +494,7 @@ class Board(Window):
                 side.value: [save_piece_type(t) if t is not NoPiece else None for t in piece_set]
                 for side, piece_set in self.piece_sets.items()
             },
-            'pawn': save_piece_type(self.custom_pawn) if self.custom_pawn != fide.Pawn else None,
+            'pawn': save_piece_type(self.custom_pawn) if self.custom_pawn != Pawn else None,
             'pieces': cnd_alg({
                 p.board_pos: save_piece(p.on(None))
                 for pieces in [*self.movable_pieces.values(), self.obstacles] for p in pieces
@@ -851,17 +504,18 @@ class Board(Window):
             'promotions': {
                 side.value: {
                     save_piece_type(f): cnd_alg({
-                        p: [
+                        p: unpack([
                             (save_piece if isinstance(t, Piece) else save_piece_type)(t) for t in l
-                        ] for p, l in s.items()
+                        ]) for p, l in s.items()
                     }, *wh) for f, s in d.items()
                 } for side, d in self.custom_promotions.items()
             },
             'drops': {
                 side.value: {
                     save_piece_type(f): cnd_alg({
-                        p: (save_piece if isinstance(t, Piece) else save_piece_type)(t)
-                        for p, t in s.items()
+                        p: unpack([
+                            (save_piece if isinstance(t, Piece) else save_piece_type)(t) for t in l
+                        ]) for p, l in s.items()
                     }, *wh) for f, s in d.items()
                 } for side, d in self.custom_drops.items()
             },
@@ -890,16 +544,16 @@ class Board(Window):
             'ply': self.ply_count,
             'turn': self.get_turn() + 1,
             'order': [
-                [side[0].value, [{k: v for k, v in {
+                side[0].value if side[1] is None else
+                [side[0].value, unpack([{k: v for k, v in {
                     'order': d.get('order'),
-                    'cls': [save_piece_type(t) for t in d.get('cls', ())],
-                    'tag': [t for t in d.get('tag', ())],
-                    'last': [i for i in d.get('last', ())],
+                    'cls': unpack([save_piece_type(t) for t in d.get('cls', [])]),
+                    'tag': unpack([t for t in d.get('tag', [])]),
+                    'last': unpack([i for i in d.get('last', [])]),
                     'type': d.get('type', ''),
                     'state': d.get('state', 0),
                     'check': d.get('check', 0),
-                }.items() if v} for d in side[1]]]
-                if isinstance(side, list) else side.value
+                }.items() if v} for d in side[1]])]
                 for side in self.custom_turn_order
             ],
             'edit': self.edit_mode,
@@ -1053,12 +707,12 @@ class Board(Window):
         self.custom_pieces = {k: load_custom_type(v, k) for k, v in custom_data.items()}
         c = self.custom_pieces
         if 'pawn' in data:
-            self.custom_pawn = load_piece_type(data.get('pawn'), c) or fide.Pawn
+            self.custom_pawn = load_piece_type(data.get('pawn'), c) or Pawn
         self.custom_promotions = {
             Side(int(v)): {
                 load_piece_type(f, c): {
                     p: [
-                        (load_piece_type(t, c) if isinstance(t, str) else load_piece(t, self, c)) for t in l
+                        (load_piece_type(t, c) if isinstance(t, str) else load_piece(t, self, c)) for t in repack(l)
                     ] for p, l in exp_alg(s, *wh).items()
                 } for f, s in d.items()
             } for v, d in data.get('promotions', {}).items()
@@ -1066,8 +720,9 @@ class Board(Window):
         self.custom_drops = {
             Side(int(v)): {
                 load_piece_type(f, c): {
-                    p: (load_piece_type(t, c) if isinstance(t, str) else load_piece(t, self, c))
-                    for p, t in exp_alg(s, *wh).items()
+                    p: [
+                        (load_piece_type(t, c) if isinstance(t, str) else load_piece(t, self, c)) for t in repack(l)
+                    ] for p, l in exp_alg(s, *wh).items()
                 } for f, s in d.items()
             } for v, d in data.get('drops', {}).items()
         }
@@ -1121,26 +776,21 @@ class Board(Window):
 
         ply_count = data.get('ply', self.ply_count)
         self.custom_turn_order = [
-            [Side(int(side[0])), [{k: v for k, v in {
+            (Side(int(side[0])), [{k: v for k, v in {
                 'order': d.get('order', 0),
-                'cls': [load_piece_type(t, c) for t in d.get('cls', ())],
-                'tag': [t for t in d.get('tag', ())],
-                'last': [i for i in d.get('last', ())],
+                'cls': [load_piece_type(t, c) for t in repack(d.get('cls', []))],
+                'tag': [t for t in repack(d.get('tag', []))],
+                'last': [i for i in repack(d.get('last', []))],
                 'type': d.get('type', ''),
                 'state': d.get('state', 0),
                 'check': d.get('check', 0),
-            }.items() if v} for d in side[1]]]
-            if isinstance(side, list) else Side(int(side))
+            }.items() if v} for d in side[1]])
+            if isinstance(side, list) and len(side) > 1 else (Side(int(side)), None)
             for side in data.get('order', [])
         ]
         self.reset_turn_order()
-        turn_order = self.turn_order_start + self.turn_order
         turn_side = data.get('turn', self.get_turn(ply_count) + 1)
-        self.turn_side = turn_order[turn_side - 1]
-        if isinstance(self.turn_side, list):
-            self.turn_side, self.turn_rules = self.turn_side[0], self.turn_side[1]
-        else:
-            self.turn_rules = None
+        self.turn_side, self.turn_rules = (self.turn_order_start + self.turn_order)[turn_side - 1]
 
         self.move_history = [load_move(d, self, c) for d in data.get('moves', [])]
         self.future_move_history = [load_move(d, self, c) for d in data.get('future', [])[::-1]]
@@ -1275,11 +925,7 @@ class Board(Window):
         self.clear_auto_capture_markers()
         self.reset_captures()
 
-        self.turn_side = (self.turn_order_start + self.turn_order)[0]
-        if isinstance(self.turn_side, list):
-            self.turn_side, self.turn_rules = self.turn_side[0], self.turn_side[1]
-        else:
-            self.turn_rules = None
+        self.turn_side, self.turn_rules = (self.turn_order_start + self.turn_order)[0]
 
         self.game_over = False
         self.chain_start = None
@@ -1325,8 +971,11 @@ class Board(Window):
 
         self.update_status()
 
-    def reset_custom_data(self) -> None:
-        self.past_custom_pieces = {**self.past_custom_pieces, **self.custom_pieces}
+    def reset_custom_data(self, rollback: bool = False) -> None:
+        if rollback:
+            self.custom_pieces = self.past_custom_pieces
+        else:
+            self.past_custom_pieces = {**self.past_custom_pieces, **self.custom_pieces}
         self.variant = ''
         self.alias_dict = {}
         self.custom_drops = {}
@@ -1334,8 +983,8 @@ class Board(Window):
         self.custom_layout = {}
         self.custom_promotions = {}
         self.custom_extra_drops = {}
-        self.custom_turn_order = [Side.WHITE, Side.BLACK]
-        self.custom_pawn = fide.Pawn
+        self.custom_turn_order = []
+        self.custom_pawn = Pawn
         if self.color_index is None:
             self.color_index = 0
         self.color_scheme = colors[self.color_index]
@@ -1378,9 +1027,9 @@ class Board(Window):
             pawn = self.custom_pawn(self)
             pawn.movement.set_moves(1)
             for pos in pawn_drop_squares[drop_side]:
-                drops[self.custom_pawn][pos] = pawn
+                drops[self.custom_pawn][pos] = [pawn]
             for pos in pawn_drop_squares_2[drop_side]:
-                drops[self.custom_pawn][pos] = self.custom_pawn
+                drops[self.custom_pawn][pos] = [self.custom_pawn]
             for side in (drop_side, drop_side.opponent()):
                 if not piece_sets[side]:
                     continue
@@ -1399,9 +1048,9 @@ class Board(Window):
                         if has_moved:
                             piece = piece_type(self)
                             piece.movement.set_moves(1)
-                            drops[piece_type] = {pos: piece for pos in drop_squares[side]}
+                            drops[piece_type] = {pos: [piece] for pos in drop_squares[side]}
                         else:
-                            drops[piece_type] = {pos: piece_type for pos in drop_squares[side]}
+                            drops[piece_type] = {pos: [piece_type] for pos in drop_squares[side]}
             self.drops[drop_side] = drops
 
     def reset_promotions(self, piece_sets: dict[Side, list[type[Piece]]] | None = None) -> None:
@@ -1500,7 +1149,7 @@ class Board(Window):
     def reset_turn_order(self) -> None:
         if not self.custom_turn_order:
             self.turn_order_start = []
-            self.turn_order = [Side.WHITE, Side.BLACK]
+            self.turn_order = [(side, None) for side in (Side.WHITE, Side.BLACK)]
             return
         self.turn_order_start, self.turn_order = [], []
         start_ended = False
@@ -1511,11 +1160,17 @@ class Board(Window):
             if isinstance(side, list):
                 side, rules = (side[0], side[1])
                 fmt_rules = {}
-                for rule in rules:
+                override_default = False
+                for rule in [{}] + rules:
                     data = fmt_rules
-                    data_order = data.setdefault(int(rule.get('order', 0)), {})
+                    order = int(rule.get('order', 0))
+                    if order == 0 and not override_default:
+                        override_default = True
+                        del data[order]
+                    data_order = data.setdefault(order, {})
                     data_state = data_order.setdefault(int(rule.get('state', 0)), {})
                     for last in rule.get('last', '*'):
+                        last = load_movement_type(last) or last
                         data_last = data_state.setdefault(last, {})
                         for piece in rule.get('cls', '*'):
                             data_cls = data_last.setdefault(piece, {})
@@ -1607,7 +1262,7 @@ class Board(Window):
                 if self.chaos_mode == 3 and set_pos != 3 and j > 0:
                     if random_set[set_pos] != random_set[7 - set_pos]:
                         piece_set[pos] = random_set[7 - set_pos]
-        piece_set[4] = cb.King if piece_set[0].is_colorbound() else fide.King
+        piece_set[4] = ColorboundKing if piece_set[0].is_colorbound() else King
         return piece_set, get_set_name(piece_set)
 
     def get_chaos_set(self, side: Side) -> tuple[list[type[Piece]], str]:
@@ -1779,7 +1434,7 @@ class Board(Window):
                 ):
                     last_chain_move = chained_move
                 chained_move = chained_move.chained_move
-        for order in sorted(self.turn_rules or {0}, reverse=True):
+        for order in self.get_order():
             order_rules = self.turn_rules.get(order, []) if self.turn_rules is not None else None
             if moves_for is None:
                 moves_for = self.turn_side
@@ -1833,10 +1488,17 @@ class Board(Window):
                     order_rules.get(-2 if check_side == Side.BLACK else 2, None),
                 ) if rules is not None] if order_rules is not None else None
                 last_history_move = None
+                last_history_tags = []
                 if self.move_history:
-                    last_history_move = self.move_history[-1]
+                    for last_history_move in self.move_history[::-1]:
+                        if last_history_move and not last_history_move.is_edit:
+                            if last_history_move.tag:
+                                last_history_tags.append(last_history_move.tag)
+                            while last_history_move.chained_move:
+                                last_history_move = last_history_move.chained_move
+                            break
                 last_tag_rules = [rules[k] for rules in state_rules for k in (
-                    ('*', (last_history_move.tag or ''))
+                    ('*', *(last_history_tags or ''), last_history_move.movement_type)
                     if last_history_move and last_history_move.is_edit != 1 else '*'
                 ) if rules.get(k) is not None] if state_rules is not None else None
                 piece_rules = {}
@@ -1926,13 +1588,10 @@ class Board(Window):
                             continue
                         if pass_turn_options:
                             self.load_check(turn_side)
-                            conditions = {
-                                0,
-                                -1 if self.check_side == Side.WHITE else 1,
-                                -2 if self.check_side == Side.BLACK else 2,
-                            }
-                            if conditions.union(pass_turn_options):
-                                self.moves[turn_side]['pass'] = True
+                            if self.check_side != turn_side:
+                                conditions = {0, 1 if self.check_side else -1}
+                                if conditions.union(pass_turn_options):
+                                    self.moves[turn_side]['pass'] = True
                             self.check_side = check_side
                         if make_turn_options:
                             self.update_auto_capture_markers(move)
@@ -2001,11 +1660,7 @@ class Board(Window):
                                         self.moves_queried[self.turn_side.opponent()] = True
                                         self.game_over = True
                             if self.check_side != turn_side:
-                                conditions = {
-                                    0,
-                                    -1 if self.check_side == Side.WHITE else 1,
-                                    -2 if self.check_side == Side.BLACK else 2,
-                                }
+                                conditions = {0, 1 if self.check_side else -1}
                                 if conditions.union(make_turn_options):
                                     pos_from, pos_to = move.pos_from, move.pos_to
                                     if pos_from == pos_to and move.captured_piece is not None:
@@ -2403,11 +2058,9 @@ class Board(Window):
             chained = False
             if next_move is None:
                 self.move_history.append(None)
-                turn_side = (self.turn_order_start + self.turn_order)[self.get_turn()]
-                if isinstance(turn_side, list):
-                    turn_side = turn_side[0]
-                self.log(f"[Ply {self.ply_count}] Pass: {turn_side} to move")
                 self.ply_count += 1
+                turn_side = (self.turn_order_start + self.turn_order)[self.get_turn()][0]
+                self.log(f"[Ply {self.ply_count}] Pass: {turn_side} to move")
                 self.clear_en_passant()
                 self.clear_castling_ep()
             if next_move.is_edit:
@@ -2675,9 +2328,7 @@ class Board(Window):
                 self.revert_auto_capture_markers(chained_move)
                 if chained_move.promotion is not None:
                     if chained_move.placed_piece is not None:
-                        turn_side = (self.turn_order_start + self.turn_order)[self.get_turn(self.ply_count - 1)]
-                        if isinstance(turn_side, list):
-                            turn_side = turn_side[0]
+                        turn_side = (self.turn_order_start + self.turn_order)[self.get_turn(self.ply_count)][0]
                         if chained_move.placed_piece in self.drops[turn_side]:
                             self.captured_pieces[turn_side].append(chained_move.placed_piece)
                     if not chained_move.piece.is_empty():
@@ -2693,9 +2344,7 @@ class Board(Window):
                 self.log(f"[Ply {self.ply_count}] Undo: {move_type}: {logged_move}")
                 in_promotion = False
         else:
-            turn_side = (self.turn_order_start + self.turn_order)[self.get_turn(self.ply_count - 1)]
-            if isinstance(turn_side, list):
-                turn_side = turn_side[0]
+            turn_side = (self.turn_order_start + self.turn_order)[self.get_turn(self.ply_count + 1)][0]
             self.log(f"[Ply {self.ply_count}] Undo: Pass: {turn_side} to move")
         if self.move_history:
             move = self.move_history[-1]
@@ -2779,9 +2428,7 @@ class Board(Window):
                 return
         last_chain_move = last_move
         if self.future_move_history[-1] is None:
-            turn_side = (self.turn_order_start + self.turn_order)[self.get_turn()]
-            if isinstance(turn_side, list):
-                turn_side = turn_side[0]
+            turn_side = (self.turn_order_start + self.turn_order)[self.get_turn()][0]
             self.log(f"[Ply {self.ply_count}] Redo: Pass: {turn_side} to move")
             self.clear_en_passant()
             self.clear_castling_ep()
@@ -2867,17 +2514,27 @@ class Board(Window):
             self.redo_last_move()
         self.redo_last_move()
 
-    def pass_turn(self) -> None:
-        self.move_history.append(None)
-        turn_side = (self.turn_order_start + self.turn_order)[self.get_turn()]
-        if isinstance(turn_side, list):
-            turn_side = turn_side[0]
-        self.log(f"[Ply {self.ply_count}] Pass: {turn_side} to move")
-        self.ply_count += 1
-        self.clear_en_passant()
-        self.clear_castling_ep()
-        self.compare_history()
-        self.advance_turn()
+    def pass_turn(self, side: Side | None = None) -> None:
+        index = self.ply_count
+        count = self.get_turn()
+        start_count = count
+        turn_order = self.turn_order_start + self.turn_order
+        while turn_order[count][0] != side:
+            index += 1
+            if side is None:
+                break
+            count = self.get_turn(index)
+            if count == start_count:
+                return
+        for _ in range(index - self.ply_count):
+            self.move_history.append(None)
+            self.ply_count += 1
+            turn_side = (self.turn_order_start + self.turn_order)[self.get_turn()][0]
+            self.log(f"[Ply {self.ply_count}] Pass: {turn_side} to move")
+            self.clear_en_passant()
+            self.clear_castling_ep()
+            self.compare_history()
+            self.advance_turn()
 
     def advance_turn(self) -> None:
         self.deselect_piece()
@@ -2900,11 +2557,7 @@ class Board(Window):
             self.color_pieces()  # reverting the piece colors to normal in case they were changed
             self.update_caption()  # updating the caption to reflect the edit that was just made
             return  # let's not advance the turn while editing the board to hopefully make things easier for everyone
-        self.turn_side = (self.turn_order_start + self.turn_order)[self.get_turn()]
-        if isinstance(self.turn_side, list):
-            self.turn_side, self.turn_rules = self.turn_side[0], self.turn_side[1]
-        else:
-            self.turn_rules = None
+        self.turn_side, self.turn_rules = (self.turn_order_start + self.turn_order)[self.get_turn()]
         self.update_status()
 
     def update_status(self) -> None:
@@ -3109,9 +2762,9 @@ class Board(Window):
             drop_squares = side_drops[piece_type]
             if move.piece.board_pos not in drop_squares:
                 continue
-            drop = drop_squares[move.piece.board_pos]
-            drop_list.append(drop)
-            drop_type_list.append(piece_type)
+            drops = drop_squares[move.piece.board_pos]
+            drop_list.extend(drops)
+            drop_type_list.extend(piece_type for _ in drops)
         if not drop_list:
             return
         self.start_promotion(self.get_piece(move.piece.board_pos), drop_list, drop_type_list)
@@ -3165,7 +2818,7 @@ class Board(Window):
         piece_pos = piece.board_pos
         direction = (Side.WHITE if piece_pos[0] < self.board_height / 2 else Side.BLACK).direction
         area = len(promotions)
-        area_height = min(len(promotions), max(self.board_height // 2, ceil(sqrt(area))))
+        area_height = min(len(promotions), max(self.board_height // 2, 1 + isqrt(area - 1)))
         area_width = ceil(area / area_height)
         area_origin = piece_pos
         while self.not_on_board((area_origin[0] + direction(area_height - 1), area_origin[1])):
@@ -4243,7 +3896,7 @@ class Board(Window):
                 self.save_log()
                 self.log(f"[Ply {self.ply_count}] Info: Log file saved", False)
                 self.log(f"[Ply {self.ply_count}] Info: Saving debug information", False)
-                debug_log_data = self.debug_info()
+                debug_log_data = debug_info(self)
                 self.save_log(debug_log_data, 'debug')
                 self.log(f"[Ply {self.ply_count}] Info: Debug information saved", False)
                 save_path = get_filename('save', 'json')
@@ -4284,9 +3937,8 @@ class Board(Window):
                 )
                 self.reset_custom_data()
                 self.reset_board()
-            elif modifiers & key.MOD_ACCEL and not modifiers & key.MOD_SHIFT:  # White is in control
-                while self.turn_side != Side.WHITE and not self.chain_start:
-                    self.pass_turn()
+            elif modifiers & key.MOD_ACCEL and not modifiers & key.MOD_SHIFT and not self.chain_start:  # White moves
+                self.pass_turn(Side.WHITE)
             elif modifiers & key.MOD_SHIFT:  # Shift white piece set
                 d = -1 if modifiers & key.MOD_ACCEL else 1
                 self.piece_set_ids[Side.WHITE] = (
@@ -4321,9 +3973,8 @@ class Board(Window):
                 )
                 self.reset_custom_data()
                 self.reset_board()
-            elif modifiers & key.MOD_ACCEL and not modifiers & key.MOD_SHIFT:  # Black is in control
-                while self.turn_side != Side.BLACK and not self.chain_start:
-                    self.pass_turn()
+            elif modifiers & key.MOD_ACCEL and not modifiers & key.MOD_SHIFT and not self.chain_start:  # Black moves
+                self.pass_turn(Side.BLACK)
             elif modifiers & key.MOD_SHIFT:  # Shift black piece set
                 d = -1 if modifiers & key.MOD_ACCEL else 1
                 self.piece_set_ids[Side.BLACK] = (
@@ -4600,6 +4251,10 @@ class Board(Window):
                 load_path = select_save_data()
                 if load_path:
                     self.load(load_path, with_history=modifiers & key.MOD_SHIFT)
+                    if not self.save_loaded:
+                        self.reset_custom_data(True)
+                        self.reset_board()
+                        self.log_special_modes()
                 else:
                     self.log(f"[Ply {self.ply_count}] Info: Load cancelled", False)
                 self.activate()
@@ -4616,12 +4271,12 @@ class Board(Window):
         if symbol == key.D:  # Debug
             if modifiers & key.MOD_ACCEL:  # Save debug log
                 self.log(f"[Ply {self.ply_count}] Info: Saving debug information", False)
-                debug_log_data = self.debug_info()
+                debug_log_data = debug_info(self)
                 self.save_log(debug_log_data, 'debug')
                 self.log(f"[Ply {self.ply_count}] Info: Debug information saved", False)
             if modifiers & key.MOD_SHIFT:  # Print debug log
                 self.log(f"[Ply {self.ply_count}] Info: Printing debug information", False)
-                debug_log_data = self.debug_info()
+                debug_log_data = debug_info(self)
                 for string in debug_log_data:
                     print(f"[Debug] {string}")
                 self.log(f"[Ply {self.ply_count}] Info: Debug information printed", False)
@@ -4801,366 +4456,6 @@ class Board(Window):
         config['roll_seed'] = self.roll_seed
         config['verbose'] = self.verbose
         config.save(get_filename('config', 'ini'))
-
-    def debug_info(self) -> list[str]:
-        debug_log_data = []  # noqa
-        debug_log_data.append(f"Board size: {self.board_width}x{self.board_height}")
-        debug_log_data.append(f"Screen size: {self.width}x{self.height}")
-        debug_log_data.append(f"Square size: {self.square_size}")
-        debug_log_data.append(f"Windowed screen size: {self.windowed_size[0]}x{self.windowed_size[1]}")
-        debug_log_data.append(f"Windowed square size: {self.windowed_square_size}")
-        debug_log_data.append(f"Color scheme ID: {'-' if self.color_index is None else self.color_index}")
-        debug_log_data.append("Color scheme:")
-        color_scheme = deepcopy(self.color_scheme)  # just in case trickster mode messes with the color scheme RIGHT NOW
-        for k, v in color_scheme.items():
-            debug_log_data.append(f"  {k} = {v}")
-        debug_log_data.append(f"Piece sets ({len(piece_groups)}):")
-        digits = len(str(len(piece_groups)))
-        for i, group in enumerate(piece_groups):
-            debug_log_data.append(f"  ID {i:0{digits}d}: {group['name']}")
-        for i in sorted(self.chaos_sets):
-            debug_log_data.append(f"  ID {-i:0{digits}d}: {self.chaos_sets[i][1]}")
-        debug_log_data.append(
-            f"ID blocklist ({len(self.board_config['block_ids'])}): "
-            f"{', '.join(str(i) for i in self.board_config['block_ids']) or 'None'}"
-        )
-        debug_log_data.append(
-            f"Chaos ID blocklist ({len(self.board_config['block_ids_chaos'])}): "
-            f"{', '.join(str(i) for i in self.board_config['block_ids_chaos']) or 'None'}"
-        )
-        debug_log_data.append(f"Variant: {self.variant or 'None'}")
-        side_id_strings = {
-            side: '-' if set_id is None else f"{set_id:0{digits}d}"
-            for side, set_id in self.piece_set_ids.items()
-        }
-        debug_log_data.append(
-            f"Game: "
-            f"(ID {side_id_strings[Side.WHITE]}) {self.piece_set_names[Side.WHITE]} vs. "
-            f"(ID {side_id_strings[Side.BLACK]}) {self.piece_set_names[Side.BLACK]}"
-        )
-        for side in self.piece_set_ids:
-            debug_log_data.append(f"{side} setup: {', '.join(piece.name for piece in self.piece_sets[side])}")
-        for side in self.piece_set_ids:
-            debug_log_data.append(f"{side} pieces ({len(self.movable_pieces[side])}):")
-            for piece in self.movable_pieces[side]:
-                debug_log_data.append(f'  {toa(piece.board_pos)} {piece.board_pos}: {piece.name}')
-            if not self.movable_pieces[side]:
-                debug_log_data[-1] += " None"
-        for side in self.piece_set_ids:
-            debug_log_data.append(f"{side} royal pieces ({len(self.royal_pieces[side])}):")
-            for piece in self.royal_pieces[side]:
-                debug_log_data.append(f'  {toa(piece.board_pos)} {piece.board_pos}: {piece.name}')
-            if not self.royal_pieces[side]:
-                debug_log_data[-1] += " None"
-        for side in self.piece_set_ids:
-            debug_log_data.append(f"{side} quasi-royal pieces ({len(self.quasi_royal_pieces[side])}):")
-            for piece in self.quasi_royal_pieces[side]:
-                debug_log_data.append(f'  {toa(piece.board_pos)} {piece.board_pos}: {piece.name}')
-            if not self.quasi_royal_pieces[side]:
-                debug_log_data[-1] += " None"
-        for side in self.piece_set_ids:
-            debug_log_data.append(f"{side} probabilistic pieces ({len(self.probabilistic_pieces[side])}):")
-            for piece in self.probabilistic_pieces[side]:
-                debug_log_data.append(f'  {toa(piece.board_pos)} {piece.board_pos}: {piece.name}')
-            if not self.probabilistic_pieces[side]:
-                debug_log_data[-1] += " None"
-        for side in self.piece_set_ids:
-            debug_log_data.append(f"{side} auto-ranged pieces ({len(self.auto_ranged_pieces[side])}):")
-            for piece in self.auto_ranged_pieces[side]:
-                debug_log_data.append(f'  {toa(piece.board_pos)} {piece.board_pos}: {piece.name}')
-            if not self.auto_ranged_pieces[side]:
-                debug_log_data[-1] += " None"
-        for side in self.piece_set_ids:
-            debug_log_data.append(f"{side} auto-capture squares ({len(self.auto_capture_markers[side])}):")
-            for pos in sorted(self.auto_capture_markers[side]):
-                piece_poss = self.auto_capture_markers[side][pos]
-                debug_log_data.append(f"""  {toa(pos)} {pos}: (From {len(piece_poss)}) {
-                    ', '.join(f'{toa(xy)} {xy}' for xy in sorted(piece_poss))
-                }""")
-            if not self.auto_capture_markers[side]:
-                debug_log_data[-1] += " None"
-        for side in self.piece_set_ids:
-            promotions = self.promotions.get(side, {})
-            debug_log_data.append(f"{side} promotion rules ({len(promotions)}):")
-            for piece in promotions:
-                debug_log_data.append(f"  {piece.name} ({len(promotions[piece])}):")
-                rows = set()
-                for pos in promotions[piece]:
-                    row = pos[0]
-                    if row in rows:
-                        continue
-                    rows.add(row)
-                if rows == set(range(self.board_height)):
-                    rows = {-1}
-                for row in sorted(rows):
-                    piece_list = []
-                    for to_piece in promotions[piece][(max(row, 0), 0)]:
-                        suffixes = []
-                        if isinstance(to_piece, Piece):
-                            if to_piece.side not in {side, Side.NONE}:
-                                suffixes.append(f"Side: {to_piece.side}")
-                            if to_piece.movement and to_piece.movement.total_moves:
-                                suffixes.append(f"Moves: {to_piece.movement.total_moves}")
-                            if to_piece.promoted_from:
-                                suffixes.append(f"Promoted from: {to_piece.promoted_from.name}")
-                            if to_piece.is_hidden is False:
-                                suffixes.append('Never hide')
-                        suffix = f" ({', '.join(suffixes)})" if suffixes else ''
-                        piece_list.append(f"{to_piece.name}{suffix}")
-                    piece_list = ', '.join(string for string in piece_list)
-                    debug_log_data.append(f"    {toa((row, -1))} {(row, -1)}: {piece_list if piece_list else 'None'}")
-                if not promotions[piece]:
-                    debug_log_data[-1] += " None"
-            if not promotions:
-                debug_log_data[-1] += " None"
-        for side in self.piece_set_ids:
-            drops = self.drops.get(side, {})
-            debug_log_data.append(f"{side} drop rules ({len(drops)}):")
-            for piece in drops:
-                debug_log_data.append(f"  {piece.name} ({len(drops[piece])}):")
-                rows = set()
-                for pos in drops[piece]:
-                    row = pos[0]
-                    if row in rows:
-                        continue
-                    rows.add(row)
-                if rows == set(range(self.board_height)):
-                    rows = {-1}
-                for row in sorted(rows):
-                    to_piece = drops[piece][(max(row, 0), 0)]
-                    suffixes = []
-                    if isinstance(to_piece, Piece):
-                        if to_piece.side not in {side, Side.NONE}:
-                            suffixes.append(f"Side: {to_piece.side}")
-                        if to_piece.movement and to_piece.movement.total_moves:
-                            suffixes.append(f"Moves: {to_piece.movement.total_moves}")
-                        if to_piece.promoted_from:
-                            suffixes.append(f"Promoted from: {to_piece.promoted_from.name}")
-                        if to_piece.is_hidden is False:
-                            suffixes.append('Never hide')
-                    suffix = f" ({', '.join(suffixes)})" if suffixes else ''
-                    debug_log_data.append(f"    {toa((row, -1))} {(row, -1)}: {to_piece.name}{suffix}")
-                if not drops[piece]:
-                    debug_log_data[-1] += " None"
-            if not drops:
-                debug_log_data[-1] += " None"
-        for side in self.piece_set_ids:
-            piece_list = ', '.join(piece.name for piece in self.edit_promotions[side])
-            debug_log_data.append(
-                f"{side} replacements ({len(self.edit_promotions[side])}): {piece_list if piece_list else 'None'}"
-            )
-        debug_log_data.append(f"Edit piece set: {self.edit_piece_set_id}")
-        debug_log_data.append(f"Custom pieces ({len(self.custom_pieces)}):")
-        for piece, data in self.custom_pieces.items():
-            debug_log_data.append(f"  '{piece}': {save_custom_type(data)}")
-        if not self.custom_pieces:
-            debug_log_data[-1] += " None"
-        debug_log_data.append(f"Past custom pieces ({len(self.past_custom_pieces)}):")
-        for piece, data in self.past_custom_pieces.items():
-            debug_log_data.append(f"  '{piece}': {save_custom_type(data)}")
-        if not self.past_custom_pieces:
-            debug_log_data[-1] += " None"
-        if self.custom_pawn != fide.Pawn:
-            debug_log_data.append(f"Custom pawn: {self.custom_pawn.name} ({save_piece_type(self.custom_pawn)})")
-        else:
-            debug_log_data.append("Custom pawn: None")
-        debug_log_data.append(f"Custom layout ({len(self.custom_layout)}):")
-        for pos, piece in self.custom_layout.items():
-            suffixes = []
-            if piece.movement and piece.movement.total_moves:
-                suffixes.append(f"Moves: {piece.movement.total_moves}")
-            if piece.promoted_from:
-                suffixes.append(f"Promoted from: {piece.promoted_from.name}")
-            if piece.is_hidden is False:
-                suffixes.append('Never hide')
-            suffix = f" ({', '.join(suffixes)})" if suffixes else ''
-            debug_log_data.append(f"  {toa(pos)} {pos}: {piece}{suffix}")
-        if not self.custom_layout:
-            debug_log_data[-1] += " None"
-        data = (self.load_dict or {}).get('promotions', {})
-        for side in self.piece_set_ids:
-            promotions = self.custom_promotions.get(side, {})
-            debug_log_data.append(f"{side} custom promotion rules ({len(promotions)}):")
-            for piece in promotions:
-                debug_log_data.append(f"  {piece.name} ({len(promotions[piece])}):")
-                compressed = data.get(str(side.value), {}).get(save_piece_type(piece), {})
-                from_mapping = frm(list(compressed), self.width, self.height)
-                mapping = {}
-                for pos, value in from_mapping.items():
-                    if value not in mapping:
-                        mapping[value] = pos
-                for value, pos in mapping.items():
-                    piece_list = []
-                    for to_piece in promotions[piece][pos]:
-                        suffixes = []
-                        if isinstance(to_piece, Piece):
-                            if to_piece.side not in {side, Side.NONE}:
-                                suffixes.append(f"Side: {to_piece.side}")
-                            if to_piece.movement and to_piece.movement.total_moves:
-                                suffixes.append(f"Moves: {to_piece.movement.total_moves}")
-                            if to_piece.promoted_from:
-                                suffixes.append(f"Promoted from: {to_piece.promoted_from.name}")
-                            if to_piece.is_hidden is False:
-                                suffixes.append('Never hide')
-                        suffix = f" ({', '.join(suffixes)})" if suffixes else ''
-                        piece_list.append(f"{to_piece.name}{suffix}")
-                    piece_list = ', '.join(string for string in piece_list)
-                    debug_log_data.append(f"    {value} {fra(value)}: {piece_list if piece_list else 'None'}")
-                if not promotions[piece]:
-                    debug_log_data[-1] += " None"
-            if not promotions:
-                debug_log_data[-1] += " None"
-        data = (self.load_dict or {}).get('drops', {})
-        for side in self.piece_set_ids:
-            drops = self.custom_drops.get(side, {})
-            debug_log_data.append(f"{side} custom drop rules ({len(drops)}):")
-            for piece in drops:
-                debug_log_data.append(f"  {piece.name} ({len(drops[piece])}):")
-                compressed = data.get(str(side.value), {}).get(save_piece_type(piece), {})
-                from_mapping = frm(list(compressed), self.width, self.height)
-                mapping = {}
-                for pos, value in from_mapping.items():
-                    if value not in mapping:
-                        mapping[value] = pos
-                for value, pos in mapping.items():
-                    to_piece = drops[piece][pos]
-                    suffixes = []
-                    if isinstance(to_piece, Piece):
-                        if to_piece.side not in {side, Side.NONE}:
-                            suffixes.append(f"Side: {to_piece.side}")
-                        if to_piece.movement and to_piece.movement.total_moves:
-                            suffixes.append(f"Moves: {to_piece.movement.total_moves}")
-                        if to_piece.promoted_from:
-                            suffixes.append(f"Promoted from: {to_piece.promoted_from.name}")
-                        if to_piece.is_hidden is False:
-                            suffixes.append('Never hide')
-                    suffix = f" ({', '.join(suffixes)})" if suffixes else ''
-                    debug_log_data.append(f"    {value} {fra(value)}: {to_piece.name}{suffix}")
-                if not drops[piece]:
-                    debug_log_data[-1] += " None"
-            if not drops:
-                debug_log_data[-1] += " None"
-        for side in self.custom_extra_drops:
-            debug_log_data.append(
-                f"{side} starting drops ({len(self.custom_extra_drops[side])}): "
-                f"{', '.join(piece.name for piece in self.custom_extra_drops[side]) or 'None'}"
-            )
-        for side in self.captured_pieces:
-            debug_log_data.append(
-                f"{side} drops ({len(self.captured_pieces[side])}): "
-                f"{', '.join(piece.name for piece in self.captured_pieces[side]) or 'None'}"
-            )
-        en_passant_pos = toa(self.en_passant_target.board_pos) if self.en_passant_target else 'None'
-        debug_log_data.append(f"En passant target: {en_passant_pos}")
-        en_passant_squares = ', '.join(toa(xy) for xy in sorted(self.en_passant_markers)) or 'None'
-        debug_log_data.append(f"En passant squares ({len(self.en_passant_markers)}): {en_passant_squares}")
-        castling_ep_pos = toa(self.castling_ep_target.board_pos) if self.castling_ep_target else 'None'
-        debug_log_data.append(f"Castling EP target: {castling_ep_pos}")
-        castling_ep_squares = ', '.join(toa(xy) for xy in sorted(self.castling_ep_markers)) or 'None'
-        debug_log_data.append(f"Castling EP squares ({len(self.castling_ep_markers)}): {castling_ep_squares}")
-        piece_modes = {0: "Shown", 1: "Hidden", 2: "Penultima"}
-        debug_log_data.append(f"Hide pieces: {self.should_hide_pieces} - {piece_modes[self.should_hide_pieces]}")
-        move_modes = {None: "Default", False: "Shown", True: "Hidden"}
-        debug_log_data.append(f"Hide moves: {self.should_hide_moves} - {move_modes[self.should_hide_moves]}")
-        drop_modes = {k: f"Pieces {v} be dropped on the board" for k, v in {False: "cannot", True: "can"}.items()}
-        debug_log_data.append(f"Use drops: {self.use_drops} - {drop_modes[self.use_drops]}")
-        check_modes = {False: "Capture the royal piece to win", True: "Checkmate the royal piece to win"}
-        debug_log_data.append(f"Use check: {self.use_check} - {check_modes[self.use_check]}")
-        stalemate_modes = {0: "draws", 1: "loses", -1: "wins"}
-        if isinstance(self.stalemate_rule, dict):
-            for side, mode in self.stalemate_rule.items():
-                debug_log_data.append(f"Stalemate rule: {side} {stalemate_modes[mode]} when stalemated")
-        else:
-            debug_log_data.append(f"Stalemate rule: Player {stalemate_modes[self.stalemate_rule]} when stalemated")
-        royal_modes = {0: "Default", 1: "Force royal (Threaten Any)", 2: "Force quasi-royal (Threaten Last)"}
-        debug_log_data.append(f"Royal mode: {self.royal_piece_mode} - {royal_modes[self.royal_piece_mode]}")
-        chaos_modes = {
-            0: "Off",
-            1: "Chaos (Matching Pieces)",
-            2: "Chaos (Matching Pieces), Asymmetrical",
-            3: "Extreme Chaos (Any Pieces)",
-            4: "Extreme Chaos (Any Pieces), Asymmetrical"
-        }
-        debug_log_data.append(f"Chaos mode: {self.chaos_mode} - {chaos_modes[self.chaos_mode]}")
-        debug_log_data.append(f"Board mode: {'Edit' if self.edit_mode else 'Play'}")
-        debug_log_data.append(f"Current ply: {self.ply_count}")
-        debug_log_data.append(f"Turn side: {self.turn_side if self.turn_side else 'None'}")
-        debug_log_data.append(f"Turn order ({len(self.custom_turn_order)}):")
-        for i, data in enumerate(self.custom_turn_order):
-            if isinstance(data, list):
-                turn_side = data[0]
-                turn_pieces = f" (NYI: {data[1]})"
-            else:
-                turn_side = data
-                turn_pieces = ''
-            debug_log_data.append(f"  {i + 1}: {turn_side if turn_side else 'None'}{turn_pieces}")
-        possible_moves = sum((sum(v.values(), []) for v in self.moves.get(self.turn_side, {}).values()), [])
-        debug_log_data.append(f"Moves possible: {len(possible_moves)}")
-        debug_log_data.append(f"Unique moves: {sum(len(i) for i in self.unique_moves()[self.turn_side].values())}")
-        debug_log_data.append(f"Check side: {self.check_side if self.check_side else 'None'}")
-        debug_log_data.append(f"Game over: {self.game_over}")
-        debug_log_data.append(f"Action history ({len(self.move_history)}):")
-        for i, move in enumerate(self.move_history):
-            if not move:
-                debug_log_data.append(f"  {i + 1}: (Pass) None")
-            else:
-                move_type = (
-                    'Edit' if move.is_edit else 'Drop' if move.movement_type == movement.DropMovement else 'Move'
-                )
-                debug_log_data.append(f"  {i + 1}: ({move_type}) {move}")
-                j = 0
-                while move.chained_move:
-                    move = move.chained_move
-                    move_type = (
-                        'Edit' if move.is_edit else 'Drop' if move.movement_type == movement.DropMovement else 'Move'
-                    )
-                    debug_log_data.append(f"  {i + 1}.{j + 1}: ({move_type}) {move}")
-                    j += 1
-        if not self.move_history:
-            debug_log_data[-1] += " None"
-        debug_log_data.append(f"Future action history ({len(self.future_move_history)}):")
-        for i, move in enumerate(self.future_move_history[::-1], len(self.move_history)):
-            if not move:
-                debug_log_data.append(f"  {i + 1}: (Pass) None")
-            else:
-                move_type = (
-                    'Edit' if move.is_edit else 'Drop' if move.movement_type == movement.DropMovement else 'Move'
-                )
-                debug_log_data.append(f"  {i + 1}: ({move_type}) {move}")
-                j = 0
-                while move.chained_move:
-                    move = move.chained_move
-                    move_type = (
-                        'Edit' if move.is_edit else 'Drop' if move.movement_type == movement.DropMovement else 'Move'
-                    )
-                    debug_log_data.append(f"  {i + 1}.{j + 1}: ({move_type}) {move}")
-                    j += 1
-        if not self.future_move_history:
-            debug_log_data[-1] += " None"
-        empty = True
-        debug_log_data.append(f"Roll history ({len(self.roll_history)}):")
-        for i, roll in enumerate(self.roll_history):
-            if roll:
-                empty = False
-                debug_log_data.append(f"  Roll {i + 1}:")
-                for pos, value in roll.items():
-                    debug_log_data.append(f"    {toa(pos)} {pos}: {value}")
-        if empty:
-            debug_log_data[-1] += " None"
-        empty = True
-        debug_log_data.append(f"Probabilistic piece history ({len(self.probabilistic_piece_history)}):")
-        for i, pieces in enumerate(self.probabilistic_piece_history):
-            if pieces:
-                empty = False
-                debug_log_data.append(f"  Ply {i + 1}:")
-                for pos, piece in sorted(pieces, key=lambda x: x[0]):
-                    debug_log_data.append(f"    {toa(pos)} {pos}: {piece.name}")
-        if empty:
-            debug_log_data[-1] += " None"
-        debug_log_data.append(f"Roll seed: {self.roll_seed} (update: {self.board_config['update_roll_seed']})")
-        debug_log_data.append(f"Piece set seed: {self.set_seed}")
-        debug_log_data.append(f"Chaos set seed: {self.chaos_seed}")
-        return debug_log_data
 
     def run(self):
         if self.board_config['save_update_mode'] < 0 and self.load_data is not None:

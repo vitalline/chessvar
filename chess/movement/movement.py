@@ -574,7 +574,16 @@ class IndexMovement(BaseMultiMovement):
 class PlyMovement(IndexMovement):
     def moves(self, pos_from: Position, piece: Piece, theoretical: bool = False, index: int | None = None):
         if index is None:
-            index = self.board.ply_count - 1
+            index = self.board.ply_count
+            count = self.board.get_turn()
+            start_count = count
+            turn_order = self.board.turn_order_start + self.board.turn_order
+            while turn_order[count][0] != piece.side:
+                index += 1
+                count = self.board.get_turn(index)
+                if count == start_count:
+                    return ()
+            index -= 1
         return super().moves(pos_from, piece, theoretical, index)
 
 
