@@ -433,6 +433,8 @@ class CastlingMovement(BaseMovement):
             direction = piece.side.direction(self.direction)
             offset = sub(move.pos_to, move.pos_from)
             if offset == direction:
+                if self.board.castling_ep_target != piece:
+                    self.board.clear_castling_ep()
                 for gap_offset in self.en_passant_gap:
                     pos = add(move.pos_from, gap_offset)
                     self.board.mark_castling_ep(move.pos_to, pos)
@@ -477,6 +479,8 @@ class EnPassantTargetRiderMovement(RiderMovement):
                         is_clear = False
                         break
                 if is_clear:
+                    if self.board.en_passant_target != piece:
+                        self.board.clear_en_passant()
                     for pos in positions:
                         self.board.mark_en_passant(move.pos_to, pos)
         super().update(move, piece)
