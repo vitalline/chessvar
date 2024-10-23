@@ -49,7 +49,7 @@ class BaseMovement(object):
 
 
 class BaseDirectionalMovement(BaseMovement):
-    def __init__(self, board: Board, directions: list[AnyDirection] | None = None, loop: bool = False):
+    def __init__(self, board: Board, directions: list[AnyDirection] | None = None, loop: int = 0):
         super().__init__(board)
         self.directions = directions or []
         self.loop = loop
@@ -136,7 +136,7 @@ class RiderMovement(BaseDirectionalMovement):
 
 
 class HalflingRiderMovement(RiderMovement):
-    def __init__(self, board: Board, directions: list[AnyDirection] | None = None, shift: int = 0, loop: bool = False):
+    def __init__(self, board: Board, directions: list[AnyDirection] | None = None, shift: int = 0, loop: int = 0):
         super().__init__(board, directions, loop)
         self.shift = shift
         self.max_steps = 0
@@ -158,9 +158,7 @@ class HalflingRiderMovement(RiderMovement):
 
 
 class CannonRiderMovement(RiderMovement):
-    def __init__(
-        self, board: Board, directions: list[AnyDirection] | None = None, distance: int = 0, loop: bool = False
-    ):
+    def __init__(self, board: Board, directions: list[AnyDirection] | None = None, distance: int = 0, loop: int = 0):
         super().__init__(board, directions, loop)
         self.distance = distance
         self.jumped = -1
@@ -193,9 +191,7 @@ class CannonRiderMovement(RiderMovement):
 
 
 class HopperRiderMovement(CannonRiderMovement):
-    def __init__(
-        self, board: Board, directions: list[AnyDirection] | None = None, distance: int = 0, loop: bool = False
-    ):
+    def __init__(self, board: Board, directions: list[AnyDirection] | None = None, distance: int = 0, loop: int = 0):
         super().__init__(board, directions, distance, loop)
         self.capture = None
 
@@ -395,7 +391,7 @@ class CastlingMovement(BaseMovement):
         other_piece: Direction,
         other_direction: Direction,
         movement_gap: list[Direction] | None = None,
-        en_passant_gap: list[Direction] | None = None
+        en_passant_gap: list[Direction] | None = None,
     ):
         super().__init__(board)
         self.direction = direction
@@ -533,25 +529,53 @@ class BaseMultiMovement(BaseMovement):
         return self.board, deepcopy(self.movements)
 
 
-class FirstMoveMovement(BaseMultiMovement):
+class IndexMovement(BaseMultiMovement):
     def __init__(
         self,
         board: Board,
-        base_movements: list[BaseMovement] | None = None,
-        first_move_movements: list[BaseMovement] | None = None
+        movement_index: list[list[BaseMovement]] | None = None,
+        iteration_type: int = 0,
+        iteration_div: int = 0,
+        iteration_sub: int = 0,
+        cycle_mode: int = 0,
     ):
-        self.base_movements = base_movements or []
-        self.first_move_movements = first_move_movements or []
-        super().__init__(board, self.base_movements + self.first_move_movements)
+        self.movement_index = movement_index or []
+        self.iteration_type = iteration_type
+        self.iteration_div = iteration_div
+        self.iteration_sub = iteration_sub
+        self.cycle_mode = cycle_mode
+        super().__init__(board, sum(self.movement_index, []))
 
-    def moves(self, pos_from: Position, piece: Piece, theoretical: bool = False):
-        movements = self.movements if not self.total_moves else self.base_movements
+    def moves(self, pos_from: Position, piece: Piece, theoretical: bool = False, index: int | None = None):
+        if index is None:
+            index = self.total_moves
+        index = max(0, index - self.iteration_sub) // (self.iteration_div or 1)
+        if index >= len(self.movement_index):
+            if self.cycle_mode > 0:
+                index %= len(self.movement_index)
+            elif self.cycle_mode < 0:
+                index %= 2 * (len(self.movement_index) - 1)
+                if index >= len(self.movement_index):
+                    index = 2 * (len(self.movement_index) - 1) - index
+            else:
+                index = len(self.movement_index) - 1
+        movements = self.movements[slice(
+            0 if self.iteration_type < 0 else index,
+            0 if self.iteration_type > 0 else index + 1,
+        )]
         for movement in movements:
             for move in movement.moves(pos_from, piece, theoretical):
                 yield copy(move)
 
     def __copy_args__(self):
-        return self.board, copy(self.base_movements), copy(self.first_move_movements)
+        return self.board, deepcopy(self.movement_index), self.iteration_type, self.cycle_mode
+
+
+class PlyMovement(IndexMovement):
+    def moves(self, pos_from: Position, piece: Piece, theoretical: bool = False, index: int | None = None):
+        if index is None:
+            index = self.board.ply_count - 1
+        return super().moves(pos_from, piece, theoretical, index)
 
 
 class RepeatBentMovement(BaseMultiMovement):
@@ -562,15 +586,17 @@ class RepeatBentMovement(BaseMultiMovement):
         start_index: int = 0,
         step_count: int = 0,
         skip_count: int = 0,
-        split: bool = False,
-        loop: bool = False,
+        loop: int = 0,
+        cycle_mode: int = 0,
+        path_split: int = 0,
     ):
         super().__init__(board, movements)
         self.start_index = start_index
         self.step_count = step_count
         self.skip_count = skip_count
-        self.split = split
         self.loop = loop
+        self.cycle_mode = cycle_mode
+        self.path_split = path_split
         self.dir_indexes = [-1] * len(self.movements)
 
     def moves(self, pos_from: Position, piece: Piece, theoretical: bool = False, index: int = 0):
@@ -578,10 +604,19 @@ class RepeatBentMovement(BaseMultiMovement):
             self.dir_indexes = [-1] * len(self.movements)
         if self.step_count and index >= self.step_count:
             return ()
-        index, true_index = index % len(self.movements), index
+        true_index = index
+        if index >= len(self.movements):
+            if self.cycle_mode > 0:
+                index %= len(self.movements)
+            elif self.cycle_mode < 0:
+                index %= 2 * (len(self.movements) - 1)
+                if index >= len(self.movements):
+                    index = 2 * (len(self.movements) - 1) - index
+            else:
+                return ()
         movement = copy(self.movements[index])  # copy movement because changing it inside the loop completely breaks it
         if isinstance(movement, BaseDirectionalMovement):
-            if self.split:
+            if self.path_split:
                 self.dir_indexes[index] = -1
             is_new = self.dir_indexes[index] < 0
             directions = movement.directions if is_new else [movement.directions[self.dir_indexes[index]]]
@@ -619,13 +654,32 @@ class RepeatBentMovement(BaseMultiMovement):
         return (
             self.board, deepcopy(self.movements),
             self.start_index, self.step_count, self.skip_count,
-            self.split, self.loop,
+            self.loop, self.cycle_mode, self.path_split
         )
 
 
 class RepeatMovement(RepeatBentMovement):
-    # Alias for RepeatBentMovement for backwards compatibility
-    pass
+    def __init__(
+        self,
+        board: Board,
+        movements: list[BaseDirectionalMovement] | None = None,
+        start_index: int = 0,
+        step_count: int = 0,
+        skip_count: int = 0,
+        loop: int = 0,
+    ):
+        super().__init__(
+            board, movements,
+            start_index=start_index,
+            step_count=step_count,
+            skip_count=skip_count,
+            loop=loop,
+            cycle_mode=1,
+            path_split=0,
+        )
+
+    def __copy_args__(self):
+        return self.board, deepcopy(self.movements), self.start_index, self.step_count, self.skip_count, self.loop
 
 
 class BentMovement(RepeatBentMovement):
@@ -634,12 +688,52 @@ class BentMovement(RepeatBentMovement):
         board: Board,
         movements: list[BaseDirectionalMovement] | None = None,
         start_index: int = 0,
-        loop: bool = False,
+        loop: int = 0,
     ):
-        super().__init__(board, movements, start_index, len(movements) if movements else 0, loop=loop)
+        super().__init__(
+            board, movements,
+            start_index=start_index,
+            step_count=len(movements) if movements else 0,
+            loop=loop,
+        )
 
     def __copy_args__(self):
         return self.board, deepcopy(self.movements), self.start_index, self.loop
+
+
+class SpinMovement(RepeatBentMovement):
+    def __init__(
+        self,
+        board: Board,
+        movements: list[BaseDirectionalMovement] | None = None,
+        reverse: int = 0,
+        start_index: int = 0,
+        step_count: int = 0,
+        loop: int = 0,
+    ):
+        super().__init__(
+            board, movements,
+            start_index=start_index,
+            step_count=step_count,
+            loop=loop,
+        )
+        self.reverse = reverse
+        self.movement_cycle = copy(self.movements)
+
+    def moves(self, pos_from: Position, piece: Piece, theoretical: bool = False, index: int = 0):
+        if index == 0:
+            for i in range(len(self.movement_cycle)):
+                if self.reverse >= 0:
+                    self.movements = self.movement_cycle[i:] + self.movement_cycle[:i]
+                    yield from super().moves(pos_from, piece, theoretical, index)
+                if self.reverse != 0:
+                    self.movements = self.movements[::-1]
+                    yield from super().moves(pos_from, piece, theoretical, index)
+        else:
+            yield from super().moves(pos_from, piece, theoretical, index)
+
+    def __copy_args__(self):
+        return self.board, deepcopy(self.movements), self.reverse, self.start_index, self.step_count, self.loop
 
 
 class ChainMovement(BaseMultiMovement):

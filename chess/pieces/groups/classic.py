@@ -93,10 +93,12 @@ class Pawn(Piece):
             movement.MultiMovement(
                 board,
                 move=[
-                    movement.FirstMoveMovement(
+                    movement.IndexMovement(
                         board,
-                        [movement.RiderMovement(board, [(1, 0, 1)])],
-                        [movement.EnPassantTargetRiderMovement(board, [(1, 0, 2)])]
+                        [
+                            [movement.EnPassantTargetRiderMovement(board, [(1, 0, 2)])],
+                            [movement.RiderMovement(board, [(1, 0, 1)])],
+                        ],
                     )
                 ],
                 capture=[

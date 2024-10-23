@@ -212,6 +212,8 @@ def save_custom_movement_type(movement: type[BaseMovement]) -> list[str]:
 
 
 def load_custom_movement_type(bases: dict[str, type[BaseMovement]]) -> type[BaseMovement]:
+    if len(bases) == 1:
+        return list(bases.values())[0]
     name = CUSTOM_PREFIX + '_'.join(bases)
     bases = list(v for k, v in bases.items())
     return type(name, (*bases, BaseMovement), {})  # type: ignore

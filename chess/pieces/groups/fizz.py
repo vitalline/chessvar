@@ -11,15 +11,10 @@ class LRhino(Piece):
     def __init__(self, board, **kwargs):
         super().__init__(
             board,
-            movement.MultiMovement(board, [
-                movement.BentMovement(board, [
-                    movement.RiderMovement(board, [(*ij, 1)]),
-                    movement.RiderMovement(board, [(*kl, 1)])
-                ]) for ij, kl in zip(
-                    [(1, 1), (0, 1), (-1, 1), (-1, 0), (-1, -1), (0, -1), (1, -1), (1, 0)],
-                    [(1, 0), (1, 1), (0, 1), (-1, 1), (-1, 0), (-1, -1), (0, -1), (1, -1)]
-                )
-            ]),
+            movement.SpinMovement(board, [
+                movement.RiderMovement(board, [(*ij, 1)])
+                for ij in [(1, 0), (1, -1), (0, -1), (-1, -1), (-1, 0), (-1, 1), (0, 1), (1, 1)]
+            ], step_count=2),
             **kwargs
         )
 
@@ -32,15 +27,10 @@ class RRhino(Piece):
     def __init__(self, board, **kwargs):
         super().__init__(
             board,
-            movement.MultiMovement(board, [
-                movement.BentMovement(board, [
-                    movement.RiderMovement(board, [(*ij, 1)]),
-                    movement.RiderMovement(board, [(*kl, 1)])
-                ]) for ij, kl in zip(
-                    [(1, 1), (0, 1), (-1, 1), (-1, 0), (-1, -1), (0, -1), (1, -1), (1, 0)],
-                    [(0, 1), (-1, 1), (-1, 0), (-1, -1), (0, -1), (1, -1), (1, 0), (1, 1)]
-                )
-            ]),
+            movement.SpinMovement(board, [
+                movement.RiderMovement(board, [(*ij, 1)])
+                for ij in [(1, 1), (0, 1), (-1, 1), (-1, 0), (-1, -1), (0, -1), (1, -1), (1, 0)]
+            ], step_count=2),
             **kwargs
         )
 

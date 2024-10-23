@@ -493,8 +493,9 @@ class Board(Window):
         self.probabilistic_piece_history = []  # list of probabilistic piece positions for every ply
         self.obstacles = []  # list of obstacles (neutral pieces that block movement and cannot move)
         self.penultima_pieces = {Side.WHITE: {}, Side.BLACK: {}}  # piece textures that are used for penultima mode
-        self.custom_pawn = fide.Pawn  # custom pawn type
+        self.past_custom_pieces = {}  # custom piece types that have been used before a reset of custom data
         self.custom_pieces = {}  # custom piece types
+        self.custom_pawn = fide.Pawn  # custom pawn type
         self.custom_layout = {}  # custom starting layout of the board
         self.custom_turn_order = []  # custom turn order options
         self.custom_promotions = {}  # custom promotion options
@@ -1047,6 +1048,7 @@ class Board(Window):
             self.roll_rng = Random(self.roll_seed)
         self.board_config['update_roll_seed'] = data.get('roll_update', self.board_config['update_roll_seed'])
 
+        self.past_custom_pieces = {**self.past_custom_pieces, **self.custom_pieces}
         custom_data = data.get('custom', {})
         self.custom_pieces = {k: load_custom_type(v, k) for k, v in custom_data.items()}
         c = self.custom_pieces
@@ -1133,7 +1135,7 @@ class Board(Window):
         ]
         self.reset_turn_order()
         turn_order = self.turn_order_start + self.turn_order
-        turn_side = data.get('turn', self.get_turn(ply_count))
+        turn_side = data.get('turn', self.get_turn(ply_count) + 1)
         self.turn_side = turn_order[turn_side - 1]
         if isinstance(self.turn_side, list):
             self.turn_side, self.turn_rules = self.turn_side[0], self.turn_side[1]
@@ -1324,6 +1326,7 @@ class Board(Window):
         self.update_status()
 
     def reset_custom_data(self) -> None:
+        self.past_custom_pieces = {**self.past_custom_pieces, **self.custom_pieces}
         self.variant = ''
         self.alias_dict = {}
         self.custom_drops = {}
@@ -1431,7 +1434,9 @@ class Board(Window):
     def reset_edit_promotions(self, piece_sets: dict[Side, list[type[Piece]]] | None = None) -> None:
         if is_prefix_of('custom', self.edit_piece_set_id):
             self.edit_promotions = {
-                side: [piece_type for _, piece_type in self.custom_pieces.items()] + [Block, Wall]
+                side: [Block, Wall]
+                + [piece_type for _, piece_type in self.custom_pieces.items()]
+                + [piece_type for k, piece_type in self.past_custom_pieces.items() if k not in self.custom_pieces]
                 for side in self.edit_promotions
             }
             return
@@ -1983,12 +1988,13 @@ class Board(Window):
                                             self.check_side = turn_side
                                         if chained_move.captured_piece in royal_pieces[self.turn_side.opponent()]:
                                             royal_loss = True
-                                    if not isinstance(chained_move.promotion, (Royal, QuasiRoyal)):
-                                        if isinstance(chained_move.piece, (Royal, QuasiRoyal)):
-                                            if chained_move.piece in royal_pieces[turn_side]:
-                                                self.check_side = turn_side
-                                            if chained_move.piece in royal_pieces[self.turn_side.opponent()]:
-                                                royal_loss = True
+                                    if chained_move.promotion:
+                                        if not isinstance(chained_move.promotion, (Royal, QuasiRoyal)):
+                                            if isinstance(chained_move.piece, (Royal, QuasiRoyal)):
+                                                if chained_move.piece in royal_pieces[turn_side]:
+                                                    self.check_side = turn_side
+                                                if chained_move.piece in royal_pieces[self.turn_side.opponent()]:
+                                                    royal_loss = True
                                     if royal_loss:
                                         check_side = self.turn_side.opponent()
                                         self.moves[self.turn_side.opponent()] = {}
@@ -2480,7 +2486,7 @@ class Board(Window):
                     while last_move.chained_move:
                         last_move = last_move.chained_move
                     last_move.chained_move = deepcopy(move)
-                if next_move.chained_move is Unset and not self.promotion_piece:
+                if chained_move is Unset and not self.promotion_piece:
                     self.load_moves()
                     chained = True
                 else:
@@ -3261,6 +3267,11 @@ class Board(Window):
         self.piece_sprite_list.append(new_piece)
         if pos in self.en_passant_markers and not self.not_a_piece(pos):
             self.en_passant_markers.remove(pos)
+        if pos in self.castling_ep_markers and not self.not_a_piece(pos):
+            self.castling_ep_markers.remove(pos)
+        if (new_type := save_piece_type(type(new_piece))) in self.past_custom_pieces:
+            self.custom_pieces[new_type] = self.past_custom_pieces[new_type]
+            del self.past_custom_pieces[new_type]
 
     def color_pieces(self, side: Side = Side.ANY, color: tuple[int, int, int] | None = None) -> None:
         for piece in self.movable_pieces.get(side, sum(self.movable_pieces.values(), [])):
@@ -4943,6 +4954,11 @@ class Board(Window):
         for piece, data in self.custom_pieces.items():
             debug_log_data.append(f"  '{piece}': {save_custom_type(data)}")
         if not self.custom_pieces:
+            debug_log_data[-1] += " None"
+        debug_log_data.append(f"Past custom pieces ({len(self.past_custom_pieces)}):")
+        for piece, data in self.past_custom_pieces.items():
+            debug_log_data.append(f"  '{piece}': {save_custom_type(data)}")
+        if not self.past_custom_pieces:
             debug_log_data[-1] += " None"
         if self.custom_pawn != fide.Pawn:
             debug_log_data.append(f"Custom pawn: {self.custom_pawn.name} ({save_piece_type(self.custom_pawn)})")
