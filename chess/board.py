@@ -1037,10 +1037,14 @@ class Board(Window):
                 trimmed_set = piece_sets[side].copy()
                 while issubclass(trimmed_set[0], NoPiece):
                     trimmed_set.pop(0)
+                    if not trimmed_set:
+                        break
                 if not trimmed_set:
                     continue
                 while issubclass(trimmed_set[-1], NoPiece):
                     trimmed_set.pop()
+                    if not trimmed_set:
+                        break
                 if not trimmed_set:
                     continue
                 for i, piece_type in enumerate(trimmed_set):
@@ -1128,10 +1132,14 @@ class Board(Window):
                 trimmed_set = piece_sets[piece_side].copy()
                 while issubclass(trimmed_set[0], NoPiece):
                     trimmed_set.pop(0)
+                    if not trimmed_set:
+                        break
                 if not trimmed_set:
                     continue
                 while issubclass(trimmed_set[-1], NoPiece):
                     trimmed_set.pop()
+                    if not trimmed_set:
+                        break
                 if not trimmed_set:
                     continue
                 textures = copy(penultima_textures)
