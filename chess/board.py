@@ -2680,8 +2680,8 @@ class Board(Window):
                     # the current player was checkmated, the game ends and the opponent wins
                     self.log(f"[Ply {self.ply_count}] Info: Checkmate! {self.check_side.opponent()} wins.")
                 else:
-                    # the current player's royal piece was captured, the game ends and the opponent wins
-                    self.log(f"[Ply {self.ply_count}] Info: King captured! {self.check_side.opponent()} wins.")
+                    # the current player's royal piece was lost, the game ends and the opponent wins
+                    self.log(f"[Ply {self.ply_count}] Info: Game over! {self.check_side.opponent()} wins.")
             else:
                 # the current player was stalemated, let's consult the rules to see if it's a draw or a win
                 if isinstance(self.stalemate_rule, dict):
@@ -2822,7 +2822,7 @@ class Board(Window):
                 if self.use_check:
                     self.set_caption(f"[Ply {self.ply_count}] Checkmate! {self.check_side.opponent()} wins.")
                 else:
-                    self.set_caption(f"[Ply {self.ply_count}] King captured! {self.check_side.opponent()} wins.")
+                    self.set_caption(f"[Ply {self.ply_count}] Game over! {self.check_side.opponent()} wins.")
             else:
                 if isinstance(self.stalemate_rule, dict):
                     rule = self.stalemate_rule.get(self.turn_side, 0)
