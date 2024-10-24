@@ -23,8 +23,8 @@ from chess.data import default_board_width, default_board_height, default_size, 
 from chess.data import min_width, min_height
 from chess.debug import debug_info, save_piece_data, save_piece_sets, save_piece_types
 from chess.movement.move import Move
-from chess.movement.types import AutoCaptureMovement, AutoRangedAutoCaptureRiderMovement
-from chess.movement.types import CastlingMovement, DropMovement, ProbabilisticMovement
+from chess.movement.types import AutoCaptureMovement, AutoRangedAutoCaptureRiderMovement, CastlingMovement
+from chess.movement.types import CloneMovement, DropMovement, ProbabilisticMovement
 from chess.movement.util import Position, add, to_alpha as b26
 from chess.movement.util import to_algebraic as toa, from_algebraic as fra
 from chess.pieces.groups.classic import Pawn, King
@@ -1440,6 +1440,7 @@ class Board(Window):
                     issubclass(chained_move.movement_type, CastlingMovement)
                     and chained_move.chained_move.pos_from != last_chain_move.pos_to
                     or isinstance(chained_move.piece.movement, AutoCaptureMovement)
+                    or issubclass(chained_move.chained_move.movement_type, CloneMovement)
                 ):
                     last_chain_move = chained_move
                 chained_move = chained_move.chained_move
@@ -1708,6 +1709,7 @@ class Board(Window):
                                         issubclass(chained_move.movement_type, CastlingMovement)
                                         and chained_move.chained_move.pos_from != move.pos_to
                                         or isinstance(chained_move.piece.movement, AutoCaptureMovement)
+                                        or issubclass(chained_move.chained_move.movement_type, CloneMovement)
                                     ):
                                         poss.extend((chained_move.pos_from, chained_move.pos_to))
                                         chained_move = chained_move.chained_move
@@ -1807,6 +1809,7 @@ class Board(Window):
                         issubclass(chained_move.movement_type, CastlingMovement)
                         and chained_move.chained_move.pos_from != move.pos_to
                         or isinstance(chained_move.piece.movement, AutoCaptureMovement)
+                        or issubclass(chained_move.chained_move.movement_type, CloneMovement)
                     ):
                         poss.extend((chained_move.pos_from, chained_move.pos_to))
                         chained_move = chained_move.chained_move
@@ -1947,6 +1950,8 @@ class Board(Window):
     def update_move(self, move: Move) -> None:
         if move.pos_from:
             move.set(piece=self.get_piece(move.pos_from))
+        elif not move.piece and move.pos_to:
+            move.set(piece=self.get_piece(move.pos_to))
         new_piece = move.swapped_piece or move.captured_piece
         new_piece = self.get_piece(new_piece.board_pos if new_piece is not None else move.pos_to)
         if move.piece != new_piece and not new_piece.is_empty():
@@ -2018,7 +2023,7 @@ class Board(Window):
         while move:
             moved_piece = move.piece
             if move.promotion:
-                if isinstance(moved_piece.movement, AutoRangedAutoCaptureRiderMovement):
+                if moved_piece and isinstance(moved_piece.movement, AutoRangedAutoCaptureRiderMovement):
                     moved_piece.movement.unmark(move.pos_to, moved_piece)
                 moved_piece = self.get_piece(move.pos_to)
             if isinstance(moved_piece.movement, AutoRangedAutoCaptureRiderMovement):
@@ -2147,6 +2152,7 @@ class Board(Window):
                     issubclass(chained_move.movement_type, CastlingMovement)
                     and chained_move.chained_move.pos_from != move.pos_to
                     or isinstance(chained_move.piece.movement, AutoCaptureMovement)
+                    or issubclass(chained_move.chained_move.movement_type, CloneMovement)
                 ):
                     poss.extend((chained_move.pos_from, chained_move.pos_to))
                     chained_move = chained_move.chained_move
@@ -2237,18 +2243,18 @@ class Board(Window):
             # piece was added to the board, update it and add it to the sprite list
             self.update_piece(move.piece)
             self.piece_sprite_list.append(move.piece)
-        if move.piece.side in self.drops and not move.is_edit == 1:
+        if move.piece is not None and move.piece.side in self.drops and not move.is_edit == 1:
             captured_piece = move.piece if move.pos_to is None else move.captured_piece
             if captured_piece is not None and move.piece.side in self.captured_pieces:
                 capture_type = captured_piece.promoted_from or type(captured_piece)
                 if capture_type in self.drops[move.piece.side]:
                     # droppable piece was captured, add it to the roster of captured pieces
                     self.captured_pieces[move.piece.side].append(capture_type)
-        if move.is_edit != 1 and move.movement_type != DropMovement:
+        if move.is_edit != 1 and not issubclass(move.movement_type, (CloneMovement, DropMovement)):
             # call movement.update() to update movement state after the move (e.g. pawn double move, castling rights)
             move.piece.movement.update(move, move.piece)
         if move.is_edit != 1:
-            if move.piece.is_empty():
+            if not move.piece or move.piece.is_empty():
                 # check if a piece can be dropped
                 self.try_drop(move)
             else:
@@ -2355,7 +2361,7 @@ class Board(Window):
             self.update_piece(move.captured_piece)  # update the piece sprite to reflect current piece hiding mode
             self.pieces[capture_pos[0]][capture_pos[1]] = move.captured_piece
             self.piece_sprite_list.append(move.captured_piece)
-        if move.piece.side in self.drops and move.is_edit != 1:
+        if move.piece is not None and move.piece.side in self.drops and move.is_edit != 1:
             captured_piece = move.piece if move.pos_to is None else move.captured_piece
             if captured_piece is not None and move.piece.side in self.captured_pieces:
                 capture_type = captured_piece.promoted_from or type(captured_piece)
@@ -2378,7 +2384,7 @@ class Board(Window):
                 self.update_piece(move.swapped_piece)  # update the piece sprite to reflect current piece hiding mode
                 self.pieces[move.pos_to[0]][move.pos_to[1]] = move.swapped_piece
                 self.piece_sprite_list.append(move.swapped_piece)
-        if move.is_edit != 1 and move.movement_type != DropMovement:
+        if move.is_edit != 1 and not issubclass(move.movement_type, (CloneMovement, DropMovement)):
             # call movement.undo() to restore movement state before the move (e.g. pawn double move, castling rights)
             move.piece.movement.undo(move, move.piece)
 
@@ -2784,6 +2790,7 @@ class Board(Window):
                     issubclass(chained_move.movement_type, CastlingMovement)
                     and chained_move.chained_move.pos_from != move.pos_to
                     or isinstance(chained_move.piece.movement, AutoCaptureMovement)
+                    or issubclass(chained_move.chained_move.movement_type, CloneMovement)
                 ):
                     # let's also not show all auto-captures because space in the caption is VERY limited
                     if isinstance(chained_move.piece.movement, AutoCaptureMovement):
@@ -2836,10 +2843,6 @@ class Board(Window):
                 self.set_caption(f"[Ply {self.ply_count}] {self.turn_side} to move")
 
     def try_drop(self, move: Move) -> None:
-        if self.turn_side not in self.drops:
-            return
-        if not self.captured_pieces[self.turn_side]:
-            return
         if move.promotion:
             if move.placed_piece is not None:
                 for i, piece in enumerate(self.captured_pieces[self.turn_side][::-1]):
@@ -2851,6 +2854,10 @@ class Board(Window):
             self.replace(move.piece, move.promotion)
             self.update_promotion_auto_captures(move)
             self.promotion_piece = promotion_piece
+            return
+        if self.turn_side not in self.drops:
+            return
+        if not self.captured_pieces[self.turn_side]:
             return
         if not self.use_drops and not self.edit_mode:
             return
@@ -2908,13 +2915,6 @@ class Board(Window):
         self.start_promotion(self.get_piece(move.piece.board_pos), drop_list, drop_type_list)
 
     def try_promotion(self, move: Move) -> None:
-        if is_active(move.chained_move):
-            return
-        if move.piece.side not in self.promotions:
-            return
-        side_promotions = self.promotions[move.piece.side]
-        if type(move.piece) not in side_promotions:
-            return
         promotion_piece = self.promotion_piece
         if move.promotion:
             self.promotion_piece = True
@@ -2926,6 +2926,13 @@ class Board(Window):
             self.replace(move.piece, move.promotion)
             self.update_promotion_auto_captures(move)
             self.promotion_piece = promotion_piece
+            return
+        if is_active(move.chained_move):
+            return
+        if move.piece.side not in self.promotions:
+            return
+        side_promotions = self.promotions[move.piece.side]
+        if type(move.piece) not in side_promotions:
             return
         promotion_squares = side_promotions[type(move.piece)]
         for square in (move.pos_to, move.pos_from):
@@ -3816,6 +3823,7 @@ class Board(Window):
                     issubclass(chained_move.movement_type, CastlingMovement)
                     and chained_move.chained_move.pos_from != move.pos_to
                     or isinstance(chained_move.piece.movement, AutoCaptureMovement)
+                    or issubclass(chained_move.chained_move.movement_type, CloneMovement)
                 ):
                     poss.extend((chained_move.pos_from, chained_move.pos_to))
                     chained_move = chained_move.chained_move

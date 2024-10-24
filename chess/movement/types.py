@@ -823,6 +823,44 @@ class RangedMultiMovement(RangedMovement, MultiMovement):
     pass
 
 
+class CloneMovement(BaseMultiMovement):
+    def __init__(self, board: Board, movements: list[BaseMovement] | None = None, move_only: int = 0):
+        super().__init__(board, movements)
+        self.move_only = move_only
+
+    def moves(self, pos_from: Position, piece: Piece, theoretical: bool = False):
+        move_capture_dict = {1: False, -1: True}
+        for movement in self.movements:
+            for move in movement.moves(pos_from, piece, theoretical):
+                if not move:
+                    continue
+                spawn_points = []
+                chained_move = move
+                while chained_move.chained_move:
+                    is_capture = chained_move.captured_piece or not self.board.not_a_piece(chained_move.pos_to)
+                    if self.move_only == 0 or is_capture == move_capture_dict.get(self.move_only):
+                        if chained_move.pos_from and chained_move.pos_from != chained_move.pos_to:
+                            spawn_points.append(chained_move.pos_from)
+                    chained_move = chained_move.chained_move
+                is_capture = chained_move.captured_piece or not self.board.not_a_piece(chained_move.pos_to)
+                if self.move_only == 0 or is_capture == move_capture_dict.get(self.move_only):
+                    if chained_move.pos_from and chained_move.pos_from != chained_move.pos_to:
+                        spawn_points.append(chained_move.pos_from)
+                if not spawn_points:
+                    yield move
+                    continue
+                for spawn_point in spawn_points:
+                    chained_move = chained_move.set(chained_move=Move(
+                        pos_from=None, pos_to=spawn_point,
+                        promotion=copy(piece),
+                        movement_type=type(self),
+                    )).chained_move
+                yield move
+
+    def __copy_args__(self):
+        return self.board, deepcopy(self.movements), self.move_only
+
+
 class ColorMovement(BaseMultiMovement):
     def __init__(
         self,

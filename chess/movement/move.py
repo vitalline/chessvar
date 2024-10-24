@@ -159,7 +159,7 @@ class Move(object):
         else:
             string = "does something very mysterious"
         if self.piece:
-            if self.piece.is_empty() and not (self.promotion and not moved):
+            if self.piece.is_empty() and not (self.promotion and (self.pos_from is None or not moved)):
                 side = board.get_promotion_side(self.piece) if self.is_edit == 1 else board.turn_side
                 string = f"{side} {string}"
             elif self.piece.is_empty():
