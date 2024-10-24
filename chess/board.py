@@ -1528,6 +1528,25 @@ class Board(Window):
                     ('*', *(last_history_tags or ''), last_history_move.movement_type)
                     if last_history_move and last_history_move.is_edit != 1 else '*'
                 ) if rules.get(k) is not None] if state_rules is not None else None
+                for type_rules in last_tag_rules:
+                    any_type_rules = type_rules.get('*') or {}
+                    tag_rules = [rules for rules in [any_type_rules.get(tag) for tag in ('*', '')] if rules]
+                    pass_turn_options = {x for x in [rules.get('p') for rules in tag_rules] if x is not None}
+                    if 0 in pass_turn_options:
+                        self.moves[turn_side]['pass'] = True
+                    elif pass_turn_options.union({1, -1}):
+                        old_check_side = self.check_side
+                        opponent = self.turn_side.opponent()
+                        if opponent not in check_sides:
+                            self.load_check(opponent)
+                            if self.check_side == opponent:
+                                check_sides[opponent] = True
+                        self.check_side = old_check_side
+                        if self.check_side != turn_side:
+                            conditions = {0, 1 if check_sides.get(opponent, False) else -1}
+                            if conditions.union(pass_turn_options):
+                                self.moves[turn_side]['pass'] = True
+                        self.check_side = check_side
                 piece_rules = {}
                 if self.use_drops and turn_side in self.drops:
                     side_drops = self.drops[turn_side]
@@ -1599,7 +1618,7 @@ class Board(Window):
                         options = {k: [] for k, v in {
                             'm': not move.captured_piece,
                             'c': move.captured_piece,
-                            'p': True,
+                            'p': 'pass' not in self.moves[turn_side],
                         }.items() if v}
                         if move_tag_rules is not None:
                             for rules in move_tag_rules:
