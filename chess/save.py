@@ -157,7 +157,7 @@ def save_movement_type(movement_type: type[BaseMovement] | frozenset | None) -> 
 
 
 def load_movement_type(data: str | None) -> type[BaseMovement] | frozenset | None:
-    if data is None:
+    if not data:
         return None
     if data == UNSET_STRING:
         return Unset
@@ -187,7 +187,7 @@ def save_piece(piece: Piece | frozenset | None) -> dict | str | None:
 
 
 def load_piece(data: dict | str | None, board: Board, from_dict: dict | None) -> Piece | frozenset | None:
-    if data is None:
+    if not data:
         return None
     if data == UNSET_STRING:
         return Unset
@@ -304,7 +304,7 @@ def save_custom_type(piece: type[Piece] | Piece | None) -> dict | None:
 
 
 def load_custom_type(data: dict | None, name: str) -> type[Piece] | None:
-    if data is None:
+    if not data:
         return None
     base_strings = data.get('cls', ())
     if isinstance(base_strings, str):
@@ -373,7 +373,7 @@ def save_move(move: Move | frozenset | None) -> dict | str | None:
 
 
 def load_move(data: dict | str | None, board: Board, from_dict: dict | None) -> Move | frozenset | None:
-    if data is None:
+    if not data:
         return None
     if data == UNSET_STRING:
         return Unset
