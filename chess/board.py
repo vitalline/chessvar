@@ -1587,8 +1587,7 @@ class Board(Window):
                                 for k in rules:
                                     if k == '*' or k == piece_type or k and k[0] is False and k[1] != piece_type:
                                         piece_rule_dict[piece_type].append(rules[k])
-                        type_rules = piece_rule_dict[piece_type]
-                        tag_rules = [rules[s] for s in ['*'] for rules in type_rules]
+                        tag_rules = [rules[s] for s in ['*'] for rules in piece_rule_dict[piece_type]]
                         options = {k: [] for k, v in {'d': self.use_drops}.items() if v}
                         for rules in tag_rules:
                             for option in options:
@@ -1602,7 +1601,6 @@ class Board(Window):
                                 self.moves[turn_side].setdefault('drop', set()).add(piece_type)
                                 break
                 for piece in movable_pieces[turn_side] if chain_moves is None else [last_chain_move.piece]:
-                    history_piece_rules = []
                     if type(piece) not in piece_rule_dict:
                         if last_tag_rules is None:
                             piece_rule_dict[type(piece)] = None
@@ -1612,12 +1610,15 @@ class Board(Window):
                                 for k in rules:
                                     if k in ('*', type(piece)) or k and k[0] is False and k[1] not in ('', type(piece)):
                                         piece_rule_dict[type(piece)].append(rules[k])
-                                    if k == '' and piece in last_history_pieces:
-                                        history_piece_rules.append(rules[k])
-                                    if k == (False, '') and piece not in last_history_pieces:
-                                        history_piece_rules.append(rules[k])
-                    piece_rules = piece_rule_dict[type(piece)]
+                    piece_rules = copy(piece_rule_dict[type(piece)])
                     if piece_rules is not None:
+                        history_piece_rules = []
+                        for rules in last_tag_rules:
+                            for k in rules:
+                                if k == '' and piece in last_history_pieces:
+                                    history_piece_rules.append(rules[k])
+                                if k == (False, '') and piece not in last_history_pieces:
+                                    history_piece_rules.append(rules[k])
                         if history_piece_rules is not None:
                             piece_rules.extend(history_piece_rules)
                         else:
@@ -1627,7 +1628,6 @@ class Board(Window):
                     tag_rule_dict = {}
                     for move in piece.moves() if chain_moves is None else chain_moves:
                         tag = move.tag
-                        history_tag_rules = []
                         if tag not in tag_rule_dict:
                             if piece_rules is None:
                                 tag_rule_dict[tag] = None
@@ -1637,13 +1637,15 @@ class Board(Window):
                                     for k in rules:
                                         if k in ('*', tag) or k and k[0] is False and k[1] not in ('', tag):
                                             tag_rule_dict[tag].append(rules[k])
-                                        if k == '' and tag in last_history_tags:
-                                            history_tag_rules.append(rules[k])
-                                        if k == (False, '') and tag not in last_history_tags:
-                                            history_tag_rules.append(rules[k])
-                                tag_rule_dict[tag] = tag_rule_dict[tag] or None
-                        tag_rules = tag_rule_dict[tag]
+                        tag_rules = copy(tag_rule_dict[tag])
                         if tag_rules is not None:
+                            history_tag_rules = []
+                            for rules in piece_rules:
+                                for k in rules:
+                                    if k == '' and tag in last_history_tags:
+                                        history_tag_rules.append(rules[k])
+                                    if k == (False, '') and tag not in last_history_tags:
+                                        history_tag_rules.append(rules[k])
                             if history_tag_rules is not None:
                                 tag_rules.extend(history_tag_rules)
                             else:
