@@ -1413,14 +1413,14 @@ class Board(Window):
                             gained_piece = chained_move.promotion
                     royal_gain = isinstance(gained_piece, (Royal, QuasiRoyal))
                     if lost_piece and lost_piece.side == turn_side and not royal_gain:
-                        # NB: quasi-royal pieces are treated as royal if only one remains!
-                        royal_loss = isinstance(lost_piece, (Royal, QuasiRoyal))
-                        if self.royal_piece_mode == 0 and royal_loss:
-                            # treat as royal capture iff no strictly royal pieces exist
-                            royal_loss = not self.royal_pieces[turn_side]
-                        elif self.royal_piece_mode == 2 and royal_loss:
-                            # treat as royal capture iff no quasi or royal pieces exist
+                        royal_loss = isinstance(lost_piece, Royal)
+                        quasi_royal_loss = isinstance(lost_piece, QuasiRoyal)
+                        if self.royal_piece_mode == 0 and not royal_loss:
+                            royal_loss = quasi_royal_loss and not self.quasi_royal_pieces[turn_side]
+                        elif self.royal_piece_mode == 1:  # Force royal pieces
                             royal_loss = not self.royal_pieces[turn_side] and not self.quasi_royal_pieces[turn_side]
+                        elif self.royal_piece_mode == 2:  # Force quasi-royal pieces
+                            royal_loss = royal_loss or quasi_royal_loss
                         if royal_loss:
                             break
                     chained_move = chained_move.chained_move
