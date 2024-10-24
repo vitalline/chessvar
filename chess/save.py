@@ -106,7 +106,7 @@ def condense_algebraic(data: dict[Position, AnyJson], width: int, height: int) -
                         result[order.setdefault(pos2, toa(pos2))] = data[pos2]
                     break
             else:
-                result[order.setdefault(poss[0], notation)] = value
+                result[order.setdefault(fra(notation), notation)] = value
     return {v: result[v] for _, v in sorted(order.items(), key=lambda x: x[0])}
 
 
@@ -129,7 +129,7 @@ def save_piece_type(piece_type: type[Piece] | frozenset | None) -> str | None:
 
 
 def load_piece_type(data: str | None, from_dict: dict | None) -> type[Piece] | frozenset | None:
-    if data is None:
+    if not data:
         return None
     if data == UNSET_STRING:
         return Unset

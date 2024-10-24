@@ -493,7 +493,7 @@ class Board(Window):
             'chaos_blocklist': self.board_config['block_ids_chaos'],
             'set_ids': {side.value: piece_set_id for side, piece_set_id in self.piece_set_ids.items()},
             'sets': {
-                side.value: [save_piece_type(t) if t is not NoPiece else None for t in piece_set]
+                side.value: [save_piece_type(t) if t is not NoPiece else '' for t in piece_set]
                 for side, piece_set in self.piece_sets.items()
             },
             'pawn': save_piece_type(self.custom_pawn) if self.custom_pawn != Pawn else None,
