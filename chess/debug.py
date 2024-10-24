@@ -451,8 +451,8 @@ def debug_info(board: Board) -> list[str]:
     debug_log_data.append(f"Turn order ({len(board.custom_turn_order)}):")
     for i, data in enumerate(board.custom_turn_order):
         turn_side, turn_rules = data
-        turn_suffix = 'None' if turn_rules is None else f", {turn_rules}"
-        debug_log_data.append(f"  {i + 1}: {turn_side or 'None'}{turn_suffix}")
+        turn_suffix = '' if turn_rules is None else f", {turn_rules}"
+        debug_log_data.append(f"  {i + 1}: {turn_side or 'Loop:'}{turn_suffix}")
     possible_moves = sum((
         sum(v.values(), []) for k, v in board.moves.get(board.turn_side, {}).items() if not isinstance(k, str)
     ), [])
