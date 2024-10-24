@@ -230,7 +230,7 @@ def load_custom_movement_type(bases: dict[str, type[BaseMovement]]) -> type[Base
 
 
 def save_movement(movement: BaseMovement | frozenset | None) -> list | str | None:
-    save_key = lambda key: save_piece_type(key) if issubclass(key, type) and issubclass(key, Piece) else key
+    save_key = lambda key: save_piece_type(key) if isinstance(key, type) and issubclass(key, Piece) else key
     def save_arg(arg: Any) -> Any:  # helper function for saving constructor arguments of a movement object:
         if isinstance(arg, BaseMovement):  # the movement here is made out of movement (Multi, Bent, others)
             return save_movement(arg)  # save the movement recursively. not the most efficient, but it works

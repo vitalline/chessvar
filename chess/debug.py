@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import sys
 
-from copy import deepcopy
+from copy import deepcopy, copy
 from json import dumps
 from typing import TYPE_CHECKING, TextIO
 
@@ -12,7 +12,7 @@ from chess.movement.util import to_algebraic as toa, from_algebraic as fra, from
 from chess.pieces.groups import classic as fide
 from chess.pieces.piece import Piece
 from chess.pieces.side import Side
-from chess.save import save_piece_type, save_custom_type
+from chess.save import save_piece_type, save_custom_type, unpack, repack
 from chess.util import get_filename
 
 if TYPE_CHECKING:
@@ -448,11 +448,47 @@ def debug_info(board: Board) -> list[str]:
                 debug_log_data[-1] += " None"
         if not board.turn_rules:
             debug_log_data[-1] += " None"
-    debug_log_data.append(f"Turn order ({len(board.custom_turn_order)}):")
-    for i, data in enumerate(board.custom_turn_order):
-        turn_side, turn_rules = data
-        turn_suffix = '' if turn_rules is None else f", {turn_rules}"
-        debug_log_data.append(f"  {i + 1}: {turn_side or 'Loop:'}{turn_suffix}")
+    start, loop = [], []
+    start_ended = False
+    for data in board.custom_turn_order:
+        if data[0] == Side.NONE:
+            start_ended = True
+            continue
+        (loop if start_ended else start).append(data)
+    if start and not loop and not start_ended:
+        start, loop = loop, start
+    if not start and not loop:
+        loop = [(Side.WHITE, None), (Side.BLACK, None)]
+    debug_log_data.append(f"Turn order ({len(start) + len(loop)}):")
+    if start:
+        debug_log_data.append(f"  Start: ({len(start)}):")
+        for i, data in enumerate(start):
+            turn_side, turn_rules = data
+            turn_rules = copy(repack(turn_rules))
+            for j, rule in enumerate(turn_rules):
+                if rule and 'cls' in rule:
+                    turn_rules[j] = copy(rule)
+                    turn_rules[j]['cls'] = unpack([save_piece_type(t) for t in repack(rule['cls'])])
+            turn_rules = unpack(turn_rules)
+            turn_suffix = '' if turn_rules is None else f", {turn_rules}"
+            debug_log_data.append(f"    {i + 1}: {turn_side}{turn_suffix}")
+    if loop:
+        pad = ''
+        if start:
+            debug_log_data.append(f"  Loop: ({len(loop)}):")
+            pad = '  '
+        for i, data in enumerate(loop, len(start)):
+            turn_side, turn_rules = data
+            turn_rules = copy(repack(turn_rules))
+            for j, rule in enumerate(turn_rules):
+                if rule and 'cls' in rule:
+                    turn_rules[j] = copy(rule)
+                    turn_rules[j]['cls'] = unpack([save_piece_type(t) for t in repack(rule['cls'])])
+            turn_rules = unpack(turn_rules)
+            turn_suffix = '' if turn_rules is None else f", {turn_rules}"
+            debug_log_data.append(f"  {pad}{i + 1}: {turn_side}{turn_suffix}")
+    if not start and not loop:
+        debug_log_data[-1] += " None"
     possible_moves = sum((
         sum(v.values(), []) for k, v in board.moves.get(board.turn_side, {}).items() if not isinstance(k, str)
     ), [])
