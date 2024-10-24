@@ -786,7 +786,7 @@ class Board(Window):
                 'type': d.get('type', ''),
                 'state': d.get('state', 0),
                 'check': d.get('check', 0),
-            }.items() if v} for d in side[1]])
+            }.items() if v} for d in repack(side[1])])
             if isinstance(side, list) and len(side) > 1 else (Side(int(side)), None)
             for side in data.get('order', [])
         ]
@@ -2881,12 +2881,29 @@ class Board(Window):
                 drop = drop(board=self, pos=move.piece.board_pos, side=self.turn_side)
             move.set(promotion=drop, placed_piece=drop_type_list[0])
             for i, piece in enumerate(self.captured_pieces[self.turn_side][::-1]):
-                if piece == drop:
+                if piece == type(drop):
                     self.captured_pieces[self.turn_side].pop(-(i + 1))
                     break
             self.replace(move.piece, move.promotion)
             self.update_promotion_auto_captures(move)
             self.promotion_piece = promotion_piece
+            chained_move = move
+            while chained_move:
+                move_type = (
+                    'Edit' if chained_move.is_edit
+                    else 'Drop' if chained_move.movement_type == DropMovement
+                    else 'Move'
+                )
+                self.log(f"[Ply {self.ply_count}] {move_type}: {chained_move}")
+                chained_move = chained_move.chained_move
+                if chained_move:
+                    chained_move.piece.move(chained_move)
+                    self.update_auto_capture_markers(chained_move)
+                    chained_move.set(piece=copy(chained_move.piece))
+            self.move_history.append(deepcopy(move))
+            self.ply_count += not move.is_edit
+            self.compare_history()
+            self.advance_turn()
             return
         self.start_promotion(self.get_piece(move.piece.board_pos), drop_list, drop_type_list)
 
