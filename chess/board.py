@@ -1783,7 +1783,9 @@ class Board(Window):
         for turn_side in turn_sides:
             moves[turn_side] = {}
             move_data_set = set()
-            for move in sum((sum(v.values(), []) for v in self.moves.get(turn_side, {}).values()), []):
+            for move in sum((
+                sum(v.values(), []) for k, v in self.moves.get(self.turn_side, {}).items() if not isinstance(k, str)
+            ), []):
                 move_data = [move.pos_from]
                 if move.pos_from == move.pos_to and move.captured_piece:
                     move_data.append(move.captured_piece.board_pos)
@@ -2899,7 +2901,9 @@ class Board(Window):
         promotion_piece = self.promotion_piece
         if move.promotion:
             self.promotion_piece = True
-            promoted_from = move.promotion.promoted_from or move.piece.promoted_from or type(move.piece)
+            promoted_from = move.promotion.promoted_from or move.piece.promoted_from
+            if not move.piece.is_empty():
+                promoted_from = promoted_from or type(move.piece)
             if type(move.promotion) != promoted_from:
                 move.promotion.promoted_from = promoted_from
             self.replace(move.piece, move.promotion)
@@ -2920,7 +2924,9 @@ class Board(Window):
                     promotion = promotion.of(promotion.side or move.piece.side).on(square)
                 else:
                     promotion = promotion(board=self, pos=square, side=move.piece.side)
-                promoted_from = promotion.promoted_from or move.piece.promoted_from or type(move.piece)
+                promoted_from = promotion.promoted_from or move.piece.promoted_from
+                if not move.piece.is_empty():
+                    promoted_from = promoted_from or type(move.piece)
                 if type(promotion) != promoted_from:
                     promotion.promoted_from = promoted_from
                 move.set(promotion=promotion)
@@ -2974,7 +2980,9 @@ class Board(Window):
             else:
                 promotion_piece = promotion(board=self, pos=pos, side=side)
             if not self.edit_mode or (self.move_history and ((m := self.move_history[-1]) and m.is_edit != 1)):
-                promoted_from = promotion_piece.promoted_from or piece.promoted_from or type(piece)
+                promoted_from = promotion_piece.promoted_from or piece.promoted_from
+                if not piece.is_empty():
+                    promoted_from = promoted_from or type(piece)
                 if type(promotion_piece) != promoted_from:
                     promotion_piece.promoted_from = promoted_from
             if self.edit_mode and is_prefix_in(['custom', 'wall'], self.edit_piece_set_id):
@@ -3695,7 +3703,9 @@ class Board(Window):
                                 piece = piece.of(piece.side or side).on(pos)
                             else:
                                 piece = piece(board=self, pos=move.pos_to, side=side)
-                            promoted_from = piece.promoted_from or ((mp := move.piece).promoted_from or type(mp))
+                            promoted_from = piece.promoted_from or move.piece.promoted_from
+                            if not move.piece.is_empty():
+                                promoted_from = promoted_from or type(move.piece)
                             if type(piece) != promoted_from:
                                 piece.promoted_from = promoted_from
                             move.set(promotion=piece)

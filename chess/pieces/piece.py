@@ -98,7 +98,9 @@ class Piece(Sprite):
                                                 board_pos=square,
                                                 side=self.side,
                                             )
-                                        promoted_from = piece.promoted_from or self.promoted_from or type(self)
+                                        promoted_from = piece.promoted_from or self.promoted_from
+                                        if not self.is_empty():
+                                            promoted_from = promoted_from or type(self)
                                         if type(piece) != promoted_from:
                                             piece.promoted_from = promoted_from
                                         copy_move = copy(move)

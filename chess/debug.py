@@ -453,7 +453,9 @@ def debug_info(board: Board) -> list[str]:
         turn_side, turn_rules = data
         turn_suffix = 'None' if turn_rules is None else f", {turn_rules}"
         debug_log_data.append(f"  {i + 1}: {turn_side or 'None'}{turn_suffix}")
-    possible_moves = sum((sum(v.values(), []) for v in board.moves.get(board.turn_side, {}).values()), [])
+    possible_moves = sum((
+        sum(v.values(), []) for k, v in board.moves.get(board.turn_side, {}).items() if not isinstance(k, str)
+    ), [])
     debug_log_data.append(f"Moves possible: {len(possible_moves)}")
     debug_log_data.append(f"Unique moves: {sum(len(i) for i in board.unique_moves()[board.turn_side].values())}")
     debug_log_data.append(f"Check side: {board.check_side if board.check_side else 'None'}")

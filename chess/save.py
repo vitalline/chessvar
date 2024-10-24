@@ -44,14 +44,15 @@ unpack = lambda l: l[0] if len(l) == 1 else l
 repack = lambda l: l if isinstance(l, list) else [l]
 
 
-def condense(data: AnyJson, alias_dict: dict, recursive: bool = False) -> AnyJson:
-    def make_tuple(thing: AnyJson) -> tuple | AnyJsonType:
-        if isinstance(thing, dict):
-            return tuple((k, make_tuple(thing[k])) for k in thing)
-        if isinstance(thing, list):
-            return tuple(make_tuple(x) for x in thing)
-        return thing
+def make_tuple(thing: AnyJson) -> tuple | AnyJsonType:
+    if isinstance(thing, dict):
+        return tuple((k, make_tuple(thing[k])) for k in thing)
+    if isinstance(thing, list):
+        return tuple(make_tuple(x) for x in thing)
+    return thing
 
+
+def condense(data: AnyJson, alias_dict: dict, recursive: bool = False) -> AnyJson:
     tuple_dict = {make_tuple(v): k for k, v in alias_dict.items()}
 
     def find_alias(thing: AnyJson, tuple_thing: tuple | AnyJsonType) -> AnyJson:
@@ -64,12 +65,10 @@ def condense(data: AnyJson, alias_dict: dict, recursive: bool = False) -> AnyJso
         return thing
 
     old_data = None
-
     while old_data != data:
         old_data, data = data, find_alias(data, make_tuple(data))
         if not recursive:
             break
-
     return data
 
 
@@ -90,20 +89,25 @@ def expand(data: AnyJson, alias_dict: dict, recursive: bool = False) -> AnyJson:
 
 
 def condense_algebraic(data: dict[Position, AnyJson], width: int, height: int) -> dict[str, AnyJson]:
-    mapping = tom(list(data), width, height)
+    data_groups = {}
+    for key, value in data.items():
+        data_groups.setdefault(make_tuple(value), set()).add(key)
     result = {}
-    for notation, poss in mapping.items():
-        if not poss:
-            continue
-        value = data[poss[0]]
-        for pos in poss[1:]:
-            if data[pos] != value:
-                for pos2 in poss:
-                    result[toa(pos2)] = data[pos2]
-                break
-        else:
-            result[notation] = value
-    return result
+    order = {}
+    for group in data_groups.values():
+        mapping = tom(list(group), width, height)
+        for notation, poss in mapping.items():
+            if not poss:
+                continue
+            value = data[poss[0]]
+            for pos in poss[1:]:
+                if data[pos] != value:
+                    for pos2 in poss:
+                        result[order.setdefault(pos2, toa(pos2))] = data[pos2]
+                    break
+            else:
+                result[order.setdefault(poss[0], notation)] = value
+    return {v: result[v] for _, v in sorted(order.items(), key=lambda x: x[0])}
 
 
 def expand_algebraic(data: dict[str, AnyJson], width: int, height: int) -> dict[Position, AnyJson]:
