@@ -380,6 +380,7 @@ def debug_info(board: Board) -> list[str]:
             debug_log_data.append(f"  Priority {order} ({len(order_rules)}):")
             states = [x for x in [0, 1, -1, 2, -2] if x in order_rules]
             for state in states:
+                state_rules = order_rules[state]
                 state_explanation = {
                     0: "Default",
                     1: "White is NOT in check",
@@ -387,37 +388,51 @@ def debug_info(board: Board) -> list[str]:
                     -1: "White is in check",
                     -2: "Black is in check"
                 }.get(state, "Unknown")
-                state_rules = order_rules[state]
                 if state_rules is None:
                     debug_log_data.append(f"    State {state} ({state_explanation}): Any")
                     continue
                 debug_log_data.append(f"    State {state} ({state_explanation}) ({len(state_rules)}):")
                 for last in sorted(state_rules):
+                    last_rules = state_rules[last]
+                    not_last = False
+                    if last and last[0] is False:
+                        not_last, last = last
+                    not_last = 'not ' if not_last else ''
                     last_string = (
                         "Any last move" if last == '*' else
-                        "Last move was untagged" if not last else
-                        f"Last move was {last.__name__}"
+                        f"Last move was {not_last}made earlier" if last is '' else
+                        f"Last move was {not_last}untagged" if last is None else
+                        f"Last move was {not_last}{last.__name__}"
                         if isinstance(last, type) and issubclass(last, BaseMovement) else
-                        f"Last move was \"{last}\""
+                        f"Last move was {not_last}{last}"
                     )
-                    last_rules = state_rules[last]
                     if last_rules is None:
                         debug_log_data.append(f"      {last_string}: Any")
                         continue
                     debug_log_data.append(f"      {last_string} ({len(last_rules)}):")
                     for piece in last_rules:
                         piece_rules = last_rules[piece]
+                        not_piece = False
+                        if piece and piece[0] is False:
+                            not_piece, piece = piece
+                        not_piece = 'Not ' if not_piece else ''
                         if piece_rules is None:
-                            debug_log_data.append(f"        {piece.name}: Any")
+                            debug_log_data.append(f"        {not_piece}{piece.name}: Any")
                             continue
-                        debug_log_data.append(f"        {piece.name} ({len(piece_rules)}):")
+                        debug_log_data.append(f"        {not_piece}{piece.name} ({len(piece_rules)}):")
                         for tag in piece_rules:
+                            tag_rules = piece_rules[tag]
+                            not_tag = False
+                            if tag and tag[0] is False:
+                                not_tag, tag = tag
+                            not_tag = 'Not ' if not_tag else ''
                             tag_string = (
                                 "Any" if tag == '*' else
-                                "Untagged" if not tag else
-                                f"{tag.__name__}" if isinstance(tag, type) and issubclass(tag, BaseMovement) else tag
+                                f"{not_tag}Untagged" if tag is None else
+                                f"{not_tag}{tag.__name__}"
+                                if isinstance(tag, type) and issubclass(tag, BaseMovement) else
+                                f"{not_tag}{tag}"
                             )
-                            tag_rules = piece_rules[tag]
                             if tag_rules is None:
                                 debug_log_data.append(f"          {tag_string}: Any")
                                 continue
