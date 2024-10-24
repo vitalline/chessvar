@@ -920,7 +920,7 @@ class BaseChoiceMovement(BaseMultiMovement):
         super().__init__(board, sum(movements.values(), []))
 
     def __copy_args__(self):
-        return self.board, {piece_type: deepcopy(movements) for piece_type, movements in self.movement_dict.items()}
+        return self.board, {key: deepcopy(movements) for key, movements in self.movement_dict.items()}
 
 
 class ChoiceMovement(BaseChoiceMovement):
