@@ -1415,12 +1415,12 @@ class Board(Window):
                     if lost_piece and lost_piece.side == turn_side and not royal_gain:
                         royal_loss = isinstance(lost_piece, Royal)
                         quasi_royal_loss = isinstance(lost_piece, QuasiRoyal)
-                        if self.royal_piece_mode == 0 and not royal_loss:
-                            royal_loss = quasi_royal_loss and not self.quasi_royal_pieces[turn_side]
-                        elif self.royal_piece_mode == 1:  # Force royal pieces
+                        if self.royal_piece_mode == 0 and not royal_loss and quasi_royal_loss:
                             royal_loss = not self.royal_pieces[turn_side] and not self.quasi_royal_pieces[turn_side]
-                        elif self.royal_piece_mode == 2:  # Force quasi-royal pieces
+                        elif self.royal_piece_mode == 1:  # Force royal pieces
                             royal_loss = royal_loss or quasi_royal_loss
+                        elif self.royal_piece_mode == 2:  # Force quasi-royal pieces
+                            royal_loss = not self.royal_pieces[turn_side] and not self.quasi_royal_pieces[turn_side]
                         if royal_loss:
                             break
                     chained_move = chained_move.chained_move
