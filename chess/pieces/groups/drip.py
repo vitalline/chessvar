@@ -1,4 +1,4 @@
-from chess.movement import movement
+from chess.movement import types
 from chess.movement.util import rot, symv
 from chess.pieces.piece import Piece
 
@@ -12,7 +12,7 @@ class Lobefin(Piece):
     def __init__(self, board, **kwargs):
         super().__init__(
             board,
-            movement.RiderMovement(board, rot([(2, 0, 1)]) + symv([(2, 2), (-1, 1)])),
+            types.RiderMovement(board, rot([(2, 0, 1)]) + symv([(2, 2), (-1, 1)])),
             **kwargs
         )
 
@@ -25,7 +25,7 @@ class CrabRdr(Piece):
     def __init__(self, board, **kwargs):
         super().__init__(
             board,
-            movement.RiderMovement(board, symv([(2, 1), (-1, 2)])),
+            types.RiderMovement(board, symv([(2, 1), (-1, 2)])),
             **kwargs
         )
 
@@ -38,7 +38,7 @@ class Sandbar(Piece):
     def __init__(self, board, **kwargs):
         super().__init__(
             board,
-            movement.RiderMovement(board, symv([(1, 2), (-2, 1)]) + rot([(1, 0, 1)]) + [(2, 0, 1)]),
+            types.RiderMovement(board, symv([(1, 2), (-2, 1)]) + rot([(1, 0, 1)]) + [(2, 0, 1)]),
             **kwargs
         )
 
@@ -51,6 +51,6 @@ class Oyster(Piece):
     def __init__(self, board, **kwargs):
         super().__init__(
             board,
-            movement.RiderMovement(board, symv([(2, 1), (2, 2), (-1, 1), (-1, 2)]) + rot([(1, 0, 1)]) + [(2, 0, 1)]),
+            types.RiderMovement(board, symv([(2, 1), (2, 2), (-1, 1), (-1, 2)]) + rot([(1, 0, 1)]) + [(2, 0, 1)]),
             **kwargs
         )

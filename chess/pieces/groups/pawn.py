@@ -1,4 +1,4 @@
-from chess.movement import movement
+from chess.movement import types
 from chess.movement.util import rot, symv
 from chess.pieces.piece import Piece
 
@@ -11,11 +11,11 @@ class Paladin(Piece):
     def __init__(self, board, **kwargs):
         super().__init__(
             board,
-            movement.MultiMovement(
+            types.MultiMovement(
                 board,
-                move_or_capture=[movement.RiderMovement(board, rot([(1, 2, 1), (2, 1, 1)]))],
-                move=[movement.RiderMovement(board, rot([(1, 0, 1)]))],
-                capture=[movement.RiderMovement(board, rot([(1, 1, 1)]))]
+                move_or_capture=[types.RiderMovement(board, rot([(1, 2, 1), (2, 1, 1)]))],
+                move=[types.RiderMovement(board, rot([(1, 0, 1)]))],
+                capture=[types.RiderMovement(board, rot([(1, 1, 1)]))]
             ),
             **kwargs
         )
@@ -29,11 +29,11 @@ class Guarddog(Piece):
     def __init__(self, board, **kwargs):
         super().__init__(
             board,
-            movement.MultiMovement(
+            types.MultiMovement(
                 board,
-                move_or_capture=[movement.RiderMovement(board, symv([(1, 2), (-2, 1)]))],
-                move=[movement.RiderMovement(board, [(1, 0)])],
-                capture=[movement.RiderMovement(board, symv([(1, 1)]))]
+                move_or_capture=[types.RiderMovement(board, symv([(1, 2), (-2, 1)]))],
+                move=[types.RiderMovement(board, [(1, 0)])],
+                capture=[types.RiderMovement(board, symv([(1, 1)]))]
             ),
             **kwargs
         )
@@ -47,10 +47,10 @@ class Stewardess(Piece):
     def __init__(self, board, **kwargs):
         super().__init__(
             board,
-            movement.MultiMovement(
+            types.MultiMovement(
                 board,
-                move=[movement.RiderMovement(board, rot([(1, 0)]))],
-                capture=[movement.RiderMovement(board, rot([(1, 1)]))]
+                move=[types.RiderMovement(board, rot([(1, 0)]))],
+                capture=[types.RiderMovement(board, rot([(1, 1)]))]
             ),
             **kwargs
         )
@@ -64,11 +64,11 @@ class Dowager(Piece):
     def __init__(self, board, **kwargs):
         super().__init__(
             board,
-            movement.MultiMovement(
+            types.MultiMovement(
                 board,
-                move_or_capture=[movement.RiderMovement(board, symv([(2, 1), (-1, 2)]))],
-                move=[movement.RiderMovement(board, rot([(1, 0)]))],
-                capture=[movement.RiderMovement(board, rot([(1, 1)]))]
+                move_or_capture=[types.RiderMovement(board, symv([(2, 1), (-1, 2)]))],
+                move=[types.RiderMovement(board, rot([(1, 0)]))],
+                capture=[types.RiderMovement(board, rot([(1, 1)]))]
             ),
             **kwargs
         )

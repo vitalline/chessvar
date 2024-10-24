@@ -1,4 +1,4 @@
-from chess.movement import movement
+from chess.movement import types
 from chess.movement.util import rot, sym, symh, symv
 from chess.pieces.piece import Piece
 
@@ -11,7 +11,7 @@ class Ogre(Piece):
     def __init__(self, board, **kwargs):
         super().__init__(
             board,
-            movement.RiderMovement(board, sym([(0, 1), (1, 0, 1), (2, 1, 1)])),
+            types.RiderMovement(board, sym([(0, 1), (1, 0, 1), (2, 1, 1)])),
             **kwargs
         )
 
@@ -24,15 +24,15 @@ class Sidesail(Piece):
     def __init__(self, board, **kwargs):
         super().__init__(
             board,
-            movement.MultiMovement(board, [
-                movement.BentMovement(board, [
-                    movement.RiderMovement(board, [(i or k, j or k, 1) for k in (1, -1)]),
-                    movement.RiderMovement(board, [(i, j)])
+            types.MultiMovement(board, [
+                types.BentMovement(board, [
+                    types.RiderMovement(board, [(i or k, j or k, 1) for k in (1, -1)]),
+                    types.RiderMovement(board, [(i, j)])
                 ]) for i, j in symv([(0, 1)])
             ] + [
-                movement.BentMovement(board, [
-                    movement.RiderMovement(board, [(i or k, j or k, 1) for k in (1, -1)]),
-                    movement.RiderMovement(board, [(i, j, 1)])
+                types.BentMovement(board, [
+                    types.RiderMovement(board, [(i or k, j or k, 1) for k in (1, -1)]),
+                    types.RiderMovement(board, [(i, j, 1)])
                 ]) for i, j in symh([(1, 0)])
             ]),
             **kwargs
@@ -48,10 +48,10 @@ class Sidewinder(Piece):
     def __init__(self, board, **kwargs):
         super().__init__(
             board,
-            movement.MultiMovement(board, [movement.RiderMovement(board, symh([(2, 0, 1)]))] + [
-                movement.RepeatMovement(board, [
-                    movement.RiderMovement(board, [(i, j, 1)]),
-                    movement.RiderMovement(board, [(-i, j, 1)])
+            types.MultiMovement(board, [types.RiderMovement(board, symh([(2, 0, 1)]))] + [
+                types.RepeatMovement(board, [
+                    types.RiderMovement(board, [(i, j, 1)]),
+                    types.RiderMovement(board, [(-i, j, 1)])
                 ]) for i, j in rot([(1, 1)])
             ]),
             **kwargs
@@ -66,6 +66,6 @@ class Ogress(Piece):
     def __init__(self, board, **kwargs):
         super().__init__(
             board,
-            movement.RiderMovement(board, sym([(0, 1), (1, 0, 1), (1, 1, 1), (1, 2, 1), (2, 1, 1)])),
+            types.RiderMovement(board, sym([(0, 1), (1, 0, 1), (1, 1, 1), (1, 2, 1), (2, 1, 1)])),
             **kwargs
         )

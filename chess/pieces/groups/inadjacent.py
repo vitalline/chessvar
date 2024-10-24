@@ -1,4 +1,4 @@
-from chess.movement import movement
+from chess.movement import types
 from chess.movement.util import rot
 from chess.pieces.piece import Piece
 
@@ -11,10 +11,10 @@ class Bireme(Piece):
     def __init__(self, board, **kwargs):
         super().__init__(
             board,
-            movement.MultiMovement(board, [
-                movement.BentMovement(board, [
-                    movement.RiderMovement(board, [(2 * i, 2 * j, 1)]),
-                    movement.RiderMovement(board, [(i, j)])
+            types.MultiMovement(board, [
+                types.BentMovement(board, [
+                    types.RiderMovement(board, [(2 * i, 2 * j, 1)]),
+                    types.RiderMovement(board, [(i, j)])
                 ]) for i, j in rot([(1, 0)])
             ]),
             **kwargs
@@ -34,13 +34,13 @@ class Tigon(Piece):
                 f = (i or k, j or k, 1)
                 for directions in [(w, w, f), (w, f, f), (f, w, w), (f, f, w)]:
                     movements.extend([
-                        movement.BentMovement(board, [
-                            movement.RiderMovement(board, [direction]) for direction in directions
+                        types.BentMovement(board, [
+                            types.RiderMovement(board, [direction]) for direction in directions
                         ], 2),
                     ])
         super().__init__(
             board,
-            movement.MultiMovement(board, movements),
+            types.MultiMovement(board, movements),
             **kwargs
         )
 
@@ -54,10 +54,10 @@ class Bicycle(Piece):
     def __init__(self, board, **kwargs):
         super().__init__(
             board,
-            movement.MultiMovement(board, [
-                movement.BentMovement(board, [
-                    movement.RiderMovement(board, [(2 * i, 2 * j, 1)]),
-                    movement.RiderMovement(board, [(i, j)])
+            types.MultiMovement(board, [
+                types.BentMovement(board, [
+                    types.RiderMovement(board, [(2 * i, 2 * j, 1)]),
+                    types.RiderMovement(board, [(i, j)])
                 ]) for i, j in rot([(1, 1)])
             ]),
             **kwargs
@@ -72,10 +72,10 @@ class Biplane(Piece):
     def __init__(self, board, **kwargs):
         super().__init__(
             board,
-            movement.MultiMovement(board, [
-                movement.BentMovement(board, [
-                    movement.RiderMovement(board, [(2 * i, 2 * j, 1)]),
-                    movement.RiderMovement(board, [(i, j)])
+            types.MultiMovement(board, [
+                types.BentMovement(board, [
+                    types.RiderMovement(board, [(2 * i, 2 * j, 1)]),
+                    types.RiderMovement(board, [(i, j)])
                 ]) for i, j in rot([(1, 0), (1, 1)])
             ]),
             **kwargs

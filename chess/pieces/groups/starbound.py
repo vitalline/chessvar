@@ -1,4 +1,4 @@
-from chess.movement import movement
+from chess.movement import types
 from chess.movement.util import rot, symv
 from chess.pieces.piece import Piece
 
@@ -11,7 +11,7 @@ class Star(Piece):
     def __init__(self, board, **kwargs):
         super().__init__(
             board,
-            movement.RiderMovement(board, symv([(1, 0), (0, 1), (-1, 1)])),
+            types.RiderMovement(board, symv([(1, 0), (0, 1), (-1, 1)])),
             **kwargs
         )
 
@@ -24,7 +24,7 @@ class Lancer(Piece):
     def __init__(self, board, **kwargs):
         super().__init__(
             board,
-            movement.RiderMovement(board, symv([(1, 0), (1, 1, 1), (0, 1, 1), (-1, 1, 1), (-1, 0, 1)])),
+            types.RiderMovement(board, symv([(1, 0), (1, 1, 1), (0, 1, 1), (-1, 1, 1), (-1, 0, 1)])),
             **kwargs
         )
 
@@ -37,17 +37,17 @@ class SineRdr(Piece):
     def __init__(self, board, **kwargs):
         super().__init__(
             board,
-            movement.MultiMovement(board, [movement.RiderMovement(board, symv([(0, 1), (-1, 1)]))] + [
-                movement.BentMovement(board, [
-                    movement.RiderMovement(board, symv([(1, 1, 1)])) for _ in range(2)
+            types.MultiMovement(board, [types.RiderMovement(board, symv([(0, 1), (-1, 1)]))] + [
+                types.BentMovement(board, [
+                    types.RiderMovement(board, symv([(1, 1, 1)])) for _ in range(2)
                 ])
             ] + [
-                movement.ChainMovement(board, [
-                    movement.MultiMovement(board, capture=[
-                        movement.RiderMovement(board, symv([(1, 1, 1)]))
+                types.ChainMovement(board, [
+                    types.MultiMovement(board, capture=[
+                        types.RiderMovement(board, symv([(1, 1, 1)]))
                     ]),
-                    movement.MultiMovement(board, move=[
-                        movement.RiderMovement(board, symv([(1, 1, 1)]) + [(0, 0)])
+                    types.MultiMovement(board, move=[
+                        types.RiderMovement(board, symv([(1, 1, 1)]) + [(0, 0)])
                     ])
                 ])
             ]),
@@ -63,18 +63,18 @@ class Turneagle(Piece):
     def __init__(self, board, **kwargs):
         super().__init__(
             board,
-            movement.MultiMovement(board, [movement.RiderMovement(board, rot([(1, 0)]))] + [
-                movement.BentMovement(board, [
-                    movement.RiderMovement(board, [(i, j, 1)]),
-                    movement.RiderMovement(board, [(k, l, 1) for k, l in rot([(1, 1)]) if (i, j) != (-k, -l)])
+            types.MultiMovement(board, [types.RiderMovement(board, rot([(1, 0)]))] + [
+                types.BentMovement(board, [
+                    types.RiderMovement(board, [(i, j, 1)]),
+                    types.RiderMovement(board, [(k, l, 1) for k, l in rot([(1, 1)]) if (i, j) != (-k, -l)])
                 ]) for i, j in rot([(1, 1)])
             ] + [
-                movement.ChainMovement(board, [
-                    movement.MultiMovement(board, capture=[
-                        movement.RiderMovement(board, [(i, j, 1)])
+                types.ChainMovement(board, [
+                    types.MultiMovement(board, capture=[
+                        types.RiderMovement(board, [(i, j, 1)])
                     ]),
-                    movement.MultiMovement(board, move_or_capture=[
-                        movement.RiderMovement(board, [
+                    types.MultiMovement(board, move_or_capture=[
+                        types.RiderMovement(board, [
                             (k, l, 1) for k, l in rot([(1, 1)]) + [(0, 0)] if (i, j) != (-k, -l)
                         ])
                     ])

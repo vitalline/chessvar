@@ -1,4 +1,4 @@
-from chess.movement import movement
+from chess.movement import types
 from chess.movement.util import rot, symv
 from chess.pieces.piece import Piece
 
@@ -11,9 +11,9 @@ class Hasdrubal(Piece):
     def __init__(self, board, **kwargs):
         super().__init__(
             board,
-            movement.MultiMovement(board, [
-                movement.RiderMovement(board, symv([(1, 2), (-2, 1)])),
-                movement.HalflingRiderMovement(board, rot([(1, 0)]))
+            types.MultiMovement(board, [
+                types.RiderMovement(board, symv([(1, 2), (-2, 1)])),
+                types.HalflingRiderMovement(board, rot([(1, 0)]))
             ]),
             **kwargs
         )
@@ -27,7 +27,7 @@ class Barcfil(Piece):
     def __init__(self, board, **kwargs):
         super().__init__(
             board,
-            movement.RiderMovement(board, symv([(1, 2, 1), (2, 2, 1), (-2, 1, 1), (-2, 2, 1)])),
+            types.RiderMovement(board, symv([(1, 2, 1), (2, 2, 1), (-2, 1, 1), (-2, 2, 1)])),
             **kwargs
         )
 
@@ -41,9 +41,9 @@ class Bed(Piece):
     def __init__(self, board, **kwargs):
         super().__init__(
             board,
-            movement.MultiMovement(board, [
-                movement.RiderMovement(board, rot([(2, 0, 1)])),
-                movement.HalflingRiderMovement(board, rot([(1, 1)]))
+            types.MultiMovement(board, [
+                types.RiderMovement(board, rot([(2, 0, 1)])),
+                types.HalflingRiderMovement(board, rot([(1, 1)]))
             ]),
             **kwargs
         )
@@ -57,9 +57,9 @@ class Hamilcar(Piece):
     def __init__(self, board, **kwargs):
         super().__init__(
             board,
-            movement.MultiMovement(board, [
-                movement.RiderMovement(board, symv([(1, 2), (-2, 1), (2, 1, 1), (-1, 2, 1)])),
-                movement.HalflingRiderMovement(board, rot([(1, 0), (1, 1)]))
+            types.MultiMovement(board, [
+                types.RiderMovement(board, symv([(1, 2), (-2, 1), (2, 1, 1), (-1, 2, 1)])),
+                types.HalflingRiderMovement(board, rot([(1, 0), (1, 1)]))
             ]),
             **kwargs
         )

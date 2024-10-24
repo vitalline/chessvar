@@ -1,4 +1,4 @@
-from chess.movement import movement
+from chess.movement import types
 from chess.movement.util import rot
 from chess.pieces.piece import Piece
 
@@ -11,10 +11,10 @@ class Panda(Piece):
     def __init__(self, board, **kwargs):
         super().__init__(
             board,
-            movement.MultiMovement(board, [
-                movement.BentMovement(board, [
-                    movement.RiderMovement(board, [(i, j, 1)]),
-                    movement.RiderMovement(board, [(2 * i, 2 * j)])
+            types.MultiMovement(board, [
+                types.BentMovement(board, [
+                    types.RiderMovement(board, [(i, j, 1)]),
+                    types.RiderMovement(board, [(2 * i, 2 * j)])
                 ]) for i, j in rot([(1, 0)])
             ]),
             **kwargs
@@ -29,7 +29,7 @@ class Marquis(Piece):
     def __init__(self, board, **kwargs):
         super().__init__(
             board,
-            movement.RiderMovement(board, rot([(1, 0, 1), (1, 2, 1), (2, 1, 1)])),
+            types.RiderMovement(board, rot([(1, 0, 1), (1, 2, 1), (2, 1, 1)])),
             **kwargs
         )
 
@@ -43,10 +43,10 @@ class Bear(Piece):
     def __init__(self, board, **kwargs):
         super().__init__(
             board,
-            movement.MultiMovement(board, [
-                movement.BentMovement(board, [
-                    movement.RiderMovement(board, [(i, j, 1)]),
-                    movement.RiderMovement(board, [(2 * i, 2 * j)])
+            types.MultiMovement(board, [
+                types.BentMovement(board, [
+                    types.RiderMovement(board, [(i, j, 1)]),
+                    types.RiderMovement(board, [(2 * i, 2 * j)])
                 ]) for i, j in rot([(1, 1)])
             ]),
             **kwargs
@@ -61,10 +61,10 @@ class Earl(Piece):
     def __init__(self, board, **kwargs):
         super().__init__(
             board,
-            movement.MultiMovement(board, [
-                movement.BentMovement(board, [
-                    movement.RiderMovement(board, [(i, j, 1)]),
-                    movement.RiderMovement(board, [(2 * i, 2 * j)])
+            types.MultiMovement(board, [
+                types.BentMovement(board, [
+                    types.RiderMovement(board, [(i, j, 1)]),
+                    types.RiderMovement(board, [(2 * i, 2 * j)])
                 ]) for i, j in rot([(1, 0), (1, 1)])
             ]),
             **kwargs

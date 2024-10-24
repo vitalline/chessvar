@@ -1,7 +1,7 @@
-from chess.movement import movement
+from chess.movement import types
 from chess.movement.util import rot, symv
 from chess.pieces.piece import Piece
-from chess.pieces.type import Royal
+from chess.pieces.types import Royal
 
 
 class Rook(Piece):
@@ -12,7 +12,7 @@ class Rook(Piece):
     def __init__(self, board, **kwargs):
         super().__init__(
             board,
-            movement.RiderMovement(board, rot([(1, 0)])),
+            types.RiderMovement(board, rot([(1, 0)])),
             **kwargs
         )
 
@@ -25,7 +25,7 @@ class Knight(Piece):
     def __init__(self, board, **kwargs):
         super().__init__(
             board,
-            movement.RiderMovement(board, rot([(1, 2, 1), (2, 1, 1)])),
+            types.RiderMovement(board, rot([(1, 2, 1), (2, 1, 1)])),
             **kwargs
         )
 
@@ -39,7 +39,7 @@ class Bishop(Piece):
     def __init__(self, board, **kwargs):
         super().__init__(
             board,
-            movement.RiderMovement(board, rot([(1, 1)])),
+            types.RiderMovement(board, rot([(1, 1)])),
             **kwargs
         )
 
@@ -52,7 +52,7 @@ class Queen(Piece):
     def __init__(self, board, **kwargs):
         super().__init__(
             board,
-            movement.RiderMovement(board, rot([(1, 0), (1, 1)])),
+            types.RiderMovement(board, rot([(1, 0), (1, 1)])),
             **kwargs
         )
 
@@ -65,14 +65,14 @@ class King(Piece, Royal):
     def __init__(self, board, **kwargs):
         super().__init__(
             board,
-            movement.MultiMovement(
+            types.MultiMovement(
                 board, [
-                    movement.RiderMovement(board, rot([(1, 0, 1), (1, 1, 1)])),
-                    movement.CastlingMovement(
+                    types.RiderMovement(board, rot([(1, 0, 1), (1, 1, 1)])),
+                    types.CastlingMovement(
                         board, (0, 2), (0, 3), (0, -2),
                         movement_gap=[(0, 1), (0, 2)], en_passant_gap=[(0, 0), (0, 1)]
                     ),
-                    movement.CastlingMovement(
+                    types.CastlingMovement(
                         board, (0, -2), (0, -4), (0, 3),
                         movement_gap=[(0, -1), (0, -2), (0, -3)], en_passant_gap=[(0, 0), (0, -1)],
                     )
@@ -90,19 +90,19 @@ class Pawn(Piece):
     def __init__(self, board, **kwargs):
         super().__init__(
             board,
-            movement.MultiMovement(
+            types.MultiMovement(
                 board,
                 move=[
-                    movement.IndexMovement(
+                    types.IndexMovement(
                         board,
                         [
-                            [movement.EnPassantTargetRiderMovement(board, [(1, 0, 2)])],
-                            [movement.RiderMovement(board, [(1, 0, 1)])],
+                            [types.EnPassantTargetRiderMovement(board, [(1, 0, 2)])],
+                            [types.RiderMovement(board, [(1, 0, 1)])],
                         ],
                     )
                 ],
                 capture=[
-                    movement.EnPassantRiderMovement(board, symv([(1, 1, 1)]))
+                    types.EnPassantRiderMovement(board, symv([(1, 1, 1)]))
                 ]
             ),
             **kwargs

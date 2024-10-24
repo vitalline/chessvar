@@ -6,7 +6,7 @@ from typing import TYPE_CHECKING
 
 from chess.movement.move import Move
 from chess.movement.util import AnyDirection, Direction, Position, add, sub, mul, ddiv
-from chess.pieces.type import Immune
+from chess.pieces.types import Immune
 from chess.util import Unset
 
 if TYPE_CHECKING:
@@ -318,8 +318,8 @@ class RangedCaptureRiderMovement(RangedMovement, RiderMovement):
         return super().stop_condition(move, direction, piece, theoretical)
 
 
-class RangedAutoCaptureRiderMovement(RiderMovement):
-    # Note: This implementation assumes that the pieces that utilize it cannot be blocked by another piece mid-movement.
+class AutoCaptureMovement(BaseMovement):
+    # Note: The auto-capture implementation assumes that none of the pieces that utilize it can be blocked mid-movement.
     # This is true for the only army that utilizes this movement type, but it may not work correctly in other scenarios.
     def generate_captures(self, move: Move, piece: Piece) -> Move:
         if not move.is_edit:
@@ -327,32 +327,32 @@ class RangedAutoCaptureRiderMovement(RiderMovement):
             for capture in super().moves(move.pos_to, piece):
                 captured_piece = self.board.get_piece(capture.pos_to)
                 if piece.captures(captured_piece):
-                    captures[capture.pos_to] = copy(capture)
-                    captures[capture.pos_to].set(piece=piece, pos_to=move.pos_to, captured_piece=captured_piece)
+                    captures[capture.pos_to] = copy(capture).set(
+                        piece=piece, pos_to=move.pos_to,
+                        captured_piece=captured_piece,
+                        movement_type=AutoCaptureMovement
+                    )
             last_chain_move = move
-            while last_chain_move.chained_move and not (issubclass(
-                move.chained_move.movement_type,
-                AutoRangedAutoCaptureRiderMovement
-            ) and move.chained_move.piece.side == piece.side):
+            while last_chain_move.chained_move:
                 last_chain_move = last_chain_move.chained_move
             for capture_pos_to in sorted(captures):
                 last_chain_move.chained_move = captures[capture_pos_to]
                 last_chain_move = last_chain_move.chained_move
         return move
 
+
+class RangedAutoCaptureRiderMovement(AutoCaptureMovement, RiderMovement):
     def moves(self, pos_from: Position, piece: Piece, theoretical: bool = False):
         for move in super().moves(pos_from, piece, theoretical):
             move.movement_type = RiderMovement
             yield move if theoretical else self.generate_captures(move, piece)
 
 
-class AutoRangedAutoCaptureRiderMovement(RangedAutoCaptureRiderMovement):
-    # Note: Same as RangedAutoCaptureRiderMovement, this assumes that pieces that use it cannot be blocked mid-movement.
+class AutoRangedAutoCaptureRiderMovement(RangedAutoCaptureRiderMovement, RiderMovement):
     def mark(self, pos: Position, piece: Piece):
         for move in self.moves(pos, piece, True):
             if move.pos_to not in self.board.auto_capture_markers[piece.side]:
                 self.board.auto_capture_markers[piece.side][move.pos_to] = set()
-            # noinspection PyTestUnpassedFixture
             self.board.auto_capture_markers[piece.side][move.pos_to].add(pos)
 
     def unmark(self, pos: Position, piece: Piece):
@@ -361,11 +361,6 @@ class AutoRangedAutoCaptureRiderMovement(RangedAutoCaptureRiderMovement):
                 self.board.auto_capture_markers[piece.side][move.pos_to].discard(pos)
                 if not self.board.auto_capture_markers[piece.side][move.pos_to]:
                     del self.board.auto_capture_markers[piece.side][move.pos_to]
-
-    def moves(self, pos_from: Position, piece: Piece, theoretical: bool = False):
-        for move in super().moves(pos_from, piece, theoretical):
-            move.movement_type = RiderMovement
-            yield move
 
     def update(self, move: Move, piece: Piece):
         self.unmark(move.pos_from, piece)

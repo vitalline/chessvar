@@ -4,16 +4,18 @@ from base64 import b64decode, b64encode
 from copy import copy
 from importlib import import_module
 from random import Random
+from traceback import print_exc
 from typing import TYPE_CHECKING, Any
+from warnings import warn
 
-from chess.movement import movement as movement_module
+from chess.movement import types as movement_types
 from chess.movement.move import Move
-from chess.movement.movement import BaseMovement
+from chess.movement.types import BaseMovement
 from chess.pieces.side import Side
 from chess.movement.util import Position
 from chess.movement.util import to_algebraic as toa, from_algebraic as fra
 from chess.movement.util import to_algebraic_map as tom, from_algebraic_map as frm
-from chess.pieces import type as type_module
+from chess.pieces import types as piece_types
 from chess.pieces.piece import Piece
 from chess.pieces.groups.util import NonMovingPiece, NoPiece
 from chess.util import Unset
@@ -29,8 +31,8 @@ CUSTOM_PREFIX = '_custom_'
 MOVEMENT_SUFFIXES = ('Movement', 'Rider')
 
 TYPE_CONFLICTS = {
-    type_module.Royal: {type_module.QuasiRoyal},
-    type_module.QuasiRoyal: {type_module.Royal},
+    piece_types.Royal: {piece_types.QuasiRoyal},
+    piece_types.QuasiRoyal: {piece_types.Royal},
 }
 
 
@@ -141,7 +143,7 @@ def save_movement_type(movement_type: type[BaseMovement] | frozenset | None) -> 
         return None
     if movement_type is Unset:
         return UNSET_STRING
-    if movement_type.__module__ == movement_module.__name__:
+    if movement_type.__module__ == movement_types.__name__:
         pass
     name = movement_type.__name__
     for suffix in MOVEMENT_SUFFIXES:
@@ -157,7 +159,7 @@ def load_movement_type(data: str | None) -> type[BaseMovement] | frozenset | Non
         return Unset
     for i in range(len(MOVEMENT_SUFFIXES) + 1):
         name = data + ''.join(MOVEMENT_SUFFIXES[:i][::-1])
-        movement_type = getattr(movement_module, name, None)
+        movement_type = getattr(movement_types, name, None)
         if movement_type:
             return movement_type
     return None
@@ -205,13 +207,13 @@ def load_piece(data: dict | str | None, board: Board, from_dict: dict | None) ->
 
 
 def save_custom_movement_type(movement: type[BaseMovement]) -> list[str]:
-    if movement.__module__ == movement_module.__name__:
+    if movement.__module__ == movement_types.__name__:
         return [save_movement_type(movement)]
     return [
         save_movement_type(base)
         for base in movement.__bases__
         if issubclass(base, BaseMovement)
-        and base.__module__ == movement_module.__name__
+           and base.__module__ == movement_types.__name__
     ]
 
 
@@ -284,7 +286,7 @@ def save_custom_type(piece: type[Piece] | Piece | None) -> dict | None:
     piece, piece_type = (piece, type(piece)) if isinstance(piece, Piece) else (None, piece)
     if not issubclass(piece_type, Piece):
         return None
-    bases = [base.__name__ for base in piece_type.__bases__ if base.__module__ == type_module.__name__]
+    bases = [base.__name__ for base in piece_type.__bases__ if base.__module__ == piece_types.__name__]
     if len(bases) == 1:
         bases = bases[0]
     return {k: v for k, v in {
@@ -306,7 +308,7 @@ def load_custom_type(data: dict | None, name: str) -> type[Piece] | None:
     base_set = set()
     bases = [Piece]
     for base_string in base_strings:
-        base = getattr(type_module, base_string, None)
+        base = getattr(piece_types, base_string, None)
         if base and base not in base_set and not base_set.intersection(TYPE_CONFLICTS.get(base, set())):
             base_set.add(base)
             bases.append(base)
@@ -401,14 +403,23 @@ def load_move(data: dict | str | None, board: Board, from_dict: dict | None) -> 
 
 def save_rng(rng: Random) -> list:
     state = rng.getstate()
-    data = bytearray(x for i in state[1][:-1] for x in i.to_bytes(4, signed=False, byteorder='big'))
-    return [state[0], b64encode(data).decode(), state[1][-1], state[2]]
+    # noinspection PyBroadException
+    try:  # compress the state of a version 3 random number generator using base64 encoding for the data
+        data = bytearray(x for i in state[1][:-1] for x in i.to_bytes(4, signed=False, byteorder='big'))
+        return [state[0], b64encode(data).decode(), state[1][-1], state[2]]
+    except Exception:  # but just in case something goes wrong, here is a fallback that returns the state as a list
+        warn('Failed to compress random number generator state. Falling back to uncompressed state.')
+        print_exc()
+        return [state[0], list(state[1]), state[2]]
 
 
 def load_rng(data: list) -> Random:
-    arr = b64decode(data[1])
-    tup = (*(int.from_bytes(arr[i:i + 4], signed=False, byteorder='big') for i in range(0, len(arr), 4)), data[2])
-    state = (data[0], tup, data[3])
+    if isinstance(data[1], str):
+        arr = b64decode(data[1])  # assuming compressed data, do the inverse of the save_rng function
+        tup = (*(int.from_bytes(arr[i:i + 4], signed=False, byteorder='big') for i in range(0, len(arr), 4)), data[2])
+        state = (data[0], tup, data[3])
+    else:  # assuming fallback, load the state as is
+        state = (data[0], tuple(data[1]), data[2])
     rng = Random()
     rng.setstate(state)
     return rng

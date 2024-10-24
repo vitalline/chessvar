@@ -1,4 +1,4 @@
-from chess.movement import movement
+from chess.movement import types
 from chess.movement.util import rot, symv
 from chess.pieces.piece import Piece
 
@@ -11,8 +11,8 @@ class LRhino(Piece):
     def __init__(self, board, **kwargs):
         super().__init__(
             board,
-            movement.SpinMovement(board, [
-                movement.RiderMovement(board, [(*ij, 1)])
+            types.SpinMovement(board, [
+                types.RiderMovement(board, [(*ij, 1)])
                 for ij in [(1, 0), (1, -1), (0, -1), (-1, -1), (-1, 0), (-1, 1), (0, 1), (1, 1)]
             ], step_count=2),
             **kwargs
@@ -27,8 +27,8 @@ class RRhino(Piece):
     def __init__(self, board, **kwargs):
         super().__init__(
             board,
-            movement.SpinMovement(board, [
-                movement.RiderMovement(board, [(*ij, 1)])
+            types.SpinMovement(board, [
+                types.RiderMovement(board, [(*ij, 1)])
                 for ij in [(1, 1), (0, 1), (-1, 1), (-1, 0), (-1, -1), (0, -1), (1, -1), (1, 0)]
             ], step_count=2),
             **kwargs
@@ -43,10 +43,10 @@ class Wyvern(Piece):
     def __init__(self, board, **kwargs):
         super().__init__(
             board,
-            movement.MultiMovement(board, [
-                movement.BentMovement(board, [
-                    movement.RiderMovement(board, [(i, j, 1)]),
-                    movement.HalflingRiderMovement(board, [(i or k, j or k) for k in (1, -1)], 1)
+            types.MultiMovement(board, [
+                types.BentMovement(board, [
+                    types.RiderMovement(board, [(i, j, 1)]),
+                    types.HalflingRiderMovement(board, [(i or k, j or k) for k in (1, -1)], 1)
                 ]) for i, j in rot([(1, 0)])
             ]),
             **kwargs
@@ -61,9 +61,9 @@ class Crabinal(Piece):
     def __init__(self, board, **kwargs):
         super().__init__(
             board,
-            movement.MultiMovement(board, [
-                movement.RiderMovement(board, symv([(2, 1, 1), (-1, 2, 1)])),
-                movement.HalflingRiderMovement(board, rot([(1, 1)]))
+            types.MultiMovement(board, [
+                types.RiderMovement(board, symv([(2, 1, 1), (-1, 2, 1)])),
+                types.HalflingRiderMovement(board, rot([(1, 1)]))
             ]),
             **kwargs
         )
@@ -77,10 +77,10 @@ class EagleScout(Piece):
     def __init__(self, board, **kwargs):
         super().__init__(
             board,
-            movement.MultiMovement(board, [movement.RiderMovement(board, rot([(1, 0, 1)]))] + [
-                movement.RepeatMovement(board, [
-                    movement.RiderMovement(board, [(i, j, 1), (-i, -j, 1)]),
-                    movement.RiderMovement(board, [(i, -j, 1), (-i, j, 1)]),
+            types.MultiMovement(board, [types.RiderMovement(board, rot([(1, 0, 1)]))] + [
+                types.RepeatMovement(board, [
+                    types.RiderMovement(board, [(i, j, 1), (-i, -j, 1)]),
+                    types.RiderMovement(board, [(i, -j, 1), (-i, j, 1)]),
                 ]) for i, j in symv([(1, 1)])
             ]),
             **kwargs

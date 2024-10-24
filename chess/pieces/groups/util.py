@@ -1,6 +1,6 @@
 from chess.pieces.piece import Piece
 from chess.pieces.side import Side
-from chess.pieces.type import Immune
+from chess.pieces.types import Immune
 
 
 class NonMovingPiece(Piece):

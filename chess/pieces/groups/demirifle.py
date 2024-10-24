@@ -1,4 +1,4 @@
-from chess.movement import movement
+from chess.movement import types
 from chess.movement.util import rot, symv
 from chess.pieces.piece import Piece
 
@@ -11,7 +11,7 @@ class Snail(Piece):
     def __init__(self, board, **kwargs):
         super().__init__(
             board,
-            movement.AutoRangedAutoCaptureRiderMovement(board, rot([(1, 0, 1)]) + [(2, 0, 1)]),
+            types.AutoRangedAutoCaptureRiderMovement(board, rot([(1, 0, 1)]) + [(2, 0, 1)]),
             **kwargs
         )
 
@@ -24,7 +24,7 @@ class Crab(Piece):
     def __init__(self, board, **kwargs):
         super().__init__(
             board,
-            movement.AutoRangedAutoCaptureRiderMovement(board, symv([(2, 1, 1), (-1, 2, 1)])),
+            types.AutoRangedAutoCaptureRiderMovement(board, symv([(2, 1, 1), (-1, 2, 1)])),
             **kwargs
         )
 
@@ -38,7 +38,7 @@ class Lobster(Piece):
     def __init__(self, board, **kwargs):
         super().__init__(
             board,
-            movement.AutoRangedAutoCaptureRiderMovement(board, symv([(2, 2, 1), (-1, 1, 1)])),
+            types.AutoRangedAutoCaptureRiderMovement(board, symv([(2, 2, 1), (-1, 1, 1)])),
             **kwargs
         )
 
@@ -51,7 +51,7 @@ class Crabsnail(Piece):
     def __init__(self, board, **kwargs):
         super().__init__(
             board,
-            movement.AutoRangedAutoCaptureRiderMovement(
+            types.AutoRangedAutoCaptureRiderMovement(
                 board, symv([(2, 0, 1), (2, 1, 1), (-1, 2, 1)]) + rot([(1, 0, 1)])
             ),
             **kwargs

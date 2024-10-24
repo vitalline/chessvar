@@ -1,4 +1,4 @@
-from chess.movement import movement
+from chess.movement import types
 from chess.movement.util import rot
 from chess.pieces.piece import Piece
 
@@ -11,9 +11,9 @@ class Veteran(Piece):
     def __init__(self, board, **kwargs):
         super().__init__(
             board,
-            movement.ProbabilisticMovement(board, [
-                movement.RiderMovement(board, rot([(1, 0)])),
-                movement.RiderMovement(board, rot([(1, 0, 1), (1, 1, 1), (2, 0, 1), (2, 2, 1)]))
+            types.ProbabilisticMovement(board, [
+                types.RiderMovement(board, rot([(1, 0)])),
+                types.RiderMovement(board, rot([(1, 0, 1), (1, 1, 1), (2, 0, 1), (2, 2, 1)]))
             ]),
             **kwargs
         )
@@ -27,14 +27,14 @@ class RedPanda(Piece):
     def __init__(self, board, **kwargs):
         super().__init__(
             board,
-            movement.ProbabilisticMovement(board, [
-                movement.MultiMovement(board, [
-                    movement.BentMovement(board, [
-                        movement.RiderMovement(board, [(i, j, 1)]),
-                        movement.RiderMovement(board, [(2 * i, 2 * j)])
+            types.ProbabilisticMovement(board, [
+                types.MultiMovement(board, [
+                    types.BentMovement(board, [
+                        types.RiderMovement(board, [(i, j, 1)]),
+                        types.RiderMovement(board, [(2 * i, 2 * j)])
                     ]) for i, j in rot([(1, 0)])
                 ]),
-                movement.RiderMovement(board, rot([(1, 2, 1), (2, 1, 1)]))
+                types.RiderMovement(board, rot([(1, 2, 1), (2, 1, 1)]))
             ]),
             **kwargs
         )
@@ -49,9 +49,9 @@ class Tempofad(Piece):
     def __init__(self, board, **kwargs):
         super().__init__(
             board,
-            movement.ProbabilisticMovement(board, [
-                movement.RiderMovement(board, rot([(1, 1)])),
-                movement.RiderMovement(board, rot([(1, 1, 1), (2, 0, 1), (2, 2, 1)]))
+            types.ProbabilisticMovement(board, [
+                types.RiderMovement(board, rot([(1, 1)])),
+                types.RiderMovement(board, rot([(1, 1, 1), (2, 0, 1), (2, 2, 1)]))
             ]),
             **kwargs
         )
@@ -65,9 +65,9 @@ class WaterBuffalo(Piece):
     def __init__(self, board, **kwargs):
         super().__init__(
             board,
-            movement.ProbabilisticMovement(board, [
-                movement.RiderMovement(board, rot([(1, 0), (1, 1)])),
-                movement.RiderMovement(board, rot([(1, 2, 1), (1, 3, 1), (2, 1, 1), (2, 3, 1), (3, 1, 1), (3, 2, 1)]))
+            types.ProbabilisticMovement(board, [
+                types.RiderMovement(board, rot([(1, 0), (1, 1)])),
+                types.RiderMovement(board, rot([(1, 2, 1), (1, 3, 1), (2, 1, 1), (2, 3, 1), (3, 1, 1), (3, 2, 1)]))
             ]),
             **kwargs
         )

@@ -1,7 +1,7 @@
-from chess.movement import movement
+from chess.movement import types
 from chess.movement.util import rot
 from chess.pieces.piece import Piece
-from chess.pieces.type import Royal
+from chess.pieces.types import Royal
 
 
 class Bede(Piece):
@@ -13,7 +13,7 @@ class Bede(Piece):
     def __init__(self, board, **kwargs):
         super().__init__(
             board,
-            movement.RiderMovement(board, rot([(1, 1), (2, 0, 1)])),
+            types.RiderMovement(board, rot([(1, 1), (2, 0, 1)])),
             **kwargs
         )
 
@@ -26,7 +26,7 @@ class Waffle(Piece):
     def __init__(self, board, **kwargs):
         super().__init__(
             board,
-            movement.RiderMovement(board, rot([(1, 0, 1), (2, 2, 1)])),
+            types.RiderMovement(board, rot([(1, 0, 1), (2, 2, 1)])),
             **kwargs
         )
 
@@ -40,7 +40,7 @@ class Fad(Piece):
     def __init__(self, board, **kwargs):
         super().__init__(
             board,
-            movement.RiderMovement(board, rot([(1, 1, 1), (2, 0, 1), (2, 2, 1)])),
+            types.RiderMovement(board, rot([(1, 1, 1), (2, 0, 1), (2, 2, 1)])),
             **kwargs
         )
 
@@ -53,7 +53,7 @@ class Archbishop(Piece):
     def __init__(self, board, **kwargs):
         super().__init__(
             board,
-            movement.RiderMovement(board, rot([(1, 1), (1, 2, 1), (2, 1, 1)])),
+            types.RiderMovement(board, rot([(1, 1), (1, 2, 1), (2, 1, 1)])),
             **kwargs
         )
 
@@ -69,14 +69,14 @@ class King(Piece, Royal):
     def __init__(self, board, **kwargs):
         super().__init__(
             board,
-            movement.MultiMovement(
+            types.MultiMovement(
                 board, [
-                    movement.RiderMovement(board, rot([(1, 0, 1), (1, 1, 1)])),
-                    movement.CastlingMovement(
+                    types.RiderMovement(board, rot([(1, 0, 1), (1, 1, 1)])),
+                    types.CastlingMovement(
                         board, (0, 2), (0, 3), (0, -2),
                         movement_gap=[(0, 1), (0, 2)], en_passant_gap=[(0, 0), (0, 1)]
                     ),
-                    movement.CastlingMovement(
+                    types.CastlingMovement(
                         board, (0, -3), (0, -4), (0, 2),
                         movement_gap=[(0, -1), (0, -2), (0, -3)], en_passant_gap=[(0, 0), (0, -1), (0, -2)]
                     )

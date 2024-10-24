@@ -1,4 +1,4 @@
-from chess.movement import movement
+from chess.movement import types
 from chess.movement.util import rot, symv
 from chess.pieces.piece import Piece
 
@@ -12,20 +12,20 @@ class LionCub(Piece):
         movements = []
         for i, j in rot([(1, 0)]):
             movements.append(
-                movement.BentMovement(board, [
-                    movement.RiderMovement(board, [(i, j, 1)]),
-                    movement.RiderMovement(board, [
+                types.BentMovement(board, [
+                    types.RiderMovement(board, [(i, j, 1)]),
+                    types.RiderMovement(board, [
                         (k, l, 1) for k, l in rot([(1, 0)]) if (i, j) != (-k, -l)
                     ])
                 ])
             )
             movements.append(
-                movement.ChainMovement(board, [
-                    movement.MultiMovement(board, capture=[
-                        movement.RiderMovement(board, [(i, j, 1)])
+                types.ChainMovement(board, [
+                    types.MultiMovement(board, capture=[
+                        types.RiderMovement(board, [(i, j, 1)])
                     ]),
-                    movement.MultiMovement(board, move=[
-                        movement.RiderMovement(board, [
+                    types.MultiMovement(board, move=[
+                        types.RiderMovement(board, [
                             (k, l, 1) for k, l in rot([(1, 0)]) + [(0, 0)] if (i, j) != (-k, -l)
                         ])
                     ])
@@ -33,7 +33,7 @@ class LionCub(Piece):
             )
         super().__init__(
             board,
-            movement.MultiMovement(board, movements),
+            types.MultiMovement(board, movements),
             **kwargs
         )
 
@@ -46,10 +46,10 @@ class Rhino(Piece):
     def __init__(self, board, **kwargs):
         super().__init__(
             board,
-            movement.MultiMovement(board, [
-                movement.BentMovement(board, [
-                    movement.RiderMovement(board, [(i, j, 1)]),
-                    movement.RiderMovement(board, [(i or k, j or k, 1) for k in (1, -1)])
+            types.MultiMovement(board, [
+                types.BentMovement(board, [
+                    types.RiderMovement(board, [(i, j, 1)]),
+                    types.RiderMovement(board, [(i or k, j or k, 1) for k in (1, -1)])
                 ]) for i, j in rot([(1, 0)])
             ]),
             **kwargs
@@ -65,10 +65,10 @@ class Boyscout(Piece):
     def __init__(self, board, **kwargs):
         super().__init__(
             board,
-            movement.MultiMovement(board, [
-                movement.RepeatMovement(board, [
-                    movement.RiderMovement(board, [(i, j, 1), (-i, -j, 1)]),
-                    movement.RiderMovement(board, [(i, -j, 1), (-i, j, 1)]),
+            types.MultiMovement(board, [
+                types.RepeatMovement(board, [
+                    types.RiderMovement(board, [(i, j, 1), (-i, -j, 1)]),
+                    types.RiderMovement(board, [(i, -j, 1), (-i, j, 1)]),
                 ]) for i, j in symv([(1, 1)])
             ]),
             **kwargs
@@ -83,10 +83,10 @@ class Griffon(Piece):
     def __init__(self, board, **kwargs):
         super().__init__(
             board,
-            movement.MultiMovement(board, [
-                movement.BentMovement(board, [
-                    movement.RiderMovement(board, [(i, j, 1)]),
-                    movement.RiderMovement(board, [(i, 0), (0, j)])
+            types.MultiMovement(board, [
+                types.BentMovement(board, [
+                    types.RiderMovement(board, [(i, j, 1)]),
+                    types.RiderMovement(board, [(i, 0), (0, j)])
                 ]) for i, j in rot([(1, 1)])
             ]),
             **kwargs

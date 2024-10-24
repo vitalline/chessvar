@@ -1,4 +1,4 @@
-from chess.movement import movement
+from chess.movement import types
 from chess.movement.util import rot
 from chess.pieces.piece import Piece
 
@@ -11,10 +11,10 @@ class MachineRdr(Piece):
     def __init__(self, board, **kwargs):
         super().__init__(
             board,
-            movement.MultiMovement(board, [movement.RiderMovement(board, rot([(2, 0, 2)]))] + [
-                movement.BentMovement(board, [
-                    movement.RiderMovement(board, [(k * i, k * j, 1)]),
-                    movement.RiderMovement(board, [(l * i, l * j, 1)])
+            types.MultiMovement(board, [types.RiderMovement(board, rot([(2, 0, 2)]))] + [
+                types.BentMovement(board, [
+                    types.RiderMovement(board, [(k * i, k * j, 1)]),
+                    types.RiderMovement(board, [(l * i, l * j, 1)])
                 ]) for i, j in rot([(1, 0)]) for k, l in [(1, 2), (2, 1)]
             ]),
             **kwargs
@@ -29,7 +29,7 @@ class Allnight(Piece):
     def __init__(self, board, **kwargs):
         super().__init__(
             board,
-            movement.RiderMovement(board, rot([(1, 2, 1), (2, 1, 1), (2, 2, 1)])),
+            types.RiderMovement(board, rot([(1, 2, 1), (2, 1, 1), (2, 2, 1)])),
             **kwargs
         )
 
@@ -43,10 +43,10 @@ class Tusker(Piece):
     def __init__(self, board, **kwargs):
         super().__init__(
             board,
-            movement.MultiMovement(board, [movement.RiderMovement(board, rot([(2, 2, 2)]))] + [
-                movement.BentMovement(board, [
-                    movement.RiderMovement(board, [(k * i, k * j, 1)]),
-                    movement.RiderMovement(board, [(l * -i, l * j, 1), (l * i, l * -j, 1)])
+            types.MultiMovement(board, [types.RiderMovement(board, rot([(2, 2, 2)]))] + [
+                types.BentMovement(board, [
+                    types.RiderMovement(board, [(k * i, k * j, 1)]),
+                    types.RiderMovement(board, [(l * -i, l * j, 1), (l * i, l * -j, 1)])
                 ]) for i, j in rot([(1, 1)]) for k, l in [(1, 2), (2, 1)]
             ]),
             **kwargs
@@ -61,10 +61,10 @@ class Hierophant(Piece):
     def __init__(self, board, **kwargs):
         super().__init__(
             board,
-            movement.MultiMovement(board, [movement.RiderMovement(board, rot([(2, 0, 2), (2, 2, 2)]))] + [
-                movement.BentMovement(board, [
-                    movement.RiderMovement(board, [(k * i, k * j, 1)]),
-                    movement.RiderMovement(board, [(l * i, l * j, 1)])
+            types.MultiMovement(board, [types.RiderMovement(board, rot([(2, 0, 2), (2, 2, 2)]))] + [
+                types.BentMovement(board, [
+                    types.RiderMovement(board, [(k * i, k * j, 1)]),
+                    types.RiderMovement(board, [(l * i, l * j, 1)])
                 ]) for i, j in rot([(1, 0), (1, 1)]) for k, l in [(1, 2), (2, 1)]
             ]),
             **kwargs

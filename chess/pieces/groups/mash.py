@@ -1,4 +1,4 @@
-from chess.movement import movement
+from chess.movement import types
 from chess.movement.util import rot
 from chess.pieces.piece import Piece
 
@@ -11,7 +11,7 @@ class Forfer(Piece):
     def __init__(self, board, **kwargs):
         super().__init__(
             board,
-            movement.RiderMovement(board, rot([(1, 1, 1), (1, 0, 4)])),
+            types.RiderMovement(board, rot([(1, 1, 1), (1, 0, 4)])),
             **kwargs
         )
 
@@ -24,7 +24,7 @@ class Scout(Piece):
     def __init__(self, board, **kwargs):
         super().__init__(
             board,
-            movement.RiderMovement(board, rot([(1, 0, 1), (3, 0, 1)])),
+            types.RiderMovement(board, rot([(1, 0, 1), (3, 0, 1)])),
             **kwargs
         )
 
@@ -38,7 +38,7 @@ class Bandit(Piece):
     def __init__(self, board, **kwargs):
         super().__init__(
             board,
-            movement.RiderMovement(board, rot([(1, 1, 4), (1, 0, 2, 2)])),
+            types.RiderMovement(board, rot([(1, 1, 4), (1, 0, 2, 2)])),
             **kwargs
         )
 
@@ -51,6 +51,6 @@ class Rancher(Piece):
     def __init__(self, board, **kwargs):
         super().__init__(
             board,
-            movement.RiderMovement(board, rot([(1, 0, 4), (1, 2, 2), (2, 1, 2)])),
+            types.RiderMovement(board, rot([(1, 0, 4), (1, 2, 2), (2, 1, 2)])),
             **kwargs
         )

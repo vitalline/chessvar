@@ -1,4 +1,4 @@
-from chess.movement import movement
+from chess.movement import types
 from chess.movement.util import rot
 from chess.pieces.piece import Piece
 
@@ -11,7 +11,7 @@ class Caecilian(Piece):
     def __init__(self, board, **kwargs):
         super().__init__(
             board,
-            movement.RiderMovement(board, rot([(2, 2, 1), (3, 0, 1)])),
+            types.RiderMovement(board, rot([(2, 2, 1), (3, 0, 1)])),
             **kwargs
         )
 
@@ -24,7 +24,7 @@ class Brick(Piece):
     def __init__(self, board, **kwargs):
         super().__init__(
             board,
-            movement.RiderMovement(board, rot([(1, 0, 1), (2, 0, 1), (3, 3, 1)])),
+            types.RiderMovement(board, rot([(1, 0, 1), (2, 0, 1), (3, 3, 1)])),
             **kwargs
         )
 
@@ -38,20 +38,20 @@ class Stele(Piece):
     def __init__(self, board, **kwargs):
         super().__init__(
             board,
-            movement.MultiMovement(board, [
-                movement.BentMovement(board, [
-                    movement.RiderMovement(board, [(i, j, 1)]),
-                    movement.RiderMovement(board, [
+            types.MultiMovement(board, [
+                types.BentMovement(board, [
+                    types.RiderMovement(board, [(i, j, 1)]),
+                    types.RiderMovement(board, [
                         (k, l, 1) for k, l in rot([(1, 1)]) if (i, j) != (-k, -l)
                     ])
                 ]) for i, j in rot([(1, 1)])
             ] + [
-                movement.ChainMovement(board, [
-                    movement.MultiMovement(board, capture=[
-                        movement.RiderMovement(board, [(i, j, 1)])
+                types.ChainMovement(board, [
+                    types.MultiMovement(board, capture=[
+                        types.RiderMovement(board, [(i, j, 1)])
                     ]),
-                    movement.MultiMovement(board, move_or_capture=[
-                        movement.RiderMovement(board, [
+                    types.MultiMovement(board, move_or_capture=[
+                        types.RiderMovement(board, [
                             (k, l, 1) for k, l in rot([(1, 1)]) + [(0, 0)] if (i, j) != (-k, -l)
                         ])
                     ])
@@ -69,20 +69,20 @@ class Caryatid(Piece):
     def __init__(self, board, **kwargs):
         super().__init__(
             board,
-            movement.MultiMovement(board, [
-                movement.BentMovement(board, [
-                    movement.RiderMovement(board, [(i, j, 1)]),
-                    movement.RiderMovement(board, [
+            types.MultiMovement(board, [
+                types.BentMovement(board, [
+                    types.RiderMovement(board, [(i, j, 1)]),
+                    types.RiderMovement(board, [
                         (k, l, 1) for k, l in rot([(1, 0)]) if (i, j) != (-k, -l)
                     ])
                 ]) for i, j in rot([(1, 0)])
             ] + [
-                movement.ChainMovement(board, [
-                    movement.MultiMovement(board, capture=[
-                        movement.RiderMovement(board, [(i, j, 1)])
+                types.ChainMovement(board, [
+                    types.MultiMovement(board, capture=[
+                        types.RiderMovement(board, [(i, j, 1)])
                     ]),
-                    movement.MultiMovement(board, move_or_capture=[
-                        movement.RiderMovement(board, [
+                    types.MultiMovement(board, move_or_capture=[
+                        types.RiderMovement(board, [
                             (k, l, 1) for k, l in rot([(1, 0)]) + [(0, 0)] if (i, j) != (-k, -l)
                         ])
                     ])

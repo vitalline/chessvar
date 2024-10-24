@@ -1,4 +1,4 @@
-from chess.movement import movement
+from chess.movement import types
 from chess.movement.util import rot
 from chess.pieces.piece import Piece
 
@@ -10,9 +10,9 @@ class Belwaffle(Piece):
     def __init__(self, board, **kwargs):
         super().__init__(
             board,
-            movement.MultiMovement(board, [
-                movement.RiderMovement(board, rot([(1, 0, 1), (2, 2, 1)])),
-                movement.CannonRiderMovement(board, rot([(1, 0)]))
+            types.MultiMovement(board, [
+                types.RiderMovement(board, rot([(1, 0, 1), (2, 2, 1)])),
+                types.CannonRiderMovement(board, rot([(1, 0)]))
             ]),
             **kwargs
         )
@@ -26,9 +26,9 @@ class Pancake(Piece):
     def __init__(self, board, **kwargs):
         super().__init__(
             board,
-            movement.MultiMovement(board, [
-                movement.RiderMovement(board, rot([(1, 0, 1), (1, 1, 1)])),
-                movement.CannonRiderMovement(board, rot([(1, 2), (2, 1)]))
+            types.MultiMovement(board, [
+                types.RiderMovement(board, rot([(1, 0, 1), (1, 1, 1)])),
+                types.CannonRiderMovement(board, rot([(1, 2), (2, 1)]))
             ]),
             **kwargs
         )
@@ -43,9 +43,9 @@ class Bacon(Piece):
     def __init__(self, board, **kwargs):
         super().__init__(
             board,
-            movement.MultiMovement(board, [
-                movement.RiderMovement(board, rot([(1, 1, 1), (2, 0, 1)])),
-                movement.CannonRiderMovement(board, rot([(1, 1)]))
+            types.MultiMovement(board, [
+                types.RiderMovement(board, rot([(1, 1, 1), (2, 0, 1)])),
+                types.CannonRiderMovement(board, rot([(1, 1)]))
             ]),
             **kwargs
         )
@@ -59,9 +59,9 @@ class Omelet(Piece):
     def __init__(self, board, **kwargs):
         super().__init__(
             board,
-            movement.MultiMovement(board, [
-                movement.RiderMovement(board, rot([(1, 0, 1), (1, 1, 1)])),
-                movement.CannonRiderMovement(board, rot([(1, 0), (1, 1)]))
+            types.MultiMovement(board, [
+                types.RiderMovement(board, rot([(1, 0, 1), (1, 1, 1)])),
+                types.CannonRiderMovement(board, rot([(1, 0), (1, 1)]))
             ]),
             **kwargs
         )

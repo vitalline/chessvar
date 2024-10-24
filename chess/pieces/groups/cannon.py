@@ -1,4 +1,4 @@
-from chess.movement import movement
+from chess.movement import types
 from chess.movement.util import rot, sym
 from chess.pieces.piece import Piece
 
@@ -11,13 +11,13 @@ class Howitzer(Piece):
     def __init__(self, board, **kwargs):
         super().__init__(
             board,
-            movement.MultiMovement(
+            types.MultiMovement(
                 board,
                 move_or_capture=[
-                    movement.RiderMovement(board, rot([(1, 0, 1)])),
-                    movement.SpaciousRiderMovement(board, rot([(1, 0)]))
+                    types.RiderMovement(board, rot([(1, 0, 1)])),
+                    types.SpaciousRiderMovement(board, rot([(1, 0)]))
                 ], move=[
-                    movement.CannonRiderMovement(board, rot([(1, 0)]))
+                    types.CannonRiderMovement(board, rot([(1, 0)]))
                 ]
             ),
             **kwargs
@@ -32,14 +32,14 @@ class Mortar(Piece):
     def __init__(self, board, **kwargs):
         super().__init__(
             board,
-            movement.MultiMovement(
+            types.MultiMovement(
                 board,
                 move_or_capture=[
-                    movement.RiderMovement(board, rot([(1, 0, 1)])),
-                    movement.SpaciousRiderMovement(board, rot([(1, 0)]))
+                    types.RiderMovement(board, rot([(1, 0, 1)])),
+                    types.SpaciousRiderMovement(board, rot([(1, 0)]))
                 ],
                 capture=[
-                    movement.CannonRiderMovement(board, rot([(1, 0)]))
+                    types.CannonRiderMovement(board, rot([(1, 0)]))
                 ]
             ),
             **kwargs
@@ -54,7 +54,7 @@ class Napoleon(Piece):
     def __init__(self, board, **kwargs):
         super().__init__(
             board,
-            movement.RiderMovement(board, rot([(1, 0, 1)]) + sym([(2, 1, 1)])),
+            types.RiderMovement(board, rot([(1, 0, 1)]) + sym([(2, 1, 1)])),
             **kwargs
         )
 
@@ -68,10 +68,10 @@ class Carronade(Piece):
     def __init__(self, board, **kwargs):
         super().__init__(
             board,
-            movement.MultiMovement(board, [
-                # movement.RiderMovement(board, rot([(1, 1, 1)])),
-                movement.SpaciousRiderMovement(board, rot([(1, 1)])),
-                movement.CannonRiderMovement(board, rot([(1, 1)]))
+            types.MultiMovement(board, [
+                # types.RiderMovement(board, rot([(1, 1, 1)])),
+                types.SpaciousRiderMovement(board, rot([(1, 1)])),
+                types.CannonRiderMovement(board, rot([(1, 1)]))
             ]),
             **kwargs
         )
@@ -85,13 +85,13 @@ class Bertha(Piece):
     def __init__(self, board, **kwargs):
         super().__init__(
             board,
-            movement.MultiMovement(board, [
-                movement.RiderMovement(board, rot([(1, 0, 1)])),
-                # movement.RiderMovement(board, rot([(1, 1, 1)])),
-                movement.SpaciousRiderMovement(board, rot([(1, 0)])),
-                movement.SpaciousRiderMovement(board, rot([(1, 1)])),
-                movement.CannonRiderMovement(board, rot([(1, 0)])),
-                movement.CannonRiderMovement(board, rot([(1, 1)]))
+            types.MultiMovement(board, [
+                types.RiderMovement(board, rot([(1, 0, 1)])),
+                # types.RiderMovement(board, rot([(1, 1, 1)])),
+                types.SpaciousRiderMovement(board, rot([(1, 0)])),
+                types.SpaciousRiderMovement(board, rot([(1, 1)])),
+                types.CannonRiderMovement(board, rot([(1, 0)])),
+                types.CannonRiderMovement(board, rot([(1, 1)]))
             ]),
             **kwargs
         )

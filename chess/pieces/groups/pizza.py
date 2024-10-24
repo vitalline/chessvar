@@ -1,4 +1,4 @@
-from chess.movement import movement
+from chess.movement import types
 from chess.movement.util import rot, sym, symv
 from chess.pieces.piece import Piece
 
@@ -11,7 +11,7 @@ class Pepperoni(Piece):
     def __init__(self, board, **kwargs):
         super().__init__(
             board,
-            movement.RiderMovement(board, symv([(2, 2, 1)]) + sym([(0, 2, 1), (1, 1, 1), (1, 0, 1)])),
+            types.RiderMovement(board, symv([(2, 2, 1)]) + sym([(0, 2, 1), (1, 1, 1), (1, 0, 1)])),
             **kwargs
         )
 
@@ -24,7 +24,7 @@ class Mushroom(Piece):
     def __init__(self, board, **kwargs):
         super().__init__(
             board,
-            movement.RiderMovement(board, symv([(2, 1, 1), (1, 3, 1), (-1, 1, 1), (-2, 1, 1)])),
+            types.RiderMovement(board, symv([(2, 1, 1), (1, 3, 1), (-1, 1, 1), (-2, 1, 1)])),
             **kwargs
         )
 
@@ -37,7 +37,7 @@ class Sausage(Piece):
     def __init__(self, board, **kwargs):
         super().__init__(
             board,
-            movement.RiderMovement(board, sym([(3, 0, 1), (2, 1, 1), (1, 1, 1), (0, 1, 1)])),
+            types.RiderMovement(board, sym([(3, 0, 1), (2, 1, 1), (1, 1, 1), (0, 1, 1)])),
             **kwargs
         )
 
@@ -50,6 +50,6 @@ class Meatball(Piece):
     def __init__(self, board, **kwargs):
         super().__init__(
             board,
-            movement.RiderMovement(board, symv([(2, 1, 1)]) + rot([(1, 0, 1), (1, 1, 1), (2, 0, 1), (2, 2, 1)])),
+            types.RiderMovement(board, symv([(2, 1, 1)]) + rot([(1, 0, 1), (1, 1, 1), (2, 0, 1), (2, 2, 1)])),
             **kwargs
         )

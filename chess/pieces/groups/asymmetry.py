@@ -1,4 +1,4 @@
-from chess.movement import movement
+from chess.movement import types
 from chess.movement.util import rot, rot2, symh
 from chess.pieces.piece import Piece
 
@@ -11,7 +11,7 @@ class LQue(Piece):
     def __init__(self, board, **kwargs):
         super().__init__(
             board,
-            movement.RiderMovement(board, rot2([(0, -1), (1, -1)])),
+            types.RiderMovement(board, rot2([(0, -1), (1, -1)])),
             **kwargs
         )
 
@@ -24,7 +24,7 @@ class RQue(Piece):
     def __init__(self, board, **kwargs):
         super().__init__(
             board,
-            movement.RiderMovement(board, rot2([(0, 1), (1, 1)])),
+            types.RiderMovement(board, rot2([(0, 1), (1, 1)])),
             **kwargs
         )
 
@@ -37,10 +37,10 @@ class Knish(Piece):
     def __init__(self, board, **kwargs):
         super().__init__(
             board,
-            movement.SideMovement(
+            types.SideMovement(
                 board,
-                left=[movement.RiderMovement(board, symh([(1, -1), (1, 2, 1), (2, 1, 1)]))],
-                right=[movement.RiderMovement(board, symh([(1, 1), (1, -2, 1), (2, -1, 1)]))],
+                left=[types.RiderMovement(board, symh([(1, -1), (1, 2, 1), (2, 1, 1)]))],
+                right=[types.RiderMovement(board, symh([(1, 1), (1, -2, 1), (2, -1, 1)]))],
             ),
             **kwargs
         )
@@ -55,10 +55,10 @@ class Blizzard(Piece):
     def __init__(self, board, **kwargs):
         super().__init__(
             board,
-            movement.SideMovement(
+            types.SideMovement(
                 board,
-                left=[movement.RiderMovement(board, rot2([(1, -1), (1, 1, 1), (1, 3, 1), (3, 1, 1)]))],
-                right=[movement.RiderMovement(board, rot2([(1, 1), (1, -1, 1), (1, -3, 1), (3, -1, 1)]))],
+                left=[types.RiderMovement(board, rot2([(1, -1), (1, 1, 1), (1, 3, 1), (3, 1, 1)]))],
+                right=[types.RiderMovement(board, rot2([(1, 1), (1, -1, 1), (1, -3, 1), (3, -1, 1)]))],
             ),
             **kwargs
         )
@@ -72,10 +72,10 @@ class Chanqueen(Piece):
     def __init__(self, board, **kwargs):
         super().__init__(
             board,
-            movement.SideMovement(
+            types.SideMovement(
                 board,
-                left=[movement.RiderMovement(board, rot([(1, 0)]) + symh([(1, -1), (1, 2, 1), (2, 1, 1)]))],
-                right=[movement.RiderMovement(board, rot([(1, 0)]) + symh([(1, 1), (1, -2, 1), (2, -1, 1)]))],
+                left=[types.RiderMovement(board, rot([(1, 0)]) + symh([(1, -1), (1, 2, 1), (2, 1, 1)]))],
+                right=[types.RiderMovement(board, rot([(1, 0)]) + symh([(1, 1), (1, -2, 1), (2, -1, 1)]))],
             ),
             **kwargs
         )

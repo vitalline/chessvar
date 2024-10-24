@@ -1,4 +1,4 @@
-from chess.movement import movement
+from chess.movement import types
 from chess.movement.util import rot
 from chess.pieces.piece import Piece
 
@@ -11,7 +11,7 @@ class Ouroboros(Piece):
     def __init__(self, board, **kwargs):
         super().__init__(
             board,
-            movement.RiderMovement(board, rot([(1, 2, 1), (2, 0, 1), (2, 1, 1)])),
+            types.RiderMovement(board, rot([(1, 2, 1), (2, 0, 1), (2, 1, 1)])),
             **kwargs
         )
 
@@ -24,7 +24,7 @@ class Quagga(Piece):
     def __init__(self, board, **kwargs):
         super().__init__(
             board,
-            movement.RiderMovement(board, rot([(1, 1, 1), (2, 3, 1), (3, 2, 1)])),
+            types.RiderMovement(board, rot([(1, 1, 1), (2, 3, 1), (3, 2, 1)])),
             **kwargs
         )
 
@@ -38,7 +38,7 @@ class Roc(Piece):
     def __init__(self, board, **kwargs):
         super().__init__(
             board,
-            movement.RiderMovement(board, rot([(1, 3, 1), (2, 2, 1), (3, 1, 1)])),
+            types.RiderMovement(board, rot([(1, 3, 1), (2, 2, 1), (3, 1, 1)])),
             **kwargs
         )
 
@@ -51,6 +51,6 @@ class Buffalo(Piece):
     def __init__(self, board, **kwargs):
         super().__init__(
             board,
-            movement.RiderMovement(board, rot([(1, 2, 1), (1, 3, 1), (2, 1, 1), (2, 3, 1), (3, 1, 1), (3, 2, 1)])),
+            types.RiderMovement(board, rot([(1, 2, 1), (1, 3, 1), (2, 1, 1), (2, 3, 1), (3, 1, 1), (3, 2, 1)])),
             **kwargs
         )

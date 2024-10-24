@@ -1,4 +1,4 @@
-from chess.movement import movement
+from chess.movement import types
 from chess.movement.util import rot
 from chess.pieces.piece import Piece
 
@@ -11,9 +11,9 @@ class Naysayer(Piece):
     def __init__(self, board, **kwargs):
         super().__init__(
             board,
-            movement.MultiMovement(board, [movement.RiderMovement(board, rot([(1, 0, 3, 3)]))] + [
-                movement.RepeatMovement(board, [
-                    movement.RiderMovement(board, [(i, j, 2, 2) for i, j in rot([(1, 1)])])
+            types.MultiMovement(board, [types.RiderMovement(board, rot([(1, 0, 3, 3)]))] + [
+                types.RepeatMovement(board, [
+                    types.RiderMovement(board, [(i, j, 2, 2) for i, j in rot([(1, 1)])])
                 ])
             ]),
             **kwargs
@@ -28,10 +28,10 @@ class HorseRdr(Piece):
     def __init__(self, board, **kwargs):
         super().__init__(
             board,
-            movement.MultiMovement(board, [
-                movement.RepeatMovement(board, [
-                    movement.RiderMovement(board, [(i, j, 1)]),
-                    movement.RiderMovement(board, [(i or k, j or k, 1) for k in (1, -1)])
+            types.MultiMovement(board, [
+                types.RepeatMovement(board, [
+                    types.RiderMovement(board, [(i, j, 1)]),
+                    types.RiderMovement(board, [(i or k, j or k, 1) for k in (1, -1)])
                 ], 1) for i, j in rot([(1, 0)])
             ]),
             **kwargs
@@ -46,10 +46,10 @@ class Tapir(Piece):
     def __init__(self, board, **kwargs):
         super().__init__(
             board,
-            movement.MultiMovement(board, [movement.RiderMovement(board, rot([(1, 1, 2, 2)]))] + [
-                movement.BentMovement(board, [
-                    movement.RiderMovement(board, [(i, j, 1)]),
-                    movement.RiderMovement(board, [(i or k, j or k, 1) for k in (1, -1)])
+            types.MultiMovement(board, [types.RiderMovement(board, rot([(1, 1, 2, 2)]))] + [
+                types.BentMovement(board, [
+                    types.RiderMovement(board, [(i, j, 1)]),
+                    types.RiderMovement(board, [(i or k, j or k, 1) for k in (1, -1)])
                 ], 1) for i, j in rot([(1, 0)])
             ]),
             **kwargs
@@ -64,10 +64,10 @@ class Marauder(Piece):
     def __init__(self, board, **kwargs):
         super().__init__(
             board,
-            movement.MultiMovement(board, [
-                movement.RepeatMovement(board, [
-                    movement.RiderMovement(board, [(i, j, 1)]),
-                    movement.RiderMovement(board, [(i, 0, 1), (0, j, 1)])
+            types.MultiMovement(board, [
+                types.RepeatMovement(board, [
+                    types.RiderMovement(board, [(i, j, 1)]),
+                    types.RiderMovement(board, [(i, 0, 1), (0, j, 1)])
                 ]) for i, j in rot([(1, 1)])
             ]),
             **kwargs

@@ -1,4 +1,4 @@
-from chess.movement import movement
+from chess.movement import types
 from chess.movement.util import rot
 from chess.pieces.piece import Piece
 
@@ -11,10 +11,10 @@ class Cannon(Piece):
     def __init__(self, board, **kwargs):
         super().__init__(
             board,
-            movement.MultiMovement(
+            types.MultiMovement(
                 board,
-                move=[movement.RiderMovement(board, rot([(1, 0)]))],
-                capture=[movement.CannonRiderMovement(board, rot([(1, 0)]))]
+                move=[types.RiderMovement(board, rot([(1, 0)]))],
+                capture=[types.CannonRiderMovement(board, rot([(1, 0)]))]
             ),
             **kwargs
         )
@@ -29,7 +29,7 @@ class Camel(Piece):
     def __init__(self, board, **kwargs):
         super().__init__(
             board,
-            movement.RiderMovement(board, rot([(1, 3, 1), (3, 1, 1)])),
+            types.RiderMovement(board, rot([(1, 3, 1), (3, 1, 1)])),
             **kwargs
         )
 
@@ -42,7 +42,7 @@ class NightRdr(Piece):
     def __init__(self, board, **kwargs):
         super().__init__(
             board,
-            movement.RiderMovement(board, rot([(1, 2), (2, 1)])),
+            types.RiderMovement(board, rot([(1, 2), (2, 1)])),
             **kwargs
         )
 
@@ -55,6 +55,6 @@ class Amazon(Piece):
     def __init__(self, board, **kwargs):
         super().__init__(
             board,
-            movement.RiderMovement(board, rot([(1, 0), (1, 1), (1, 2, 1), (2, 1, 1)])),
+            types.RiderMovement(board, rot([(1, 0), (1, 1), (1, 2, 1), (2, 1, 1)])),
             **kwargs
         )

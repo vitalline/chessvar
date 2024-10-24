@@ -7,15 +7,13 @@ from json import dumps
 from typing import TYPE_CHECKING, TextIO
 
 from chess.data import piece_groups, get_piece_types, get_set_name
-from chess.movement import movement
+from chess.movement.types import BaseMovement, DropMovement
 from chess.movement.util import to_algebraic as toa, from_algebraic as fra, from_algebraic_map as frm
 from chess.pieces.groups import classic as fide
 from chess.pieces.piece import Piece
 from chess.pieces.side import Side
 from chess.save import save_piece_type, save_custom_type
 from chess.util import get_filename
-
-
 
 if TYPE_CHECKING:
     from chess.board import Board
@@ -399,7 +397,7 @@ def debug_info(board: Board) -> list[str]:
                         "Any last move" if last == '*' else
                         "Last move was untagged" if not last else
                         f"Last move was {last.__name__}"
-                        if issubclass(last, type) and issubclass(last, movement.BaseMovement) else
+                        if isinstance(last, type) and issubclass(last, BaseMovement) else
                         f"Last move was \"{last}\""
                     )
                     last_rules = state_rules[last]
@@ -417,8 +415,7 @@ def debug_info(board: Board) -> list[str]:
                             tag_string = (
                                 "Any" if tag == '*' else
                                 "Untagged" if not tag else
-                                f"{tag.__name__}"
-                                if issubclass(tag, type) and issubclass(tag, movement.BaseMovement) else tag
+                                f"{tag.__name__}" if isinstance(tag, type) and issubclass(tag, BaseMovement) else tag
                             )
                             tag_rules = piece_rules[tag]
                             if tag_rules is None:
@@ -466,16 +463,12 @@ def debug_info(board: Board) -> list[str]:
         if not move:
             debug_log_data.append(f"  {i + 1}: (Pass) None")
         else:
-            move_type = (
-                'Edit' if move.is_edit else 'Drop' if move.movement_type == movement.DropMovement else 'Move'
-            )
+            move_type = 'Edit' if move.is_edit else 'Drop' if move.movement_type == DropMovement else 'Move'
             debug_log_data.append(f"  {i + 1}: ({move_type}) {move}")
             j = 0
             while move.chained_move:
                 move = move.chained_move
-                move_type = (
-                    'Edit' if move.is_edit else 'Drop' if move.movement_type == movement.DropMovement else 'Move'
-                )
+                move_type = 'Edit' if move.is_edit else 'Drop' if move.movement_type == DropMovement else 'Move'
                 debug_log_data.append(f"  {i + 1}.{j + 1}: ({move_type}) {move}")
                 j += 1
     if not board.move_history:
@@ -485,16 +478,12 @@ def debug_info(board: Board) -> list[str]:
         if not move:
             debug_log_data.append(f"  {i + 1}: (Pass) None")
         else:
-            move_type = (
-                'Edit' if move.is_edit else 'Drop' if move.movement_type == movement.DropMovement else 'Move'
-            )
+            move_type = 'Edit' if move.is_edit else 'Drop' if move.movement_type == DropMovement else 'Move'
             debug_log_data.append(f"  {i + 1}: ({move_type}) {move}")
             j = 0
             while move.chained_move:
                 move = move.chained_move
-                move_type = (
-                    'Edit' if move.is_edit else 'Drop' if move.movement_type == movement.DropMovement else 'Move'
-                )
+                move_type = 'Edit' if move.is_edit else 'Drop' if move.movement_type == DropMovement else 'Move'
                 debug_log_data.append(f"  {i + 1}.{j + 1}: ({move_type}) {move}")
                 j += 1
     if not board.future_move_history:

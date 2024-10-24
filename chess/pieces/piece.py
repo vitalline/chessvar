@@ -5,15 +5,28 @@ from typing import TYPE_CHECKING
 
 from arcade import Color, Sprite, load_texture
 
+from chess.movement import types
 from chess.pieces.side import Side
-from chess.pieces.type import Immune, Double
+from chess.pieces.types import Immune, Double
 from chess.util import Default, get_texture_path
 
 if TYPE_CHECKING:
     from chess.board import Board
     from chess.movement.move import Move
-    from chess.movement.movement import BaseMovement
     from chess.movement.util import Position
+
+
+# Movements that do not move the piece, instead interacting with the game in other, more mysterious ways. Intrigued yet?
+passive_movements = (
+    types.RangedMovement,
+    types.AutoCaptureMovement,
+)
+
+
+is_active = lambda move: (
+    move and not move.is_edit and move.pos_from and move.pos_to and
+    (move.pos_from != move.pos_to or move.movement_type and not issubclass(move.movement_type, passive_movements))
+)
 
 
 class Piece(Sprite):
@@ -24,7 +37,7 @@ class Piece(Sprite):
     def __init__(
         self,
         board: Board,
-        movement: BaseMovement | None = None,
+        movement: types.BaseMovement | None = None,
         pos: Position | None = None,
         side: Side = Side.NONE,
         **kwargs
@@ -62,34 +75,41 @@ class Piece(Sprite):
         if self.movement:
             for move in self.movement.moves(self.board_pos, self, theoretical):
                 chained_move = move
-                while chained_move.chained_move:
+                while chained_move and is_active(chained_move.chained_move):
                     chained_move = chained_move.chained_move
-                if self.side in self.board.promotions:
-                    side_promotions = self.board.promotions[self.side]
-                    if type(self) in side_promotions:
-                        promotion_squares = side_promotions[type(self)]
-                        if chained_move.pos_to in promotion_squares:
-                            promotions = promotion_squares[chained_move.pos_to]
-                            if promotions:
-                                for piece in promotions:
-                                    if isinstance(piece, Piece):
-                                        piece = piece.of(piece.side or self.side).on(chained_move.pos_to)
-                                    else:
-                                        piece = piece(
-                                            board=self.board,
-                                            board_pos=chained_move.pos_to,
-                                            side=self.side,
-                                        )
-                                    promoted_from = piece.promoted_from or self.promoted_from or type(self)
-                                    if type(piece) != promoted_from:
-                                        piece.promoted_from = promoted_from
-                                    copy_move = copy(move)
-                                    chained_copy = copy_move
-                                    while chained_copy.chained_move:
-                                        chained_copy.set(chained_move=copy(chained_copy.chained_move))
-                                        chained_copy = chained_copy.chained_move
-                                    chained_copy.set(promotion=piece)
-                                    yield copy_move
+                if is_active(chained_move):
+                    if self.side in self.board.promotions:
+                        side_promotions = self.board.promotions[self.side]
+                        if type(self) in side_promotions:
+                            promotion_squares = side_promotions[type(self)]
+                            promotion_found = False
+                            for square in (chained_move.pos_to, chained_move.pos_from):
+                                if square in promotion_squares:
+                                    promotions = promotion_squares[square]
+                                    if not promotions:
+                                        break
+                                    promotion_found = True
+                                    for piece in promotions:
+                                        if isinstance(piece, Piece):
+                                            piece = piece.of(piece.side or self.side).on(square)
+                                        else:
+                                            piece = piece(
+                                                board=self.board,
+                                                board_pos=square,
+                                                side=self.side,
+                                            )
+                                        promoted_from = piece.promoted_from or self.promoted_from or type(self)
+                                        if type(piece) != promoted_from:
+                                            piece.promoted_from = promoted_from
+                                        copy_move = copy(move)
+                                        chained_copy = copy_move
+                                        while chained_copy and is_active(chained_copy.chained_move):
+                                            chained_copy.set(chained_move=copy(chained_copy.chained_move))
+                                            chained_copy = chained_copy.chained_move
+                                        chained_copy.set(promotion=piece)
+                                        yield copy_move
+                                    break
+                            if promotion_found:
                                 continue
                 yield move
         return ()

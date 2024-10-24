@@ -7,7 +7,7 @@ from chess.pieces.side import Side
 from chess.util import Default, Unset
 
 if TYPE_CHECKING:
-    from chess.movement.movement import BaseMovement
+    from chess.movement.types import BaseMovement
     from chess.pieces.piece import Piece
 
 
