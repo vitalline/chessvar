@@ -157,6 +157,24 @@ def debug_info(board: Board) -> list[str]:
         if not board.auto_capture_markers[side]:
             debug_log_data[-1] += " None"
     for side in board.piece_set_ids:
+        debug_log_data.append(f"{side} en passant targets ({len(board.en_passant_targets[side])}):")
+        for pos in sorted(board.en_passant_targets[side]):
+            piece_poss = board.en_passant_targets[side][pos]
+            debug_log_data.append(f"""  {toa(pos)} {pos}: (From {len(piece_poss)}) {
+            ', '.join(f'{toa(xy)} {xy}' for xy in sorted(piece_poss))
+            }""")
+        if not board.en_passant_targets[side]:
+            debug_log_data[-1] += " None"
+    for side in board.piece_set_ids:
+        debug_log_data.append(f"{side} royal en passant targets ({len(board.royal_ep_targets[side])}):")
+        for pos in sorted(board.royal_ep_targets[side]):
+            piece_poss = board.royal_ep_targets[side][pos]
+            debug_log_data.append(f"""  {toa(pos)} {pos}: (From {len(piece_poss)}) {
+            ', '.join(f'{toa(xy)} {xy}' for xy in sorted(piece_poss))
+            }""")
+        if not board.royal_ep_targets[side]:
+            debug_log_data[-1] += " None"
+    for side in board.piece_set_ids:
         promotions = board.promotions.get(side, {})
         debug_log_data.append(f"{side} promotion rules ({len(promotions)}):")
         for piece in promotions:
@@ -333,14 +351,6 @@ def debug_info(board: Board) -> list[str]:
             f"{side} drops ({len(board.captured_pieces[side])}): "
             f"{', '.join(piece.name for piece in board.captured_pieces[side]) or 'None'}"
         )
-    en_passant_pos = toa(board.en_passant_target.board_pos) if board.en_passant_target else 'None'
-    debug_log_data.append(f"En passant target: {en_passant_pos}")
-    en_passant_squares = ', '.join(toa(xy) for xy in sorted(board.en_passant_markers)) or 'None'
-    debug_log_data.append(f"En passant squares ({len(board.en_passant_markers)}): {en_passant_squares}")
-    castling_ep_pos = toa(board.castling_ep_target.board_pos) if board.castling_ep_target else 'None'
-    debug_log_data.append(f"Castling EP target: {castling_ep_pos}")
-    castling_ep_squares = ', '.join(toa(xy) for xy in sorted(board.castling_ep_markers)) or 'None'
-    debug_log_data.append(f"Castling EP squares ({len(board.castling_ep_markers)}): {castling_ep_squares}")
     piece_modes = {0: "Shown", 1: "Hidden", 2: "Penultima"}
     debug_log_data.append(f"Hide pieces: {board.should_hide_pieces} - {piece_modes[board.should_hide_pieces]}")
     move_modes = {None: "Default", False: "Shown", True: "Hidden"}
@@ -400,7 +410,7 @@ def debug_info(board: Board) -> list[str]:
                     not_last = 'not ' if not_last else ''
                     last_string = (
                         "Any last move" if last == '*' else
-                        f"Last move was {not_last}made earlier" if last is '' else
+                        f"Last move was {not_last}made earlier" if last == '' else
                         f"Last move was {not_last}untagged" if last is None else
                         f"Last move was {not_last}{last.__name__}"
                         if isinstance(last, type) and issubclass(last, BaseMovement) else

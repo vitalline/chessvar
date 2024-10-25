@@ -6,7 +6,7 @@ from typing import TYPE_CHECKING
 
 from chess.movement.move import Move
 from chess.movement.util import AnyDirection, Direction, Position, add, sub, mul, ddiv
-from chess.pieces.types import Immune
+from chess.pieces.types import Immune, Slow
 from chess.util import Unset
 
 if TYPE_CHECKING:
@@ -24,7 +24,6 @@ class BaseMovement(object):
 
     def update(self, move: Move, piece: Piece):
         self.total_moves += 1
-        self.board.update_board(move)
 
     def undo(self, move: Move, piece: Piece):
         self.total_moves -= 1
@@ -97,9 +96,14 @@ class BaseDirectionalMovement(BaseMovement):
                 self.advance_direction(move, direction, pos_from, piece)
                 if self.skip_condition(move, direction, piece, theoretical):
                     continue
-                if not theoretical and move.pos_to in self.board.castling_ep_markers:
-                    yield Move(move.pos_from, self.board.castling_ep_target.board_pos, RoyalEnPassantMovement)
-                yield move
+                if not theoretical and move.pos_to in self.board.royal_ep_markers:
+                    for chained_move in (
+                        Move(move.pos_to, move.pos_to),
+                        Move(move.pos_to, self.board.royal_ep_markers[move.pos_to], RoyalEnPassantMovement),
+                    ):
+                        yield copy(move).set(chained_move=chained_move)
+                else:
+                    yield move
                 self.steps = steps  # this is a hacky way to make sure the step count stays correct after the yield
                 # this is because the step count will be reset to 0 if self.moves() is called before the next yield
             else:
@@ -362,16 +366,6 @@ class AutoRangedAutoCaptureRiderMovement(RangedAutoCaptureRiderMovement, RiderMo
                 if not self.board.auto_capture_markers[piece.side][move.pos_to]:
                     del self.board.auto_capture_markers[piece.side][move.pos_to]
 
-    def update(self, move: Move, piece: Piece):
-        self.unmark(move.pos_from, piece)
-        self.mark(move.pos_to, piece)
-        super().update(move, piece)
-
-    def undo(self, move: Move, piece: Piece):
-        super().undo(move, piece)
-        self.unmark(move.pos_to, piece)
-        self.mark(move.pos_from, piece)
-
 
 class DropMovement(BaseMovement):
     # used to mark piece drops (Move.movement_type == DropMovement)
@@ -428,16 +422,17 @@ class CastlingMovement(BaseMovement):
             direction = piece.side.direction(self.direction)
             offset = sub(move.pos_to, move.pos_from)
             if offset == direction:
-                if self.board.castling_ep_target != piece:
-                    self.board.clear_castling_ep()
+                positions = []
                 for gap_offset in self.en_passant_gap:
-                    pos = add(move.pos_from, gap_offset)
-                    self.board.mark_castling_ep(move.pos_to, pos)
+                    positions.append(add(move.pos_from, gap_offset))
+                if positions:
+                    marker_set = set(positions)
+                    if isinstance(piece, Slow):
+                        marker_set.add(True)
+                    self.board.royal_ep_targets.get(piece.side, {})[move.pos_to] = marker_set
+                    for pos in positions:
+                        self.board.royal_ep_markers.get(piece.side, {})[pos] = move.pos_to
         super().update(move, piece)
-
-    def undo(self, move: Move, piece: Piece):
-        super().undo(move, piece)
-        self.board.clear_castling_ep()
 
     def __copy_args__(self):
         return (
@@ -468,21 +463,13 @@ class EnPassantTargetRiderMovement(RiderMovement):
                 if steps < 2:
                     continue
                 positions = [add(move.pos_from, mul(direction[:2], i)) for i in range(1, steps)]
-                is_clear = True
+                marker_set = set(positions)
+                if isinstance(piece, Slow):
+                    marker_set.add(True)
+                self.board.en_passant_targets.get(piece.side, {})[move.pos_to] = marker_set
                 for pos in positions:
-                    if not self.board.not_a_piece(pos):
-                        is_clear = False
-                        break
-                if is_clear:
-                    if self.board.en_passant_target != piece:
-                        self.board.clear_en_passant()
-                    for pos in positions:
-                        self.board.mark_en_passant(move.pos_to, pos)
+                    self.board.en_passant_markers.get(piece.side, {})[pos] = move.pos_to
         super().update(move, piece)
-
-    def undo(self, move: Move, piece: Piece):
-        super().undo(move, piece)
-        self.board.clear_en_passant()
 
 
 class EnPassantRiderMovement(RiderMovement):
@@ -490,8 +477,9 @@ class EnPassantRiderMovement(RiderMovement):
         for move in super().moves(pos_from, piece, theoretical):
             move.movement_type = RiderMovement
             if not theoretical:
-                if move.pos_to in self.board.en_passant_markers:
-                    move.captured_piece = self.board.en_passant_target
+                marker_dict = self.board.en_passant_markers.get(piece.side.opponent(), {})
+                if not move.captured_piece and move.pos_to in marker_dict:
+                    move.captured_piece = self.board.get_piece(marker_dict[move.pos_to])
                     move.movement_type = type(self)
             yield move
 
@@ -576,8 +564,7 @@ class PlyMovement(IndexMovement):
             index = self.board.ply_count
             count = self.board.get_turn()
             start_count = count
-            turn_order = self.board.turn_order_start + self.board.turn_order
-            while turn_order[count][0] != piece.side:
+            while self.board.turn_order[count][0] != piece.side:
                 index += 1
                 count = self.board.get_turn(index)
                 if count == start_count:
@@ -637,7 +624,7 @@ class RepeatBentMovement(BaseMultiMovement):
                 movement.directions = [direction]
                 move = None
                 for move in movement.moves(pos_from, piece, theoretical):
-                    if move.movement_type != RoyalEnPassantMovement and any(direction[:2]):
+                    if any(direction[:2]):
                         pos_to = move.pos_to
                         if issubclass(move.movement_type, RangedMovement) and move.captured_piece:
                             pos_to = move.captured_piece.board_pos
@@ -756,18 +743,25 @@ class ChainMovement(BaseMultiMovement):
         if theoretical:
             for move in self.movements[index].moves(pos_from, piece, theoretical):
                 yield copy(move)
-                for chained_move in self.moves(move.pos_to, piece, theoretical, index + 1):
+                chained_move = move
+                while chained_move.chained_move:
+                    chained_move = chained_move.chained_move
+                    yield copy(chained_move).set(pos_from=move.pos_from)
+                last_chain_move = chained_move
+                if last_chain_move.movement_type == RoyalEnPassantMovement:
+                    continue
+                for chained_move in self.moves(last_chain_move.pos_to, piece, theoretical, index + 1):
                     yield copy(chained_move).set(pos_from=move.pos_from)
         else:
             for move in self.movements[index].moves(pos_from, piece, theoretical):
-                if move.movement_type == RoyalEnPassantMovement:
-                    yield move
-                    continue
                 move_chain = []
                 chained_move = move
                 while chained_move:
                     move_chain.append(copy(chained_move).set(chained_move=Unset))
                     chained_move = chained_move.chained_move
+                if move_chain[-1].movement_type == RoyalEnPassantMovement:
+                    yield move
+                    continue
                 for chained_move in move_chain:
                     self.board.update_move(chained_move)
                     self.board.move(chained_move)
@@ -948,6 +942,10 @@ class ProbabilisticMovement(BaseMultiMovement):
 
     def roll(self):
         return self.board.roll_rng.randrange(len(self.movements))
+
+
+class RandomMovement(ProbabilisticMovement):
+    pass
 
 
 class BaseChoiceMovement(BaseMultiMovement):

@@ -15,5 +15,9 @@ class QuasiRoyal(object):
     pass
 
 class Fast(object):
-    # Royal pieces with this attribute cannot be captured en passant on squares they moved to during the last move chain
+    # Pieces with this attribute cannot be captured en passant on squares they moved to during the last move chain
+    pass
+
+class Slow(object):
+    # Pieces with this attribute can be captured en passant even if they haven't moved immediately before
     pass
