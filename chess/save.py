@@ -174,11 +174,12 @@ def load_movement_type(data: list | str | None) -> type[BaseMovement] | frozense
             else:
                 return None
         return load_custom_movement_type(bases)
-    for i in range(len(MOVEMENT_SUFFIXES) + 1):
-        name = data + ''.join(MOVEMENT_SUFFIXES[:i][::-1])
-        movement_type = getattr(movement_types, name, None)
-        if movement_type:
-            return movement_type
+    if isinstance(data, str):
+        for i in range(len(MOVEMENT_SUFFIXES) + 1):
+            name = data + ''.join(MOVEMENT_SUFFIXES[:i][::-1])
+            movement_type = getattr(movement_types, name, None)
+            if movement_type:
+                return movement_type
     return None
 
 

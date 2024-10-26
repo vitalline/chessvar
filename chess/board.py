@@ -1182,9 +1182,11 @@ class Board(Window):
                     data_state = data_order.setdefault(int(rule.get('state', 0)), {})
                     for last in rule.get('last', '*'):
                         if last and last[0] == '!':
-                            last = (False, load_movement_type(last[1:]).__name__ or last[1:])
+                            last = (False, load_movement_type(last[1:]) or last[1:])
                         else:
-                            last = load_movement_type(last).__name__ or last
+                            last = load_movement_type(last) or last
+                        if isinstance(last, type):
+                            last = last.__name__
                         data_last = data_state.setdefault(last, {})
                         for piece in rule.get('piece', '*'):
                             if piece and piece[0] == '!':
@@ -1194,9 +1196,11 @@ class Board(Window):
                             data_cls = data_last.setdefault(piece, {})
                             for move_type in rule.get('type', '*'):
                                 if move_type and move_type[0] == '!':
-                                    move_type = (False, load_movement_type(move_type[1:]).__name__ or move_type[1:])
+                                    move_type = (False, load_movement_type(move_type[1:]) or move_type[1:])
                                 else:
-                                    move_type = load_movement_type(move_type).__name__ or move_type
+                                    move_type = load_movement_type(move_type) or move_type
+                                if isinstance(move_type, type):
+                                    move_type = last.__name__
                                 data_type = data_cls.setdefault(move_type, {})
                                 for action in rule.get('action', 'mcd'):
                                     data_type.setdefault(action[0], int(rule.get('check', 0)))
