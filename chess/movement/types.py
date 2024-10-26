@@ -149,7 +149,7 @@ class RiderMovement(BaseDirectionalMovement):
                 and next_piece.movement is None
             ) if theoretical else (
                 piece.blocked_by(self.board.get_piece(next_pos_to))
-                or piece.captures(self.board.get_piece(move.pos_to))
+                or piece.captures(captured_piece := self.board.get_piece(move.pos_to)) and piece != captured_piece
             ))
         )
 

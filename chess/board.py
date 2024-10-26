@@ -1558,7 +1558,7 @@ class Board(Window):
                     and k[1] not in last_history_tags and k[1] not in last_history_types
                 ] if state_rules is not None else None
                 last_type_rules = [
-                    rules[k] for rules in state_rules for k in match_types if rules.get(k) is not None
+                    rules[k] for rules in state_rules for k in match_types if k in rules
                 ] if state_rules is not None else None
                 if not self.chain_start:
                     for last_type_rule in (last_type_rules or ()):
@@ -1590,14 +1590,21 @@ class Board(Window):
                             continue
                         if piece_type not in piece_rule_dict:
                             piece_rule_dict[piece_type] = []
-                            for rules in last_type_rules:
-                                for k in rules:
-                                    if (
-                                        k == '*' or k == piece_type
-                                        or isinstance(k, tuple) and k[0] is False and k[1] != piece_type
-                                    ):
-                                        piece_rule_dict[piece_type].append(rules[k])
-                        type_rules = [rules[s] for s in ['*'] for rules in piece_rule_dict[piece_type]]
+                            if last_type_rules is None:
+                                piece_rule_dict[piece_type] = None
+                                self.moves[turn_side].setdefault('drop', set()).add(piece_type)
+                                continue
+                            else:
+                                for rules in last_type_rules:
+                                    for k in rules:
+                                        if (
+                                            k == '*' or k == piece_type
+                                            or isinstance(k, tuple) and k[0] is False and k[1] != piece_type
+                                        ):
+                                            piece_rule_dict[piece_type].append(rules[k])
+                        if piece_rule_dict[piece_type] is None:
+                            continue
+                        type_rules = [rules[s] for s in ['*'] for rules in piece_rule_dict[piece_type] if s in rules]
                         options = {k: [] for k, v in {'d': self.use_drops}.items() if v}
                         for rules in type_rules:
                             for option in options:
