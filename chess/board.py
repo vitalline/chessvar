@@ -817,7 +817,7 @@ class Board(Window):
             self.chain_start.piece.side: {
                 (tuple(poss)): [load_move(m, self, c) for m in data.get('chain_moves', [])]
             }, self.chain_start.piece.side.opponent(): {}
-        } if self.chain_start else {}
+        } if self.chain_start else {Side.WHITE: {}, Side.BLACK: {}}
 
         if 'chaos_state' in data:
             self.chaos_rng = load_rng(data['chaos_state'])
@@ -1560,27 +1560,30 @@ class Board(Window):
                 last_type_rules = [
                     rules[k] for rules in state_rules for k in match_types if rules.get(k) is not None
                 ] if state_rules is not None else None
-                for last_type_rule in (last_type_rules or ()):
-                    piece_rules = last_type_rule.get('*') or {}
-                    type_rules = [rules for rules in [piece_rules.get('*')] if rules]
-                    pass_turn_options = {x for x in [rules.get('p') for rules in type_rules if rules] if x is not None}
-                    if 0 in pass_turn_options:
-                        self.moves[turn_side]['pass'] = True
-                    elif pass_turn_options.intersection({1, -1}):
-                        old_check_side = self.check_side
-                        opponent = self.turn_side.opponent()
-                        if opponent not in check_sides:
-                            self.load_check(opponent)
-                            if self.check_side == opponent:
-                                check_sides[opponent] = True
-                        self.check_side = old_check_side
-                        if self.check_side != turn_side:
-                            conditions = {0, 1 if check_sides.get(opponent, False) else -1}
-                            if conditions.intersection(pass_turn_options):
-                                self.moves[turn_side]['pass'] = True
-                        self.check_side = check_side
+                if not self.chain_start:
+                    for last_type_rule in (last_type_rules or ()):
+                        piece_rules = last_type_rule.get('*') or {}
+                        type_rules = [rules for rules in [piece_rules.get('*')] if rules]
+                        pass_turn_options = {
+                            x for x in [rules.get('p') for rules in type_rules if rules] if x is not None
+                        }
+                        if 0 in pass_turn_options:
+                            self.moves[turn_side]['pass'] = True
+                        elif pass_turn_options.intersection({1, -1}):
+                            old_check_side = self.check_side
+                            opponent = self.turn_side.opponent()
+                            if opponent not in check_sides:
+                                self.load_check(opponent)
+                                if self.check_side == opponent:
+                                    check_sides[opponent] = True
+                            self.check_side = old_check_side
+                            if self.check_side != turn_side:
+                                conditions = {0, 1 if check_sides.get(opponent, False) else -1}
+                                if conditions.intersection(pass_turn_options):
+                                    self.moves[turn_side]['pass'] = True
+                            self.check_side = check_side
                 piece_rule_dict = {}
-                if self.use_drops and turn_side in self.drops:
+                if not self.chain_start and self.use_drops and turn_side in self.drops:
                     side_drops = self.drops[turn_side]
                     for piece_type in self.captured_pieces[turn_side]:
                         if piece_type not in side_drops:
@@ -1674,7 +1677,7 @@ class Board(Window):
                         options = {k: [] for k, v in {
                             'm': not move.captured_piece,
                             'c': move.captured_piece,
-                            'p': 'pass' not in self.moves[turn_side],
+                            'p': not self.chain_start and 'pass' not in self.moves[turn_side],
                         }.items() if v}
                         if type_rules is not None:
                             for rules in type_rules:
@@ -2180,20 +2183,18 @@ class Board(Window):
         last_side = self.turn_side
         last_moves = []
         for move in self.move_history[::-1]:
-            if (
-                move and move.is_edit != 1 and move.movement_type and move.piece.movement
-                and not issubclass(move.movement_type, (CloneMovement, DropMovement))
-            ):
-                move.piece.movement.undo(move, move.piece)
             if move:
+                move_chain = [move]
                 chained_move = move.chained_move
                 while chained_move:
+                    move_chain.append(chained_move)
+                    chained_move = chained_move.chained_move
+                for chained_move in move_chain[::-1]:
                     if (
                         chained_move.is_edit != 1 and chained_move.movement_type and chained_move.piece.movement
                         and not issubclass(chained_move.movement_type, (CloneMovement, DropMovement))
                     ):
                         chained_move.piece.movement.undo(chained_move, chained_move.piece)
-                        chained_move = chained_move.chained_move
                 if move.is_edit:
                     last_moves.append(move)
                     continue
@@ -2624,6 +2625,7 @@ class Board(Window):
             move = self.move_history[-1]
             if move is not None and move.is_edit != 1 and move.movement_type != DropMovement:
                 move.piece.movement.reload(move, move.piece)
+        self.reload_en_passant_markers()
         future_move_history = self.future_move_history.copy()
         self.advance_turn()
         self.future_move_history = future_move_history
@@ -2778,7 +2780,6 @@ class Board(Window):
         while self.move_history and self.move_history[-1] is None:
             self.undo_last_move()
         self.undo_last_move()
-        self.reload_en_passant_markers()
         self.auto_moves = True
 
     def redo_last_finished_move(self) -> None:
@@ -2830,6 +2831,8 @@ class Board(Window):
             self.update_caption()  # updating the caption to reflect the edit that was just made
             return  # let's not advance the turn while editing the board to hopefully make things easier for everyone
         self.turn_side, self.turn_rules = self.turn_order[self.get_turn()]
+        self.chain_start = None
+        self.chain_moves = {side: {} for side in self.chain_moves}
         self.update_status()
         if self.auto_moves and self.board_config['fast_moves'] and not self.game_over:
             if self.try_auto():
@@ -3509,7 +3512,9 @@ class Board(Window):
             return
 
         if self.chain_start or self.promotion_piece:
-            self.undo_last_finished_move()
+            # in theory, we could just undo the unfinished move and resize the board as expected
+            # but for consistency with other move-reloading actions let's just cancel the resize
+            return
 
         old_highlight = self.get_board_position(self.highlight.position) if self.highlight_square else None
         old_width, old_height = self.board_width, self.board_height
@@ -4156,7 +4161,7 @@ class Board(Window):
         if symbol == key.X:
             if modifiers & (key.MOD_SHIFT | key.MOD_ALT):  # Extreme chaos mode
                 self.load_chaos_sets(3 + bool(modifiers & key.MOD_ALT), modifiers & key.MOD_ACCEL)
-            elif modifiers & key.MOD_ACCEL:  # Extra roll (update probabilistic pieces)
+            elif modifiers & key.MOD_ACCEL and not self.chain_start:  # Extra roll (update probabilistic pieces)
                 if self.selected_square:  # Only update selected piece (if it is probabilistic)
                     piece = self.get_piece(self.selected_square)
                     if isinstance(piece.movement, ProbabilisticMovement):
@@ -4240,7 +4245,7 @@ class Board(Window):
             else:
                 if modifiers & key.MOD_SHIFT:  # Empty board
                     self.empty_board()
-                if modifiers & key.MOD_ACCEL:  # Edit mode (toggle)
+                if modifiers & key.MOD_ACCEL and not self.chain_start:  # Edit mode (toggle)
                     self.edit_mode = not self.edit_mode
                     self.log(f"[Ply {self.ply_count}] Mode: {'EDIT' if self.edit_mode else 'PLAY'}", False)
                     self.deselect_piece()
@@ -4415,7 +4420,7 @@ class Board(Window):
                         if len(self.edit_promotions[promotion_side]):
                             self.start_promotion(promotion_piece, self.edit_promotions[promotion_side])
                             self.update_caption()
-        if symbol == key.O:  # Royal pieces
+        if symbol == key.O and not self.chain_start:  # Royal pieces
             old_mode = self.royal_piece_mode
             old_check = self.use_check
             if modifiers & key.MOD_ALT:  # Toggle checks
@@ -4484,7 +4489,7 @@ class Board(Window):
         if symbol == key.H:
             old_should_hide_pieces = self.should_hide_pieces
             old_drops = self.use_drops
-            if modifiers & key.MOD_ALT:  # Toggle drops (Crazyhouse mode)
+            if modifiers & key.MOD_ALT and not self.chain_start:  # Toggle drops (Crazyhouse mode)
                 self.use_drops = not self.use_drops
             elif modifiers & key.MOD_ACCEL and modifiers & key.MOD_SHIFT:  # Show
                 self.should_hide_pieces = 0
@@ -4518,7 +4523,7 @@ class Board(Window):
                 self.future_move_history = []  # we don't know if we can redo the future moves anymore, so we clear them
                 self.advance_turn()
         if symbol == key.M:  # Moves
-            if modifiers & key.MOD_ALT:  # Clear future move history
+            if modifiers & key.MOD_ALT and not self.chain_start:  # Clear future move history
                 self.log(f"[Ply {self.ply_count}] Info: Future move history cleared", False)
                 if self.future_move_history:
                     self.future_move_history = []
