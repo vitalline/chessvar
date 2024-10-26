@@ -2181,21 +2181,22 @@ class Board(Window):
         last_moves = []
         for move in self.move_history[::-1]:
             if (
-                move.is_edit != 1 and move.movement_type and move.piece.movement
+                move and move.is_edit != 1 and move.movement_type and move.piece.movement
                 and not issubclass(move.movement_type, (CloneMovement, DropMovement))
             ):
                 move.piece.movement.undo(move, move.piece)
-            chained_move = move.chained_move
-            while chained_move:
-                if (
-                    move.is_edit != 1 and move.movement_type and move.piece.movement
-                    and not issubclass(move.movement_type, (CloneMovement, DropMovement))
-                ):
-                    move.piece.movement.undo(move, move.piece)
-                    chained_move = chained_move.chained_move
-            if move.is_edit:
-                last_moves.append(move)
-                continue
+            if move:
+                chained_move = move.chained_move
+                while chained_move:
+                    if (
+                        chained_move.is_edit != 1 and chained_move.movement_type and chained_move.piece.movement
+                        and not issubclass(chained_move.movement_type, (CloneMovement, DropMovement))
+                    ):
+                        chained_move.piece.movement.undo(chained_move, chained_move.piece)
+                        chained_move = chained_move.chained_move
+                if move.is_edit:
+                    last_moves.append(move)
+                    continue
             self.ply_count -= 1
             self.turn_side = self.turn_order[self.get_turn()][0]
             if self.turn_side != last_side:
@@ -2208,22 +2209,23 @@ class Board(Window):
         self.turn_side = self.turn_order[self.get_turn()][0]
         for move in last_moves[::-1]:
             if (
-                move.is_edit != 1 and move.movement_type and move.piece.movement
+                move and move.is_edit != 1 and move.movement_type and move.piece.movement
                 and not issubclass(move.movement_type, (CloneMovement, DropMovement))
             ):
                 move.piece.movement.update(move, move.piece)
             self.update_en_passant_markers(move)
-            chained_move = move.chained_move
-            while chained_move:
-                if (
-                    move.is_edit != 1 and move.movement_type and move.piece.movement
-                    and not issubclass(move.movement_type, (CloneMovement, DropMovement))
-                ):
-                    move.piece.movement.update(move, move.piece)
-                self.update_en_passant_markers(chained_move)
-                chained_move = chained_move.chained_move
-            if move.is_edit:
-                continue
+            if move:
+                chained_move = move.chained_move
+                while chained_move:
+                    if (
+                        chained_move.is_edit != 1 and chained_move.movement_type and chained_move.piece.movement
+                        and not issubclass(chained_move.movement_type, (CloneMovement, DropMovement))
+                    ):
+                        chained_move.piece.movement.update(chained_move, chained_move.piece)
+                    self.update_en_passant_markers(chained_move)
+                    chained_move = chained_move.chained_move
+                if move.is_edit:
+                    continue
             self.ply_count += 1
             self.turn_side = self.turn_order[self.get_turn()][0]
         self.ply_count = ply_count
