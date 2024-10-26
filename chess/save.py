@@ -144,13 +144,13 @@ def load_piece_type(data: str | None, from_dict: dict | None) -> type[Piece] | f
         return None
 
 
-def save_movement_type(movement_type: type[BaseMovement] | frozenset | None) -> str | None:
+def save_movement_type(movement_type: type[BaseMovement] | frozenset | None) -> list | str | None:
     if movement_type is None:
         return None
     if movement_type is Unset:
         return UNSET_STRING
-    if movement_type.__module__ == movement_types.__name__:
-        pass
+    if movement_types.__name__.startswith(CUSTOM_PREFIX):
+        return save_custom_movement_type(movement_type)
     name = movement_type.__name__
     for suffix in MOVEMENT_SUFFIXES:
         if name.endswith(suffix, 1):
@@ -158,11 +158,22 @@ def save_movement_type(movement_type: type[BaseMovement] | frozenset | None) -> 
     return name
 
 
-def load_movement_type(data: str | None) -> type[BaseMovement] | frozenset | None:
+def load_movement_type(data: list | str | None) -> type[BaseMovement] | frozenset | None:
     if not data:
         return None
     if data == UNSET_STRING:
         return Unset
+    if isinstance(data, list):
+        bases = {}
+        for x in data:
+            if base := load_movement_type(x):
+                name = base.__name__
+                if name.startswith(CUSTOM_PREFIX):
+                    name = name.removeprefix('_')
+                bases[name] = base
+            else:
+                return None
+        return load_custom_movement_type(bases)
     for i in range(len(MOVEMENT_SUFFIXES) + 1):
         name = data + ''.join(MOVEMENT_SUFFIXES[:i][::-1])
         movement_type = getattr(movement_types, name, None)
@@ -213,19 +224,15 @@ def load_piece(data: dict | str | None, board: Board, from_dict: dict | None) ->
 
 
 def save_custom_movement_type(movement: type[BaseMovement]) -> list[str]:
-    if movement.__module__ == movement_types.__name__:
-        return [save_movement_type(movement)]
-    return [
-        save_movement_type(base)
-        for base in movement.__bases__
-        if issubclass(base, BaseMovement)
-           and base.__module__ == movement_types.__name__
-    ]
+    return [save_movement_type(base) for base in movement.__bases__ if issubclass(base, BaseMovement)]
 
 
 def load_custom_movement_type(bases: dict[str, type[BaseMovement]]) -> type[BaseMovement]:
     if len(bases) == 1:
         return list(bases.values())[0]
+    # Here's the issue: moves have a movement_type attribute, which is used for direct comparisons. If we want to load a
+    # multiclass movement type, it will not be equal to the original movement type, even if it is functionally the same.
+    # A name-based comparison is used as a workaround when directly comparing moves, but who knows what else will break?
     name = CUSTOM_PREFIX + '_'.join(bases)
     bases = list(v for k, v in bases.items())
     return type(name, (*bases, BaseMovement), {})  # type: ignore
@@ -254,7 +261,7 @@ def save_movement(movement: BaseMovement | frozenset | None) -> list | str | Non
     args = list(movement.__copy_args__()[1:])  # store arguments of the movement (except the board argument)
     while not args[-1]:  # some movement classes have optional __init__() arguments with falsy defaults that
         args.pop()  # aren't needed to reconstruct the movement, so we can remove the trailing ones and then
-    return save_custom_movement_type(type(movement)) + [save_arg(arg) for arg in args]  # save data as list.
+    return [save_movement_type(type(movement))] + [save_arg(arg) for arg in args]  # save the data as a list
 
 
 def load_movement(data: list | str | None, board: Board, from_dict: dict | None) -> BaseMovement | frozenset | None:
@@ -276,11 +283,11 @@ def load_movement(data: list | str | None, board: Board, from_dict: dict | None)
     if data == UNSET_STRING:  # otherwise, we need to load the movement type and the rest of the arguments, so that we
         return Unset  # can create a new instance of the movement type with the arguments we just loaded. very simple.
     bases, data_copy = {}, data.copy()  # oh boy, here comes the hard part. we need to load the movement classes first
-    for i, base_string in enumerate(data):  # for every base class string in front of the data list, we need to load a
-        if isinstance(base_string, str) and (base := load_movement_type(base_string)):  # movement class corresponding
-            bases[base_string] = base  # to that string. but if we can't, we assume that the movement classes have all
-            data_copy.pop(i)  # been loaded and that the rest are arguments. so we remove the leading strings from the
-        else:  # argument list until we encounter something that isn't a base string. that's when we know we are done,
+    for i, base_string in enumerate(data):  # for every base class string or list that's at the start of the data list
+        if base := load_movement_type(base_string):  # we need to load a movement class corresponding to the string or
+            bases[base_string] = base  # list. but once we can't, we assume that all the movement classes have already
+            data_copy.pop(i)  # been loaded and that the rest are arguments. so we remove the leading entries from the
+        else:  # argument list until we encounter something that is not a base entry. that's when we know we are done,
             break  # and we can move on to loading the arguments. the bases are stored in a dict for easy access later
     args = board, *[load_arg(arg) for arg in data_copy]  # we need to load the arguments alongside the board object...
     return load_custom_movement_type(bases)(*args)  # and that's it. we are done. movement loaded successfully. maybe.

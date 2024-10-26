@@ -7,7 +7,7 @@ from json import dumps
 from typing import TYPE_CHECKING, TextIO
 
 from chess.data import piece_groups, get_piece_types, get_set_name
-from chess.movement.types import BaseMovement, DropMovement
+from chess.movement.types import DropMovement
 from chess.movement.util import to_algebraic as toa, from_algebraic as fra, from_algebraic_map as frm
 from chess.pieces.groups import classic as fide
 from chess.pieces.piece import Piece
@@ -391,7 +391,7 @@ def debug_info(board: Board) -> list[str]:
             states = [x for x in [0, 1, -1, 2, -2] if x in order_rules]
             for state in states:
                 state_rules = order_rules[state]
-                state_explanation = {
+                state_string = {
                     0: "Default",
                     1: "White is NOT in check",
                     2: "Black is NOT in check",
@@ -399,9 +399,9 @@ def debug_info(board: Board) -> list[str]:
                     -2: "Black is in check"
                 }.get(state, "Unknown")
                 if state_rules is None:
-                    debug_log_data.append(f"    State {state} ({state_explanation}): Any")
+                    debug_log_data.append(f"    State {state} ({state_string}): Any")
                     continue
-                debug_log_data.append(f"    State {state} ({state_explanation}) ({len(state_rules)}):")
+                debug_log_data.append(f"    State {state} ({state_string}) ({len(state_rules)}):")
                 for last in sorted(state_rules):
                     last_rules = state_rules[last]
                     not_last = False
@@ -410,8 +410,6 @@ def debug_info(board: Board) -> list[str]:
                     not_last = 'not ' if not_last else ''
                     last_string = (
                         "Any last move" if last == '*' else
-                        f"Last move was {not_last}{last.__name__}"
-                        if isinstance(last, type) and issubclass(last, BaseMovement) else
                         f"Last move was {not_last}{last}"
                     )
                     if last_rules is None:
@@ -433,38 +431,36 @@ def debug_info(board: Board) -> list[str]:
                             debug_log_data.append(f"        {piece_string}: Any")
                             continue
                         debug_log_data.append(f"        {piece_string} ({len(piece_rules)}):")
-                        for tag in piece_rules:
-                            tag_rules = piece_rules[tag]
-                            not_tag = False
-                            if isinstance(tag, tuple) and tag[0] is False:
-                                not_tag, tag = tag
-                            not_tag = "Not " if not_tag else ''
-                            tag_string = (
-                                "Any move" if tag == '*' else
-                                ("Not last move" if not_tag else "Last move") if tag == '' else
-                                f"{not_tag}{tag.__name__}"
-                                if isinstance(tag, type) and issubclass(tag, BaseMovement) else
-                                f"{not_tag}{tag}"
+                        for move_type in piece_rules:
+                            type_rules = piece_rules[move_type]
+                            not_type = False
+                            if isinstance(move_type, tuple) and move_type[0] is False:
+                                not_type, move_type = move_type
+                            not_type = "Not " if not_type else ''
+                            type_string = (
+                                "Any move" if move_type == '*' else
+                                ("Not last move" if not_type else "Last move") if move_type == '' else
+                                f"{not_type}{move_type}"
                             )
-                            if tag_rules is None:
-                                debug_log_data.append(f"          {tag_string}: Any")
+                            if type_rules is None:
+                                debug_log_data.append(f"          {type_string}: Any")
                                 continue
-                            debug_log_data.append(f"          {tag_string} ({len(tag_rules)}):")
-                            for move_type in tag_rules:
-                                type_string = {
+                            debug_log_data.append(f"          {type_string} ({len(type_rules)}):")
+                            for action in type_rules:
+                                action_string = {
                                     'm': "Move",
                                     'c': "Capture",
                                     'd': "Drop",
                                     'p': "Pass",
-                                }.get(move_type, "Unknown")
-                                check_rule = tag_rules[move_type]
-                                check_explanation = {
+                                }.get(action, "Unknown")
+                                check_rule = type_rules[action]
+                                check_string = {
                                     0: "Any", None: "Any",
                                     1: "Only as check",
                                     -1: "Never as check",
                                 }.get(check_rule, "Unknown")
-                                debug_log_data.append(f"            {type_string}: {check_rule} ({check_explanation})")
-                            if not tag_rules:
+                                debug_log_data.append(f"            {action_string}: {check_rule} ({check_string})")
+                            if not type_rules:
                                 debug_log_data[-1] += " None"
                         if not piece_rules:
                             debug_log_data[-1] += " None"

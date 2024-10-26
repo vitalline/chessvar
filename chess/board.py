@@ -548,11 +548,11 @@ class Board(Window):
                 side[0].value if side[1] is None else
                 [side[0].value, unpack([{k: v for k, v in {
                     'order': d.get('order'),
-                    'cls': unpack([t for t in d.get('cls', [])]),
-                    'tag': unpack([t for t in d.get('tag', [])]),
-                    'last': unpack([i for i in d.get('last', [])]),
-                    'type': d.get('type', ''),
                     'state': d.get('state', 0),
+                    'last': unpack([i for i in d.get('last', [])]),
+                    'piece': unpack([t for t in d.get('piece', [])]),
+                    'type': unpack([t for t in d.get('type', [])]),
+                    'action': d.get('action', ''),
                     'check': d.get('check', 0),
                 }.items() if v} for d in side[1]])]
                 for side in self.custom_turn_order
@@ -778,11 +778,11 @@ class Board(Window):
         self.custom_turn_order = [
             (Side(int(side[0])), [{k: v for k, v in {
                 'order': d.get('order', 0),
-                'cls': [t for t in repack(d.get('cls', []))],
-                'tag': [t for t in repack(d.get('tag', []))],
-                'last': [t for t in repack(d.get('last', []))],
-                'type': d.get('type', ''),
                 'state': d.get('state', 0),
+                'last': [t for t in repack(d.get('last', []))],
+                'piece': [t for t in repack(d.get('piece', []))],
+                'type': [t for t in repack(d.get('type', []))],
+                'action': d.get('action', ''),
                 'check': d.get('check', 0),
             }.items() if v} for d in repack(side[1])])
             if isinstance(side, list) and len(side) > 1 else (Side(int(side)), None)
@@ -1182,24 +1182,24 @@ class Board(Window):
                     data_state = data_order.setdefault(int(rule.get('state', 0)), {})
                     for last in rule.get('last', '*'):
                         if last and last[0] == '!':
-                            last = (False, load_movement_type(last[1:]) or last[1:])
+                            last = (False, load_movement_type(last[1:]).__name__ or last[1:])
                         else:
-                            last = load_movement_type(last) or last
+                            last = load_movement_type(last).__name__ or last
                         data_last = data_state.setdefault(last, {})
-                        for piece in rule.get('cls', '*'):
+                        for piece in rule.get('piece', '*'):
                             if piece and piece[0] == '!':
                                 piece = (False, load_piece_type(piece[1:], self.custom_pieces) or piece[1:])
                             else:
                                 piece = load_piece_type(piece, self.custom_pieces) or piece
                             data_cls = data_last.setdefault(piece, {})
-                            for tag in rule.get('tag', '*'):
-                                if tag and tag[0] == '!':
-                                    tag = (False, load_movement_type(tag[1:]) or tag[1:])
+                            for move_type in rule.get('type', '*'):
+                                if move_type and move_type[0] == '!':
+                                    move_type = (False, load_movement_type(move_type[1:]).__name__ or move_type[1:])
                                 else:
-                                    tag = load_movement_type(tag) or tag
-                                data_tag = data_cls.setdefault(tag, {})
-                                for move_type in rule.get('type', 'mcd'):
-                                    data_tag.setdefault(move_type[0], int(rule.get('check', 0)))
+                                    move_type = load_movement_type(move_type).__name__ or move_type
+                                data_type = data_cls.setdefault(move_type, {})
+                                for action in rule.get('action', 'mcd'):
+                                    data_type.setdefault(action[0], int(rule.get('check', 0)))
                 turn = (side, fmt_rules)
             (loop_turns if start_ended else start_turns).append(turn)
         if start_turns and not loop_turns and not start_ended:
@@ -1537,7 +1537,7 @@ class Board(Window):
                                 last_history_pieces.append(moved_piece)
                             while last_history_move:
                                 if last_history_move.movement_type:
-                                    last_history_types.add(last_history_move.movement_type)
+                                    last_history_types.add(last_history_move.movement_type.__name__)
                                 if last_history_move.tag:
                                     last_history_tags.add(last_history_move.tag)
                                 last_history_move = last_history_move.chained_move
@@ -1547,19 +1547,19 @@ class Board(Window):
                                         if moved_piece.side != turn_side:
                                             break
                                         last_history_pieces.append(moved_piece)
-                match_tags = [
+                match_types = [
                     k for rules in state_rules for k in rules
                     if k == '*' or k in last_history_tags or k in last_history_types
                     or isinstance(k, tuple) and k[0] is False
                     and k[1] not in last_history_tags and k[1] not in last_history_types
                 ] if state_rules is not None else None
-                last_tag_rules = [
-                    rules[k] for rules in state_rules for k in match_tags if rules.get(k) is not None
+                last_type_rules = [
+                    rules[k] for rules in state_rules for k in match_types if rules.get(k) is not None
                 ] if state_rules is not None else None
-                for type_rules in (last_tag_rules or ()):
-                    any_type_rules = type_rules.get('*') or {}
-                    tag_rules = [rules for rules in [any_type_rules.get(s) for s in ('*', None)] if rules]
-                    pass_turn_options = {x for x in [rules.get('p') for rules in tag_rules if rules] if x is not None}
+                for last_type_rule in (last_type_rules or ()):
+                    piece_rules = last_type_rule.get('*') or {}
+                    type_rules = [rules for rules in [piece_rules.get('*')] if rules]
+                    pass_turn_options = {x for x in [rules.get('p') for rules in type_rules if rules] if x is not None}
                     if 0 in pass_turn_options:
                         self.moves[turn_side]['pass'] = True
                     elif pass_turn_options.intersection({1, -1}):
@@ -1583,16 +1583,16 @@ class Board(Window):
                             continue
                         if piece_type not in piece_rule_dict:
                             piece_rule_dict[piece_type] = []
-                            for rules in last_tag_rules:
+                            for rules in last_type_rules:
                                 for k in rules:
                                     if (
                                         k == '*' or k == piece_type
                                         or isinstance(k, tuple) and k[0] is False and k[1] != piece_type
                                     ):
                                         piece_rule_dict[piece_type].append(rules[k])
-                        tag_rules = [rules[s] for s in ['*'] for rules in piece_rule_dict[piece_type]]
+                        type_rules = [rules[s] for s in ['*'] for rules in piece_rule_dict[piece_type]]
                         options = {k: [] for k, v in {'d': self.use_drops}.items() if v}
-                        for rules in tag_rules:
+                        for rules in type_rules:
                             for option in options:
                                 if option in rules:
                                     options[option].append(rules[option])
@@ -1605,11 +1605,11 @@ class Board(Window):
                                 break
                 for piece in movable_pieces[turn_side] if chain_moves is None else [last_chain_move.piece]:
                     if type(piece) not in piece_rule_dict:
-                        if last_tag_rules is None:
+                        if last_type_rules is None:
                             piece_rule_dict[type(piece)] = None
                         else:
                             piece_rule_dict[type(piece)] = []
-                            for rules in last_tag_rules:
+                            for rules in last_type_rules:
                                 for k in rules:
                                     if (
                                         k in ('*', type(piece))
@@ -1619,7 +1619,7 @@ class Board(Window):
                     piece_rules = copy(piece_rule_dict[type(piece)])
                     if piece_rules is not None:
                         history_piece_rules = []
-                        for rules in last_tag_rules:
+                        for rules in last_type_rules:
                             for k in rules:
                                 if k == '' and piece in last_history_pieces:
                                     history_piece_rules.append(rules[k])
@@ -1631,38 +1631,40 @@ class Board(Window):
                             piece_rules = None
                     if not piece_rules and piece_rules is not None:
                         continue
-                    tag_rule_dict = {}
+                    type_rule_dict = {}
                     for move in piece.moves() if chain_moves is None else chain_moves:
-                        tag_options = {x for x in (move.tag, move.movement_type) if x}
-                        for tag in tag_options:
-                            if tag not in tag_rule_dict:
+                        movement_type = move.movement_type.__name__
+                        type_options = {x for x in (move.tag, movement_type) if x}
+                        for move_type in type_options:
+                            if move_type not in type_rule_dict:
                                 if piece_rules is None:
-                                    tag_rule_dict[tag] = None
+                                    type_rule_dict[move_type] = None
                                 else:
-                                    tag_rule_dict[tag] = []
+                                    type_rule_dict[move_type] = []
                                     for rules in piece_rules:
                                         for k in rules:
                                             if (
-                                                k in ('*', tag)
+                                                k in ('*', move_type)
                                                 or isinstance(k, tuple) and k[0] is False
-                                                and k[1] not in ('', move.tag, move.movement_type)
+                                                and k[1] not in ('', move.tag, movement_type)
                                             ):
-                                                tag_rule_dict[tag].append(rules[k])
-                        tag = move.tag or move.movement_type
-                        tag_rules = copy(tag_rule_dict[tag])
-                        if tag_rules is not None:
-                            history_tag_rules = []
+                                                type_rule_dict[move_type].append(rules[k])
+                        move_type = move.tag or movement_type
+                        type_rules = copy(type_rule_dict[move_type])
+                        if type_rules is not None:
+                            history_type_rules = []
                             for rules in piece_rules:
                                 for k in rules:
-                                    if k == '' and tag in last_history_tags:
-                                        history_tag_rules.append(rules[k])
-                                    if k == (False, '') and tag not in last_history_tags:
-                                        history_tag_rules.append(rules[k])
-                            if history_tag_rules is not None:
-                                tag_rules.extend(history_tag_rules)
+                                    history_match = (move_type in last_history_tags or move_type in last_history_types)
+                                    if k == '' and history_match:
+                                        history_type_rules.append(rules[k])
+                                    if k == (False, '') and not history_match:
+                                        history_type_rules.append(rules[k])
+                            if history_type_rules is not None:
+                                type_rules.extend(history_type_rules)
                             else:
-                                tag_rules = None
-                        if not tag_rules and tag_rules is not None:
+                                type_rules = None
+                        if not type_rules and type_rules is not None:
                             continue
                         self.update_move(move)
                         options = {k: [] for k, v in {
@@ -1670,8 +1672,8 @@ class Board(Window):
                             'c': move.captured_piece,
                             'p': 'pass' not in self.moves[turn_side],
                         }.items() if v}
-                        if tag_rules is not None:
-                            for rules in tag_rules:
+                        if type_rules is not None:
+                            for rules in type_rules:
                                 for option in options:
                                     if option in rules:
                                         options[option].append(rules[option])
