@@ -93,10 +93,6 @@ class Board(Window):
         self.square_was_clicked = False  # used to discern two-click moving from dragging
         self.piece_was_selected = False  # used to discern between selecting a piece and moving it
         self.held_buttons = 0  # mouse button that was pressed
-        self.en_passant_target = None  # piece that can be captured en passant
-        self.en_passant_markers = set()  # squares where it can be captured
-        self.castling_ep_target = None  # piece that can be captured en passant after castling
-        self.castling_ep_markers = set()  # squares where it can be captured that way
         self.promotion_piece = None  # piece that is currently being promoted
         self.promotion_area = {}  # squares to draw possible promotions on
         self.promotion_area_drops = {}  # dropped pieces matching the squares above
@@ -2132,6 +2128,9 @@ class Board(Window):
                     for pos in list(side_target_dict):
                         if move and pos == move.pos_to:
                             continue
+                        if False in side_target_dict.get(pos, {}):
+                            side_target_dict[pos].discard(False)
+                            continue
                         if True not in side_target_dict.get(pos, {}) or side == next_side and side != current_side:
                             markers = side_target_dict.pop(pos, ())
                             for marker in markers:
@@ -2164,6 +2163,7 @@ class Board(Window):
             and move.piece in self.royal_pieces[move.piece.side]
         ):
             self.royal_ep_targets.get(move.piece.side, {}).setdefault(move.pos_to, set()).add(move.pos_to)
+            self.royal_ep_markers.get(move.piece.side, {})[move.pos_to] = move.pos_to
 
     def reload_en_passant_markers(self) -> None:
         self.clear_en_passant_markers()
@@ -2179,6 +2179,14 @@ class Board(Window):
                 and not issubclass(move.movement_type, (CloneMovement, DropMovement))
             ):
                 move.piece.movement.undo(move, move.piece)
+            chained_move = move.chained_move
+            while chained_move:
+                if (
+                    move.is_edit != 1 and move.movement_type and move.piece.movement
+                    and not issubclass(move.movement_type, (CloneMovement, DropMovement))
+                ):
+                    move.piece.movement.undo(move, move.piece)
+                    chained_move = chained_move.chained_move
             if move.is_edit:
                 last_moves.append(move)
                 continue
@@ -2201,7 +2209,13 @@ class Board(Window):
             self.update_en_passant_markers(move)
             chained_move = move.chained_move
             while chained_move:
+                if (
+                    move.is_edit != 1 and move.movement_type and move.piece.movement
+                    and not issubclass(move.movement_type, (CloneMovement, DropMovement))
+                ):
+                    move.piece.movement.update(move, move.piece)
                 self.update_en_passant_markers(chained_move)
+                chained_move = chained_move.chained_move
             if move.is_edit:
                 continue
             self.ply_count += 1

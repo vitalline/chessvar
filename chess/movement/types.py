@@ -96,12 +96,27 @@ class BaseDirectionalMovement(BaseMovement):
                 self.advance_direction(move, direction, pos_from, piece)
                 if self.skip_condition(move, direction, piece, theoretical):
                     continue
-                if not theoretical and move.pos_to in self.board.royal_ep_markers:
-                    for chained_move in (
-                        Move(move.pos_to, self.board.royal_ep_markers[move.pos_to], RoyalEnPassantMovement),
-                        Move(move.pos_to, move.pos_to, move.movement_type),
-                    ):
-                        yield copy(move).set(chained_move=chained_move)
+                if not theoretical:
+                    royal_ep_markers = self.board.royal_ep_markers.get(piece.side.opponent(), {})
+                    if move.pos_to in royal_ep_markers:
+                        for chained_move in (
+                            Move(
+                                pos_from=move.pos_to,
+                                pos_to=royal_ep_markers[move.pos_to],
+                                movement_type=RoyalEnPassantMovement,
+                                piece=piece,
+                                captured_piece=self.board.get_piece(royal_ep_markers[move.pos_to]),
+                            ),
+                            Move(
+                                pos_from=move.pos_to,
+                                pos_to=move.pos_to,
+                                movement_type=move.movement_type,
+                                piece=piece,
+                            ),
+                        ):
+                            yield copy(move).set(chained_move=chained_move)
+                    else:
+                        yield move
                 else:
                     yield move
                 self.steps = steps  # this is a hacky way to make sure the step count stays correct after the yield
@@ -429,6 +444,8 @@ class CastlingMovement(BaseMovement):
                     marker_set = set(positions)
                     if isinstance(piece, Slow):
                         marker_set.add(True)
+                    else:
+                        marker_set.add(False)
                     self.board.royal_ep_targets.get(piece.side, {})[move.pos_to] = marker_set
                     for pos in positions:
                         self.board.royal_ep_markers.get(piece.side, {})[pos] = move.pos_to
