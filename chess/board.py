@@ -1551,8 +1551,6 @@ class Board(Window):
                                         if moved_piece.side != turn_side:
                                             break
                                         last_history_pieces.append(moved_piece)
-                if not last_history_tags:
-                    last_history_tags.add(None)
                 match_tags = [
                     k for rules in state_rules for k in rules
                     if k == '*' or k in last_history_tags or k in last_history_types
@@ -1640,8 +1638,6 @@ class Board(Window):
                     tag_rule_dict = {}
                     for move in piece.moves() if chain_moves is None else chain_moves:
                         tag_options = {x for x in (move.tag, move.movement_type) if x}
-                        if not tag_options:
-                            tag_options = {None}
                         for tag in tag_options:
                             if tag not in tag_rule_dict:
                                 if piece_rules is None:
@@ -1656,9 +1652,7 @@ class Board(Window):
                                                 and k[1] not in ('', move.tag, move.movement_type)
                                             ):
                                                 tag_rule_dict[tag].append(rules[k])
-                        tag = move.tag
-                        if tag is None and None not in tag_rule_dict:
-                            tag = move.movement_type
+                        tag = move.tag or move.movement_type
                         tag_rules = copy(tag_rule_dict[tag])
                         if tag_rules is not None:
                             history_tag_rules = []

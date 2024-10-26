@@ -98,8 +98,8 @@ class BaseDirectionalMovement(BaseMovement):
                     continue
                 if not theoretical and move.pos_to in self.board.royal_ep_markers:
                     for chained_move in (
-                        Move(move.pos_to, move.pos_to),
                         Move(move.pos_to, self.board.royal_ep_markers[move.pos_to], RoyalEnPassantMovement),
+                        Move(move.pos_to, move.pos_to, move.movement_type),
                     ):
                         yield copy(move).set(chained_move=chained_move)
                 else:

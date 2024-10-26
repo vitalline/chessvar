@@ -405,13 +405,11 @@ def debug_info(board: Board) -> list[str]:
                 for last in sorted(state_rules):
                     last_rules = state_rules[last]
                     not_last = False
-                    if last and last[0] is False:
+                    if isinstance(last, tuple) and last[0] is False:
                         not_last, last = last
                     not_last = 'not ' if not_last else ''
                     last_string = (
                         "Any last move" if last == '*' else
-                        f"Last move was {not_last}made earlier" if last == '' else
-                        f"Last move was {not_last}untagged" if last is None else
                         f"Last move was {not_last}{last.__name__}"
                         if isinstance(last, type) and issubclass(last, BaseMovement) else
                         f"Last move was {not_last}{last}"
@@ -423,22 +421,27 @@ def debug_info(board: Board) -> list[str]:
                     for piece in last_rules:
                         piece_rules = last_rules[piece]
                         not_piece = False
-                        if piece and piece[0] is False:
+                        if isinstance(piece, tuple) and piece[0] is False:
                             not_piece, piece = piece
-                        not_piece = 'Not ' if not_piece else ''
+                        not_piece = "Not " if not_piece else ''
+                        piece_string = (
+                            "Any piece" if piece == '*' else
+                            ("Not last piece" if not_piece else "Last piece") if piece == '' else
+                            f"{not_piece}{piece.name}"
+                        )
                         if piece_rules is None:
-                            debug_log_data.append(f"        {not_piece}{piece.name}: Any")
+                            debug_log_data.append(f"        {piece_string}: Any")
                             continue
-                        debug_log_data.append(f"        {not_piece}{piece.name} ({len(piece_rules)}):")
+                        debug_log_data.append(f"        {piece_string} ({len(piece_rules)}):")
                         for tag in piece_rules:
                             tag_rules = piece_rules[tag]
                             not_tag = False
-                            if tag and tag[0] is False:
+                            if isinstance(tag, tuple) and tag[0] is False:
                                 not_tag, tag = tag
-                            not_tag = 'Not ' if not_tag else ''
+                            not_tag = "Not " if not_tag else ''
                             tag_string = (
-                                "Any" if tag == '*' else
-                                f"{not_tag}Untagged" if tag is None else
+                                "Any move" if tag == '*' else
+                                ("Not last move" if not_tag else "Last move") if tag == '' else
                                 f"{not_tag}{tag.__name__}"
                                 if isinstance(tag, type) and issubclass(tag, BaseMovement) else
                                 f"{not_tag}{tag}"
