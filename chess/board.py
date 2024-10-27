@@ -1945,19 +1945,19 @@ class Board(Window):
                         return copy(to_moves[0])
         return None
 
-    def show_moves(self) -> None:
+    def show_moves(self, with_markers: bool | None = None) -> None:
         self.hide_moves()
         self.update_caption()
         move_sprites = dict()
+        with_markers = not self.should_hide_moves if with_markers is None else with_markers
         pos = self.selected_square or self.hovered_square
         if not pos and self.is_active:
             pos = self.highlight_square
-        if self.on_board(pos):
+        if self.on_board(pos) and with_markers:
             piece = self.get_piece(pos)
-            hide_moves = self.should_hide_moves
-            if hide_moves is None:
-                hide_moves = piece.is_hidden
-            if not piece.is_empty() and not hide_moves:
+            if with_markers is None:
+                with_markers = not piece.is_hidden
+            if not piece.is_empty() and with_markers:
                 if self.display_theoretical_moves.get(piece.side, False):
                     move_dict = self.theoretical_moves.get(piece.side, {})
                 elif self.display_moves.get(piece.side, False):
@@ -2501,6 +2501,8 @@ class Board(Window):
             last_move.chained_move = move
         if move.chained_move is Unset and not self.promotion_piece:
             self.load_moves()
+            self.show_moves(False)
+            self.draw(0)
             self.select_piece(move.pos_to)
             if self.auto_moves and self.board_config['fast_chain'] and not self.game_over:
                 self.try_auto()
@@ -4122,6 +4124,8 @@ class Board(Window):
                     last_move.chained_move = deepcopy(move)
                 if not is_final and not self.promotion_piece:
                     self.load_moves()
+                    self.show_moves(False)
+                    self.draw(0)
                     self.select_piece(move.pos_to)
                     if self.auto_moves and self.board_config['fast_chain'] and not self.game_over:
                         self.try_auto()
