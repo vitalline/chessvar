@@ -2874,6 +2874,7 @@ class Board(Window):
         self.chain_start = None
         self.chain_moves = {side: {} for side in self.chain_moves}
         self.update_status()
+        self.draw(0)
         if self.auto_moves and self.board_config['fast_moves'] and not self.game_over:
             if self.try_auto():
                 return
