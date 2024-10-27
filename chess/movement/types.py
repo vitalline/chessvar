@@ -47,12 +47,14 @@ class BaseMovement(object):
         return self.__copy__()
 
 
-class BaseDirectionalMovement(BaseMovement):
-    def __init__(self, board: Board, directions: list[AnyDirection] | None = None, loop: int = 0):
+class RiderMovement(BaseMovement):
+    def __init__(self, board: Board, directions: list[AnyDirection] | None = None, boundless: int = 0, loop: int = 0):
         super().__init__(board)
         self.directions = directions or []
+        self.boundless = boundless
         self.loop = loop
         self.steps = 0
+        self.bounds = []
 
     def initialize_direction(self, direction: AnyDirection, pos_from: Position, piece: Piece) -> None:
         pass
@@ -60,18 +62,27 @@ class BaseDirectionalMovement(BaseMovement):
     def advance_direction(self, move: Move, direction: AnyDirection, pos_from: Position, piece: Piece) -> None:
         pass
 
-    def skip_condition(self, move: Move, direction: AnyDirection, piece: Piece, theoretical: bool = False) -> bool:
-        return False
-
-    def stop_condition(self, move: Move, direction: AnyDirection, piece: Piece, theoretical: bool = False) -> bool:
-        return False
-
     def transform(self, pos: Position) -> Position:
         return pos
+
+    def in_bounds(self, pos: Position) -> bool:
+        return all(self.bounds[i][0] <= pos[i] < self.bounds[i][1] for i in range(2))
 
     def moves(self, pos_from: Position, piece: Piece, theoretical: bool = False):
         if self.board.not_on_board(pos_from):
             return ()
+        board_size = self.board.board_height, self.board.board_width
+        if self.boundless:
+            self.bounds = [[0, board_size[i]] for i in range(2)]
+        else:
+            blanks = [self.board.blank_rows, self.board.blank_cols]
+            blanks = [[0] + blanks[i] + [board_size[i]] for i in range(2)]
+            self.bounds = [
+                [
+                    max(x for x in blanks[i] if x <= pos_from[i]),
+                    min(x for x in blanks[i] if x > pos_from[i])
+                ] for i in range(2)
+            ]
         direction_id = 0
         while direction_id < len(self.directions):
             direction = piece.side.direction(self.directions[direction_id])
@@ -85,7 +96,7 @@ class BaseDirectionalMovement(BaseMovement):
             self.initialize_direction(direction, pos_from, piece)
             current_pos = pos_from
             move = Move(pos_from, self.transform(current_pos), type(self))
-            while self.board.on_board(self.transform(current_pos)):
+            while self.in_bounds(self.transform(current_pos)):
                 if self.stop_condition(move, direction, piece, theoretical):
                     direction_id += 1
                     break
@@ -124,11 +135,6 @@ class BaseDirectionalMovement(BaseMovement):
             else:
                 direction_id += 1
 
-    def __copy_args__(self):
-        return self.board, copy(self.directions)
-
-
-class RiderMovement(BaseDirectionalMovement):
     def skip_condition(self, move: Move, direction: AnyDirection, piece: Piece, theoretical: bool = False) -> bool:
         if len(direction) < 4:
             return False
@@ -141,7 +147,7 @@ class RiderMovement(BaseDirectionalMovement):
     def stop_condition(self, move: Move, direction: AnyDirection, piece: Piece, theoretical: bool = False) -> bool:
         next_pos_to = self.transform(add(move.pos_from, mul(direction[:2], self.steps + 1)))
         return (
-            self.board.not_on_board(next_pos_to)
+            not self.in_bounds(next_pos_to)
             or ((move.pos_from == move.pos_to and self.steps) if self.loop else (move.pos_from == next_pos_to))
             or len(direction) > 2 and direction[2] and self.steps >= direction[2]
             or ((
@@ -153,32 +159,42 @@ class RiderMovement(BaseDirectionalMovement):
             ))
         )
 
+    def __copy_args__(self):
+        return self.board, copy(self.directions), self.boundless, self.loop
+
 
 class HalflingRiderMovement(RiderMovement):
-    def __init__(self, board: Board, directions: list[AnyDirection] | None = None, shift: int = 0, loop: int = 0):
-        super().__init__(board, directions, loop)
+    def __init__(
+        self, board: Board,
+        directions: list[AnyDirection] | None = None,
+        shift: int = 0, boundless: int = 0, loop: int = 0
+    ):
+        super().__init__(board, directions, boundless, loop)
         self.shift = shift
         self.max_steps = 0
 
-    def steps_to_edge(self, position: int, direction: int, size: int) -> int:
+    def steps_to_edge(self, position: int, direction: int, start: int, stop: int) -> int:
         if direction == 0:
-            return size
-        return (((size - position - 1) if direction > 0 else position) - self.shift) // abs(direction)
+            return stop - start
+        return (((stop - 1 - position) if direction > 0 else position - start) - self.shift) // abs(direction)
 
     def initialize_direction(self, direction: AnyDirection, pos_from: Position, piece: Piece) -> None:
-        board_size = self.board.board_height, self.board.board_width
-        self.max_steps = min(ceil(self.steps_to_edge(pos_from[i], direction[i], board_size[i]) / 2) for i in range(2))
+        self.max_steps = min(ceil(self.steps_to_edge(pos_from[i], direction[i], *self.bounds[i]) / 2) for i in range(2))
 
     def stop_condition(self, move: Move, direction: AnyDirection, piece: Piece, theoretical: bool = False) -> bool:
         return self.steps >= self.max_steps or super().stop_condition(move, direction, piece, theoretical)
 
     def __copy_args__(self):
-        return self.board, copy(self.directions), self.shift, self.loop
+        return self.board, copy(self.directions), self.shift, self.boundless, self.loop
 
 
 class CannonRiderMovement(RiderMovement):
-    def __init__(self, board: Board, directions: list[AnyDirection] | None = None, distance: int = 0, loop: int = 0):
-        super().__init__(board, directions, loop)
+    def __init__(
+        self, board: Board,
+        directions: list[AnyDirection] | None = None,
+        distance: int = 0, boundless: int = 0, loop: int = 0
+    ):
+        super().__init__(board, directions, boundless, loop)
         self.distance = distance
         self.jumped = -1
 
@@ -208,10 +224,17 @@ class CannonRiderMovement(RiderMovement):
             return True
         return super().stop_condition(move, direction, piece, theoretical or not self.jumped > 0)
 
+    def __copy_args__(self):
+        return self.board, copy(self.directions), self.distance, self.boundless, self.loop
+
 
 class HopperRiderMovement(CannonRiderMovement):
-    def __init__(self, board: Board, directions: list[AnyDirection] | None = None, distance: int = 0, loop: int = 0):
-        super().__init__(board, directions, distance, loop)
+    def __init__(
+        self, board: Board,
+        directions: list[AnyDirection] | None = None,
+        distance: int = 0, boundless: int = 0, loop: int = 0
+    ):
+        super().__init__(board, directions, distance, boundless, loop)
         self.capture = None
 
     def initialize_direction(self, direction: AnyDirection, pos_from: Position, piece: Piece) -> None:
@@ -241,8 +264,8 @@ class HopperRiderMovement(CannonRiderMovement):
 
 class SpaciousRiderMovement(RiderMovement):
     def spacious_transform(self, pos: Position) -> Position:
-        # return pos[0] % self.board.board_height, pos[1] % self.board.board_width
         return pos  # as much as i like the idea of a toroidal movement condition, it's just not practical for this game
+        # but if you want to use the "canon" rules for spacious movement, you can use TrueSpaciousRiderMovement instead.
 
     def skip_condition(self, move: Move, direction: AnyDirection, piece: Piece, theoretical: bool = False) -> bool:
         next_pos_to = self.transform(add(move.pos_from, mul(direction[:2], self.steps + 1)))
@@ -253,25 +276,31 @@ class SpaciousRiderMovement(RiderMovement):
 
 class TrueSpaciousRiderMovement(SpaciousRiderMovement):
     def spacious_transform(self, pos: Position) -> Position:
-        return pos[0] % self.board.board_height, pos[1] % self.board.board_width
+        new_pos = (
+            (pos[i] - self.bounds[i][0]) % (self.bounds[i][1] - self.bounds[i][0]) + self.bounds[i][0] for i in range(2)
+        )
+        return tuple(new_pos)  # type: ignore
 
 
 class ToroidalRiderMovement(RiderMovement):
     # Looping movement along both axes
     def transform(self, pos: Position) -> Position:
-        return pos[0] % self.board.board_height, pos[1] % self.board.board_width
+        new_pos = (
+            (pos[i] - self.bounds[i][0]) % (self.bounds[i][1] - self.bounds[i][0]) + self.bounds[i][0] for i in range(2)
+        )
+        return tuple(new_pos)  # type: ignore
 
 
 class FileCylindricalRiderMovement(RiderMovement):
     # Looping movement along the file (vertical) axis
     def transform(self, pos: Position) -> Position:
-        return pos[0] % self.board.board_height, pos[1]
+        return (pos[0] - self.bounds[0][0]) % (self.bounds[0][1] - self.bounds[0][0]) + self.bounds[0][0], pos[1]
 
 
 class RankCylindricalRiderMovement(RiderMovement):
     # Looping movement along the rank (horizontal) axis
     def transform(self, pos: Position) -> Position:
-        return pos[0], pos[1] % self.board.board_width
+        return pos[0], (pos[1] - self.bounds[1][0]) % (self.bounds[1][1] - self.bounds[1][0]) + self.bounds[1][0]
 
 
 class CylindricalRiderMovement(RankCylindricalRiderMovement):
@@ -281,9 +310,11 @@ class CylindricalRiderMovement(RankCylindricalRiderMovement):
 class BouncingRiderMovement(RiderMovement):
     # Reflective movement along both axes
     def transform(self, pos: Position) -> Position:
-        bounds = self.board.board_height - 1, self.board.board_width - 1
-        pos = [bounds[i] - abs(pos[i] % (bounds[i] * 2) - bounds[i]) for i in range(2)]
-        return tuple(pos)  # noqa
+        size = [self.bounds[i][1] - self.bounds[i][0] - 1 for i in range(2)]
+        new_pos = (
+            size[i] - abs((pos[i] - self.bounds[i][0]) % (size[i] * 2) - size[i]) + self.bounds[i][0] for i in range(2)
+        )
+        return tuple(new_pos)  # type: ignore
 
 
 class FileBouncingRiderMovement(BouncingRiderMovement):
@@ -594,7 +625,7 @@ class RepeatBentMovement(BaseMultiMovement):
     def __init__(
         self,
         board: Board,
-        movements: list[BaseDirectionalMovement] | None = None,
+        movements: list[RiderMovement] | None = None,
         start_index: int = 0,
         step_count: int = 0,
         skip_count: int = 0,
@@ -627,7 +658,7 @@ class RepeatBentMovement(BaseMultiMovement):
             else:
                 return ()
         movement = copy(self.movements[index])  # copy movement because changing it inside the loop completely breaks it
-        if isinstance(movement, BaseDirectionalMovement):
+        if isinstance(movement, RiderMovement):
             if self.path_split:
                 self.dir_indexes[index] = -1
             is_new = self.dir_indexes[index] < 0
@@ -674,7 +705,7 @@ class RepeatMovement(RepeatBentMovement):
     def __init__(
         self,
         board: Board,
-        movements: list[BaseDirectionalMovement] | None = None,
+        movements: list[RiderMovement] | None = None,
         start_index: int = 0,
         step_count: int = 0,
         skip_count: int = 0,
@@ -698,7 +729,7 @@ class BentMovement(RepeatBentMovement):
     def __init__(
         self,
         board: Board,
-        movements: list[BaseDirectionalMovement] | None = None,
+        movements: list[RiderMovement] | None = None,
         start_index: int = 0,
         loop: int = 0,
     ):
@@ -717,7 +748,7 @@ class SpinMovement(RepeatBentMovement):
     def __init__(
         self,
         board: Board,
-        movements: list[BaseDirectionalMovement] | None = None,
+        movements: list[RiderMovement] | None = None,
         reverse: int = 0,
         start_index: int = 0,
         step_count: int = 0,

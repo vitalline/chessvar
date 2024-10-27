@@ -77,6 +77,7 @@ class Move(object):
             and self.pos_from == other.pos_from
             and self.pos_to == other.pos_to
             # NB: "self.movement_type == other.movement_type" does not work for multiclass types loaded from a save file
+            and self.movement_type is None == other.movement_type is None
             and self.movement_type.__name__ == other.movement_type.__name__
             and type(self.piece) is type(other.piece)
             and type(self.captured_piece) is type(other.captured_piece)
