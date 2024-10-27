@@ -847,14 +847,23 @@ class MultiMovement(BaseMultiMovement):
         else:
             for movement in self.move_or_capture + self.move:
                 for move in movement.moves(pos_from, piece, theoretical):
-                    to_piece = self.board.get_piece(move.pos_to)
-                    if to_piece.is_empty() or piece == to_piece:
+                    chained_move = move
+                    while chained_move:
+                        captured_piece = chained_move.captured_piece or self.board.get_piece(chained_move.pos_to)
+                        if piece.captures(captured_piece) and piece != captured_piece:
+                            break
+                        chained_move = chained_move.chained_move
+                    else:
                         yield copy(move)
             for movement in self.move_or_capture + self.capture:
                 for move in movement.moves(pos_from, piece, theoretical):
-                    captured_piece = move.captured_piece or self.board.get_piece(move.pos_to)
-                    if piece.captures(captured_piece):
-                        yield copy(move)
+                    chained_move = move
+                    while chained_move:
+                        captured_piece = chained_move.captured_piece or self.board.get_piece(chained_move.pos_to)
+                        if piece.captures(captured_piece):
+                            yield copy(move)
+                            break
+                        chained_move = chained_move.chained_move
 
     def __copy_args__(self):
         return self.board, deepcopy(self.move_or_capture), deepcopy(self.move), deepcopy(self.capture)
