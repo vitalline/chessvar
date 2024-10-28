@@ -2206,10 +2206,8 @@ class Board(Window):
                                 for pos in from_markers:
                                     side_marker_dict[pos] = pos_to
         if (
-            move
-            and not move.is_edit
-            and not issubclass(type(move.piece), Fast)
-            and move.piece in self.royal_pieces[move.piece.side]
+            move and not move.is_edit and not issubclass(move.movement_type, (CloneMovement, DropMovement))
+            and not issubclass(type(move.piece), Fast) and move.piece in self.royal_pieces[move.piece.side]
         ):
             self.royal_ep_targets.get(move.piece.side, {}).setdefault(move.pos_to, set()).add(move.pos_to)
             self.royal_ep_markers.get(move.piece.side, {})[move.pos_to] = move.pos_to
@@ -3124,6 +3122,7 @@ class Board(Window):
                     chained_move.piece.move(chained_move)
                     self.update_auto_capture_markers(chained_move)
                     chained_move.set(piece=copy(chained_move.piece))
+            self.update_en_passant_markers(move)
             self.move_history.append(deepcopy(move))
             self.ply_count += not move.is_edit
             self.compare_history()
@@ -3853,6 +3852,7 @@ class Board(Window):
                             if piece == drop:
                                 self.captured_pieces[self.turn_side].pop(-(i + 1))
                                 break
+                        self.update_en_passant_markers(chained_move)
                     chained_move.set(promotion=self.promotion_area[pos])
                     self.replace(self.promotion_piece, self.promotion_area[pos])
                     self.update_promotion_auto_captures(chained_move)
