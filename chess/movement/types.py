@@ -6,7 +6,7 @@ from typing import TYPE_CHECKING
 
 from chess.movement.move import Move
 from chess.movement.util import AnyDirection, Direction, Position, add, sub, mul, ddiv
-from chess.pieces.types import Immune, Slow
+from chess.pieces.types import Fast, Immune, Slow
 from chess.util import Unset
 
 if TYPE_CHECKING:
@@ -475,7 +475,7 @@ class CastlingMovement(BaseMovement):
                     marker_set = set(positions)
                     if isinstance(piece, Slow):
                         marker_set.add(True)
-                    else:
+                    elif not isinstance(piece, Fast):
                         marker_set.add(False)
                     self.board.royal_ep_targets.get(piece.side, {})[move.pos_to] = marker_set
                     for pos in positions:
@@ -514,6 +514,8 @@ class EnPassantTargetRiderMovement(RiderMovement):
                 marker_set = set(positions)
                 if isinstance(piece, Slow):
                     marker_set.add(True)
+                elif not isinstance(piece, Fast):
+                    marker_set.add(False)
                 self.board.en_passant_targets.get(piece.side, {})[move.pos_to] = marker_set
                 for pos in positions:
                     self.board.en_passant_markers.get(piece.side, {})[pos] = move.pos_to

@@ -1231,7 +1231,7 @@ class Board(Window):
                                 else:
                                     move_type = load_movement_type(move_type) or move_type
                                 if isinstance(move_type, type):
-                                    move_type = last.__name__
+                                    move_type = move_type.__name__
                                 data_type = data_cls.setdefault(move_type, {})
                                 for action in rule.get('action', 'mcd'):
                                     data_type.setdefault(action[0], int(rule.get('check', 0)))
