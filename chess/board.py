@@ -1212,12 +1212,13 @@ class Board(Window):
                     data_order = data.setdefault(order, {})
                     data_state = data_order.setdefault(int(rule.get('state', 0)), {})
                     for last in rule.get('last', '*'):
-                        if last and last[0] == '!':
-                            last = (False, load_movement_type(last[1:]) or last[1:])
-                        else:
-                            last = load_movement_type(last) or last
+                        invert_last = last and last[0] == '!'
+                        last = last[1:] if invert_last else last
+                        last = load_movement_type(last) or last
                         if isinstance(last, type):
                             last = last.__name__
+                        if invert_last:
+                            last = (False, last)
                         data_last = data_state.setdefault(last, {})
                         for piece in rule.get('piece', '*'):
                             if piece and piece[0] == '!':
@@ -1226,12 +1227,13 @@ class Board(Window):
                                 piece = load_piece_type(piece, self.custom_pieces) or piece
                             data_cls = data_last.setdefault(piece, {})
                             for move_type in rule.get('type', '*'):
-                                if move_type and move_type[0] == '!':
-                                    move_type = (False, load_movement_type(move_type[1:]) or move_type[1:])
-                                else:
-                                    move_type = load_movement_type(move_type) or move_type
+                                invert_type = move_type and move_type[0] == '!'
+                                move_type = move_type[1:] if invert_type else move_type
+                                move_type = load_movement_type(move_type) or move_type
                                 if isinstance(move_type, type):
                                     move_type = move_type.__name__
+                                if invert_type:
+                                    move_type = (False, move_type)
                                 data_type = data_cls.setdefault(move_type, {})
                                 for action in rule.get('action', 'mcd'):
                                     data_type.setdefault(action[0], int(rule.get('check', 0)))
@@ -2170,7 +2172,7 @@ class Board(Window):
             if not move or not (move.is_edit or move.chained_move is not None):
                 current_side = self.turn_side
                 next_side = self.turn_order[self.get_turn(self.ply_count + 1)][0]
-                for side in {current_side, next_side}:
+                for side in {current_side, current_side.opponent(), next_side}:
                     side_target_dict, side_marker_dict = target_dict.get(side, {}), marker_dict.get(side, {})
                     for pos in list(side_target_dict):
                         if move and pos == move.pos_to:
