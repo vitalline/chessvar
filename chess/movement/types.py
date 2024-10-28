@@ -6,7 +6,7 @@ from typing import TYPE_CHECKING
 
 from chess.movement.move import Move
 from chess.movement.util import AnyDirection, Direction, Position, add, sub, mul, ddiv
-from chess.pieces.types import Fast, Immune, Slow
+from chess.pieces.types import Immune, Slow, Delayed, Delayed2
 from chess.util import Unset
 
 if TYPE_CHECKING:
@@ -473,10 +473,11 @@ class CastlingMovement(BaseMovement):
                     positions.append(add(move.pos_from, gap_offset))
                 if positions:
                     marker_set = set(positions)
-                    if isinstance(piece, Slow):
-                        marker_set.add(True)
-                    elif not isinstance(piece, Fast):
-                        marker_set.add(False)
+                    if isinstance(piece, Delayed2):
+                        marker_set.add(Delayed2)
+                    elif isinstance(piece, Delayed):
+                        marker_set.add(Delayed)
+                    marker_set.add(Slow)
                     self.board.royal_ep_targets.get(piece.side, {})[move.pos_to] = marker_set
                     for pos in positions:
                         self.board.royal_ep_markers.get(piece.side, {})[pos] = move.pos_to
@@ -512,10 +513,12 @@ class EnPassantTargetRiderMovement(RiderMovement):
                     continue
                 positions = [add(move.pos_from, mul(direction[:2], i)) for i in range(1, steps)]
                 marker_set = set(positions)
+                if isinstance(piece, Delayed2):
+                    marker_set.add(Delayed2)
+                elif isinstance(piece, Delayed):
+                    marker_set.add(Delayed)
                 if isinstance(piece, Slow):
-                    marker_set.add(True)
-                elif not isinstance(piece, Fast):
-                    marker_set.add(False)
+                    marker_set.add(Slow)
                 self.board.en_passant_targets.get(piece.side, {})[move.pos_to] = marker_set
                 for pos in positions:
                     self.board.en_passant_markers.get(piece.side, {})[pos] = move.pos_to

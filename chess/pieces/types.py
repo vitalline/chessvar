@@ -1,23 +1,27 @@
 class Double(object):
-    # Pieces with this attribute can capture other pieces of their own side
+    # Can capture other pieces of its own side
     pass
 
 class Immune(object):
-    # Pieces with this attribute cannot be captured
+    # Cannot be captured
     pass
 
 class Royal(object):
-    # Pieces with this attribute are subject to check and checkmate
+    # Subject to check and checkmate
     pass
 
 class QuasiRoyal(object):
-    # Pieces with this attribute are considered royal if they are the only such piece of their side
-    pass
-
-class Fast(object):
-    # Pieces with this attribute cannot be captured en passant on squares they moved through during the last move chain
+    # Considered royal if it is the only such piece of their side
     pass
 
 class Slow(object):
-    # Pieces with this attribute can be captured en passant even if they haven't moved immediately before
+    # Can be captured en passant on any squares it moved through during the last move chain
+    pass
+
+class Delayed(object):
+    # Can be captured en passant on the opponent's first move even if it hasn't moved immediately before
+    pass
+
+class Delayed2(object):
+    # Same as above, but for any move until the next turn
     pass

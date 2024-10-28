@@ -32,7 +32,7 @@ from chess.pieces.groups.colorbound import King as CBKing
 from chess.pieces.groups.util import NoPiece, Obstacle, Block, Wall
 from chess.pieces.piece import Piece, is_active
 from chess.pieces.side import Side
-from chess.pieces.types import Fast, QuasiRoyal, Royal
+from chess.pieces.types import QuasiRoyal, Royal, Slow, Delayed, Delayed2
 from chess.save import condense, expand, unpack, repack
 from chess.save import condense_algebraic as cnd_alg, expand_algebraic as exp_alg
 from chess.save import load_move, load_piece, load_rng, load_piece_type, load_custom_type, load_movement_type
@@ -1759,7 +1759,7 @@ class Board(Window):
                             end_early = False
                             if (
                                 self.use_check and chained_move
-                                and not issubclass(type(move.piece), Fast)
+                                and issubclass(type(move.piece), Slow)
                                 and move.piece in royal_pieces[turn_side]
                             ):
                                 self.load_check(turn_side)
@@ -1779,7 +1779,7 @@ class Board(Window):
                                 move_chain.append(chained_move)
                                 if (
                                     self.use_check and chained_move.chained_move
-                                    and not issubclass(type(chained_move.piece), Fast)
+                                    and issubclass(type(chained_move.piece), Slow)
                                     and chained_move.piece in royal_pieces[turn_side]
                                 ):
                                     self.load_check(turn_side)
@@ -2171,19 +2171,26 @@ class Board(Window):
         ):
             if not move or not (move.is_edit or move.chained_move is not None):
                 current_side = self.turn_side
+                last_side = self.turn_order[self.get_turn(self.ply_count - 1)][0]
                 next_side = self.turn_order[self.get_turn(self.ply_count + 1)][0]
-                for side in {current_side, current_side.opponent(), next_side}:
+                is_first_turn = current_side != last_side
+                is_final_turn = current_side != next_side
+                for side in {current_side, current_side.opponent()}:
                     side_target_dict, side_marker_dict = target_dict.get(side, {}), marker_dict.get(side, {})
                     for pos in list(side_target_dict):
                         if move and pos == move.pos_to:
                             continue
-                        if False in side_target_dict.get(pos, {}):
-                            side_target_dict[pos].discard(False)
+                        pos_target_dict = side_target_dict.get(pos, ())
+                        if Delayed2 in pos_target_dict and not (side == next_side and is_final_turn):
                             continue
-                        if True not in side_target_dict.get(pos, {}) or side == next_side and side != current_side:
-                            markers = side_target_dict.pop(pos, ())
-                            for marker in markers:
-                                side_marker_dict.pop(marker, None)
+                        if Delayed in pos_target_dict and not (side == last_side and is_first_turn):
+                            continue
+                        if Slow in side_target_dict.get(pos, ()):
+                            side_target_dict[pos].discard(Slow)
+                            continue
+                        markers = side_target_dict.pop(pos, ())
+                        for marker in markers:
+                            side_marker_dict.pop(marker, None)
             if move:
                 if move.captured_piece is not None:
                     for pos in target_dict.get(move.captured_piece.side, {}).pop(move.captured_piece.board_pos, ()):
@@ -2194,22 +2201,22 @@ class Board(Window):
                     pos_from, pos_to = old_pos, piece.board_pos
                     if pos_from == pos_to:
                         continue
-                    if move.is_edit or issubclass(type(piece), Fast):
+                    if move.is_edit or not issubclass(type(piece), Slow):
                         for pos in target_dict.get(piece.side, {}).pop(pos_from, ()):
                             marker_dict.get(piece.side, {}).pop(pos, None)
                     else:
                         from_markers = target_dict.get(piece.side, {}).pop(pos_from, ())
                         if from_markers:
-                            target_dict.get(piece.side, {})[pos_to] = from_markers
                             if piece.side in marker_dict:
                                 side_marker_dict = marker_dict[piece.side]
                                 for pos in from_markers:
                                     side_marker_dict[pos] = pos_to
+                            target_dict.get(piece.side, {}).setdefault(pos_to, set()).update(from_markers)
         if (
             move and not move.is_edit and not issubclass(move.movement_type, (CloneMovement, DropMovement))
-            and not issubclass(type(move.piece), Fast) and move.piece in self.royal_pieces[move.piece.side]
+            and issubclass(type(move.piece), Slow) and move.piece in self.royal_pieces[move.piece.side]
         ):
-            self.royal_ep_targets.get(move.piece.side, {}).setdefault(move.pos_to, set()).add(move.pos_to)
+            self.royal_ep_targets.get(move.piece.side, {}).setdefault(move.pos_to, set()).update((Slow, move.pos_to))
             self.royal_ep_markers.get(move.piece.side, {})[move.pos_to] = move.pos_to
 
     def reload_en_passant_markers(self) -> None:

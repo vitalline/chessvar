@@ -1,7 +1,7 @@
 from chess.movement import types
 from chess.movement.util import rot, symv
 from chess.pieces.piece import Piece
-from chess.pieces.types import Fast, Royal
+from chess.pieces.types import Royal
 
 
 class Rook(Piece):
@@ -82,7 +82,7 @@ class King(Piece, Royal):
         )
 
 
-class Pawn(Piece, Fast):
+class Pawn(Piece):
     name = 'Pawn'
     file_name = 'P'
     asset_folder = 'classic'
