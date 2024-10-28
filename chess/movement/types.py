@@ -75,12 +75,12 @@ class RiderMovement(BaseMovement):
         if self.boundless:
             self.bounds = [[0, board_size[i]] for i in range(2)]
         else:
-            blanks = [self.board.blank_rows, self.board.blank_cols]
-            blanks = [[0] + blanks[i] + [board_size[i]] for i in range(2)]
+            bounds = [self.board.border_rows, self.board.border_cols]
+            bounds = [[0] + bounds[i] + [board_size[i]] for i in range(2)]
             self.bounds = [
                 [
-                    max(x for x in blanks[i] if x <= pos_from[i]),
-                    min(x for x in blanks[i] if x > pos_from[i])
+                    max(x for x in bounds[i] if x <= pos_from[i]),
+                    min(x for x in bounds[i] if x > pos_from[i])
                 ] for i in range(2)
             ]
         direction_id = 0

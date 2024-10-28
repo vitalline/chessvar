@@ -8,7 +8,7 @@ from typing import TYPE_CHECKING, TextIO
 
 from chess.data import piece_groups, get_piece_types, get_set_name
 from chess.movement.types import DropMovement
-from chess.movement.util import to_algebraic as toa, from_algebraic as fra, from_algebraic_map as frm
+from chess.movement.util import to_alpha as b26, to_algebraic as toa, from_algebraic as fra, from_algebraic_map as frm
 from chess.pieces.groups import classic as fide
 from chess.pieces.piece import Piece
 from chess.pieces.side import Side
@@ -82,6 +82,22 @@ def save_piece_types(file_path: str = None, side: Side = Side.WHITE) -> None:
 def debug_info(board: Board) -> list[str]:
     debug_log_data = []  # noqa
     debug_log_data.append(f"Board size: {board.board_width}x{board.board_height}")
+    debug_log_data.append("Borders:")
+    if board.border_cols or board.border_rows:
+        if board.border_cols:
+            debug_log_data.append(
+                f"  Files: {', '.join(f'{b26(x)}/{b26(x + 1)}' for x in board.border_cols)} {tuple(board.border_cols)}"
+            )
+        else:
+            debug_log_data.append("  Files: None")
+        if board.border_rows:
+            debug_log_data.append(
+                f"  Ranks: {', '.join(f'{x}/{x + 1}' for x in board.border_rows)} {tuple(board.border_rows)}"
+            )
+        else:
+            debug_log_data.append("  Ranks: None")
+    else:
+        debug_log_data[-1] += " None"
     debug_log_data.append(f"Screen size: {board.width}x{board.height}")
     debug_log_data.append(f"Square size: {board.square_size}")
     debug_log_data.append(f"Windowed screen size: {board.windowed_size[0]}x{board.windowed_size[1]}")

@@ -33,8 +33,8 @@ Gameplay hotkeys:
 Ctrl + Z: undo last move (if any)
  ... + Shift: redo last move (if any)
 Ctrl + Y: redo last move (if any)
-Shift + "/": select random piece (that can move)
-Ctrl + "/": play random move (with selected piece if one exists)
+Shift + [/]: select random piece (that can move)
+Ctrl + [/]: play random move (with selected piece if one exists)
 Ctrl + N: pass turn to next player
 Ctrl + W: pass turn to white player (if it's not their turn)
 Ctrl + B: pass turn to black player (if it's not their turn)
@@ -57,12 +57,12 @@ Alt + O: toggle between win by checkmate and by royal piece capture
 Alt + H: toggle drops (crazyhouse mode)
 
 UI hotkeys:
-Ctrl + "-": make window smaller (-5px/square)
-Shift + "-": make window square (use smaller dimension)
-Ctrl + Shift + "-": make window very small (25px/square)
-Ctrl + "=": make window larger (+5px/square)
-Shift + "=": make window square (use larger dimension)
-Ctrl + Shift + "=": make window very large (100px/square)
+Ctrl + [-]: make window smaller (-5px/square)
+Shift + [-]: make window square (use smaller dimension)
+Ctrl + Shift + [-]: make window very small (25px/square)
+Ctrl + [=]: make window larger (+5px/square)
+Shift + [=]: make window square (use larger dimension)
+Ctrl + Shift + [=]: make window very large (100px/square)
 Ctrl + 0: make window regular (50px/square)
 Ctrl + F: flip board
 Ctrl + G: reset graphics mode (colors)
@@ -101,8 +101,10 @@ Ctrl + "[": remove last file
  ... + Alt: remove last rank
 Ctrl + "]": add extra file
  ... + Alt: add extra rank
-Ctrl + "\": reset board size
-Ctrl + Alt + "\": swap board dimensions
+Ctrl + [']: add border file
+ ... + Alt: add border rank
+Ctrl + [\]: reset board size
+Ctrl + Alt + [\]: swap board dimensions
 
 Edit mode controls:
 LMB, Enter: select piece, move selected piece (click or drag)

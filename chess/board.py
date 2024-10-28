@@ -48,10 +48,10 @@ class Board(Window):
         if not isfile(config_path):
             self.board_config.save(config_path)
 
-        self.blank_cols, self.blank_rows = [], []
+        self.border_cols, self.border_rows = [], []
         self.board_width, self.board_height = default_board_width, default_board_height
-        self.visual_board_width = self.board_width + len(self.blank_cols)
-        self.visual_board_height = self.board_height + len(self.blank_rows)
+        self.visual_board_width = self.board_width + len(self.border_cols)
+        self.visual_board_height = self.board_height + len(self.border_rows)
         self.square_size = default_size
 
         super().__init__(
@@ -244,8 +244,8 @@ class Board(Window):
         origin: tuple[float, float] | None = None,
         width: int | None = None,
         height: int | None = None,
-        blank_cols: list[int] | None = None,
-        blank_rows: list[int] | None = None,
+        border_cols: list[int] | None = None,
+        border_rows: list[int] | None = None,
         flip: bool | None = None,
     ) -> Position:
         x, y = pos
@@ -253,22 +253,22 @@ class Board(Window):
         origin = origin or self.origin
         width = width or self.visual_board_width
         height = height or self.visual_board_height
-        blank_cols = blank_cols or self.blank_cols
-        blank_rows = blank_rows or self.blank_rows
+        border_cols = border_cols or self.border_cols
+        border_rows = border_rows or self.border_rows
         flip = flip if flip is not None else self.flip_mode
         board_size = width, height
         col = round((x - origin[0]) / size + (board_size[0] - 1) / 2)
         row = round((y - origin[1]) / size + (board_size[1] - 1) / 2)
-        for blank_col in blank_cols:
-            if col > blank_col:
+        for border_col in border_cols:
+            if col > border_col:
                 col -= 1
-            elif col == blank_col:
+            elif col == border_col:
                 col = -1
                 break
-        for blank_row in blank_rows:
-            if row > blank_row:
+        for border_row in border_rows:
+            if row > border_row:
                 row -= 1
-            elif row == blank_row:
+            elif row == border_row:
                 row = -1
                 break
         col, row = (board_size[0] - 1 - col, board_size[1] - 1 - row) if flip else (col, row)
@@ -281,8 +281,8 @@ class Board(Window):
         origin: tuple[float, float] | None = None,
         width: int | None = None,
         height: int | None = None,
-        blank_cols: list[int] | None = None,
-        blank_rows: list[int] | None = None,
+        border_cols: list[int] | None = None,
+        border_rows: list[int] | None = None,
         flip: bool | None = None,
     ) -> tuple[float, float]:
         row, col = pos
@@ -290,13 +290,13 @@ class Board(Window):
         origin = origin or self.origin
         width = width or self.visual_board_width
         height = height or self.visual_board_height
-        blank_cols = blank_cols or self.blank_cols
-        blank_rows = blank_rows or self.blank_rows
+        border_cols = border_cols or self.border_cols
+        border_rows = border_rows or self.border_rows
         flip = flip if flip is not None else self.flip_mode
         board_size = width, height
         col, row = (board_size[0] - 1 - col, board_size[1] - 1 - row) if flip else (col, row)
-        col += sum(1 for blank_col in blank_cols if col >= blank_col)
-        row += sum(1 for blank_row in blank_rows if row >= blank_row)
+        col += sum(1 for border_col in border_cols if col >= border_col)
+        row += sum(1 for border_row in border_rows if row >= border_row)
         x = (col - (board_size[0] - 1) / 2) * size + origin[0]
         y = (row - (board_size[1] - 1) / 2) * size + origin[1]
         return x, y
@@ -504,7 +504,7 @@ class Board(Window):
         data = {
             'variant': self.variant,
             'board_size': [*wh],
-            'board_gaps': [toa((-1, col)) for col in self.blank_cols] + [toa((row, -1)) for row in self.blank_rows],
+            'borders': [toa((-1, col)) for col in self.border_cols] + [toa((row, -1)) for row in self.border_rows],
             'window_size': list(self.windowed_size),
             'square_size': self.windowed_square_size,
             'flip_mode': self.flip_mode,
@@ -658,9 +658,9 @@ class Board(Window):
         # might have to add more error checking to saving/loading, even if at the cost of slight redundancy.
         # who knows when someone decides to introduce a breaking change and absolutely destroy all the saves
         board_size = tuple(data.get('board_size', (self.board_width, self.board_height)))
-        board_gaps = [fra(t) for t in data.get('board_gaps', [])]
-        board_gaps = [t[1] for t in board_gaps if t[0] == -1], [t[0] for t in board_gaps if t[1] == -1]
-        self.resize_board(*board_size, *board_gaps)
+        borders = [fra(t) for t in data.get('borders', [])]
+        borders = [t[1] for t in borders if t[0] == -1], [t[0] for t in borders if t[1] == -1]
+        self.resize_board(*board_size, *borders)
         wh = self.board_width, self.board_height
 
         window_size = data.get('window_size')
@@ -3489,11 +3489,11 @@ class Board(Window):
         origin: tuple[float, float],
         width: int,
         height: int,
-        blank_cols: list[int],
-        blank_rows: list[int],
+        border_cols: list[int],
+        border_rows: list[int],
         flip_mode: bool
     ) -> None:
-        args = size, origin, width, height, blank_cols, blank_rows, flip_mode
+        args = size, origin, width, height, border_cols, border_rows, flip_mode
         selected_square = self.selected_square
         self.update_sprite(self.highlight, *args)
         self.update_sprite(self.selection, *args)
@@ -3527,7 +3527,7 @@ class Board(Window):
         self.update_sprites(
             self.square_size, self.origin,
             self.visual_board_width, self.visual_board_height,
-            self.blank_cols, self.blank_rows, not self.flip_mode
+            self.border_cols, self.border_rows, not self.flip_mode
         )
 
     def is_trickster_mode(self) -> bool:
@@ -3572,27 +3572,27 @@ class Board(Window):
         self,
         width: int = 0,
         height: int = 0,
-        blank_cols: list[int] | None = None,
-        blank_rows: list[int] | None = None,
+        border_cols: list[int] | None = None,
+        border_rows: list[int] | None = None,
     ) -> None:
         width, height = width or self.board_width, height or self.board_height
-        blank_cols = self.blank_cols if blank_cols is None else blank_cols
-        blank_rows = self.blank_rows if blank_rows is None else blank_rows
-        visual_width, visual_height = width + len(blank_cols), height + len(blank_rows)
+        border_cols = self.border_cols if border_cols is None else border_cols
+        border_rows = self.border_rows if border_rows is None else border_rows
+        visual_width, visual_height = width + len(border_cols), height + len(border_rows)
         if (
             self.game_loaded and self.board_width == width and self.board_height == height
-            and self.blank_cols == blank_cols and self.blank_rows == blank_rows
+            and self.border_cols == border_cols and self.border_rows == border_rows
         ):
             return
 
         old_highlight = self.get_board_position(self.highlight.position) if self.highlight_square else None
         self.board_width, self.board_height = width, height
-        old_cols, old_rows = self.blank_cols, self.blank_rows
-        self.blank_cols, self.blank_rows = sorted(blank_cols), sorted(blank_rows)
-        while self.blank_cols and self.blank_cols[-1] >= self.board_width:
-            self.blank_cols.pop()
-        while self.blank_rows and self.blank_rows[-1] >= self.board_height:
-            self.blank_rows.pop()
+        old_cols, old_rows = self.border_cols, self.border_rows
+        self.border_cols, self.border_rows = sorted(border_cols), sorted(border_rows)
+        while self.border_cols and self.border_cols[-1] >= self.board_width:
+            self.border_cols.pop()
+        while self.border_rows and self.border_rows[-1] >= self.board_height:
+            self.border_rows.pop()
         old_width, old_height = self.visual_board_width, self.visual_board_height
         self.visual_board_width, self.visual_board_height = visual_width, visual_height
         old_board_size = old_width, old_height
@@ -3603,8 +3603,8 @@ class Board(Window):
         position_kwargs = {
             'width': old_width,
             'height': old_height,
-            'blank_cols': old_cols,
-            'blank_rows': old_rows,
+            'border_cols': old_cols,
+            'border_rows': old_rows,
         }
 
         label_kwargs = {
@@ -3688,8 +3688,8 @@ class Board(Window):
                     square_size, origin,
                     self.visual_board_width,
                     self.visual_board_height,
-                    self.blank_cols,
-                    self.blank_rows,
+                    self.border_cols,
+                    self.border_rows,
                     self.flip_mode
                 )
             else:
@@ -3799,8 +3799,8 @@ class Board(Window):
             square_size, origin,
             self.visual_board_width,
             self.visual_board_height,
-            self.blank_cols,
-            self.blank_rows,
+            self.border_cols,
+            self.border_rows,
             self.flip_mode
         )
 
@@ -4298,16 +4298,16 @@ class Board(Window):
             height = self.board_height + (1 if modifiers & key.MOD_ALT else 0)
             self.resize_board(width, height)
             self.advance_turn()
-        if symbol == key.APOSTROPHE and modifiers & key.MOD_ACCEL and not partial_move:  # Add blank row/column
-            blank_cols = self.blank_cols + ([] if modifiers & key.MOD_ALT else [self.board_width])
-            blank_rows = self.blank_rows + ([self.board_height] if modifiers & key.MOD_ALT else [])
+        if symbol == key.APOSTROPHE and modifiers & key.MOD_ACCEL and not partial_move:  # Add border row/column
+            border_cols = self.border_cols + ([] if modifiers & key.MOD_ALT else [self.board_width])
+            border_rows = self.border_rows + ([self.board_height] if modifiers & key.MOD_ALT else [])
             width = self.board_width + (0 if modifiers & key.MOD_ALT else 1)
             height = self.board_height + (1 if modifiers & key.MOD_ALT else 0)
-            self.resize_board(width, height, blank_cols, blank_rows)
+            self.resize_board(width, height, border_cols, border_rows)
             self.advance_turn()
         if symbol == key.BACKSLASH and modifiers & key.MOD_ACCEL and not partial_move:
             if modifiers & key.MOD_ALT:  # Invert board size
-                self.resize_board(self.board_height, self.board_width, self.blank_rows, self.blank_cols)
+                self.resize_board(self.board_height, self.board_width, self.border_rows, self.border_cols)
                 self.advance_turn()
             else:  # Reset board size
                 self.resize_board(default_board_width, default_board_height, [], [])
