@@ -2223,9 +2223,10 @@ class Board(Window):
         self.clear_en_passant_markers()
         if not self.move_history:
             return
+        turn_side = self.turn_side
         ply_count = self.ply_count
+        last_side = self.turn_order[self.get_turn()][0]
         side_count = 0
-        last_side = self.turn_side
         last_moves = []
         for move in self.move_history[::-1]:
             if move:
@@ -2243,6 +2244,7 @@ class Board(Window):
                 if move.is_edit:
                     last_moves.append(move)
                     continue
+            last_moves.append(move)
             self.ply_count -= 1
             self.turn_side = self.turn_order[self.get_turn()][0]
             if self.turn_side != last_side:
@@ -2250,7 +2252,6 @@ class Board(Window):
                     break
                 side_count += 1
                 last_side = self.turn_side
-            last_moves.append(move)
         self.ply_count += 1
         self.turn_side = self.turn_order[self.get_turn()][0]
         for move in last_moves[::-1]:
@@ -2275,7 +2276,7 @@ class Board(Window):
             self.ply_count += 1
             self.turn_side = self.turn_order[self.get_turn()][0]
         self.ply_count = ply_count
-        self.turn_side = self.turn_order[self.get_turn()][0]
+        self.turn_side = turn_side
 
     def clear_en_passant_markers(self,) -> None:
         for target_dict, marker_dict in (
