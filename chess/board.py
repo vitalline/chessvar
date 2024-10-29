@@ -141,6 +141,7 @@ class Board(Window):
         self.promotions = {Side.WHITE: {}, Side.BLACK: {}}  # promotion options, as {side: {from: {pos: [to]}}}
         self.edit_promotions = {Side.WHITE: [], Side.BLACK: []}  # types of pieces each side can place in edit mode
         self.movable_pieces = {Side.WHITE: [], Side.BLACK: []}  # pieces that can be moved by each side
+        self.royal_markers = {Side.WHITE: set(), Side.BLACK: set()}  # squares where the side's royals are
         self.royal_pieces = {Side.WHITE: [], Side.BLACK: []}  # these have to stay on the board and should be protected
         self.quasi_royal_pieces = {Side.WHITE: [], Side.BLACK: []}  # at least one of these has to stay on the board
         self.en_passant_targets = {Side.WHITE: {}, Side.BLACK: {}}  # pieces that can be captured en passant
@@ -1354,6 +1355,7 @@ class Board(Window):
 
     def load_pieces(self):
         self.movable_pieces = {Side.WHITE: [], Side.BLACK: []}
+        self.royal_markers = {Side.WHITE: set(), Side.BLACK: set()}
         self.royal_pieces = {Side.WHITE: [], Side.BLACK: []}
         self.quasi_royal_pieces = {Side.WHITE: [], Side.BLACK: []}
         self.probabilistic_pieces = {Side.WHITE: [], Side.BLACK: []}
@@ -1386,6 +1388,8 @@ class Board(Window):
             for side in (Side.WHITE, Side.BLACK):
                 if len(self.quasi_royal_pieces[side]) == 1:
                     self.royal_pieces[side].append(self.quasi_royal_pieces[side].pop())
+        for side in (Side.WHITE, Side.BLACK):
+            self.royal_markers[side] = {piece.board_pos for piece in self.royal_pieces[side]}
         if self.ply_count == 1:
             for side in self.auto_ranged_pieces:
                 if self.auto_ranged_pieces[side] and not self.auto_capture_markers[side]:
@@ -1394,7 +1398,6 @@ class Board(Window):
     def load_check(self, side: Side = None) -> bool:
         if side is None:
             side = self.turn_side
-        self.load_pieces()
         self.check_side = Side.NONE
         if not self.use_check:
             return False
@@ -1435,8 +1438,10 @@ class Board(Window):
             self.game_over = False
             self.moves_queried = {side: False for side in self.moves_queried}
             self.theoretical_moves_queried = {side: False for side in self.theoretical_moves_queried}
+        self.load_pieces()
         self.load_check()
         movable_pieces = {side: self.movable_pieces[side].copy() for side in self.movable_pieces}
+        royal_markers = {side: self.royal_markers[side].copy() for side in self.royal_markers}
         royal_pieces = {side: self.royal_pieces[side].copy() for side in self.royal_pieces}
         quasi_royal_pieces = {side: self.quasi_royal_pieces[side].copy() for side in self.quasi_royal_pieces}
         probabilistic_pieces = {side: self.probabilistic_pieces[side].copy() for side in self.probabilistic_pieces}
@@ -1446,6 +1451,7 @@ class Board(Window):
         en_passant_markers = deepcopy(self.en_passant_markers)
         royal_ep_targets = deepcopy(self.royal_ep_targets)
         royal_ep_markers = deepcopy(self.royal_ep_markers)
+        opponent = self.turn_side.opponent()
         check_side = self.check_side
         check_sides = {check_side: True if check_side and check_side is not Side.NONE else False}
         for turn_side in [Side.WHITE, Side.BLACK]:
@@ -1548,9 +1554,9 @@ class Board(Window):
                 order_rules = self.turn_rules.get(order, []) if self.turn_rules is not None else None
                 if self.use_check and order_rules is not None:
                     old_check_side = self.check_side
-                    opponent = self.turn_side.opponent()
                     if opponent not in check_sides:
                         if opponent.value in order_rules or -opponent.value in order_rules:
+                            self.load_pieces()
                             self.load_check(opponent)
                             if self.check_side == opponent:
                                 check_sides[opponent] = True
@@ -1603,27 +1609,28 @@ class Board(Window):
                     rules[k] for rules in state_rules for k in match_types if k in rules
                 ] if state_rules is not None else None
                 if not self.chain_start:
-                    for last_type_rule in (last_type_rules or ()):
-                        piece_rules = last_type_rule.get('*') or {}
-                        type_rules = [rules for rules in [piece_rules.get('*')] if rules]
-                        pass_turn_options = {
-                            x for x in [rules.get('p') for rules in type_rules if rules] if x is not None
-                        }
-                        if 0 in pass_turn_options:
-                            self.moves[turn_side]['pass'] = True
-                        elif pass_turn_options.intersection({1, -1}):
-                            old_check_side = self.check_side
-                            opponent = self.turn_side.opponent()
-                            if opponent not in check_sides:
-                                self.load_check(opponent)
-                                if self.check_side == opponent:
-                                    check_sides[opponent] = True
-                            self.check_side = old_check_side
-                            if self.check_side != turn_side:
-                                conditions = {0, 1 if check_sides.get(opponent, False) else -1}
-                                if conditions.intersection(pass_turn_options):
-                                    self.moves[turn_side]['pass'] = True
-                            self.check_side = check_side
+                    if last_type_rules:
+                        self.load_pieces()
+                        for last_type_rule in last_type_rules:
+                            piece_rules = last_type_rule.get('*') or {}
+                            type_rules = [rules for rules in [piece_rules.get('*')] if rules]
+                            pass_turn_options = {
+                                x for x in [rules.get('p') for rules in type_rules if rules] if x is not None
+                            }
+                            if 0 in pass_turn_options:
+                                self.moves[turn_side]['pass'] = True
+                            elif pass_turn_options.intersection({1, -1}):
+                                old_check_side = self.check_side
+                                if opponent not in check_sides:
+                                    self.load_check(opponent)
+                                    if self.check_side == opponent:
+                                        check_sides[opponent] = True
+                                self.check_side = old_check_side
+                                if self.check_side != turn_side:
+                                    conditions = {0, 1 if check_sides.get(opponent, False) else -1}
+                                    if conditions.intersection(pass_turn_options):
+                                        self.moves[turn_side]['pass'] = True
+                                self.check_side = check_side
                 piece_rule_dict = {}
                 if not self.chain_start and self.use_drops and turn_side in self.drops:
                     side_drops = self.drops[turn_side]
@@ -1745,9 +1752,9 @@ class Board(Window):
                             continue
                         if pass_turn_options:
                             old_check_side = self.check_side
-                            opponent = self.turn_side.opponent()
                             if opponent not in check_sides:
                                 if pass_turn_options.intersection({1, -1}):
+                                    self.load_pieces()
                                     self.load_check(opponent)
                                     if self.check_side == opponent:
                                         check_sides[opponent] = True
@@ -1769,10 +1776,11 @@ class Board(Window):
                             move_chain = [move]
                             chained_move = move.chained_move
                             end_early = False
+                            self.load_pieces()
                             if (
                                 self.use_check and chained_move
                                 and issubclass(type(move.piece), Slow)
-                                and move.piece in royal_pieces[turn_side]
+                                and move.piece.board_pos in self.royal_markers[turn_side]
                             ):
                                 self.load_check(turn_side)
                                 if self.check_side == turn_side:
@@ -1789,10 +1797,11 @@ class Board(Window):
                                 else:
                                     self.update_auto_capture_markers(chained_move)
                                 move_chain.append(chained_move)
+                                self.load_pieces()
                                 if (
                                     self.use_check and chained_move.chained_move
                                     and issubclass(type(chained_move.piece), Slow)
-                                    and chained_move.piece in royal_pieces[turn_side]
+                                    and chained_move.piece.board_pos in self.royal_markers[turn_side]
                                 ):
                                     self.load_check(turn_side)
                                     if self.check_side == turn_side:
@@ -1800,32 +1809,24 @@ class Board(Window):
                                 if not end_early:
                                     chained_move = chained_move.chained_move
                             if not end_early:
+                                self.load_pieces()
                                 self.load_check(turn_side)
                             if self.use_check:
-                                for chained_move in move_chain:
-                                    royal_loss = False
-                                    if isinstance(chained_move.captured_piece, (Royal, QuasiRoyal)):
-                                        if chained_move.captured_piece in royal_pieces[turn_side]:
-                                            self.check_side = turn_side
-                                        if chained_move.captured_piece in royal_pieces[self.turn_side.opponent()]:
-                                            royal_loss = True
-                                    if chained_move.promotion:
-                                        if not isinstance(chained_move.promotion, (Royal, QuasiRoyal)):
-                                            if isinstance(chained_move.piece, (Royal, QuasiRoyal)):
-                                                if chained_move.piece in royal_pieces[turn_side]:
-                                                    self.check_side = turn_side
-                                                if chained_move.piece in royal_pieces[self.turn_side.opponent()]:
-                                                    royal_loss = True
-                                    if royal_loss:
-                                        check_side = self.turn_side.opponent()
-                                        self.moves[self.turn_side.opponent()] = {}
-                                        self.moves_queried[self.turn_side.opponent()] = True
-                                        self.game_over = True
+                                royal_loss = False
+                                if royal_markers[turn_side] and not self.royal_markers[turn_side]:
+                                    self.check_side = turn_side
+                                if royal_markers[opponent] and not self.royal_markers[opponent]:
+                                    royal_loss = True
+                                if royal_loss:
+                                    check_side = opponent
+                                    self.moves[opponent] = {}
+                                    self.moves_queried[opponent] = True
+                                    self.game_over = True
                             if self.check_side != turn_side:
                                 old_check_side = self.check_side
                                 new_check_side = Side.NONE
-                                opponent = self.turn_side.opponent()
                                 if make_turn_options.intersection({1, -1}):
+                                    self.load_pieces()
                                     self.load_check(opponent)
                                     new_check_side = self.check_side
                                 self.check_side = old_check_side
@@ -1867,10 +1868,10 @@ class Board(Window):
             else:
                 self.moves_queried[turn_side] = True
         if theoretical_moves_for is None:
-            if self.game_over and self.check_side == self.turn_side.opponent():
+            if self.game_over and self.check_side == opponent:
                 theoretical_moves_for = Side.NONE
             else:
-                theoretical_moves_for = self.turn_side.opponent()
+                theoretical_moves_for = opponent
         if theoretical_moves_for == Side.ANY:
             turn_sides = [Side.WHITE, Side.BLACK]
         elif theoretical_moves_for == Side.NONE:
@@ -1889,6 +1890,7 @@ class Board(Window):
                     self.theoretical_moves[turn_side].setdefault(pos_from, {}).setdefault(pos_to, []).append(move)
             self.theoretical_moves_queried[turn_side] = True
         self.movable_pieces = movable_pieces
+        self.royal_markers = royal_markers
         self.royal_pieces = royal_pieces
         self.quasi_royal_pieces = quasi_royal_pieces
         self.probabilistic_pieces = probabilistic_pieces
