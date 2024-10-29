@@ -2040,7 +2040,7 @@ class Board(Window):
         self.move_sprite_list.clear()
 
     def can_pass(self, side: Side = None) -> bool:
-        return self.moves.get(side or self.turn_side, {}).get('pass')
+        return not self.game_over and self.moves.get(side or self.turn_side, {}).get('pass')
 
     def update_highlight(self, pos: Position | None) -> None:
         if self.clicked_square != pos:
