@@ -887,7 +887,9 @@ class Board(Window):
                 self.load_auto_capture_markers(side)
 
         starting = 'Starting new' if with_history else 'Resuming saved'
-        if self.custom_layout:
+        if self.variant:
+            self.log(f"[Ply {self.ply_count}] Info: {starting} game (with custom variant)")
+        elif self.custom_layout:
             self.log(f"[Ply {self.ply_count}] Info: {starting} game (with custom starting layout)")
         elif None in self.piece_set_ids.values():
             self.log(f"[Ply {self.ply_count}] Info: {starting} game (with custom piece sets)")
