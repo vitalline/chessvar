@@ -6,8 +6,8 @@ from typing import TYPE_CHECKING
 
 from chess.movement.move import Move
 from chess.movement.util import AnyDirection, Direction, Position, add, sub, mul, ddiv
-from chess.pieces.types import Immune, Slow, Delayed, Delayed2
-from chess.util import Unset
+from chess.pieces.types import Delayed, Delayed1, Immune, Slow
+from chess.util import Unset, sign
 
 if TYPE_CHECKING:
     from chess.board import Board
@@ -87,7 +87,7 @@ class RiderMovement(BaseMovement):
         while direction_id < len(self.directions):
             direction = piece.side.direction(self.directions[direction_id])
             if direction[:2] == (0, 0):
-                yield Move(pos_from, self.transform(pos_from), type(self))
+                yield Move(pos_from=pos_from, pos_to=self.transform(pos_from), movement_type=type(self))
                 direction_id += 1
                 continue
             self.steps = 0  # note that calls to moves() will restart the step count from 0 once for each direction
@@ -95,13 +95,13 @@ class RiderMovement(BaseMovement):
             # we set self.steps to this value on update and after each yield to make sure the step count is correct
             self.initialize_direction(direction, pos_from, piece)
             current_pos = pos_from
-            move = Move(pos_from, self.transform(current_pos), type(self))
+            move = Move(pos_from=pos_from, pos_to=self.transform(current_pos), movement_type=type(self))
             while self.in_bounds(self.transform(current_pos)):
                 if self.stop_condition(move, direction, piece, theoretical):
                     direction_id += 1
                     break
                 current_pos = add(current_pos, direction[:2])
-                move = Move(pos_from, self.transform(current_pos), type(self))
+                move = Move(pos_from=pos_from, pos_to=self.transform(current_pos), movement_type=type(self))
                 steps += 1
                 self.steps = steps
                 self.advance_direction(move, direction, pos_from, piece)
@@ -112,17 +112,13 @@ class RiderMovement(BaseMovement):
                     if move.pos_to in royal_ep_markers:
                         for chained_move in (
                             Move(
-                                pos_from=move.pos_to,
-                                pos_to=royal_ep_markers[move.pos_to],
-                                movement_type=RoyalEnPassantMovement,
-                                piece=piece,
+                                pos_from=move.pos_to, pos_to=royal_ep_markers[move.pos_to],
+                                movement_type=RoyalEnPassantMovement, piece=piece,
                                 captured_piece=self.board.get_piece(royal_ep_markers[move.pos_to]),
                             ),
                             Move(
-                                pos_from=move.pos_to,
-                                pos_to=move.pos_to,
-                                movement_type=move.movement_type,
-                                piece=piece,
+                                pos_from=move.pos_to, pos_to=move.pos_to,
+                                movement_type=move.movement_type, piece=piece,
                             ),
                         ):
                             yield copy(move).set(chained_move=chained_move)
@@ -414,7 +410,7 @@ class AutoRangedAutoCaptureRiderMovement(RangedAutoCaptureRiderMovement, RiderMo
 
 
 class DropMovement(BaseMovement):
-    # used to mark piece drops (Move.movement_type == DropMovement)
+    # used to mark piece drops
     pass
 
 
@@ -459,8 +455,11 @@ class CastlingMovement(BaseMovement):
                 pos = add(pos_from, gap_offset)
                 if not self.board.not_a_piece(pos):
                     return ()
-        self_move = Move(pos_from, pos_to, type(self))
-        other_move = Move(other_piece_pos, other_piece_pos_to, type(self), other_piece)
+        self_move = Move(pos_from=pos_from, pos_to=pos_to, movement_type=type(self))
+        other_move = Move(
+            pos_from=other_piece_pos, pos_to=other_piece_pos_to,
+            movement_type=CastlingPartnerMovement, piece=other_piece
+        )
         return self_move.set(chained_move=other_move),
 
     def update(self, move: Move, piece: Piece):
@@ -473,10 +472,10 @@ class CastlingMovement(BaseMovement):
                     positions.append(add(move.pos_from, gap_offset))
                 if positions:
                     marker_set = set(positions)
-                    if isinstance(piece, Delayed2):
-                        marker_set.add(Delayed2)
-                    elif isinstance(piece, Delayed):
+                    if isinstance(piece, Delayed):
                         marker_set.add(Delayed)
+                    elif isinstance(piece, Delayed1):
+                        marker_set.add(Delayed1)
                     marker_set.add(Slow)
                     self.board.royal_ep_targets.get(piece.side, {})[move.pos_to] = marker_set
                     for pos in positions:
@@ -490,8 +489,13 @@ class CastlingMovement(BaseMovement):
         )
 
 
+class CastlingPartnerMovement(BaseMovement):
+    # used to mark the second part of a CastlingMovement move chain
+    pass
+
+
 class RoyalEnPassantMovement(BaseMovement):
-    # used to mark en passant captures of royals that moved through check (Move.movement_type == RoyalEnPassantMovement)
+    # used to mark en passant captures of royals that moved through check
     pass
 
 
@@ -512,16 +516,17 @@ class EnPassantTargetRiderMovement(RiderMovement):
                 if steps < 2:
                     continue
                 positions = [add(move.pos_from, mul(direction[:2], i)) for i in range(1, steps)]
-                marker_set = set(positions)
-                if isinstance(piece, Delayed2):
-                    marker_set.add(Delayed2)
-                elif isinstance(piece, Delayed):
-                    marker_set.add(Delayed)
-                if isinstance(piece, Slow):
-                    marker_set.add(Slow)
-                self.board.en_passant_targets.get(piece.side, {})[move.pos_to] = marker_set
-                for pos in positions:
-                    self.board.en_passant_markers.get(piece.side, {})[pos] = move.pos_to
+                if positions:
+                    marker_set = set(positions)
+                    if isinstance(piece, Delayed):
+                        marker_set.add(Delayed)
+                    elif isinstance(piece, Delayed1):
+                        marker_set.add(Delayed1)
+                    if isinstance(piece, Slow):
+                        marker_set.add(Slow)
+                    self.board.en_passant_targets.get(piece.side, {})[move.pos_to] = marker_set
+                    for pos in positions:
+                        self.board.en_passant_markers.get(piece.side, {})[pos] = move.pos_to
         super().update(move, piece)
 
 
@@ -807,19 +812,21 @@ class ChainMovement(BaseMultiMovement):
                     yield copy(chained_move).set(pos_from=move.pos_from)
         else:
             for move in self.movements[index].moves(pos_from, piece, theoretical):
-                move_chain = []
-                chained_move = move
-                while chained_move:
-                    move_chain.append(copy(chained_move).set(chained_move=Unset))
-                    chained_move = chained_move.chained_move
+                move_chain = [move]
+                while move_chain[-1].chained_move:
+                    move_chain.append(move_chain[-1].chained_move)
                 if move_chain[-1].movement_type == RoyalEnPassantMovement:
                     yield move
                     continue
+                move_chain = [copy(chained_move).set(chained_move=Unset) for chained_move in move_chain]
+                last_pos = move_chain[0].pos_from
                 for chained_move in move_chain:
                     self.board.update_move(chained_move)
                     self.board.move(chained_move)
+                    if last_pos == chained_move.pos_from:
+                        last_pos = chained_move.pos_to
                 chain_options = []
-                for last_chained_move in self.moves(move.pos_to, piece, theoretical, index + 1):
+                for last_chained_move in self.moves(last_pos, piece, theoretical, index + 1):
                     copy_move = copy(move_chain[0])
                     chained_copy = copy_move
                     for chained_move in move_chain[1:]:
@@ -880,41 +887,54 @@ class RangedMultiMovement(RangedMovement, MultiMovement):
 
 
 class CloneMovement(BaseMultiMovement):
-    def __init__(self, board: Board, movements: list[BaseMovement] | None = None, move_only: int = 0):
+    def __init__(self, board: Board, movements: list[BaseMovement] | None = None, move: int = 0, capture: int = 0):
         super().__init__(board, movements)
-        self.move_only = move_only
+        double = move and capture
+        if double and (move > 0) is (capture > 0):
+            move = capture = 0
+        if not double and (move < 0 or capture < 0):
+            move, capture = -capture, -move
+        self.move = sign(max(move, 0))
+        self.capture = sign(max(capture, 0))
+        # invariant: (move, capture) in {(0, 0), (0, 1), (1, 0)}
+
+    def add_clone(self, spawns: dict[Position, Piece], move: Move, piece: Piece, last_pos: Position) -> None:
+        if move.pos_from and move.pos_from != move.pos_to:
+            is_capture = move.captured_piece or not self.board.not_a_piece(move.pos_to)
+            if not (self.move or self.capture) or (self.capture if is_capture else self.move):
+                move_piece = piece if move.pos_from == last_pos else (
+                    move.promotion or move.piece
+                    or self.board.get_piece(move.pos_from)
+                )
+                spawns[move.pos_from] = move_piece
 
     def moves(self, pos_from: Position, piece: Piece, theoretical: bool = False):
-        move_capture_dict = {1: False, -1: True}
         for movement in self.movements:
             for move in movement.moves(pos_from, piece, theoretical):
                 if not move:
                     continue
-                spawn_points = []
+                spawns = {}
                 chained_move = move
+                last_pos = pos_from
                 while chained_move.chained_move:
-                    is_capture = chained_move.captured_piece or not self.board.not_a_piece(chained_move.pos_to)
-                    if self.move_only == 0 or is_capture == move_capture_dict.get(self.move_only):
-                        if chained_move.pos_from and chained_move.pos_from != chained_move.pos_to:
-                            spawn_points.append(chained_move.pos_from)
+                    self.add_clone(spawns, chained_move, piece, last_pos)
+                    if last_pos == chained_move.pos_from:
+                        last_pos = chained_move.pos_to
                     chained_move = chained_move.chained_move
-                is_capture = chained_move.captured_piece or not self.board.not_a_piece(chained_move.pos_to)
-                if self.move_only == 0 or is_capture == move_capture_dict.get(self.move_only):
-                    if chained_move.pos_from and chained_move.pos_from != chained_move.pos_to:
-                        spawn_points.append(chained_move.pos_from)
-                if not spawn_points:
+                self.add_clone(spawns, chained_move, piece, last_pos)
+                if not spawns:
                     yield move
                     continue
-                for spawn_point in spawn_points:
+                for spawn_point, spawn_piece in spawns.items():
                     chained_move = chained_move.set(chained_move=Move(
                         pos_from=None, pos_to=spawn_point,
-                        promotion=copy(piece),
+                        promotion=copy(spawn_piece),
                         movement_type=type(self),
                     )).chained_move
                 yield move
 
     def __copy_args__(self):
-        return self.board, deepcopy(self.movements), self.move_only
+        return self.board, deepcopy(self.movements), self.move, self.capture
 
 
 class ColorMovement(BaseMultiMovement):

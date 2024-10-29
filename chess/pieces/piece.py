@@ -7,7 +7,7 @@ from arcade import Color, Sprite, load_texture
 
 from chess.movement import types
 from chess.pieces.side import Side
-from chess.pieces.types import Immune, Double
+from chess.pieces.types import Double, Immune
 from chess.util import Default, get_texture_path
 
 if TYPE_CHECKING:
@@ -18,6 +18,8 @@ if TYPE_CHECKING:
 
 # Movements that do not move the piece, instead interacting with the game in other, more mysterious ways. Intrigued yet?
 passive_movements = (
+    types.DropMovement,
+    types.CloneMovement,
     types.RangedMovement,
     types.AutoCaptureMovement,
 )
@@ -148,7 +150,7 @@ class Piece(Sprite):
         return (
             type(self) is type(other)
             and self.side == other.side
-            and self.is_hidden == other.is_hidden
+            and bool(self.is_hidden) == bool(other.is_hidden)
             and (
                 self.movement == other.movement and self.movement is None
                 or other.movement is not None and self.movement.total_moves == other.movement.total_moves

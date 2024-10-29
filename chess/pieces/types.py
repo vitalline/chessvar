@@ -3,11 +3,11 @@ class Double(object):
     pass
 
 class Immune(object):
-    # Cannot be captured
+    # Cannot be captured by other pieces
     pass
 
 class Royal(object):
-    # Subject to check and checkmate
+    # Subject to check and checkmate rules
     pass
 
 class QuasiRoyal(object):
@@ -19,9 +19,9 @@ class Slow(object):
     pass
 
 class Delayed(object):
-    # Can be captured en passant on the opponent's first move even if it hasn't moved immediately before
+    # Can be captured en passant during the opponent's turn, even if it hasn't moved immediately before
     pass
 
-class Delayed2(object):
-    # Same as above, but for any move until the next turn
+class Delayed1(object):
+    # Same as above, but only on the opponent's first move after the piece's last move
     pass

@@ -31,6 +31,8 @@ CUSTOM_PREFIX = '_custom_'
 MOVEMENT_SUFFIXES = ('Movement', 'Rider')
 
 TYPE_CONFLICTS = {
+    piece_types.Delayed: {piece_types.Delayed1},
+    piece_types.Delayed1: {piece_types.Delayed},
     piece_types.Royal: {piece_types.QuasiRoyal},
     piece_types.QuasiRoyal: {piece_types.Royal},
 }
