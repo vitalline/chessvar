@@ -2174,10 +2174,11 @@ class Board(Window):
             (self.en_passant_targets, self.en_passant_markers),
             (self.royal_ep_targets, self.royal_ep_markers),
         ):
-            if not move or not (move.is_edit or move.chained_move is not None):
+            if not move or not move.is_edit:
                 current_side = self.turn_side
                 last_side = self.turn_order[self.get_turn(self.ply_count - 1)][0]
                 next_side = self.turn_order[self.get_turn(self.ply_count + 1)][0]
+                chain_end = not move or move.chained_move is None
                 is_first_turn = current_side != last_side
                 is_final_turn = current_side != next_side
                 for side in {current_side, current_side.opponent()}:
@@ -2185,13 +2186,17 @@ class Board(Window):
                     for pos in list(side_target_dict):
                         if move and pos == move.pos_to:
                             continue
-                        pos_target_dict = side_target_dict.get(pos, ())
-                        if Delayed in pos_target_dict and not (side == next_side and is_final_turn):
+                        pos_target_set = side_target_dict.get(pos, ())
+                        if 'skip' in pos_target_set:
+                            pos_target_set.discard('skip')
                             continue
-                        if Delayed1 in pos_target_dict and not (side == last_side and is_first_turn):
+                        if Slow in pos_target_set:
+                            if chain_end:
+                                pos_target_set.discard(Slow)
                             continue
-                        if Slow in side_target_dict.get(pos, ()):
-                            side_target_dict[pos].discard(Slow)
+                        if Delayed1 in pos_target_set and not (side == last_side and is_first_turn):
+                            continue
+                        if Delayed in pos_target_set and not (side == next_side and is_final_turn and chain_end):
                             continue
                         markers = side_target_dict.pop(pos, ())
                         for marker in markers:
@@ -2217,11 +2222,6 @@ class Board(Window):
                                 side_marker_dict = marker_dict[piece.side]
                                 for pos in from_markers:
                                     side_marker_dict[pos] = pos_to
-            if (
-                move and not move.is_edit and move.piece and issubclass(type(move.piece), Slow) and move.movement_type
-                and not issubclass(move.movement_type, (CloneMovement, DropMovement)) and move.chained_move is not None
-            ):
-                target_dict.get(move.piece.side, {}).setdefault(move.pos_to, set()).add(Slow)
 
     def reload_en_passant_markers(self) -> None:
         self.clear_en_passant_markers()
