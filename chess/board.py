@@ -1563,6 +1563,7 @@ class Board(Window):
                 last_history_tags = set()
                 last_history_types = set()
                 last_history_pieces = set()
+                last_history_partial = set()
                 if self.move_history:
                     for last_history_move in self.move_history[::-1]:
                         if last_history_move and not last_history_move.is_edit:
@@ -1573,23 +1574,25 @@ class Board(Window):
                                     chain = False
                                 if chain and (last_history_move.promotion or last_history_move.piece).side != turn_side:
                                     chain = False
-                                if chain and issubclass(last_history_move.movement_type, CastlingPartnerMovement):
-                                    chain = False
                                 if chain:
                                     move_chain.append(last_history_move)
                                 last_history_move = last_history_move.chained_move
                             for last_history_chain_move in move_chain[::-1]:
-                                if last_history_chain_move.movement_type:
-                                    last_history_types.add(last_history_chain_move.movement_type.__name__)
-                                if last_history_chain_move.tag:
-                                    last_history_tags.add(last_history_chain_move.tag)
+                                partial = False
+                                if issubclass(last_history_chain_move.movement_type, CastlingPartnerMovement):
+                                    partial = True
+                                if not partial:
+                                    if last_history_chain_move.movement_type:
+                                        last_history_types.add(last_history_chain_move.movement_type.__name__)
+                                    if last_history_chain_move.tag:
+                                        last_history_tags.add(last_history_chain_move.tag)
                                 board_piece = self.get_piece(last_history_chain_move.pos_to)
                                 if board_piece.is_empty():
                                     continue
                                 moved_piece = last_history_chain_move.promotion or last_history_chain_move.piece
                                 if not board_piece.matches(moved_piece):
                                     continue
-                                last_history_pieces.add(board_piece.board_pos)
+                                (last_history_partial if partial else last_history_pieces).add(board_piece.board_pos)
                 match_types = [
                     k for rules in state_rules for k in rules
                     if k == '*' or k in last_history_tags or k in last_history_types
@@ -1674,9 +1677,13 @@ class Board(Window):
                         history_piece_rules = []
                         for rules in last_type_rules:
                             for k in rules:
-                                if k == '' and piece.board_pos in last_history_pieces:
+                                if k == '' and (chain_moves is not None or piece.board_pos in last_history_pieces):
                                     history_piece_rules.append(rules[k])
-                                if k == (False, '') and piece.board_pos not in last_history_pieces:
+                                if k == (False, '') and (
+                                    chain_moves is not None or
+                                    piece.board_pos not in last_history_pieces and
+                                    piece.board_pos not in last_history_partial
+                                ):
                                     history_piece_rules.append(rules[k])
                         if history_piece_rules is not None:
                             piece_rules.extend(history_piece_rules)
