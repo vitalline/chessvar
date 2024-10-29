@@ -440,7 +440,7 @@ def debug_info(board: Board) -> list[str]:
                         not_piece = "Not " if not_piece else ''
                         piece_string = (
                             "Any piece" if piece == '*' else
-                            ("Not last piece" if not_piece else "Last piece") if piece == '' else
+                            ("Different piece" if not_piece else "Same piece") if piece == '' else
                             f"{not_piece}{piece.name}"
                         )
                         if piece_rules is None:
@@ -455,7 +455,7 @@ def debug_info(board: Board) -> list[str]:
                             not_type = "Not " if not_type else ''
                             type_string = (
                                 "Any move" if move_type == '*' else
-                                ("Not last move" if not_type else "Last move") if move_type == '' else
+                                ("Different tag" if not_type else "Same tag") if move_type == '' else
                                 f"{not_type}{move_type}"
                             )
                             if type_rules is None:

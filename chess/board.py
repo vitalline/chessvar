@@ -1702,10 +1702,9 @@ class Board(Window):
                             history_type_rules = []
                             for rules in piece_rules:
                                 for k in rules:
-                                    history_match = (move_type in last_history_tags or move_type in last_history_types)
-                                    if k == '' and history_match:
+                                    if k == '' and move.tag in last_history_tags:
                                         history_type_rules.append(rules[k])
-                                    if k == (False, '') and not history_match:
+                                    if k == (False, '') and move.tag not in last_history_tags:
                                         history_type_rules.append(rules[k])
                             if history_type_rules is not None:
                                 type_rules.extend(history_type_rules)
