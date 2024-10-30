@@ -1400,38 +1400,79 @@ class Board(Window):
                 if self.auto_ranged_pieces[side] and not self.auto_capture_markers[side]:
                     self.load_auto_capture_markers(side)
 
+    def is_royal_capture(self, side: Side, move: Move) -> bool:
+        piece_loss = set()
+        piece_gain = set()
+        any_royals = (Royal, QuasiRoyal, RoyalGroup)
+        while move:
+            if move.captured_piece and move.captured_piece.side == side and isinstance(move.captured_piece, any_royals):
+                piece_loss.add(type(move.captured_piece))
+            if move.promotion:
+                if move.piece and move.piece.side == side and isinstance(move.piece, any_royals):
+                    piece_loss.add(type(move.piece))
+                if move.promotion and move.promotion.side == side and issubclass(type(move.promotion), any_royals):
+                    piece_gain.add(type(move.promotion))
+            move = move.chained_move
+        if move is Unset:
+            return False  # the chain has not finished yet. who knows, maybe we will gain a new royal piece later on
+        piece_loss.difference_update(piece_gain)
+        for lost_piece in piece_loss:
+            royal_loss = issubclass(lost_piece, Royal)
+            quasi_royal_loss = issubclass(lost_piece, QuasiRoyal)
+            royal_group_loss = issubclass(lost_piece, RoyalGroup)
+            if royal_group_loss:  # NB: promotion to a different royal group still counts as a royal group loss!
+                if any(issubclass(gained_piece, (Royal, QuasiRoyal)) for gained_piece in piece_gain):
+                    continue
+            elif piece_gain:
+                continue
+            if self.royal_piece_mode == 0:
+                if not royal_loss and quasi_royal_loss:
+                    royal_loss = not self.royal_groups[side].get(QuasiRoyal)
+                if not royal_loss and royal_group_loss:
+                    royal_loss = not self.royal_groups[side].get(lost_piece)
+            elif self.royal_piece_mode == 1:  # Force royal pieces
+                royal_loss = True
+            elif self.royal_piece_mode == 2:  # Force quasi-royal pieces
+                royal_loss = not self.royal_groups[side].get(QuasiRoyal)
+            elif self.royal_piece_mode == 3:  # Force royal groups
+                royal_loss = not self.royal_groups[side].get(lost_piece)
+            if royal_loss:
+                return True
+        return False
+
     def load_check(self, side: Side = None) -> bool:
         if side is None:
             side = self.turn_side
         self.check_side = Side.NONE
         if not self.use_check:
             return False
-        for royal in self.royal_pieces[side]:
-            self.ply_simulation += 1
-            for piece in self.movable_pieces[side.opponent()]:
-                if isinstance(piece.movement, ProbabilisticMovement):
-                    continue
-                for move in piece.moves():
-                    last_move = copy(move)
-                    self.update_move(last_move)
-                    if last_move.promotion and not last_move.is_edit:
-                        piece = last_move.promotion
+        self.ply_simulation += 1
+        for piece in self.movable_pieces[side.opponent()]:
+            if isinstance(piece.movement, ProbabilisticMovement):
+                continue
+            for move in piece.moves():
+                chained_move = move
+                while chained_move:
+                    chained_move = copy(chained_move)
+                    if chained_move.promotion and not chained_move.is_edit:
+                        piece = chained_move.promotion
                         if isinstance(piece.movement, AutoCaptureMovement):
-                            piece.movement.generate_captures(last_move, piece)
-                    else:
-                        self.update_auto_captures(last_move, side)
-                    while last_move:
-                        if last_move.pos_to == royal.board_pos or last_move.captured_piece == royal:
-                            self.check_side = side
-                            break
-                        last_move = last_move.chained_move
-                    if self.check_side:
+                            piece.movement.generate_captures(chained_move, piece)
+                    if chained_move.pos_to in self.royal_markers[side] and not chained_move.swapped_piece:
+                        self.check_side = side
                         break
+                    if (
+                        chained_move.captured_piece and chained_move.captured_piece.side == side
+                        and chained_move.captured_piece.board_pos in self.royal_markers[side]
+                    ):
+                        self.check_side = side
+                        break
+                    chained_move = chained_move.chained_move
                 if self.check_side:
                     break
-            self.ply_simulation -= 1
             if self.check_side:
                 break
+        self.ply_simulation -= 1
 
     def load_moves(
         self,
@@ -1469,41 +1510,7 @@ class Board(Window):
                     isinstance(self.move_history[-1].promotion.movement, AutoCaptureMovement)
                 )
             ):
-                # we need to check if there's a move in the move history that could be a loss
-                royal_loss = False  # of one of the opposing pieces that are treated as royal
-                chained_move = self.move_history[-1]  # checking the last move's sufficient here
-                while chained_move:  # NB: could be None but if it is the loop is skipped anyway
-                    lost_piece = chained_move.captured_piece
-                    gained_piece = None
-                    if not lost_piece or lost_piece.side != turn_side:
-                        if chained_move.promotion:
-                            lost_piece = chained_move.piece
-                            gained_piece = chained_move.promotion
-                    if lost_piece and lost_piece.side == turn_side and type(lost_piece) != type(gained_piece):
-                        royal_loss = isinstance(lost_piece, Royal)
-                        quasi_royal_loss = isinstance(lost_piece, QuasiRoyal)
-                        royal_group_loss = isinstance(lost_piece, RoyalGroup)
-                        if royal_group_loss:  # promotion to a different royal group still counts as a royal group loss!
-                            royal_gain = isinstance(gained_piece, (Royal, QuasiRoyal))
-                        else:
-                            royal_gain = isinstance(gained_piece, (Royal, QuasiRoyal, RoyalGroup))
-                        if not royal_gain:
-                            if royal_loss or quasi_royal_loss or royal_group_loss:
-                                if self.royal_piece_mode == 0:
-                                    if not royal_loss and quasi_royal_loss:
-                                        royal_loss = not royal_groups[turn_side].get(QuasiRoyal)
-                                    if not royal_loss and royal_group_loss:
-                                        royal_loss = not royal_groups[turn_side].get(type(lost_piece))
-                                elif self.royal_piece_mode == 1:  # Force royal pieces
-                                    royal_loss = True
-                                elif self.royal_piece_mode == 2:  # Force quasi-royal pieces
-                                    royal_loss = not royal_groups[turn_side].get(QuasiRoyal)
-                                elif self.royal_piece_mode == 3:  # Force royal groups
-                                    royal_loss = not royal_groups[turn_side].get(type(lost_piece))
-                            if royal_loss:
-                                break
-                    chained_move = chained_move.chained_move
-                if royal_loss:
+                if self.is_royal_capture(turn_side, self.move_history[-1]):
                     check_side = turn_side
                     if check_side is not Side.NONE:
                         check_sides[check_side] = True
@@ -1524,7 +1531,7 @@ class Board(Window):
         if moves_for is None:
             moves_for = self.turn_side
         if moves_for == Side.ANY:
-            turn_sides = [Side.WHITE, Side.BLACK]
+            turn_sides = [self.turn_side, opponent]
         elif moves_for == Side.NONE:
             turn_sides = []
         else:
@@ -1829,12 +1836,9 @@ class Board(Window):
                                 self.load_pieces()
                                 self.load_check(turn_side)
                             if self.use_check:
-                                royal_loss = False
-                                if royal_markers[turn_side] and not self.royal_markers[turn_side]:
+                                if self.is_royal_capture(turn_side, move):
                                     self.check_side = turn_side
-                                if royal_markers[opponent] and not self.royal_markers[opponent]:
-                                    royal_loss = True
-                                if royal_loss:
+                                if self.is_royal_capture(opponent, move):
                                     check_side = opponent
                                     self.moves[opponent] = {}
                                     self.moves_queried[opponent] = True
@@ -1890,7 +1894,7 @@ class Board(Window):
             else:
                 theoretical_moves_for = opponent
         if theoretical_moves_for == Side.ANY:
-            turn_sides = [Side.WHITE, Side.BLACK]
+            turn_sides = [self.turn_side, opponent]
         elif theoretical_moves_for == Side.NONE:
             turn_sides = []
         else:
