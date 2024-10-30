@@ -38,7 +38,7 @@ from chess.save import condense, expand, unpack, repack
 from chess.save import condense_algebraic as cnd_alg, expand_algebraic as exp_alg
 from chess.save import load_move, load_piece, load_rng, load_piece_type, load_custom_type, load_movement_type
 from chess.save import save_move, save_piece, save_rng, save_piece_type, save_custom_type
-from chess.util import base_dir, get_filename, is_prefix_of, is_prefix_in, select_save_data, select_save_name
+from chess.util import base_dir, get_filename, is_prefix_of, is_prefix_in, select_save_data, select_save_name, sign
 from chess.util import Default, Unset
 
 
@@ -101,8 +101,8 @@ class Board(Window):
         self.promotion_area = {}  # squares to draw possible promotions on
         self.promotion_area_drops = {}  # dropped pieces matching the squares above
         self.action_count = 0  # current number of actions taken
-        self.ply_count = 0  # current half-move number
-        self.ply_simulation = 0  # current number of look-ahead half-moves
+        self.ply_count = 0  # current overall move number
+        self.ply_simulation = 0  # current number of look-ahead moves
         self.move_history = []  # list of moves made so far
         self.future_move_history = []  # list of moves that were undone, in reverse order
         self.roll_history = []  # list of rolls made so far (used for ProbabilisticMovement)
@@ -114,7 +114,8 @@ class Board(Window):
         self.set_rng = None  # random number generator for piece set selection
         self.initial_turns = 0  # amount of initial turns
         self.turn_order = [(side, None) for side in (Side.WHITE, Side.BLACK)]  # order of turns
-        self.turn_side = None  # side whose turn it is
+        self.turn_data = [0, Side.NONE, 0]  # [turn number, turn side, move number]
+        self.turn_side = Side.NONE  # side whose turn it is
         self.turn_rules = None  # rules of movement for the current turn
         self.check_side = Side.NONE  # side that is currently in check
         self.use_drops = self.board_config['use_drops']  # whether pieces can be dropped
@@ -346,6 +347,30 @@ class Board(Window):
             (Side.WHITE if piece.board_pos[0] < self.board_height / 2 else Side.BLACK)
         )
 
+    def shift_ply(self, offset: int) -> None:
+        direction = sign(offset)
+        for i in range(abs(offset)):
+            turn_side = self.turn_side
+            self.ply_count += direction
+            if self.ply_count <= 0:
+                self.ply_count = 1
+                break
+            self.turn_side, self.turn_rules = self.turn_order[self.get_turn()]
+            if self.turn_side == turn_side:
+                self.turn_data[2] += direction
+            else:
+                self.turn_data[1] = self.turn_side
+                if direction > 0:
+                    if self.turn_side == self.turn_order[0][0]:
+                        self.turn_data[0] += 1
+                    self.turn_data[2] = 1
+                else:
+                    if turn_side == self.turn_order[0][0]:
+                        self.turn_data[0] -= 1
+                    self.turn_data[2] = 0
+                    while self.get_turn_side(-self.turn_data[2]) == self.turn_side:
+                        self.turn_data[2] += 1
+
     def set_position(self, piece: Piece, pos: Position) -> None:
         piece.board_pos = pos
         piece.position = self.get_screen_position(pos)
@@ -408,14 +433,14 @@ class Board(Window):
         self.clear_auto_capture_markers()
         self.reset_captures()
 
-        self.turn_side, self.turn_rules = self.turn_order[0]
-
         self.game_over = False
         self.edit_mode = False
         self.chain_start = None
         self.promotion_piece = None
         self.action_count = 0
         self.ply_count = 0
+        self.turn_side = Side.NONE
+        self.turn_data = [0, Side.NONE, 0]
 
         for sprite_list in self.piece_sprite_list, self.promotion_piece_sprite_list, self.promotion_area_sprite_list:
             sprite_list.clear()
@@ -435,7 +460,8 @@ class Board(Window):
 
         if log:
             self.log_armies()
-        self.ply_count += 1
+
+        self.shift_ply(+1)
 
         if update is None:
             update = not self.move_history
@@ -578,7 +604,7 @@ class Board(Window):
                 for m in moves
             ] if self.chain_start else [],
             'ply': self.ply_count,
-            'turn': self.get_turn() + 1,
+            'turn': [self.turn_data[0], self.turn_data[1].value, self.turn_data[2]],
             'order': [
                 side[0].value if side[1] is None else
                 [side[0].value, unpack([{k: v for k, v in {
@@ -812,6 +838,9 @@ class Board(Window):
         self.custom_layout = {p: load_piece(v, self, c).on(p) for p, v in exp_alg(data.get('layout', {}), *wh).items()}
 
         ply_count = data.get('ply', self.ply_count)
+        if ply_count <= 0:
+            self.log(f"Error: Invalid ply count ({ply_count})")
+            ply_count = 1
         self.custom_turn_order = [
             (Side(int(side[0])), [{k: v for k, v in {
                 'order': d.get('order', 0),
@@ -826,8 +855,14 @@ class Board(Window):
             for side in data.get('order', [])
         ]
         self.reset_turn_order()
-        turn_side = data.get('turn', self.get_turn(ply_count, 1))
-        self.turn_side, self.turn_rules = self.turn_order[turn_side - 1]
+        turn_data = data.get('turn')
+        if turn_data is not None:
+            turn_data[1] = Side(turn_data[1])
+        turn_side = self.get_turn_side(0, ply_count)
+        if turn_side != turn_data[1]:
+            self.log(f"Error: Turn side does not match ({turn_side} was {turn_data[1]})")
+            turn_data[1] = turn_side
+        turn_data = turn_data
 
         self.move_history = [load_move(d, self, c) for d in data.get('moves', [])]
         self.future_move_history = [load_move(d, self, c) for d in data.get('future', [])[::-1]]
@@ -908,9 +943,19 @@ class Board(Window):
                 some = f"a{'' if self.chaos_mode in {0, 1} else 'n'} {some}"
             sets = 'set' if same else 'sets'
             self.log(f"Info: {starting} game (with {some} piece {sets})")
-        self.ply_count = 0 if with_history else ply_count
+        if with_history:
+            self.ply_count = 0
+            self.turn_side = Side.NONE
+            self.turn_data = [0, Side.NONE, 0]
+            self.turn_rules = None
+        else:
+            self.ply_count = ply_count
+            self.turn_side = turn_side
+            self.turn_data = turn_data
+            self.turn_rules = self.turn_order[self.get_turn()][1]
         self.log_armies()
-        self.ply_count = 1 if with_history else ply_count
+        if with_history:
+            self.shift_ply(+1)
         self.log_special_modes()
         if with_history:
             success = self.reload_history()
@@ -962,13 +1007,13 @@ class Board(Window):
         self.clear_auto_capture_markers()
         self.reset_captures()
 
-        self.turn_side, self.turn_rules = self.turn_order[0]
-
         self.game_over = False
         self.chain_start = None
         self.promotion_piece = None
         self.action_count = 0
         self.ply_count = 0
+        self.turn_side = Side.NONE
+        self.turn_data = [0, Side.NONE, 0]
 
         for sprite_list in self.piece_sprite_list, self.promotion_piece_sprite_list, self.promotion_area_sprite_list:
             sprite_list.clear()
@@ -976,7 +1021,7 @@ class Board(Window):
                 sprite_list.remove(sprite)
 
         self.log("Info: Board cleared")
-        self.ply_count += 1
+        self.shift_ply(+1)
         if not self.edit_mode:
             self.log("Mode: EDIT", False)
         self.edit_mode = True
@@ -2264,7 +2309,6 @@ class Board(Window):
         self.clear_en_passant_markers()
         if not self.move_history:
             return
-        turn_side = self.turn_side
         ply_count = self.ply_count
         last_side = self.get_turn_side()
         side_count = 0
@@ -2284,15 +2328,12 @@ class Board(Window):
                     last_moves.append(move)
                     continue
             last_moves.append(move)
-            self.ply_count -= 1
-            self.turn_side = self.get_turn_side()
+            self.shift_ply(-1)
             if self.turn_side != last_side:
                 if side_count:
                     break
                 side_count += 1
                 last_side = self.turn_side
-        self.ply_count += 1
-        self.turn_side = self.get_turn_side()
         for move in last_moves[::-1]:
             if (
                 move and move.is_edit != 1 and move.movement_type and move.piece.movement
@@ -2312,10 +2353,13 @@ class Board(Window):
                     chained_move = chained_move.chained_move
                 if move.is_edit:
                     continue
-            self.ply_count += 1
-            self.turn_side = self.get_turn_side()
-        self.ply_count = ply_count
-        self.turn_side = turn_side
+            self.shift_ply(+1)
+        if ply_count != self.ply_count:
+            self.log(
+                "Error: Ply count mismatch during en passant marker reload "
+                f"(expected {ply_count}, got {self.ply_count})"
+            )
+            self.shift_ply(ply_count - self.ply_count)
 
     def clear_en_passant_markers(self,) -> None:
         for target_dict, marker_dict in (
@@ -2358,11 +2402,15 @@ class Board(Window):
         while True:
             chained = False
             if next_move is None:
+                log_turn_pass = self.board_config['log_turn_pass']
+                if log_turn_pass is None:
+                    log_turn_pass = set(self.moves[self.turn_side]) != {'pass'}
                 turn_side = self.get_turn_side(+1)
-                self.log(f"Pass: {turn_side} to move")
+                if log_turn_pass:
+                    self.log(f"Pass: {turn_side} to move")
                 self.move_history.append(None)
-                self.ply_count += 1
-            if next_move.is_edit:
+                self.shift_ply(+1)
+            elif next_move.is_edit:
                 self.update_move(next_move)
                 next_move.piece.move(next_move)
                 self.update_auto_capture_markers(next_move)
@@ -2393,7 +2441,7 @@ class Board(Window):
                         self.promotion_piece = promotion_piece
                         self.log(f"Drop: {next_move}")
                         self.move_history.append(next_move)
-                        self.ply_count += 1
+                        self.shift_ply(+1)
             else:
                 move = self.find_move(next_move.pos_from, next_move.pos_to)
                 if move is None:
@@ -2444,7 +2492,7 @@ class Board(Window):
                 else:
                     self.chain_start = None
                     if self.promotion_piece is None:
-                        self.ply_count += 1
+                        self.shift_ply(+1)
             if not chained:
                 self.advance_turn()
             if self.promotion_piece:
@@ -2555,7 +2603,7 @@ class Board(Window):
         else:
             self.chain_start = None
             if self.promotion_piece is None:
-                self.ply_count += 1
+                self.shift_ply(+1)
                 self.compare_history()
             self.advance_turn()
 
@@ -2672,7 +2720,8 @@ class Board(Window):
             self.end_promotion()
         else:
             last_move = self.move_history[-1]
-            self.ply_count -= 1 if last_move is None else not last_move.is_edit and self.chain_start is None
+            offset = last_move is None or (not last_move.is_edit and self.chain_start is None)
+            self.shift_ply(-offset)
         last_move = self.move_history.pop()
         if last_move is not None:
             move_chain = [last_move]
@@ -2689,7 +2738,7 @@ class Board(Window):
                 self.revert_auto_capture_markers(chained_move)
                 if chained_move.promotion is not None:
                     if chained_move.placed_piece is not None:
-                        turn_side = self.get_turn_side()
+                        turn_side = self.get_turn_side(+1)
                         if chained_move.placed_piece in self.drops[turn_side]:
                             self.captured_pieces[turn_side].append(chained_move.placed_piece)
                     if not chained_move.piece.is_empty():
@@ -2705,8 +2754,12 @@ class Board(Window):
                 self.log(f"Undo: {move_type}: {logged_move}")
                 in_promotion = False
         else:
+            log_turn_pass = self.board_config['log_turn_pass']
+            if log_turn_pass is None:
+                log_turn_pass = set(self.moves[self.turn_side]) != {'pass'}
             turn_side = self.get_turn_side(+1)
-            self.log(f"Undo: Pass: {turn_side} to move")
+            if log_turn_pass:
+                self.log(f"Undo: Pass: {turn_side} to move")
         if self.move_history:
             move = self.move_history[-1]
             if move is not None and move.is_edit != 1 and move.movement_type != DropMovement:
@@ -2786,8 +2839,12 @@ class Board(Window):
                 return
         last_chain_move = last_move
         if self.future_move_history[-1] is None:
+            log_turn_pass = self.board_config['log_turn_pass']
+            if log_turn_pass is None:
+                log_turn_pass = set(self.moves[self.turn_side]) != {'pass'}
             turn_side = self.get_turn_side(+1)
-            self.log(f"Redo: Pass: {turn_side} to move")
+            if log_turn_pass:
+                self.log(f"Redo: Pass: {turn_side} to move")
             self.update_en_passant_markers()
             self.move_history.append(deepcopy(last_move))
         elif piece_was_moved:
@@ -2846,7 +2903,8 @@ class Board(Window):
         ):
             self.chain_start = None
             if self.promotion_piece is None:
-                self.ply_count += 1 if last_move is None else not last_move.is_edit
+                offset = last_move is None or not last_move.is_edit
+                self.shift_ply(+offset)
                 self.compare_history()
             self.advance_turn()
         elif last_chain_move.chained_move is Unset:
@@ -2887,11 +2945,15 @@ class Board(Window):
             if count == start_count:
                 return
         for _ in range(index - self.ply_count):
+            log_turn_pass = self.board_config['log_turn_pass']
+            if log_turn_pass is None:
+                log_turn_pass = set(self.moves[self.turn_side]) != {'pass'}
             turn_side = self.get_turn_side(+1)
-            self.log(f"Pass: {turn_side} to move")
+            if log_turn_pass:
+                self.log(f"Pass: {turn_side} to move")
             self.update_en_passant_markers()
             self.move_history.append(None)
-            self.ply_count += 1
+            self.shift_ply(+1)
             self.compare_history()
             self.advance_turn()
 
@@ -2916,7 +2978,6 @@ class Board(Window):
             self.color_pieces()  # reverting the piece colors to normal in case they were changed
             self.update_caption()  # updating the caption to reflect the edit that was just made
             return  # let's not advance the turn while editing the board to hopefully make things easier for everyone
-        self.turn_side, self.turn_rules = self.turn_order[self.get_turn()]
         self.chain_start = None
         self.chain_moves = {side: {} for side in self.chain_moves}
         self.update_status()
@@ -3167,7 +3228,7 @@ class Board(Window):
                     chained_move.set(piece=copy(chained_move.piece))
             self.update_en_passant_markers(move)
             self.move_history.append(deepcopy(move))
-            self.ply_count += not move.is_edit
+            self.shift_ply(+(not move.is_edit))
             self.compare_history()
             self.advance_turn()
             return
@@ -3913,7 +3974,7 @@ class Board(Window):
                             chained_move.piece.move(chained_move)
                             self.update_auto_capture_markers(chained_move)
                             chained_move.set(piece=copy(chained_move.piece))
-                    self.ply_count += not current_move.is_edit
+                    self.shift_ply(+(not current_move.is_edit))
                     self.compare_history()
                     self.advance_turn()
                 return
@@ -4176,7 +4237,7 @@ class Board(Window):
                 else:
                     self.chain_start = None
                     if self.promotion_piece is None:
-                        self.ply_count += 1
+                        self.shift_ply(+1)
                         self.compare_history()
                     self.advance_turn()
             else:
@@ -4643,7 +4704,8 @@ class Board(Window):
             if modifiers & key.MOD_ACCEL and modifiers & key.MOD_SHIFT:  # Fast-forward, but slowly. (Reload history)
                 self.log("Info: Reloading history", False)
                 self.log("Info: Starting new game", bool(self.should_hide_pieces))
-                self.reload_history()
+                if not self.reload_history():
+                    self.log("Error: Failed to reload history!")
                 if self.edit_mode:
                     self.moves = {side: {} for side in self.moves}
                     self.chain_moves = {side: {} for side in self.chain_moves}
@@ -4876,8 +4938,19 @@ class Board(Window):
 
     def log(self, string: str, important: bool = True, *, prefix: str | None = None) -> None:
         if prefix is None:
-            prefix = f"[Ply {self.ply_count}] "
-        string = f"{prefix}{string}"
+            if self.board_config['log_prefix'] == 0:
+                prefix = f"Ply {self.ply_count}"
+            if self.board_config['log_prefix'] > 0:
+                if self.turn_data[0] == 0:
+                    prefix = "Start"
+                if self.turn_data[0] > 0:
+                    prefix = f"Turn {self.turn_data[0]}: {self.turn_data[1]}"
+                    if self.board_config['log_prefix'] > 1:
+                        prefix += f", Move {self.turn_data[2]}"
+                    if self.board_config['log_prefix'] > 2:
+                        prefix = f"(Ply {self.ply_count}) {prefix}"
+        if prefix:
+            string = f"[{prefix}] {string}"
         self.verbose_data.append(string)
         if important:
             self.log_data.append(string)

@@ -269,12 +269,17 @@ def debug_info(board: Board) -> list[str]:
                 debug_log_data[-1] += " None"
         if not drops:
             debug_log_data[-1] += " None"
+    debug_log_data.append(f"Edit piece set: {board.edit_piece_set_id}")
     for side in board.piece_set_ids:
         piece_list = ', '.join(piece.name for piece in board.edit_promotions[side])
         debug_log_data.append(
             f"{side} replacements ({len(board.edit_promotions[side])}): {piece_list if piece_list else 'None'}"
         )
-    debug_log_data.append(f"Edit piece set: {board.edit_piece_set_id}")
+    debug_log_data.append(f"Obstacles ({len(board.obstacles)}):")
+    for piece in board.obstacles:
+        debug_log_data.append(f"  {toa(piece.board_pos)} {piece.board_pos}: {piece.name}")
+    if not board.obstacles:
+        debug_log_data[-1] += " None"
     debug_log_data.append(f"Custom pieces ({len(board.custom_pieces)}):")
     for piece, data in board.custom_pieces.items():
         debug_log_data.append(f"  '{piece}': {save_custom_type(data)}")
@@ -415,11 +420,13 @@ def debug_info(board: Board) -> list[str]:
     debug_log_data.append(f"Chaos mode: {board.chaos_mode} - {chaos_mode}")
     debug_log_data.append(f"Board mode: {'Edit' if board.edit_mode else 'Play'}")
     debug_log_data.append(f"Current ply: {board.ply_count}")
-    debug_log_data.append(f"Turn side: {board.turn_side if board.turn_side else 'None'}")
+    debug_log_data.append(f"Current turn: {board.turn_data[0]}")
+    debug_log_data.append(f"Current side: {board.turn_side if board.turn_side else 'None'}")
+    debug_log_data.append(f"Current move: {board.turn_data[2]}")
     if board.turn_rules is None:
-        debug_log_data.append(f"Turn rules: None")
+        debug_log_data.append(f"Movement rules: None")
     else:
-        debug_log_data.append(f"Turn rules ({len(board.turn_rules)}):")
+        debug_log_data.append(f"Movement rules ({len(board.turn_rules)}):")
         for order in board.get_order():
             order_rules = board.turn_rules.get(order)
             if order_rules is None:
@@ -521,16 +528,17 @@ def debug_info(board: Board) -> list[str]:
         start, loop = loop, start
     if not start and not loop:
         loop = [(Side.WHITE, None), (Side.BLACK, None)]
-    debug_log_data.append(f"Turn order ({len(start) + len(loop)}):")
+    debug_log_data.append(f"Move order ({len(start) + len(loop)}):")
     if start:
         debug_log_data.append(f"  Start: ({len(start)}):")
         for i, data in enumerate(start):
             turn_side, turn_rules = data
             turn_rules = copy(repack(turn_rules))
             for j, rule in enumerate(turn_rules):
-                if rule and 'cls' in rule:
-                    turn_rules[j] = copy(rule)
-                    turn_rules[j]['cls'] = unpack([save_piece_type(t) for t in repack(rule['cls'])])
+                for string in ('last', 'piece', 'type'):
+                    if rule and string in rule:
+                        turn_rules[j] = copy(rule)
+                        turn_rules[j][string] = unpack([t for t in repack(rule[string])])
             turn_rules = unpack(turn_rules)
             turn_suffix = '' if turn_rules is None else f", {turn_rules}"
             debug_log_data.append(f"    {i + 1}: {turn_side}{turn_suffix}")
@@ -543,9 +551,10 @@ def debug_info(board: Board) -> list[str]:
             turn_side, turn_rules = data
             turn_rules = copy(repack(turn_rules))
             for j, rule in enumerate(turn_rules):
-                if rule and 'cls' in rule:
-                    turn_rules[j] = copy(rule)
-                    turn_rules[j]['cls'] = unpack([save_piece_type(t) for t in repack(rule['cls'])])
+                for string in ('last', 'piece', 'type'):
+                    if rule and string in rule:
+                        turn_rules[j] = copy(rule)
+                        turn_rules[j][string] = unpack([t for t in repack(rule[string])])
             turn_rules = unpack(turn_rules)
             turn_suffix = '' if turn_rules is None else f", {turn_rules}"
             debug_log_data.append(f"  {pad}{i + 1}: {turn_side}{turn_suffix}")

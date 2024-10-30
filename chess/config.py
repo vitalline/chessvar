@@ -28,6 +28,8 @@ DEFAULT_CONFIG = {
         'update_roll_seed': True,
         'block_ids': '',
         'block_ids_chaos': '',
+        'log_prefix': 1,
+        'log_turn_pass': '',
         'recursive_aliases': True,
         'save_indent': '',
         'save_update_mode': 0,
@@ -60,6 +62,11 @@ class Config(dict):
                     self[item] = self.base_config.getboolean(section, item)
                 if type(DEFAULT_CONFIG.get(section, {}).get(item, {})) is int:
                     self[item] = self.base_config.getint(section, item)
+                if item == 'log_turn_pass':
+                    try:
+                        self[item] = self.base_config.getboolean(section, item)
+                    except ValueError:
+                        self[item] = None
                 if item == 'stalemate':
                     if ',' in self.base_config[section][item]:
                         l = [int(s) for i in self.base_config[section][item].split(',') if (s := i.strip()).isdigit()]
