@@ -626,7 +626,7 @@ class PlyMovement(IndexMovement):
             start_count = count
             while self.board.turn_order[count][0] != piece.side:
                 index += 1
-                count = self.board.get_turn(index)
+                count = self.board.get_turn(index, 0)
                 if count == start_count:
                     return ()
             index -= 1
@@ -772,7 +772,7 @@ class SpinMovement(RepeatBentMovement):
             step_count=step_count,
             loop=loop,
         )
-        self.reverse = reverse
+        self.reverse = sign(reverse)
         self.movement_cycle = copy(self.movements)
 
     def moves(self, pos_from: Position, piece: Piece, theoretical: bool = False, index: int = 0):

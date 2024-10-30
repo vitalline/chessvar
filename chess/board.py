@@ -321,13 +321,20 @@ class Board(Window):
     def get_side(self, pos: Position | None) -> Side:
         return self.get_piece(pos).side
 
-    def get_turn(self, ply_count: int | None = None) -> int:
-        if ply_count is None:
-            ply_count = self.ply_count
+    def get_turn(self, offset: int = 0, origin: int | None = None) -> int:
+        if origin is None:
+            origin = self.ply_count
+        ply_count = origin + offset
         return (
             (ply_count - 1 - self.initial_turns) % (len(self.turn_order) - self.initial_turns) + self.initial_turns
             if ply_count > self.initial_turns else ply_count - 1
         )
+
+    def get_turn_side(self, offset: int = 0, origin: int | None = None) -> Side:
+        index = self.get_turn(offset, origin)
+        if index < 0:
+            return Side.NONE
+        return self.turn_order[index][0]
 
     def get_order(self, rules: dict = None) -> list[int]:
         rules = rules or self.turn_rules or {0}
@@ -822,7 +829,7 @@ class Board(Window):
             for side in data.get('order', [])
         ]
         self.reset_turn_order()
-        turn_side = data.get('turn', self.get_turn(ply_count) + 1)
+        turn_side = data.get('turn', self.get_turn(ply_count, 1))
         self.turn_side, self.turn_rules = self.turn_order[turn_side - 1]
 
         self.move_history = [load_move(d, self, c) for d in data.get('moves', [])]
@@ -1595,7 +1602,10 @@ class Board(Window):
                 last_history_pieces = set()
                 last_history_partial = set()
                 if self.move_history:
-                    for last_history_move in self.move_history[::-1]:
+                    for i, last_history_move in enumerate(self.move_history[::-1], start=int(not self.chain_start)):
+                        move_turn_side = self.get_turn_side(-i)
+                        if move_turn_side != turn_side:
+                            break
                         if last_history_move and not last_history_move.is_edit:
                             move_chain = []
                             while last_history_move:
@@ -2206,8 +2216,8 @@ class Board(Window):
         ):
             if not move or not move.is_edit:
                 current_side = self.turn_side
-                last_side = self.turn_order[self.get_turn(self.ply_count - 1)][0]
-                next_side = self.turn_order[self.get_turn(self.ply_count + 1)][0]
+                last_side = self.get_turn_side(-1)
+                next_side = self.get_turn_side(+1)
                 chain_end = not move or move.chained_move is None
                 is_first_turn = current_side != last_side
                 is_final_turn = current_side != next_side
@@ -2259,7 +2269,7 @@ class Board(Window):
             return
         turn_side = self.turn_side
         ply_count = self.ply_count
-        last_side = self.turn_order[self.get_turn()][0]
+        last_side = self.get_turn_side()
         side_count = 0
         last_moves = []
         for move in self.move_history[::-1]:
@@ -2278,14 +2288,14 @@ class Board(Window):
                     continue
             last_moves.append(move)
             self.ply_count -= 1
-            self.turn_side = self.turn_order[self.get_turn()][0]
+            self.turn_side = self.get_turn_side()
             if self.turn_side != last_side:
                 if side_count:
                     break
                 side_count += 1
                 last_side = self.turn_side
         self.ply_count += 1
-        self.turn_side = self.turn_order[self.get_turn()][0]
+        self.turn_side = self.get_turn_side()
         for move in last_moves[::-1]:
             if (
                 move and move.is_edit != 1 and move.movement_type and move.piece.movement
@@ -2306,7 +2316,7 @@ class Board(Window):
                 if move.is_edit:
                     continue
             self.ply_count += 1
-            self.turn_side = self.turn_order[self.get_turn()][0]
+            self.turn_side = self.get_turn_side()
         self.ply_count = ply_count
         self.turn_side = turn_side
 
@@ -2351,7 +2361,7 @@ class Board(Window):
         while True:
             chained = False
             if next_move is None:
-                turn_side = self.turn_order[self.get_turn(self.ply_count + 1)][0]
+                turn_side = self.get_turn_side(+1)
                 self.log(f"[Ply {self.ply_count}] Pass: {turn_side} to move")
                 self.move_history.append(None)
                 self.ply_count += 1
@@ -2682,7 +2692,7 @@ class Board(Window):
                 self.revert_auto_capture_markers(chained_move)
                 if chained_move.promotion is not None:
                     if chained_move.placed_piece is not None:
-                        turn_side = self.turn_order[self.get_turn(self.ply_count)][0]
+                        turn_side = self.get_turn_side()
                         if chained_move.placed_piece in self.drops[turn_side]:
                             self.captured_pieces[turn_side].append(chained_move.placed_piece)
                     if not chained_move.piece.is_empty():
@@ -2698,7 +2708,7 @@ class Board(Window):
                 self.log(f"[Ply {self.ply_count}] Undo: {move_type}: {logged_move}")
                 in_promotion = False
         else:
-            turn_side = self.turn_order[self.get_turn(self.ply_count + 1)][0]
+            turn_side = self.get_turn_side(+1)
             self.log(f"[Ply {self.ply_count}] Undo: Pass: {turn_side} to move")
         if self.move_history:
             move = self.move_history[-1]
@@ -2779,7 +2789,7 @@ class Board(Window):
                 return
         last_chain_move = last_move
         if self.future_move_history[-1] is None:
-            turn_side = self.turn_order[self.get_turn(self.ply_count + 1)][0]
+            turn_side = self.get_turn_side(+1)
             self.log(f"[Ply {self.ply_count}] Redo: Pass: {turn_side} to move")
             self.update_en_passant_markers()
             self.move_history.append(deepcopy(last_move))
@@ -2880,7 +2890,7 @@ class Board(Window):
             if count == start_count:
                 return
         for _ in range(index - self.ply_count):
-            turn_side = self.turn_order[self.get_turn(self.ply_count + 1)][0]
+            turn_side = self.get_turn_side(+1)
             self.log(f"[Ply {self.ply_count}] Pass: {turn_side} to move")
             self.update_en_passant_markers()
             self.move_history.append(None)
