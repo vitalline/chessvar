@@ -12,6 +12,7 @@ from chess.movement.util import to_alpha as b26, to_algebraic as toa, from_algeb
 from chess.pieces.groups import classic as fide
 from chess.pieces.piece import Piece
 from chess.pieces.side import Side
+from chess.pieces.types import QuasiRoyal
 from chess.save import save_piece_type, save_custom_type, unpack, repack
 from chess.util import get_filename
 
@@ -136,31 +137,41 @@ def debug_info(board: Board) -> list[str]:
     for side in board.piece_set_ids:
         debug_log_data.append(f"{side} pieces ({len(board.movable_pieces[side])}):")
         for piece in board.movable_pieces[side]:
-            debug_log_data.append(f'  {toa(piece.board_pos)} {piece.board_pos}: {piece.name}')
+            debug_log_data.append(f"  {toa(piece.board_pos)} {piece.board_pos}: {piece.name}")
         if not board.movable_pieces[side]:
             debug_log_data[-1] += " None"
     for side in board.piece_set_ids:
         debug_log_data.append(f"{side} royal pieces ({len(board.royal_pieces[side])}):")
         for piece in board.royal_pieces[side]:
-            debug_log_data.append(f'  {toa(piece.board_pos)} {piece.board_pos}: {piece.name}')
+            debug_log_data.append(f"  {toa(piece.board_pos)} {piece.board_pos}: {piece.name}")
         if not board.royal_pieces[side]:
             debug_log_data[-1] += " None"
     for side in board.piece_set_ids:
-        debug_log_data.append(f"{side} quasi-royal pieces ({len(board.quasi_royal_pieces[side])}):")
-        for piece in board.quasi_royal_pieces[side]:
-            debug_log_data.append(f'  {toa(piece.board_pos)} {piece.board_pos}: {piece.name}')
-        if not board.quasi_royal_pieces[side]:
+        debug_log_data.append(f"{side} royal groups ({len(board.royal_groups[side])}):")
+        groups = {
+            key: board.royal_groups[side][key] for key in sorted(  # this should put mixin classes before pieces
+                board.royal_groups[side], key=lambda x: (1, x.name) if issubclass(x, Piece) else (0, x.__name__)
+            )
+        }
+        for key, group in groups.items():
+            name = key.name if issubclass(key, Piece) else {QuasiRoyal: "Quasi-royal"}.get(key, key.__name__)
+            debug_log_data.append(f"  {name} ({len(group)}):")
+            for piece in group:
+                debug_log_data.append(f"  {toa(piece.board_pos)} {piece.board_pos}: {piece.name}")
+            if not group:
+                debug_log_data[-1] += " None"
+        if not board.royal_groups[side]:
             debug_log_data[-1] += " None"
     for side in board.piece_set_ids:
         debug_log_data.append(f"{side} probabilistic pieces ({len(board.probabilistic_pieces[side])}):")
         for piece in board.probabilistic_pieces[side]:
-            debug_log_data.append(f'  {toa(piece.board_pos)} {piece.board_pos}: {piece.name}')
+            debug_log_data.append(f"  {toa(piece.board_pos)} {piece.board_pos}: {piece.name}")
         if not board.probabilistic_pieces[side]:
             debug_log_data[-1] += " None"
     for side in board.piece_set_ids:
         debug_log_data.append(f"{side} auto-ranged pieces ({len(board.auto_ranged_pieces[side])}):")
         for piece in board.auto_ranged_pieces[side]:
-            debug_log_data.append(f'  {toa(piece.board_pos)} {piece.board_pos}: {piece.name}')
+            debug_log_data.append(f"  {toa(piece.board_pos)} {piece.board_pos}: {piece.name}")
         if not board.auto_ranged_pieces[side]:
             debug_log_data[-1] += " None"
     for side in board.piece_set_ids:
@@ -367,30 +378,41 @@ def debug_info(board: Board) -> list[str]:
             f"{side} drops ({len(board.captured_pieces[side])}): "
             f"{', '.join(piece.name for piece in board.captured_pieces[side]) or 'None'}"
         )
-    piece_modes = {0: "Shown", 1: "Hidden", 2: "Penultima"}
-    debug_log_data.append(f"Hide pieces: {board.should_hide_pieces} - {piece_modes[board.should_hide_pieces]}")
-    move_modes = {None: "Default", False: "Shown", True: "Hidden"}
-    debug_log_data.append(f"Hide moves: {board.should_hide_moves} - {move_modes[board.should_hide_moves]}")
-    drop_modes = {k: f"Pieces {v} be dropped on the board" for k, v in {False: "cannot", True: "can"}.items()}
-    debug_log_data.append(f"Use drops: {board.use_drops} - {drop_modes[board.use_drops]}")
-    check_modes = {False: "Capture the royal piece to win", True: "Checkmate the royal piece to win"}
-    debug_log_data.append(f"Use check: {board.use_check} - {check_modes[board.use_check]}")
+    piece_mode = {0: "Shown", 1: "Hidden", 2: "Penultima"}.get(board.should_hide_pieces, "Unknown")
+    debug_log_data.append(f"Hide pieces: {board.should_hide_pieces} - {piece_mode}")
+    move_mode = {None: "Default", False: "Shown", True: "Hidden"}.get(board.should_hide_moves, "Unknown")
+    debug_log_data.append(f"Hide moves: {board.should_hide_moves} - {move_mode}")
+    drop_mode = {
+        k: f"Pieces {v} be dropped on the board" for k, v in {False: "cannot", True: "can"}.items()
+    }.get(board.use_drops, "Unknown")
+    debug_log_data.append(f"Use drops: {board.use_drops} - {drop_mode}")
+    check_mode = {
+        k: f"{v} the royal piece to win" for k, v in {False: "Capture", True: "Checkmate"}.items()
+    }.get(board.use_check, "Unknown")
+    debug_log_data.append(f"Use check: {board.use_check} - {check_mode}")
     stalemate_modes = {0: "draws", 1: "loses", -1: "wins"}
     if isinstance(board.stalemate_rule, dict):
         for side, mode in board.stalemate_rule.items():
-            debug_log_data.append(f"Stalemate rule: {side} {stalemate_modes[mode]} when stalemated")
+            stalemate_mode = f"{side} {stalemate_modes.get(mode, '???')} when stalemated"
+            debug_log_data.append(f"Stalemate rule: {stalemate_mode}")
     else:
-        debug_log_data.append(f"Stalemate rule: Player {stalemate_modes[board.stalemate_rule]} when stalemated")
-    royal_modes = {0: "Default", 1: "Force royal (Threaten Any)", 2: "Force quasi-royal (Threaten Last)"}
-    debug_log_data.append(f"Royal mode: {board.royal_piece_mode} - {royal_modes[board.royal_piece_mode]}")
-    chaos_modes = {
+        stalemate_mode = f"Player {stalemate_modes.get(board.stalemate_rule, '???')} when stalemated"
+        debug_log_data.append(f"Stalemate rule: {stalemate_mode}")
+    royal_mode = {
+        0: "Default",
+        1: "Force royal (Threaten Any)",
+        2: "Force quasi-royal (Threaten Last)",
+        3: "Force royal groups (Threaten Last of a Kind)",
+    }.get(board.royal_piece_mode, "Unknown")
+    debug_log_data.append(f"Royal mode: {board.royal_piece_mode} - {royal_mode}")
+    chaos_mode = {
         0: "Off",
         1: "Chaos (Matching Pieces)",
         2: "Chaos (Matching Pieces), Asymmetrical",
         3: "Extreme Chaos (Any Pieces)",
         4: "Extreme Chaos (Any Pieces), Asymmetrical"
-    }
-    debug_log_data.append(f"Chaos mode: {board.chaos_mode} - {chaos_modes[board.chaos_mode]}")
+    }.get(board.chaos_mode, "Unknown")
+    debug_log_data.append(f"Chaos mode: {board.chaos_mode} - {chaos_mode}")
     debug_log_data.append(f"Board mode: {'Edit' if board.edit_mode else 'Play'}")
     debug_log_data.append(f"Current ply: {board.ply_count}")
     debug_log_data.append(f"Turn side: {board.turn_side if board.turn_side else 'None'}")

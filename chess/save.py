@@ -31,10 +31,10 @@ CUSTOM_PREFIX = '_custom_'
 MOVEMENT_SUFFIXES = ('Movement', 'Rider')
 
 TYPE_CONFLICTS = {
-    piece_types.Delayed: {piece_types.Delayed1},
-    piece_types.Delayed1: {piece_types.Delayed},
-    piece_types.Royal: {piece_types.QuasiRoyal},
-    piece_types.QuasiRoyal: {piece_types.Royal},
+    x: s for s in (map(frozenset, (
+        (piece_types.Delayed, piece_types.Delayed1),
+        (piece_types.Royal, piece_types.QuasiRoyal, piece_types.RoyalGroup),
+    ))) for x in s
 }
 
 
@@ -323,7 +323,7 @@ def load_custom_type(data: dict | None, name: str) -> type[Piece] | None:
     bases = [Piece]
     for base_string in base_strings:
         base = getattr(piece_types, base_string, None)
-        if base and base not in base_set and not base_set.intersection(TYPE_CONFLICTS.get(base, set())):
+        if base and base not in base_set and not base_set.intersection(TYPE_CONFLICTS.get(base, ())):
             base_set.add(base)
             bases.append(base)
     args = {}

@@ -11,7 +11,11 @@ class Royal(object):
     pass
 
 class QuasiRoyal(object):
-    # Considered royal if it is the only such piece of their side
+    # Considered royal if it is the only quasi-royal piece owned by the player
+    pass
+
+class RoyalGroup(object):
+    # Considered royal if it is the only piece of its type owned by the player
     pass
 
 class Slow(object):

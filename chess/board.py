@@ -33,7 +33,7 @@ from chess.pieces.groups.colorbound import King as CBKing
 from chess.pieces.groups.util import NoPiece, Obstacle, Block, Wall
 from chess.pieces.piece import Piece, is_active
 from chess.pieces.side import Side
-from chess.pieces.types import Delayed, Delayed1, QuasiRoyal, Royal, Slow
+from chess.pieces.types import Delayed, Delayed1, QuasiRoyal, Royal, RoyalGroup, Slow
 from chess.save import condense, expand, unpack, repack
 from chess.save import condense_algebraic as cnd_alg, expand_algebraic as exp_alg
 from chess.save import load_move, load_piece, load_rng, load_piece_type, load_custom_type, load_movement_type
@@ -120,7 +120,7 @@ class Board(Window):
         self.use_drops = self.board_config['use_drops']  # whether pieces can be dropped
         self.use_check = self.board_config['use_check']  # whether to check for check after each move
         self.stalemate_rule = 0  # 0: draw, 1: win for moving, -1: win for stalemated. can be {side: side is stalemated}
-        self.royal_piece_mode = self.board_config['royal_mode'] % 3  # 0: normal, 1: force royal, 2: force quasi-royal
+        self.royal_piece_mode = self.board_config['royal_mode'] % 4  # 0: normal, 1: royal, 2: quasi-royal, 3: grouped
         self.should_hide_pieces = self.board_config['hide_pieces'] % 3  # 0: don't hide, 1: hide all, 2: penultima mode
         self.should_hide_moves = self.board_config['hide_moves']  # whether to hide the move markers; None uses above
         self.auto_moves = True  # whether to skip move animations if allowed
@@ -143,7 +143,7 @@ class Board(Window):
         self.movable_pieces = {Side.WHITE: [], Side.BLACK: []}  # pieces that can be moved by each side
         self.royal_markers = {Side.WHITE: set(), Side.BLACK: set()}  # squares where the side's royals are
         self.royal_pieces = {Side.WHITE: [], Side.BLACK: []}  # these have to stay on the board and should be protected
-        self.quasi_royal_pieces = {Side.WHITE: [], Side.BLACK: []}  # at least one of these has to stay on the board
+        self.royal_groups = {Side.WHITE: {}, Side.BLACK: {}}  # at least one of these per group has to stay on the board
         self.en_passant_targets = {Side.WHITE: {}, Side.BLACK: {}}  # pieces that can be captured en passant
         self.en_passant_markers = {Side.WHITE: {}, Side.BLACK: {}}  # where the side's pieces can be captured e.p.
         self.royal_ep_targets = {Side.WHITE: {}, Side.BLACK: {}}  # royal pieces that can be captured en passant
@@ -1359,7 +1359,7 @@ class Board(Window):
         self.movable_pieces = {Side.WHITE: [], Side.BLACK: []}
         self.royal_markers = {Side.WHITE: set(), Side.BLACK: set()}
         self.royal_pieces = {Side.WHITE: [], Side.BLACK: []}
-        self.quasi_royal_pieces = {Side.WHITE: [], Side.BLACK: []}
+        self.royal_groups = {Side.WHITE: {}, Side.BLACK: {}}
         self.probabilistic_pieces = {Side.WHITE: [], Side.BLACK: []}
         self.auto_ranged_pieces = {Side.WHITE: [], Side.BLACK: []}
         self.obstacles = []
@@ -1368,28 +1368,31 @@ class Board(Window):
             side = piece.side
             if side in self.movable_pieces and not piece.is_empty():
                 self.movable_pieces[side].append(piece)
-                if isinstance(piece, Royal):
+                royal_mode = self.royal_piece_mode
+                if not royal_mode:
+                    if isinstance(piece, Royal):
+                        royal_mode = 1  # Force royal pieces
+                    if isinstance(piece, QuasiRoyal):
+                        royal_mode = 2  # Force quasi-royal pieces
+                    if isinstance(piece, RoyalGroup):
+                        royal_mode = 3  # Force royal groups
+                if royal_mode == 1:
                     self.royal_pieces[side].append(piece)
-                elif isinstance(piece, QuasiRoyal):
-                    self.quasi_royal_pieces[side].append(piece)
+                if royal_mode == 2:
+                    self.royal_groups[side].setdefault(QuasiRoyal, []).append(piece)
+                if royal_mode == 3:
+                    self.royal_groups[side].setdefault(type(piece), []).append(piece)
                 if isinstance(piece.movement, ProbabilisticMovement):
                     self.probabilistic_pieces[side].append(piece)
                 if isinstance(piece.movement, AutoRangedAutoCaptureRiderMovement):
                     self.auto_ranged_pieces[side].append(piece)
             elif isinstance(piece, Obstacle):
                 self.obstacles.append(piece)
-        if self.royal_piece_mode == 1:  # Force royal pieces
+        if self.royal_piece_mode != 1:  # If not forcing to royal and a royal group has only one piece, make it royal
             for side in (Side.WHITE, Side.BLACK):
-                self.royal_pieces[side].extend(self.quasi_royal_pieces[side])
-                self.quasi_royal_pieces[side].clear()
-        if self.royal_piece_mode == 2:  # Force quasi-royal pieces
-            for side in (Side.WHITE, Side.BLACK):
-                self.quasi_royal_pieces[side].extend(self.royal_pieces[side])
-                self.royal_pieces[side].clear()
-        if self.royal_piece_mode != 1:  # If not forcing to royal and there is only one quasi-royal piece, make it royal
-            for side in (Side.WHITE, Side.BLACK):
-                if len(self.quasi_royal_pieces[side]) == 1:
-                    self.royal_pieces[side].append(self.quasi_royal_pieces[side].pop())
+                for group in self.royal_groups[side]:
+                    if len(self.royal_groups[side][group]) == 1:
+                        self.royal_pieces[side].extend(self.royal_groups[side][group])
         for side in (Side.WHITE, Side.BLACK):
             self.royal_markers[side] = {piece.board_pos for piece in self.royal_pieces[side]}
         if self.ply_count == 1:
@@ -1445,7 +1448,8 @@ class Board(Window):
         movable_pieces = {side: self.movable_pieces[side].copy() for side in self.movable_pieces}
         royal_markers = {side: self.royal_markers[side].copy() for side in self.royal_markers}
         royal_pieces = {side: self.royal_pieces[side].copy() for side in self.royal_pieces}
-        quasi_royal_pieces = {side: self.quasi_royal_pieces[side].copy() for side in self.quasi_royal_pieces}
+        royal_groups = {side: self.royal_groups[side].copy() for side in self.royal_groups}
+        # NB: Making a deep copy of royal groups is unnecessary because they are generated anew each time.
         probabilistic_pieces = {side: self.probabilistic_pieces[side].copy() for side in self.probabilistic_pieces}
         auto_ranged_pieces = {side: self.auto_ranged_pieces[side].copy() for side in self.auto_ranged_pieces}
         auto_capture_markers = deepcopy(self.auto_capture_markers)
@@ -1475,18 +1479,29 @@ class Board(Window):
                         if chained_move.promotion:
                             lost_piece = chained_move.piece
                             gained_piece = chained_move.promotion
-                    royal_gain = isinstance(gained_piece, (Royal, QuasiRoyal))
-                    if lost_piece and lost_piece.side == turn_side and not royal_gain:
+                    if lost_piece and lost_piece.side == turn_side and type(lost_piece) != type(gained_piece):
                         royal_loss = isinstance(lost_piece, Royal)
                         quasi_royal_loss = isinstance(lost_piece, QuasiRoyal)
-                        if self.royal_piece_mode == 0 and not royal_loss and quasi_royal_loss:
-                            royal_loss = not self.royal_pieces[turn_side] and not self.quasi_royal_pieces[turn_side]
-                        elif self.royal_piece_mode == 1:  # Force royal pieces
-                            royal_loss = royal_loss or quasi_royal_loss
-                        elif self.royal_piece_mode == 2:  # Force quasi-royal pieces
-                            royal_loss = not self.royal_pieces[turn_side] and not self.quasi_royal_pieces[turn_side]
-                        if royal_loss:
-                            break
+                        royal_group_loss = isinstance(lost_piece, RoyalGroup)
+                        if royal_group_loss:  # promotion to a different royal group still counts as a royal group loss!
+                            royal_gain = isinstance(gained_piece, (Royal, QuasiRoyal))
+                        else:
+                            royal_gain = isinstance(gained_piece, (Royal, QuasiRoyal, RoyalGroup))
+                        if not royal_gain:
+                            if royal_loss or quasi_royal_loss or royal_group_loss:
+                                if self.royal_piece_mode == 0:
+                                    if not royal_loss and quasi_royal_loss:
+                                        royal_loss = not royal_groups[turn_side].get(QuasiRoyal)
+                                    if not royal_loss and royal_group_loss:
+                                        royal_loss = not royal_groups[turn_side].get(type(lost_piece))
+                                elif self.royal_piece_mode == 1:  # Force royal pieces
+                                    royal_loss = True
+                                elif self.royal_piece_mode == 2:  # Force quasi-royal pieces
+                                    royal_loss = not royal_groups[turn_side].get(QuasiRoyal)
+                                elif self.royal_piece_mode == 3:  # Force royal groups
+                                    royal_loss = not royal_groups[turn_side].get(type(lost_piece))
+                            if royal_loss:
+                                break
                     chained_move = chained_move.chained_move
                 if royal_loss:
                     check_side = turn_side
@@ -1894,7 +1909,7 @@ class Board(Window):
         self.movable_pieces = movable_pieces
         self.royal_markers = royal_markers
         self.royal_pieces = royal_pieces
-        self.quasi_royal_pieces = quasi_royal_pieces
+        self.royal_groups = royal_groups
         self.probabilistic_pieces = probabilistic_pieces
         self.auto_ranged_pieces = auto_ranged_pieces
         self.auto_capture_markers = auto_capture_markers
@@ -4574,8 +4589,10 @@ class Board(Window):
         if symbol == key.O and not partial_move:  # Royal pieces
             old_mode = self.royal_piece_mode
             old_check = self.use_check
-            if modifiers & key.MOD_ALT:  # Toggle checks
+            if modifiers & key.MOD_ALT and modifiers & key.MOD_SHIFT:  # Toggle checks
                 self.use_check = not self.use_check
+            elif modifiers & key.MOD_ALT:  # Royal group mode (threaten the last royal piece of its kind to check)
+                self.royal_piece_mode = 3
             elif modifiers & key.MOD_ACCEL and modifiers & key.MOD_SHIFT:  # Default royal mode (depends on superclass)
                 self.royal_piece_mode = 0
             elif modifiers & key.MOD_SHIFT:  # Royal mode (threaten any royal piece to check)
@@ -4589,6 +4606,8 @@ class Board(Window):
                     self.log(f"[Ply {self.ply_count}] Info: Using royal check rule (threaten any royal piece)")
                 elif self.royal_piece_mode == 2:
                     self.log(f"[Ply {self.ply_count}] Info: Using quasi-royal check rule (threaten last royal piece)")
+                elif self.royal_piece_mode == 3:
+                    self.log(f"[Ply {self.ply_count}] Info: Using royal group check rule (threaten last piece of its kind)")
                 else:
                     self.royal_piece_mode = old_mode
             if old_check != self.use_check:
@@ -4870,6 +4889,8 @@ class Board(Window):
             self.log(f"[Ply {self.ply_count}] Info: Using royal check rule (threaten any royal piece)")
         if self.royal_piece_mode == 2:
             self.log(f"[Ply {self.ply_count}] Info: Using quasi-royal check rule (threaten last royal piece)")
+        if self.royal_piece_mode == 3:
+            self.log(f"[Ply {self.ply_count}] Info: Using royal group check rule (threaten last piece of its kind)")
         if not self.use_check:
             self.log(f"[Ply {self.ply_count}] Info: Checks disabled (capture the royal piece to win)")
         if self.use_drops:
