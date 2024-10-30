@@ -410,6 +410,15 @@ class AutoRangedAutoCaptureRiderMovement(RangedAutoCaptureRiderMovement, RiderMo
                 if not self.board.auto_capture_markers[piece.side][move.pos_to]:
                     del self.board.auto_capture_markers[piece.side][move.pos_to]
 
+    def update(self, move: Move, piece: Piece):
+        self.unmark(move.pos_from, piece)
+        self.mark(move.pos_to, piece)
+        super().update(move, piece)
+
+    def undo(self, move: Move, piece: Piece):
+        super().undo(move, piece)
+        self.unmark(move.pos_to, piece)
+        self.mark(move.pos_from, piece)
 
 class DropMovement(BaseMovement):
     # used to mark piece drops
