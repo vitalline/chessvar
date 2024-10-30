@@ -53,6 +53,7 @@ class RiderMovement(BaseMovement):
         self.directions = directions or []
         self.boundless = boundless
         self.loop = loop
+        self.data = {}
         self.steps = 0
         self.bounds = []
 
@@ -83,6 +84,7 @@ class RiderMovement(BaseMovement):
                     min(x for x in bounds[i] if x > pos_from[i])
                 ] for i in range(2)
             ]
+        bounds = self.bounds
         direction_id = 0
         while direction_id < len(self.directions):
             direction = piece.side.direction(self.directions[direction_id])
@@ -93,7 +95,10 @@ class RiderMovement(BaseMovement):
             self.steps = 0  # note that calls to moves() will restart the step count from 0 once for each direction
             steps = 0  # because of this, we need to also store the step count for the current direction separately
             # we set self.steps to this value on update and after each yield to make sure the step count is correct
+            self.data = {}  # we also do the same to self.data - note that it will be updated by init/advance calls
+            self.bounds = bounds  # and, just to make sure, we also restore the boundaries to their original values
             self.initialize_direction(direction, pos_from, piece)
+            data = self.data.copy()
             current_pos = pos_from
             move = Move(pos_from=pos_from, pos_to=self.transform(current_pos), movement_type=type(self))
             while self.in_bounds(self.transform(current_pos)):
@@ -103,8 +108,11 @@ class RiderMovement(BaseMovement):
                 current_pos = add(current_pos, direction[:2])
                 move = Move(pos_from=pos_from, pos_to=self.transform(current_pos), movement_type=type(self))
                 steps += 1
+                self.data = data
                 self.steps = steps
+                self.bounds = bounds
                 self.advance_direction(move, direction, pos_from, piece)
+                data = self.data.copy()
                 if self.skip_condition(move, direction, piece, theoretical):
                     continue
                 if not theoretical:
@@ -128,6 +136,8 @@ class RiderMovement(BaseMovement):
                     yield move
                 self.steps = steps  # this is a hacky way to make sure the step count stays correct after the yield
                 # this is because the step count will be reset to 0 if self.moves() is called before the next yield
+                self.data = data  # same thing for self.data, because it's also updated by successive moves() calls
+                self.bounds = bounds  # and same for self.bounds... notice the pattern yet? good. now don't forget.
             else:
                 direction_id += 1
 
@@ -167,7 +177,6 @@ class HalflingRiderMovement(RiderMovement):
     ):
         super().__init__(board, directions, boundless, loop)
         self.shift = shift
-        self.max_steps = 0
 
     def steps_to_edge(self, position: int, direction: int, start: int, stop: int) -> int:
         if direction == 0:
@@ -175,10 +184,12 @@ class HalflingRiderMovement(RiderMovement):
         return (((stop - 1 - position) if direction > 0 else position - start) - self.shift) // abs(direction)
 
     def initialize_direction(self, direction: AnyDirection, pos_from: Position, piece: Piece) -> None:
-        self.max_steps = min(ceil(self.steps_to_edge(pos_from[i], direction[i], *self.bounds[i]) / 2) for i in range(2))
+        self.data['max_steps'] = min(
+            ceil(self.steps_to_edge(pos_from[i], direction[i], *self.bounds[i]) / 2) for i in range(2)
+        )
 
     def stop_condition(self, move: Move, direction: AnyDirection, piece: Piece, theoretical: bool = False) -> bool:
-        return self.steps >= self.max_steps or super().stop_condition(move, direction, piece, theoretical)
+        return self.steps >= self.data['max_steps'] or super().stop_condition(move, direction, piece, theoretical)
 
     def __copy_args__(self):
         return self.board, copy(self.directions), self.shift, self.boundless, self.loop
@@ -192,60 +203,51 @@ class CannonRiderMovement(RiderMovement):
     ):
         super().__init__(board, directions, boundless, loop)
         self.distance = distance
-        self.jumped = -1
 
     def initialize_direction(self, direction: AnyDirection, pos_from: Position, piece: Piece) -> None:
-        self.jumped = -1
+        self.data['jump'] = -1
 
     def advance_direction(self, move: Move, direction: AnyDirection, pos_from: Position, piece: Piece) -> None:
-        if self.jumped < 0:
+        if self.data['jump'] < 0:
             if not self.board.not_a_piece(self.transform(move.pos_to)):
-                self.jumped = 0
+                self.data['jump'] = 0
         else:
-            self.jumped += 1
+            self.data['jump'] += 1
 
     def skip_condition(self, move: Move, direction: AnyDirection, piece: Piece, theoretical: bool = False) -> bool:
-        return super().skip_condition(move, direction, piece, theoretical) if self.jumped > 0 else not theoretical
+        return super().skip_condition(move, direction, piece, theoretical) if self.data['jump'] > 0 else not theoretical
 
     def stop_condition(self, move: Move, direction: AnyDirection, piece: Piece, theoretical: bool = False) -> bool:
-        if self.jumped < 0:
+        if self.data['jump'] < 0:
             next_pos_to = self.transform(add(move.pos_from, mul(direction[:2], self.steps + 1)))
             if not (self.loop and move.pos_from == next_pos_to) and piece.blocked_by(self.board.get_piece(next_pos_to)):
                 return False
-        elif self.jumped == 0 and not theoretical:
+        elif self.data['jump'] == 0 and not theoretical:
             next_pos_to = self.transform(add(move.pos_from, mul(direction[:2], self.steps + 1)))
             if not (self.loop and move.pos_from == next_pos_to) and piece.blocked_by(self.board.get_piece(next_pos_to)):
                 return True
-        elif self.distance and self.jumped >= self.distance:
+        elif self.distance and self.data['jump'] >= self.distance:
             return True
-        return super().stop_condition(move, direction, piece, theoretical or not self.jumped > 0)
+        return super().stop_condition(move, direction, piece, theoretical or not self.data['jump'] > 0)
 
     def __copy_args__(self):
         return self.board, copy(self.directions), self.distance, self.boundless, self.loop
 
 
 class HopperRiderMovement(CannonRiderMovement):
-    def __init__(
-        self, board: Board,
-        directions: list[AnyDirection] | None = None,
-        distance: int = 0, boundless: int = 0, loop: int = 0
-    ):
-        super().__init__(board, directions, distance, boundless, loop)
-        self.capture = None
-
     def initialize_direction(self, direction: AnyDirection, pos_from: Position, piece: Piece) -> None:
         super().initialize_direction(direction, pos_from, piece)
-        self.capture = None
+        self.data['capture'] = None
 
     def advance_direction(self, move: Move, direction: AnyDirection, pos_from: Position, piece: Piece) -> None:
         super().advance_direction(move, direction, pos_from, piece)
-        if self.jumped == 0:
+        if self.data['jumped'] == 0:
             capture = self.board.get_piece(move.pos_to)
             if piece.captures(capture):
-                self.capture = capture
+                self.data['capture'] = capture
 
     def stop_condition(self, move: Move, direction: AnyDirection, piece: Piece, theoretical: bool = False) -> bool:
-        if self.jumped >= 0 and not theoretical:
+        if self.data['jumped'] >= 0 and not theoretical:
             next_pos_to = self.transform(add(move.pos_from, mul(direction[:2], self.steps + 1)))
             if not (self.loop and move.pos_from == next_pos_to) and not self.board.not_a_piece(next_pos_to):
                 return True
@@ -253,8 +255,8 @@ class HopperRiderMovement(CannonRiderMovement):
 
     def moves(self, pos_from: Position, piece: Piece, theoretical: bool = False):
         for move in super().moves(pos_from, piece, theoretical):
-            if not theoretical and self.capture:
-                move.captured_piece = self.capture
+            if not theoretical and self.data['capture']:
+                move.captured_piece = self.data['capture']
             yield move
 
 
