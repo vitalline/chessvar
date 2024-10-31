@@ -28,6 +28,34 @@ invalid_chars = ':<>|"?*'
 invalid_chars_trans_table = str.maketrans(invalid_chars, '_' * len(invalid_chars))
 
 
+# Simple template matching function. Matches a string (or a group thereof) with a template containing '*' as a wildcard.
+def fits(template: str, data: Any) -> bool:
+    if not isinstance(data, str):
+        return any(fits(template, s) for s in data)
+    if template == '*':
+        return True
+    if template == data:
+        return True
+    template_start = template[0] == '*'
+    template_end = template[-1] == '*'
+    template = template.strip('*')
+    template_middle = '*' in template
+    if template_middle:
+        keys = template.split('*')
+        if not template_start and not data.startswith(keys[0]):
+            return False
+        if not template_end and not data.endswith(keys[-1]):
+            return False
+        indexes = [data.find(key) for key in keys]
+        return all(index >= 0 for index in indexes) and indexes == sorted(indexes)
+    if template_start and template_end:
+        return template in data
+    if template_start:
+        return data.endswith(template)
+    if template_end:
+        return data.startswith(template)
+
+
 # Function to generate a file name based on a name, extension and timestamp (if not provided, the current time is used).
 def get_filename(
     name: str, ext: str, in_dir: str = base_dir, ts: datetime | None = None, ts_format: str = "%Y-%m-%d_%H-%M-%S"

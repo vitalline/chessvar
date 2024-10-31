@@ -18,9 +18,6 @@ DEFAULT_CONFIG = {
         'fast_promotion': True,
         'fast_drop': False,
         'use_drops': False,
-        'use_check': True,
-        'stalemate': '0',
-        'royal_mode': 0,
         'chaos_mode': 0,
         'chaos_seed': '',
         'set_seed': '',
@@ -67,12 +64,6 @@ class Config(dict):
                         self[item] = self.base_config.getboolean(section, item)
                     except ValueError:
                         self[item] = None
-                if item == 'stalemate':
-                    if ',' in self.base_config[section][item]:
-                        l = [int(s) for i in self.base_config[section][item].split(',') if (s := i.strip()).isdigit()]
-                        self[item] = l[0] if len(l) == 1 else {i: v for i, v in enumerate(l)}
-                    else:
-                        self[item] = self.base_config.getint(section, item)
                 if item.startswith('block_'):
                     self[item] = [
                         int(s) for i in self.base_config[section][item].split(',') if (s := i.strip()).isdigit()
@@ -98,10 +89,6 @@ class Config(dict):
         for section in self.base_config:
             for item in self.base_config[section]:
                 self.base_config[section][item] = str(self[item])
-                if item == 'stalemate':
-                    if isinstance(self[item], dict):
-                        range_max = max(self[item].keys()) + 1
-                        self.base_config[section][item] = ', '.join(str(self[item].get(i, 0)) for i in range(range_max))
                 if item.startswith('block_'):
                     self.base_config[section][item] = ', '.join(str(s) for s in self[item])
                 if (

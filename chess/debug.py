@@ -6,7 +6,7 @@ from copy import deepcopy, copy
 from json import dumps
 from typing import TYPE_CHECKING, TextIO
 
-from chess.data import piece_groups, get_piece_types, get_set_name
+from chess.data import get_piece_types, get_set_name, piece_groups
 from chess.movement.types import DropMovement
 from chess.movement.util import to_alpha as b26, to_algebraic as toa, from_algebraic as fra, from_algebraic_map as frm
 from chess.pieces.groups import classic as fide
@@ -81,73 +81,76 @@ def save_piece_types(file_path: str = None, side: Side = Side.WHITE) -> None:
 
 
 def debug_info(board: Board) -> list[str]:
-    debug_log_data = []  # noqa
-    debug_log_data.append(f"Board size: {board.board_width}x{board.board_height}")
-    debug_log_data.append("Borders:")
+    pad = ''
+    debug_log = []  # noqa
+    debug_log.append(f"Board size: {board.board_width}x{board.board_height}")
+    debug_log.append("Borders:")
     if board.border_cols or board.border_rows:
-        if board.border_cols:
-            debug_log_data.append(
-                f"  Files: {', '.join(f'{b26(x)}/{b26(x + 1)}' for x in board.border_cols)} {tuple(board.border_cols)}"
+        file_splits = (f'{b26(x)}/{b26(x + 1)}' for x in board.border_cols)
+        if file_splits:
+            debug_log.append(
+                f"{pad:2}Files: {', '.join(file_splits)} {tuple(board.border_cols)}"
             )
         else:
-            debug_log_data.append("  Files: None")
+            debug_log.append(f"{pad:2}Files: None")
+        rank_splits = (f'{x}/{x + 1}' for x in board.border_rows)
         if board.border_rows:
-            debug_log_data.append(
-                f"  Ranks: {', '.join(f'{x}/{x + 1}' for x in board.border_rows)} {tuple(board.border_rows)}"
+            debug_log.append(
+                f"{pad:2}Ranks: {', '.join(rank_splits)} {tuple(board.border_rows)}"
             )
         else:
-            debug_log_data.append("  Ranks: None")
+            debug_log.append(f"{pad:2}Ranks: None")
     else:
-        debug_log_data[-1] += " None"
-    debug_log_data.append(f"Screen size: {board.width}x{board.height}")
-    debug_log_data.append(f"Square size: {board.square_size}")
-    debug_log_data.append(f"Windowed screen size: {board.windowed_size[0]}x{board.windowed_size[1]}")
-    debug_log_data.append(f"Windowed square size: {board.windowed_square_size}")
-    debug_log_data.append(f"Color scheme ID: {'-' if board.color_index is None else board.color_index}")
-    debug_log_data.append("Color scheme:")
+        debug_log[-1] += " None"
+    debug_log.append(f"Screen size: {board.width}x{board.height}")
+    debug_log.append(f"Square size: {board.square_size}")
+    debug_log.append(f"Windowed screen size: {board.windowed_size[0]}x{board.windowed_size[1]}")
+    debug_log.append(f"Windowed square size: {board.windowed_square_size}")
+    debug_log.append(f"Color scheme ID: {'-' if board.color_index is None else board.color_index}")
+    debug_log.append("Color scheme:")
     color_scheme = deepcopy(board.color_scheme)  # just in case trickster mode messes with the color scheme RIGHT NOW
     for k, v in color_scheme.items():
-        debug_log_data.append(f"  {k} = {v}")
-    debug_log_data.append(f"Piece sets ({len(piece_groups)}):")
+        debug_log.append(f"{pad:2}{k} = {v}")
+    debug_log.append(f"Piece sets ({len(piece_groups)}):")
     digits = len(str(len(piece_groups)))
     for i, group in enumerate(piece_groups):
-        debug_log_data.append(f"  ID {i:0{digits}d}: {group['name']}")
+        debug_log.append(f"{pad:2}ID {i:0{digits}d}: {group['name']}")
     for i in sorted(board.chaos_sets):
-        debug_log_data.append(f"  ID {-i:0{digits}d}: {board.chaos_sets[i][1]}")
-    debug_log_data.append(
+        debug_log.append(f"{pad:2}ID {-i:0{digits}d}: {board.chaos_sets[i][1]}")
+    debug_log.append(
         f"ID blocklist ({len(board.board_config['block_ids'])}): "
         f"{', '.join(str(i) for i in board.board_config['block_ids']) or 'None'}"
     )
-    debug_log_data.append(
+    debug_log.append(
         f"Chaos ID blocklist ({len(board.board_config['block_ids_chaos'])}): "
         f"{', '.join(str(i) for i in board.board_config['block_ids_chaos']) or 'None'}"
     )
-    debug_log_data.append(f"Variant: {board.variant or 'None'}")
+    debug_log.append(f"Variant: {board.variant or 'None'}")
     side_id_strings = {
         side: '-' if set_id is None else f"{set_id:0{digits}d}"
         for side, set_id in board.piece_set_ids.items()
     }
-    debug_log_data.append(
+    debug_log.append(
         f"Game: "
         f"(ID {side_id_strings[Side.WHITE]}) {board.piece_set_names[Side.WHITE]} vs. "
         f"(ID {side_id_strings[Side.BLACK]}) {board.piece_set_names[Side.BLACK]}"
     )
     for side in board.piece_set_ids:
-        debug_log_data.append(f"{side} setup: {', '.join(piece.name for piece in board.piece_sets[side])}")
+        debug_log.append(f"{side} setup: {', '.join(piece.name for piece in board.piece_sets[side])}")
     for side in board.piece_set_ids:
-        debug_log_data.append(f"{side} pieces ({len(board.movable_pieces[side])}):")
+        debug_log.append(f"{side} pieces ({len(board.movable_pieces[side])}):")
         for piece in board.movable_pieces[side]:
-            debug_log_data.append(f"  {toa(piece.board_pos)} {piece.board_pos}: {piece.name}")
+            debug_log.append(f"{pad:2}{toa(piece.board_pos)} {piece.board_pos}: {piece.name}")
         if not board.movable_pieces[side]:
-            debug_log_data[-1] += " None"
+            debug_log[-1] += " None"
     for side in board.piece_set_ids:
-        debug_log_data.append(f"{side} royal pieces ({len(board.royal_pieces[side])}):")
+        debug_log.append(f"{side} royal pieces ({len(board.royal_pieces[side])}):")
         for piece in board.royal_pieces[side]:
-            debug_log_data.append(f"  {toa(piece.board_pos)} {piece.board_pos}: {piece.name}")
+            debug_log.append(f"{pad:2}{toa(piece.board_pos)} {piece.board_pos}: {piece.name}")
         if not board.royal_pieces[side]:
-            debug_log_data[-1] += " None"
+            debug_log[-1] += " None"
     for side in board.piece_set_ids:
-        debug_log_data.append(f"{side} royal groups ({len(board.royal_groups[side])}):")
+        debug_log.append(f"{side} royal groups ({len(board.royal_groups[side])}):")
         groups = {
             key: board.royal_groups[side][key] for key in sorted(  # this should put mixin classes before pieces
                 board.royal_groups[side], key=lambda x: (1, x.name) if issubclass(x, Piece) else (0, x.__name__)
@@ -155,57 +158,57 @@ def debug_info(board: Board) -> list[str]:
         }
         for key, group in groups.items():
             name = key.name if issubclass(key, Piece) else {QuasiRoyal: "Quasi-royal"}.get(key, key.__name__)
-            debug_log_data.append(f"  {name} ({len(group)}):")
+            debug_log.append(f"{pad:2}{name} ({len(group)}):")
             for piece in group:
-                debug_log_data.append(f"  {toa(piece.board_pos)} {piece.board_pos}: {piece.name}")
+                debug_log.append(f"{pad:2}{toa(piece.board_pos)} {piece.board_pos}: {piece.name}")
             if not group:
-                debug_log_data[-1] += " None"
+                debug_log[-1] += " None"
         if not board.royal_groups[side]:
-            debug_log_data[-1] += " None"
+            debug_log[-1] += " None"
     for side in board.piece_set_ids:
-        debug_log_data.append(f"{side} probabilistic pieces ({len(board.probabilistic_pieces[side])}):")
+        debug_log.append(f"{side} probabilistic pieces ({len(board.probabilistic_pieces[side])}):")
         for piece in board.probabilistic_pieces[side]:
-            debug_log_data.append(f"  {toa(piece.board_pos)} {piece.board_pos}: {piece.name}")
+            debug_log.append(f"{pad:2}{toa(piece.board_pos)} {piece.board_pos}: {piece.name}")
         if not board.probabilistic_pieces[side]:
-            debug_log_data[-1] += " None"
+            debug_log[-1] += " None"
     for side in board.piece_set_ids:
-        debug_log_data.append(f"{side} auto-ranged pieces ({len(board.auto_ranged_pieces[side])}):")
+        debug_log.append(f"{side} auto-ranged pieces ({len(board.auto_ranged_pieces[side])}):")
         for piece in board.auto_ranged_pieces[side]:
-            debug_log_data.append(f"  {toa(piece.board_pos)} {piece.board_pos}: {piece.name}")
+            debug_log.append(f"{pad:2}{toa(piece.board_pos)} {piece.board_pos}: {piece.name}")
         if not board.auto_ranged_pieces[side]:
-            debug_log_data[-1] += " None"
+            debug_log[-1] += " None"
     for side in board.piece_set_ids:
-        debug_log_data.append(f"{side} auto-capture squares ({len(board.auto_capture_markers[side])}):")
+        debug_log.append(f"{side} auto-capture squares ({len(board.auto_capture_markers[side])}):")
         for pos in sorted(board.auto_capture_markers[side]):
             piece_poss = board.auto_capture_markers[side][pos]
-            debug_log_data.append(f"""  {toa(pos)} {pos}: (From {len(piece_poss)}) {
+            debug_log.append(f"""  {toa(pos)} {pos}: (From {len(piece_poss)}) {
             ', '.join(f'{toa(xy)} {xy}' for xy in sorted(piece_poss))
             }""")
         if not board.auto_capture_markers[side]:
-            debug_log_data[-1] += " None"
+            debug_log[-1] += " None"
     for side in board.piece_set_ids:
-        debug_log_data.append(f"{side} en passant targets ({len(board.en_passant_targets[side])}):")
+        debug_log.append(f"{side} en passant targets ({len(board.en_passant_targets[side])}):")
         for pos in sorted(board.en_passant_targets[side]):
             piece_poss = board.en_passant_targets[side][pos]
-            debug_log_data.append(f"""  {toa(pos)} {pos}: (From {len(piece_poss)}) {
+            debug_log.append(f"""  {toa(pos)} {pos}: (From {len(piece_poss)}) {
             ', '.join(f'{toa(xy)} {xy}' for xy in sorted(piece_poss))
             }""")
         if not board.en_passant_targets[side]:
-            debug_log_data[-1] += " None"
+            debug_log[-1] += " None"
     for side in board.piece_set_ids:
-        debug_log_data.append(f"{side} royal en passant targets ({len(board.royal_ep_targets[side])}):")
+        debug_log.append(f"{side} royal en passant targets ({len(board.royal_ep_targets[side])}):")
         for pos in sorted(board.royal_ep_targets[side]):
             piece_poss = board.royal_ep_targets[side][pos]
-            debug_log_data.append(f"""  {toa(pos)} {pos}: (From {len(piece_poss)}) {
+            debug_log.append(f"""  {toa(pos)} {pos}: (From {len(piece_poss)}) {
             ', '.join(f'{toa(xy)} {xy}' for xy in sorted(piece_poss))
             }""")
         if not board.royal_ep_targets[side]:
-            debug_log_data[-1] += " None"
+            debug_log[-1] += " None"
     for side in board.piece_set_ids:
         promotions = board.promotions.get(side, {})
-        debug_log_data.append(f"{side} promotion rules ({len(promotions)}):")
+        debug_log.append(f"{side} promotion rules ({len(promotions)}):")
         for piece in promotions:
-            debug_log_data.append(f"  {piece.name} ({len(promotions[piece])}):")
+            debug_log.append(f"{pad:2}{piece.name} ({len(promotions[piece])}):")
             rows = set()
             for pos in promotions[piece]:
                 row = pos[0]
@@ -230,16 +233,16 @@ def debug_info(board: Board) -> list[str]:
                     suffix = f" ({', '.join(suffixes)})" if suffixes else ''
                     piece_list.append(f"{to_piece.name}{suffix}")
                 piece_list = ', '.join(string for string in piece_list)
-                debug_log_data.append(f"    {toa((row, -1))} {(row, -1)}: {piece_list if piece_list else 'None'}")
+                debug_log.append(f"{pad:4}{toa((row, -1))} {(row, -1)}: {piece_list if piece_list else 'None'}")
             if not promotions[piece]:
-                debug_log_data[-1] += " None"
+                debug_log[-1] += " None"
         if not promotions:
-            debug_log_data[-1] += " None"
+            debug_log[-1] += " None"
     for side in board.piece_set_ids:
         drops = board.drops.get(side, {})
-        debug_log_data.append(f"{side} drop rules ({len(drops)}):")
+        debug_log.append(f"{side} drop rules ({len(drops)}):")
         for piece in drops:
-            debug_log_data.append(f"  {piece.name} ({len(drops[piece])}):")
+            debug_log.append(f"{pad:2}{piece.name} ({len(drops[piece])}):")
             rows = set()
             for pos in drops[piece]:
                 row = pos[0]
@@ -264,37 +267,37 @@ def debug_info(board: Board) -> list[str]:
                     suffix = f" ({', '.join(suffixes)})" if suffixes else ''
                     piece_list.append(f"{to_piece.name}{suffix}")
                 piece_list = ', '.join(string for string in piece_list)
-                debug_log_data.append(f"    {toa((row, -1))} {(row, -1)}: {piece_list if piece_list else 'None'}")
+                debug_log.append(f"{pad:4}{toa((row, -1))} {(row, -1)}: {piece_list if piece_list else 'None'}")
             if not drops[piece]:
-                debug_log_data[-1] += " None"
+                debug_log[-1] += " None"
         if not drops:
-            debug_log_data[-1] += " None"
-    debug_log_data.append(f"Edit piece set: {board.edit_piece_set_id}")
+            debug_log[-1] += " None"
+    debug_log.append(f"Edit piece set: {board.edit_piece_set_id}")
     for side in board.piece_set_ids:
         piece_list = ', '.join(piece.name for piece in board.edit_promotions[side])
-        debug_log_data.append(
+        debug_log.append(
             f"{side} replacements ({len(board.edit_promotions[side])}): {piece_list if piece_list else 'None'}"
         )
-    debug_log_data.append(f"Obstacles ({len(board.obstacles)}):")
+    debug_log.append(f"Obstacles ({len(board.obstacles)}):")
     for piece in board.obstacles:
-        debug_log_data.append(f"  {toa(piece.board_pos)} {piece.board_pos}: {piece.name}")
+        debug_log.append(f"{pad:2}{toa(piece.board_pos)} {piece.board_pos}: {piece.name}")
     if not board.obstacles:
-        debug_log_data[-1] += " None"
-    debug_log_data.append(f"Custom pieces ({len(board.custom_pieces)}):")
+        debug_log[-1] += " None"
+    debug_log.append(f"Custom pieces ({len(board.custom_pieces)}):")
     for piece, data in board.custom_pieces.items():
-        debug_log_data.append(f"  '{piece}': {save_custom_type(data)}")
+        debug_log.append(f"{pad:2}'{piece}': {save_custom_type(data)}")
     if not board.custom_pieces:
-        debug_log_data[-1] += " None"
-    debug_log_data.append(f"Past custom pieces ({len(board.past_custom_pieces)}):")
+        debug_log[-1] += " None"
+    debug_log.append(f"Past custom pieces ({len(board.past_custom_pieces)}):")
     for piece, data in board.past_custom_pieces.items():
-        debug_log_data.append(f"  '{piece}': {save_custom_type(data)}")
+        debug_log.append(f"{pad:2}'{piece}': {save_custom_type(data)}")
     if not board.past_custom_pieces:
-        debug_log_data[-1] += " None"
+        debug_log[-1] += " None"
     if board.custom_pawn != fide.Pawn:
-        debug_log_data.append(f"Custom pawn: {board.custom_pawn.name} ({save_piece_type(board.custom_pawn)})")
+        debug_log.append(f"Custom pawn: {board.custom_pawn.name} ({save_piece_type(board.custom_pawn)})")
     else:
-        debug_log_data.append("Custom pawn: None")
-    debug_log_data.append(f"Custom layout ({len(board.custom_layout)}):")
+        debug_log.append("Custom pawn: None")
+    debug_log.append(f"Custom layout ({len(board.custom_layout)}):")
     for pos, piece in board.custom_layout.items():
         suffixes = []
         if piece.movement and piece.movement.total_moves:
@@ -304,15 +307,15 @@ def debug_info(board: Board) -> list[str]:
         if piece.is_hidden is False:
             suffixes.append('Never hide')
         suffix = f" ({', '.join(suffixes)})" if suffixes else ''
-        debug_log_data.append(f"  {toa(pos)} {pos}: {piece}{suffix}")
+        debug_log.append(f"{pad:2}{toa(pos)} {pos}: {piece}{suffix}")
     if not board.custom_layout:
-        debug_log_data[-1] += " None"
+        debug_log[-1] += " None"
     data = (board.load_dict or {}).get('promotions', {})
     for side in board.piece_set_ids:
         promotions = board.custom_promotions.get(side, {})
-        debug_log_data.append(f"{side} custom promotion rules ({len(promotions)}):")
+        debug_log.append(f"{side} custom promotion rules ({len(promotions)}):")
         for piece in promotions:
-            debug_log_data.append(f"  {piece.name} ({len(promotions[piece])}):")
+            debug_log.append(f"{pad:2}{piece.name} ({len(promotions[piece])}):")
             compressed = data.get(str(side.value), {}).get(save_piece_type(piece), {})
             from_mapping = frm(list(compressed), board.width, board.height)
             mapping = {}
@@ -335,17 +338,17 @@ def debug_info(board: Board) -> list[str]:
                     suffix = f" ({', '.join(suffixes)})" if suffixes else ''
                     piece_list.append(f"{to_piece.name}{suffix}")
                 piece_list = ', '.join(string for string in piece_list)
-                debug_log_data.append(f"    {value} {fra(value)}: {piece_list if piece_list else 'None'}")
+                debug_log.append(f"{pad:4}{value} {fra(value)}: {piece_list if piece_list else 'None'}")
             if not promotions[piece]:
-                debug_log_data[-1] += " None"
+                debug_log[-1] += " None"
         if not promotions:
-            debug_log_data[-1] += " None"
+            debug_log[-1] += " None"
     data = (board.load_dict or {}).get('drops', {})
     for side in board.piece_set_ids:
         drops = board.custom_drops.get(side, {})
-        debug_log_data.append(f"{side} custom drop rules ({len(drops)}):")
+        debug_log.append(f"{side} custom drop rules ({len(drops)}):")
         for piece in drops:
-            debug_log_data.append(f"  {piece.name} ({len(drops[piece])}):")
+            debug_log.append(f"{pad:2}{piece.name} ({len(drops[piece])}):")
             compressed = data.get(str(side.value), {}).get(save_piece_type(piece), {})
             from_mapping = frm(list(compressed), board.width, board.height)
             mapping = {}
@@ -368,48 +371,48 @@ def debug_info(board: Board) -> list[str]:
                     suffix = f" ({', '.join(suffixes)})" if suffixes else ''
                     piece_list.append(f"{to_piece.name}{suffix}")
                 piece_list = ', '.join(string for string in piece_list)
-                debug_log_data.append(f"    {value} {fra(value)}: {piece_list if piece_list else 'None'}")
+                debug_log.append(f"{pad:4}{value} {fra(value)}: {piece_list if piece_list else 'None'}")
             if not drops[piece]:
-                debug_log_data[-1] += " None"
+                debug_log[-1] += " None"
         if not drops:
-            debug_log_data[-1] += " None"
+            debug_log[-1] += " None"
     for side in board.custom_extra_drops:
-        debug_log_data.append(
+        debug_log.append(
             f"{side} starting drops ({len(board.custom_extra_drops[side])}): "
             f"{', '.join(piece.name for piece in board.custom_extra_drops[side]) or 'None'}"
         )
     for side in board.captured_pieces:
-        debug_log_data.append(
+        debug_log.append(
             f"{side} drops ({len(board.captured_pieces[side])}): "
             f"{', '.join(piece.name for piece in board.captured_pieces[side]) or 'None'}"
         )
-    piece_mode = {0: "Shown", 1: "Hidden", 2: "Penultima"}.get(board.should_hide_pieces, "Unknown")
-    debug_log_data.append(f"Hide pieces: {board.should_hide_pieces} - {piece_mode}")
-    move_mode = {None: "Default", False: "Shown", True: "Hidden"}.get(board.should_hide_moves, "Unknown")
-    debug_log_data.append(f"Hide moves: {board.should_hide_moves} - {move_mode}")
+    piece_mode = {0: "Shown", 1: "Hidden", 2: "Penultima"}.get(board.hide_pieces, "Unknown")
+    debug_log.append(f"Hide pieces: {board.hide_pieces} - {piece_mode}")
+    move_mode = {None: "Default", False: "Shown", True: "Hidden"}.get(board.hide_move_markers, "Unknown")
+    debug_log.append(f"Hide moves: {board.hide_move_markers} - {move_mode}")
     drop_mode = {
         k: f"Pieces {v} be dropped on the board" for k, v in {False: "cannot", True: "can"}.items()
     }.get(board.use_drops, "Unknown")
-    debug_log_data.append(f"Use drops: {board.use_drops} - {drop_mode}")
+    debug_log.append(f"Use drops: {board.use_drops} - {drop_mode}")
     check_mode = {
         k: f"{v} the royal piece to win" for k, v in {False: "Capture", True: "Checkmate"}.items()
     }.get(board.use_check, "Unknown")
-    debug_log_data.append(f"Use check: {board.use_check} - {check_mode}")
+    debug_log.append(f"Use check: {board.use_check} - {check_mode}")
     stalemate_modes = {0: "draws", 1: "loses", -1: "wins"}
     if isinstance(board.stalemate_rule, dict):
         for side, mode in board.stalemate_rule.items():
             stalemate_mode = f"{side} {stalemate_modes.get(mode, '???')} when stalemated"
-            debug_log_data.append(f"Stalemate rule: {stalemate_mode}")
+            debug_log.append(f"Stalemate rule: {stalemate_mode}")
     else:
         stalemate_mode = f"Player {stalemate_modes.get(board.stalemate_rule, '???')} when stalemated"
-        debug_log_data.append(f"Stalemate rule: {stalemate_mode}")
+        debug_log.append(f"Stalemate rule: {stalemate_mode}")
     royal_mode = {
         0: "Default",
         1: "Force royal (Threaten Any)",
         2: "Force quasi-royal (Threaten Last)",
         3: "Force royal groups (Threaten Last of a Kind)",
     }.get(board.royal_piece_mode, "Unknown")
-    debug_log_data.append(f"Royal mode: {board.royal_piece_mode} - {royal_mode}")
+    debug_log.append(f"Royal mode: {board.royal_piece_mode} - {royal_mode}")
     chaos_mode = {
         0: "Off",
         1: "Chaos (Matching Pieces)",
@@ -417,106 +420,96 @@ def debug_info(board: Board) -> list[str]:
         3: "Extreme Chaos (Any Pieces)",
         4: "Extreme Chaos (Any Pieces), Asymmetrical"
     }.get(board.chaos_mode, "Unknown")
-    debug_log_data.append(f"Chaos mode: {board.chaos_mode} - {chaos_mode}")
-    debug_log_data.append(f"Board mode: {'Edit' if board.edit_mode else 'Play'}")
-    debug_log_data.append(f"Current ply: {board.ply_count}")
-    debug_log_data.append(f"Current turn: {board.turn_data[0]}")
-    debug_log_data.append(f"Current side: {board.turn_side if board.turn_side else 'None'}")
-    debug_log_data.append(f"Current move: {board.turn_data[2]}")
-    if board.turn_rules is None:
-        debug_log_data.append(f"Movement rules: None")
-    else:
-        debug_log_data.append(f"Movement rules ({len(board.turn_rules)}):")
-        for order in board.get_order():
-            order_rules = board.turn_rules.get(order)
-            if order_rules is None:
-                debug_log_data.append(f"  Priority {order}: Any")
-                continue
-            debug_log_data.append(f"  Priority {order} ({len(order_rules)}):")
-            states = [x for x in [0, 1, -1, 2, -2] if x in order_rules]
-            for state in states:
-                state_rules = order_rules[state]
-                state_string = {
-                    0: "Default",
-                    1: "White is NOT in check",
-                    2: "Black is NOT in check",
-                    -1: "White is in check",
-                    -2: "Black is in check"
-                }.get(state, "Unknown")
-                if state_rules is None:
-                    debug_log_data.append(f"    State {state} ({state_string}): Any")
-                    continue
-                debug_log_data.append(f"    State {state} ({state_string}) ({len(state_rules)}):")
-                for last in sorted(state_rules):
-                    last_rules = state_rules[last]
-                    not_last = False
-                    if isinstance(last, tuple) and last[0] is False:
-                        not_last, last = last
-                    not_last = 'not ' if not_last else ''
+    debug_log.append(f"Chaos mode: {board.chaos_mode} - {chaos_mode}")
+    debug_log.append(f"Board mode: {'Edit' if board.edit_mode else 'Play'}")
+    debug_log.append(f"Current ply: {board.ply_count}")
+    debug_log.append(f"Current turn: {board.turn_data[0]}")
+    debug_log.append(f"Current side: {board.turn_side if board.turn_side else 'None'}")
+    debug_log.append(f"Current move: {board.turn_data[2]}")
+    debug_log.append(f"Movement rules ({len(board.turn_rules)}):")
+    for order in board.get_order():
+        order_rules = board.turn_rules.get(order)
+        debug_log.append(f"{pad:2}Priority {order} ({len(order_rules)}):")
+        states = [x for x in [0, 1, -1, 2, -2] if x in order_rules]
+        for state in states:
+            state_rules = order_rules[state]
+            state_string = {
+                0: "Any board state",
+                1: "White is NOT in check",
+                2: "Black is NOT in check",
+                -1: "White is in check",
+                -2: "Black is in check"
+            }.get(state, "Unknown")
+            debug_log.append(f"{pad:4}State {state} ({state_string}) ({len(state_rules)}):")
+            for allow_last in sorted(state_rules):
+                allow_last_rules = state_rules[allow_last]
+                for block_last in sorted(allow_last_rules):
+                    block_last_rules = allow_last_rules[block_last]
+                    if isinstance(allow_last, str) and allow_last not in {'*'}:
+                        allow_last = f'"{allow_last}"'
+                    if isinstance(block_last, str) and block_last not in {None}:
+                        block_last = f'"{block_last}"'
                     last_string = (
-                        "Any last move" if last == '*' else
-                        f"Last move was {not_last}{last}"
+                        "Any last move" if allow_last == '*' and block_last is None else
+                        f"Last move was {allow_last}" if block_last is None else
+                        f"Last move was NOT {block_last}" if allow_last == '*' else
+                        f"Last move was {allow_last}, NOT {block_last}"
                     )
-                    if last_rules is None:
-                        debug_log_data.append(f"      {last_string}: Any")
-                        continue
-                    debug_log_data.append(f"      {last_string} ({len(last_rules)}):")
-                    for piece in last_rules:
-                        piece_rules = last_rules[piece]
-                        not_piece = False
-                        if isinstance(piece, tuple) and piece[0] is False:
-                            not_piece, piece = piece
-                        not_piece = "Not " if not_piece else ''
-                        piece_string = (
-                            "Any piece" if piece == '*' else
-                            ("Different piece" if not_piece else "Same piece") if piece == '' else
-                            f"{not_piece}{piece.name}"
-                        )
-                        if piece_rules is None:
-                            debug_log_data.append(f"        {piece_string}: Any")
-                            continue
-                        debug_log_data.append(f"        {piece_string} ({len(piece_rules)}):")
-                        for move_type in piece_rules:
-                            type_rules = piece_rules[move_type]
-                            not_type = False
-                            if isinstance(move_type, tuple) and move_type[0] is False:
-                                not_type, move_type = move_type
-                            not_type = "Not " if not_type else ''
-                            type_string = (
-                                "Any move" if move_type == '*' else
-                                ("Different tag" if not_type else "Same tag") if move_type == '' else
-                                f"{not_type}{move_type}"
+                    debug_log.append(f"{pad:6}{last_string} ({len(block_last_rules)}):")
+                    for allow_piece in sorted(block_last_rules):
+                        allow_piece_rules = block_last_rules[allow_piece]
+                        for block_piece in sorted(allow_piece_rules):
+                            block_piece_rules = allow_piece_rules[block_piece]
+                            if isinstance(allow_piece, str) and allow_piece not in {'*', ''}:
+                                allow_piece = f'"{allow_piece}"'
+                            if isinstance(block_piece, str) and block_piece not in {None, ''}:
+                                block_piece = f'"{block_piece}"'
+                            piece_string = (
+                                "Any piece" if allow_piece == '*' and block_piece is None else
+                                "Piece moved" if allow_piece == '' and block_piece is None else
+                                "Piece NOT moved" if allow_piece == '*' and block_piece == '' else
+                                f"{allow_piece}, NOT moved" if allow_piece != '*' and block_piece == '' else
+                                f"NOT {block_piece}, moved" if allow_piece == '' and block_piece is not None else
+                                f"{allow_piece}" if block_piece is None else
+                                f"NOT {block_piece}" if allow_piece == '*' else
+                                f"{allow_piece}, NOT {block_piece}"
                             )
-                            if type_rules is None:
-                                debug_log_data.append(f"          {type_string}: Any")
-                                continue
-                            debug_log_data.append(f"          {type_string} ({len(type_rules)}):")
-                            for action in type_rules:
-                                action_string = {
-                                    'm': "Move",
-                                    'c': "Capture",
-                                    'd': "Drop",
-                                    'p': "Pass",
-                                }.get(action, "Unknown")
-                                check_rule = type_rules[action]
-                                check_string = {
-                                    0: "Any", None: "Any",
-                                    1: "Only as check",
-                                    -1: "Never as check",
-                                }.get(check_rule, "Unknown")
-                                debug_log_data.append(f"            {action_string}: {check_rule} ({check_string})")
-                            if not type_rules:
-                                debug_log_data[-1] += " None"
-                        if not piece_rules:
-                            debug_log_data[-1] += " None"
-                    if not last_rules:
-                        debug_log_data[-1] += " None"
-                if not state_rules:
-                    debug_log_data[-1] += " None"
-            if not order_rules:
-                debug_log_data[-1] += " None"
-        if not board.turn_rules:
-            debug_log_data[-1] += " None"
+                            debug_log.append(f"{pad:8}{piece_string} ({len(block_piece_rules)}):")
+                            for allow_type in sorted(block_piece_rules):
+                                allow_type_rules = block_piece_rules[allow_type]
+                                for block_type in sorted(allow_type_rules):
+                                    block_type_rules = allow_type_rules[block_type]
+                                    if isinstance(allow_type, str) and allow_type not in {'*', ''}:
+                                        allow_type = f'"{allow_type}"'
+                                    if isinstance(block_type, str) and block_type not in {None, ''}:
+                                        block_type = f'"{block_type}"'
+                                    type_string = (
+                                        "Any move" if allow_type == '*' and block_type is None else
+                                        "Tag used" if allow_type == '' and block_type is None else
+                                        "Tag NOT used" if allow_type == '*' and block_type == '' else
+                                        f"{allow_type}, NOT used" if allow_type != '*' and block_type == '' else
+                                        f"NOT {block_type}, used" if allow_type == '' and block_type is not None else
+                                        f"{allow_type}" if block_type is None else
+                                        f"NOT {block_type}" if allow_type == '*' else
+                                        f"{allow_type}, NOT {block_type}"
+                                    )
+                                    debug_log.append(f"{pad:10}{type_string} ({len(block_type_rules)}):")
+                                    for allow_action in block_type_rules:
+                                        allow_action_rules = block_type_rules[allow_action]
+                                        for block_action in sorted(allow_action_rules):
+                                            action_string = (
+                                                "Any action" if allow_action == '*' and block_action is None else
+                                                f"{allow_action.capitalize()}" if block_action is None else
+                                                f"NOT {block_action}" if allow_action == '*' else
+                                                f"{allow_action.capitalize()}, NOT {block_action}"
+                                            )
+                                            check_rule = allow_action_rules[block_action]
+                                            check_string = {
+                                                0: "Any",
+                                                1: "Only as check",
+                                                -1: "Never as check",
+                                            }.get(check_rule, "Unknown")
+                                            debug_log.append(f"{pad:12}{action_string}: {check_rule} ({check_string})")
     start, loop = [], []
     start_ended = False
     for data in board.custom_turn_order:
@@ -528,96 +521,96 @@ def debug_info(board: Board) -> list[str]:
         start, loop = loop, start
     if not start and not loop:
         loop = [(Side.WHITE, None), (Side.BLACK, None)]
-    debug_log_data.append(f"Move order ({len(start) + len(loop)}):")
+    debug_log.append(f"Move order ({len(start) + len(loop)}):")
     if start:
-        debug_log_data.append(f"  Start: ({len(start)}):")
+        debug_log.append(f"{pad:2}Start: ({len(start)}):")
         for i, data in enumerate(start):
             turn_side, turn_rules = data
-            turn_rules = copy(repack(turn_rules))
+            turn_rules = list(repack(turn_rules))
             for j, rule in enumerate(turn_rules):
-                for string in ('last', 'piece', 'type'):
+                for string in ('action', 'last', 'piece', 'type'):
                     if rule and string in rule:
                         turn_rules[j] = copy(rule)
                         turn_rules[j][string] = unpack([t for t in repack(rule[string])])
             turn_rules = unpack(turn_rules)
             turn_suffix = '' if turn_rules is None else f", {turn_rules}"
-            debug_log_data.append(f"    {i + 1}: {turn_side}{turn_suffix}")
+            debug_log.append(f"{pad:4}{i + 1}: {turn_side}{turn_suffix}")
     if loop:
         pad = ''
         if start:
-            debug_log_data.append(f"  Loop: ({len(loop)}):")
+            debug_log.append(f"{pad:2}Loop: ({len(loop)}):")
             pad = '  '
         for i, data in enumerate(loop, len(start)):
             turn_side, turn_rules = data
-            turn_rules = copy(repack(turn_rules))
+            turn_rules = list(repack(turn_rules))
             for j, rule in enumerate(turn_rules):
-                for string in ('last', 'piece', 'type'):
+                for string in ('action', 'last', 'piece', 'type'):
                     if rule and string in rule:
                         turn_rules[j] = copy(rule)
                         turn_rules[j][string] = unpack([t for t in repack(rule[string])])
             turn_rules = unpack(turn_rules)
             turn_suffix = '' if turn_rules is None else f", {turn_rules}"
-            debug_log_data.append(f"  {pad}{i + 1}: {turn_side}{turn_suffix}")
+            debug_log.append(f"{pad:2}{pad}{i + 1}: {turn_side}{turn_suffix}")
     if not start and not loop:
-        debug_log_data[-1] += " None"
+        debug_log[-1] += " None"
     possible_moves = sum((
         sum(v.values(), []) for k, v in board.moves.get(board.turn_side, {}).items() if not isinstance(k, str)
     ), [])
-    debug_log_data.append(f"Moves possible: {len(possible_moves)}")
-    debug_log_data.append(f"Unique moves: {sum(len(i) for i in board.unique_moves()[board.turn_side].values())}")
-    debug_log_data.append(f"Check side: {board.check_side if board.check_side else 'None'}")
-    debug_log_data.append(f"Game over: {board.game_over}")
-    debug_log_data.append(f"Action history ({len(board.move_history)}):")
+    debug_log.append(f"Moves possible: {len(possible_moves)}")
+    debug_log.append(f"Unique moves: {sum(len(i) for i in board.unique_moves()[board.turn_side].values())}")
+    debug_log.append(f"Check side: {board.check_side if board.check_side else 'None'}")
+    debug_log.append(f"Game over: {board.game_over}")
+    debug_log.append(f"Action history ({len(board.move_history)}):")
     for i, move in enumerate(board.move_history):
         if not move:
-            debug_log_data.append(f"  {i + 1}: (Pass) None")
+            debug_log.append(f"{pad:2}{i + 1}: (Pass) None")
         else:
             move_type = 'Edit' if move.is_edit else 'Drop' if move.movement_type == DropMovement else 'Move'
-            debug_log_data.append(f"  {i + 1}: ({move_type}) {move}")
+            debug_log.append(f"{pad:2}{i + 1}: ({move_type}) {move}")
             j = 0
             while move.chained_move:
                 move = move.chained_move
                 move_type = 'Edit' if move.is_edit else 'Drop' if move.movement_type == DropMovement else 'Move'
-                debug_log_data.append(f"  {i + 1}.{j + 1}: ({move_type}) {move}")
+                debug_log.append(f"{pad:2}{i + 1}.{j + 1}: ({move_type}) {move}")
                 j += 1
     if not board.move_history:
-        debug_log_data[-1] += " None"
-    debug_log_data.append(f"Future action history ({len(board.future_move_history)}):")
+        debug_log[-1] += " None"
+    debug_log.append(f"Future action history ({len(board.future_move_history)}):")
     for i, move in enumerate(board.future_move_history[::-1], len(board.move_history)):
         if not move:
-            debug_log_data.append(f"  {i + 1}: (Pass) None")
+            debug_log.append(f"{pad:2}{i + 1}: (Pass) None")
         else:
             move_type = 'Edit' if move.is_edit else 'Drop' if move.movement_type == DropMovement else 'Move'
-            debug_log_data.append(f"  {i + 1}: ({move_type}) {move}")
+            debug_log.append(f"{pad:2}{i + 1}: ({move_type}) {move}")
             j = 0
             while move.chained_move:
                 move = move.chained_move
                 move_type = 'Edit' if move.is_edit else 'Drop' if move.movement_type == DropMovement else 'Move'
-                debug_log_data.append(f"  {i + 1}.{j + 1}: ({move_type}) {move}")
+                debug_log.append(f"{pad:2}{i + 1}.{j + 1}: ({move_type}) {move}")
                 j += 1
     if not board.future_move_history:
-        debug_log_data[-1] += " None"
+        debug_log[-1] += " None"
     empty = True
-    debug_log_data.append(f"Roll history ({len(board.roll_history)}):")
+    debug_log.append(f"Roll history ({len(board.roll_history)}):")
     for i, roll in enumerate(board.roll_history):
         if roll:
             empty = False
-            debug_log_data.append(f"  Roll {i + 1}:")
+            debug_log.append(f"{pad:2}Roll {i + 1}:")
             for pos, value in roll.items():
-                debug_log_data.append(f"    {toa(pos)} {pos}: {value}")
+                debug_log.append(f"{pad:4}{toa(pos)} {pos}: {value}")
     if empty:
-        debug_log_data[-1] += " None"
+        debug_log[-1] += " None"
     empty = True
-    debug_log_data.append(f"Probabilistic piece history ({len(board.probabilistic_piece_history)}):")
+    debug_log.append(f"Probabilistic piece history ({len(board.probabilistic_piece_history)}):")
     for i, pieces in enumerate(board.probabilistic_piece_history):
         if pieces:
             empty = False
-            debug_log_data.append(f"  Ply {i + 1}:")
+            debug_log.append(f"{pad:2}Ply {i + 1}:")
             for pos, piece in sorted(pieces, key=lambda x: x[0]):
-                debug_log_data.append(f"    {toa(pos)} {pos}: {piece.name}")
+                debug_log.append(f"{pad:4}{toa(pos)} {pos}: {piece.name}")
     if empty:
-        debug_log_data[-1] += " None"
-    debug_log_data.append(f"Roll seed: {board.roll_seed} (update: {board.board_config['update_roll_seed']})")
-    debug_log_data.append(f"Piece set seed: {board.set_seed}")
-    debug_log_data.append(f"Chaos set seed: {board.chaos_seed}")
-    return debug_log_data
+        debug_log[-1] += " None"
+    debug_log.append(f"Roll seed: {board.roll_seed} (update: {board.board_config['update_roll_seed']})")
+    debug_log.append(f"Piece set seed: {board.set_seed}")
+    debug_log.append(f"Chaos set seed: {board.chaos_seed}")
+    return debug_log

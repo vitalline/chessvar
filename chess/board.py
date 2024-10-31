@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from copy import copy, deepcopy
-from itertools import product, zip_longest
+from itertools import chain, product, zip_longest
 from json import dumps, loads, JSONDecodeError
 from math import ceil, floor, isqrt
 from os import makedirs, name as os_name, system
@@ -9,6 +9,7 @@ from os.path import dirname, isfile, join
 from random import Random
 from sys import argv
 from traceback import print_exc
+from typing import Any
 
 from PIL.ImageColor import getrgb
 from arcade import key, MOUSE_BUTTON_LEFT, MOUSE_BUTTON_RIGHT, Text
@@ -18,10 +19,12 @@ from arcade import get_screens, start_render
 from chess.color import colors, default_colors, trickster_colors
 from chess.color import average, darken, desaturate, lighten, saturate
 from chess.config import Config
-from chess.data import config_path, base_rng, max_seed, get_set, get_set_name, penultima_textures, piece_groups
-from chess.data import default_board_width, default_board_height, default_size, max_size, min_size, size_step
-from chess.data import min_width, min_height
+from chess.data import config_path, base_rng, max_seed, get_set, get_set_name
+from chess.data import default_board_width, default_board_height, default_size
+from chess.data import min_width, min_height, min_size, max_size, size_step
+from chess.data import action_types, end_types, penultima_textures, piece_groups
 from chess.debug import debug_info, save_piece_data, save_piece_sets, save_piece_types
+from chess.movement.base import BaseMovement
 from chess.movement.move import Move
 from chess.movement.types import AutoCaptureMovement, AutoRangedAutoCaptureRiderMovement
 from chess.movement.types import CastlingMovement, CastlingPartnerMovement
@@ -38,8 +41,8 @@ from chess.save import condense, expand, unpack, repack
 from chess.save import condense_algebraic as cnd_alg, expand_algebraic as exp_alg
 from chess.save import load_move, load_piece, load_rng, load_piece_type, load_custom_type, load_movement_type
 from chess.save import save_move, save_piece, save_rng, save_piece_type, save_custom_type
-from chess.util import base_dir, get_filename, is_prefix_of, is_prefix_in, select_save_data, select_save_name, sign
-from chess.util import Default, Unset
+from chess.util import base_dir, get_filename, is_prefix_of, is_prefix_in, select_save_data, select_save_name
+from chess.util import Default, Unset, fits, sign
 
 
 class Board(Window):
@@ -90,6 +93,7 @@ class Board(Window):
         self.save_loaded = False  # whether a save was successfully loaded
         self.game_loaded = False  # whether the game had successfully loaded
         self.skip_mouse_move = 0  # setting this to >=1 skips mouse movement events
+        self.skip_caption_update = False  # setting this to True skips window caption updates
         self.highlight_square = None  # square that is being highlighted with the keyboard
         self.hovered_square = None  # square we are currently hovering over
         self.clicked_square = None  # square we clicked on
@@ -117,13 +121,15 @@ class Board(Window):
         self.turn_data = [0, Side.NONE, 0]  # [turn number, turn side, move number]
         self.turn_side = Side.NONE  # side whose turn it is
         self.turn_rules = None  # rules of movement for the current turn
-        self.check_side = Side.NONE  # side that is currently in check
+        self.end_rules = {}  # conditions under which the game ends
+        self.end_data = {}  # additional data for the game end rules
+        self.end_condition = None  # condition that has been met to end the game
+        self.end_value = 0  # value of the game ending contition, if applicable
+        self.win_side = Side.NONE  # side that has won the game, if any
+        self.check_side = Side.NONE  # side that is currently in check, if any
         self.use_drops = self.board_config['use_drops']  # whether pieces can be dropped
-        self.use_check = self.board_config['use_check']  # whether to check for check after each move
-        self.stalemate_rule = 0  # 0: draw, 1: win for moving, -1: win for stalemated. can be {side: side is stalemated}
-        self.royal_piece_mode = self.board_config['royal_mode'] % 4  # 0: normal, 1: royal, 2: quasi-royal, 3: grouped
-        self.should_hide_pieces = self.board_config['hide_pieces'] % 3  # 0: don't hide, 1: hide all, 2: penultima mode
-        self.should_hide_moves = self.board_config['hide_moves']  # whether to hide the move markers; None uses above
+        self.hide_pieces = self.board_config['hide_pieces'] % 3  # 0: don't hide, 1: hide all, 2: penultima mode
+        self.hide_move_markers = self.board_config['hide_moves']  # whether to hide the move markers; None uses above
         self.auto_moves = True  # whether to skip move animations if allowed
         self.flip_mode = False  # whether the board is flipped
         self.edit_mode = False  # allows to edit the board position if set to True
@@ -163,6 +169,7 @@ class Board(Window):
         self.custom_promotions = {}  # custom promotion options
         self.custom_drops = {}  # custom drop options
         self.custom_extra_drops = {}  # custom extra drops, as {side: [was]}
+        self.custom_end_rules = {}  # custom game end conditions
         self.captured_pieces = {Side.WHITE: [], Side.BLACK: []}  # pieces captured by each side
         self.alias_dict = {}  # dictionary of aliases for save data
         self.moves = {Side.WHITE: {}, Side.BLACK: {}}  # dictionary of valid moves from any square
@@ -193,12 +200,6 @@ class Board(Window):
 
         # initialize turn order data for the first move
         self.turn_side, self.turn_rules = self.turn_order[0]
-
-        # load stalemate rules from the config
-        if isinstance(self.board_config['stalemate'], dict):
-            self.stalemate_rule = {Side(k + 1): (v + 1) % 3 - 1 for k, v in self.board_config['stalemate'].items()}
-        else:
-            self.stalemate_rule = self.board_config['stalemate']
 
         # load piece set ids from the config
         for side in self.piece_set_ids:
@@ -371,6 +372,17 @@ class Board(Window):
                     while self.get_turn_side(-self.turn_data[2]) == self.turn_side:
                         self.turn_data[2] += 1
 
+    def fits(self, template: str, data: Any):
+        if isinstance(data, Move):
+            return self.fits(template, (data.tag or data.movement_type or ''))
+        if isinstance(data, (Piece, BaseMovement)):
+            data = type(data)
+        if isinstance(data, type) and issubclass(data, Piece):
+            return fits(template, (data.name, save_piece_type(data)))
+        if isinstance(data, type) and issubclass(data, BaseMovement):
+            return fits(template, data.__name__)
+        return fits(template, data)
+
     def set_position(self, piece: Piece, pos: Position) -> None:
         piece.board_pos = pos
         piece.position = self.get_screen_position(pos)
@@ -433,6 +445,10 @@ class Board(Window):
         self.clear_auto_capture_markers()
         self.reset_captures()
 
+        self.end_data = {side: {k: 0 for k in data} for side, data in self.end_rules.items()}
+        self.end_value = 0
+        self.end_condition = None
+        self.win_side = Side.NONE
         self.game_over = False
         self.edit_mode = False
         self.chain_start = None
@@ -532,6 +548,9 @@ class Board(Window):
             self.pieces[row][col].scale = self.square_size / self.pieces[row][col].texture.width
             self.piece_sprite_list.append(self.pieces[row][col])
 
+        self.load_pieces()
+        self.load_moves()
+        self.update_end_data()
         self.update_status()
 
     def dump_board(self, partial: bool = False) -> str:
@@ -613,22 +632,19 @@ class Board(Window):
                     'last': unpack([i for i in d.get('last', [])]),
                     'piece': unpack([t for t in d.get('piece', [])]),
                     'type': unpack([t for t in d.get('type', [])]),
-                    'action': d.get('action', ''),
+                    'action': unpack([t for t in d.get('action', [])]),
                     'check': d.get('check', 0),
                 }.items() if v} for d in side[1]])]
                 for side in self.custom_turn_order
             ],
+            'end': {
+                (side.value if isinstance(side, Side) else side): rule for side, rule in self.custom_end_rules.items()
+            },
             'edit': self.edit_mode,
             'edit_promotion': self.edit_piece_set_id,
-            'hide_pieces': self.should_hide_pieces,
-            'hide_moves': self.should_hide_moves,
+            'hide_pieces': self.hide_pieces,
+            'hide_moves': self.hide_move_markers,
             'use_drops': self.use_drops,
-            'use_check': self.use_check,
-            'stalemate': (
-                {side.value: rule for side, rule in self.stalemate_rule.items()}
-                if isinstance(self.stalemate_rule, dict) else self.stalemate_rule
-            ),
-            'royal_mode': self.royal_piece_mode,
             'chaos_mode': self.chaos_mode,
             'chaos_seed': self.chaos_seed,
             'set_seed': self.set_seed,
@@ -673,6 +689,9 @@ class Board(Window):
         self.deselect_piece()
         self.clear_en_passant_markers()
         self.clear_auto_capture_markers()
+        self.end_value = 0
+        self.end_condition = None
+        self.win_side = Side.NONE
         self.game_over = False
         self.action_count = 0
 
@@ -736,17 +755,9 @@ class Board(Window):
         self.board_config['block_ids'] = data.get('set_blocklist', self.board_config['block_ids'])
         self.board_config['block_ids_chaos'] = data.get('chaos_blocklist', self.board_config['block_ids_chaos'])
 
-        stalemate_data = data.get('stalemate')
-        if stalemate_data is not None:
-            self.stalemate_rule = {
-                Side(int(value)): (rule + 1) % 3 - 1 for value, rule in stalemate_data.items()
-            } if isinstance(stalemate_data, dict) else stalemate_data
-
-        self.should_hide_pieces = data.get('hide_pieces', self.should_hide_pieces)
-        self.should_hide_moves = data.get('hide_moves', self.should_hide_moves)
+        self.hide_pieces = data.get('hide_pieces', self.hide_pieces)
+        self.hide_move_markers = data.get('hide_moves', self.hide_move_markers)
         self.use_drops = data.get('use_drops', self.use_drops)
-        self.use_check = data.get('use_check', self.use_check)
-        self.royal_piece_mode = data.get('royal_mode', self.royal_piece_mode)
         self.chaos_mode = data.get('chaos_mode', self.chaos_mode)
         self.edit_mode = data.get('edit', self.edit_mode)
         self.edit_piece_set_id = data.get('edit_promotion', self.edit_piece_set_id)
@@ -848,7 +859,7 @@ class Board(Window):
                 'last': [t for t in repack(d.get('last', []))],
                 'piece': [t for t in repack(d.get('piece', []))],
                 'type': [t for t in repack(d.get('type', []))],
-                'action': d.get('action', ''),
+                'action': [t for t in repack(d.get('action', []))],
                 'check': d.get('check', 0),
             }.items() if v} for d in repack(side[1])])
             if isinstance(side, list) and len(side) > 1 else (Side(int(side)), None)
@@ -863,6 +874,10 @@ class Board(Window):
             self.log(f"Error: Turn side does not match ({turn_side} was {turn_data[1]})")
             turn_data[1] = turn_side
         turn_data = turn_data
+        self.custom_end_rules = {
+            (Side(int(side)) if side.isdigit() else side): rule for side, rule in data.get('end').items()
+        }
+        self.reset_end_rules()
 
         self.move_history = [load_move(d, self, c) for d in data.get('moves', [])]
         self.future_move_history = [load_move(d, self, c) for d in data.get('future', [])[::-1]]
@@ -988,6 +1003,9 @@ class Board(Window):
                         self.try_promotion(self.move_history[-1])
         else:
             if not with_history and not self.edit_mode:
+                self.load_pieces()
+                self.load_moves()
+                self.update_end_data()
                 self.update_status()
             selection = data.get('selection')
             if selection:
@@ -1007,6 +1025,10 @@ class Board(Window):
         self.clear_auto_capture_markers()
         self.reset_captures()
 
+        self.end_data = {side: {k: 0 for k in data} for side, data in self.end_rules.items()}
+        self.end_value = 0
+        self.end_condition = None
+        self.win_side = Side.NONE
         self.game_over = False
         self.chain_start = None
         self.promotion_piece = None
@@ -1051,6 +1073,9 @@ class Board(Window):
             self.pieces[row][col].scale = self.square_size / self.pieces[row][col].texture.width
             self.piece_sprite_list.append(self.pieces[row][col])
 
+        self.load_pieces()
+        self.load_moves()
+        self.update_end_data()
         self.update_status()
 
     def reset_custom_data(self, rollback: bool = False) -> None:
@@ -1066,6 +1091,7 @@ class Board(Window):
         self.custom_promotions = {}
         self.custom_extra_drops = {}
         self.custom_turn_order = []
+        self.custom_end_rules = {}
         self.custom_pawn = Pawn
         if self.color_index is None:
             self.color_index = 0
@@ -1073,11 +1099,8 @@ class Board(Window):
         for side in self.piece_set_ids:
             if self.piece_set_ids[side] is None:
                 self.piece_set_ids[side] = 0
-        if isinstance(self.board_config['stalemate'], dict):
-            self.stalemate_rule = {Side(k + 1): (v + 1) % 3 - 1 for k, v in self.board_config['stalemate'].items()}
-        else:
-            self.stalemate_rule = self.board_config['stalemate']
         self.reset_turn_order()
+        self.reset_end_rules()
 
     def reset_captures(self) -> None:
         self.captured_pieces = {Side.WHITE: [], Side.BLACK: []}
@@ -1240,62 +1263,102 @@ class Board(Window):
                             self.penultima_pieces[player_side][piece] = texture
 
     def reset_turn_order(self) -> None:
-        if not self.custom_turn_order:
-            self.initial_turns = 0
-            self.turn_order = [(side, None) for side in (Side.WHITE, Side.BLACK)]
-            return
+        to_act = lambda s: repack(action_types.get(s, list(s)))
+        to_type = lambda s: t.__name__ if isinstance((t := load_movement_type(s) or s), type) else t
+        from_iter = chain.from_iterable
         start_turns, loop_turns = [], []
         start_ended = False
-        for i, turn in enumerate(self.custom_turn_order):
+        for i, turn in enumerate(self.custom_turn_order or [(Side.WHITE, None), (Side.BLACK, None)]):
             side, rules = turn[0], turn[1]
             if side == Side.NONE:
                 start_ended = True
                 continue
-            if rules is not None:
-                fmt_rules = {}
-                override_default = False
-                for rule in ['default'] + rules:
-                    data = fmt_rules
-                    order = int(rule.get('order', 0)) if rule != 'default' else 0
-                    if rule == 'default':
-                        rule = {}
-                    elif order == 0 and not override_default:
-                        override_default = True
-                        del data[order]
-                    data_order = data.setdefault(order, {})
-                    data_state = data_order.setdefault(int(rule.get('state', 0)), {})
-                    for last in rule.get('last', '*'):
-                        invert_last = last and last[0] == '!'
-                        last = last[1:] if invert_last else last
-                        last = load_movement_type(last) or last
-                        if isinstance(last, type):
-                            last = last.__name__
-                        if invert_last:
-                            last = (False, last)
-                        data_last = data_state.setdefault(last, {})
-                        for piece in rule.get('piece', '*'):
-                            if piece and piece[0] == '!':
-                                piece = (False, load_piece_type(piece[1:], self.custom_pieces) or piece[1:])
-                            else:
-                                piece = load_piece_type(piece, self.custom_pieces) or piece
-                            data_cls = data_last.setdefault(piece, {})
-                            for move_type in rule.get('type', '*'):
-                                invert_type = move_type and move_type[0] == '!'
-                                move_type = move_type[1:] if invert_type else move_type
-                                move_type = load_movement_type(move_type) or move_type
-                                if isinstance(move_type, type):
-                                    move_type = move_type.__name__
-                                if invert_type:
-                                    move_type = (False, move_type)
-                                data_type = data_cls.setdefault(move_type, {})
-                                for action in rule.get('action', 'mcd'):
-                                    data_type.setdefault(action[0], int(rule.get('check', 0)))
-                turn = (side, fmt_rules)
-            (loop_turns if start_ended else start_turns).append(turn)
+            data = {}
+            override_default = False
+            for rule in ['default'] + (rules or []):
+                order = int(rule.get('order', 0)) if rule != 'default' else 0
+                if rule == 'default':
+                    rule = {}
+                elif order == 0 and not override_default:
+                    override_default = True
+                    del data[order]
+                state = int(rule.get('state', 0))
+                lasts = rule.get('last', '')
+                allow_lasts = [to_type(s) for s in lasts if not s or s[0] != '!'] or ['*']
+                block_lasts = [to_type(s[1:]) for s in lasts if s and s[0] == '!'] or [None]
+                pieces = rule.get('piece', '')
+                allow_pieces = [s for s in pieces if not s or s[0] != '!'] or ['*']
+                block_pieces = [s[1:] for s in pieces if s and s[0] == '!'] or [None]
+                move_types = rule.get('type', '')
+                allow_types = [to_type(s) for s in move_types if not s or s[0] != '!'] or ['*']
+                block_types = [to_type(s[1:]) for s in move_types if s and s[0] == '!'] or [None]
+                actions = rule.get('action', ['!pass'])
+                allow_actions = list(from_iter(to_act(s) for s in actions if not s or s[0] != '!')) or ['*']
+                block_actions = list(from_iter(to_act(s[1:]) for s in actions if s and s[0] == '!')) or [None]
+                check = int(rule.get('check', 0))
+                data_order = data.setdefault(order, {})
+                data_state = data_order.setdefault(state, {})
+                for allow_last in allow_lasts:
+                    data_allow_last = data_state.setdefault(allow_last, {})
+                    for block_last in block_lasts:
+                        data_block_last = data_allow_last.setdefault(block_last, {})
+                        for allow_piece in allow_pieces:
+                            data_allow_piece = data_block_last.setdefault(allow_piece, {})
+                            for block_piece in block_pieces:
+                                data_block_piece = data_allow_piece.setdefault(block_piece, {})
+                                for allow_type in allow_types:
+                                    data_allow_type = data_block_piece.setdefault(allow_type, {})
+                                    for block_type in block_types:
+                                        data_block_type = data_allow_type.setdefault(block_type, {})
+                                        for allow_action in allow_actions:
+                                            data_allow_action = data_block_type.setdefault(allow_action, {})
+                                            for block_action in block_actions:
+                                                data_allow_action.setdefault(block_action, check)
+                                                # oh my god what have i done IT'S TIME FOR TESTING *~MAKING SCIENCE~*
+            (loop_turns if start_ended else start_turns).append((side, data))
         if start_turns and not loop_turns and not start_ended:
             start_turns, loop_turns = loop_turns, start_turns
         self.initial_turns = len(start_turns)
         self.turn_order = start_turns + loop_turns
+
+    def reset_end_rules(self) -> None:
+        self.end_data = {}
+        if not self.custom_end_rules:
+            self.end_rules = {
+                side: {
+                    "checkmate": 1,
+                    "stalemate": 0,
+                    "capture": 1,
+                } for side in (Side.WHITE, Side.BLACK)
+            }
+            self.end_data = {
+                side: {
+                    "checkmate": 0,
+                    "stalemate": 0,
+                    "capture": 0,
+                } for side in (Side.WHITE, Side.BLACK)
+            }
+            return
+        self.end_rules = {}
+        for side in (Side.WHITE, Side.BLACK):
+            side_rules = self.custom_end_rules.get(side, self.custom_end_rules)
+            for condition, value in side_rules.items():
+                condition = end_types.get(condition)
+                if condition is not None:
+                    self.end_rules.setdefault(side, {}).setdefault(condition, value)
+                    self.end_data.setdefault(side, {}).setdefault(condition, 0)
+        for side in (Side.WHITE, Side.BLACK):
+            if side not in self.end_rules:
+                self.end_rules[side] = {
+                    "checkmate": 1,
+                    "stalemate": 0,
+                    "capture": 1,
+                }
+                self.end_data[side] = {
+                    "checkmate": 0,
+                    "stalemate": 0,
+                    "capture": 0,
+                }
 
     def get_piece_sets(
         self,
@@ -1417,19 +1480,11 @@ class Board(Window):
             side = piece.side
             if side in self.movable_pieces and not piece.is_empty():
                 self.movable_pieces[side].append(piece)
-                royal_mode = self.royal_piece_mode
-                if not royal_mode:
-                    if isinstance(piece, Royal):
-                        royal_mode = 1  # Force royal pieces
-                    if isinstance(piece, QuasiRoyal):
-                        royal_mode = 2  # Force quasi-royal pieces
-                    if isinstance(piece, RoyalGroup):
-                        royal_mode = 3  # Force royal groups
-                if royal_mode == 1:
+                if isinstance(piece, Royal):
                     self.royal_pieces[side].append(piece)
-                if royal_mode == 2:
+                if isinstance(piece, QuasiRoyal):
                     self.royal_groups[side].setdefault(QuasiRoyal, []).append(piece)
-                if royal_mode == 3:
+                if isinstance(piece, RoyalGroup):
                     self.royal_groups[side].setdefault(type(piece), []).append(piece)
                 if isinstance(piece.movement, ProbabilisticMovement):
                     self.probabilistic_pieces[side].append(piece)
@@ -1437,11 +1492,10 @@ class Board(Window):
                     self.auto_ranged_pieces[side].append(piece)
             elif isinstance(piece, Obstacle):
                 self.obstacles.append(piece)
-        if self.royal_piece_mode != 1:  # If not forcing to royal and a royal group has only one piece, make it royal
-            for side in (Side.WHITE, Side.BLACK):
-                for group in self.royal_groups[side]:
-                    if len(self.royal_groups[side][group]) == 1:
-                        self.royal_pieces[side].extend(self.royal_groups[side][group])
+        for side in (Side.WHITE, Side.BLACK):
+            for group in self.royal_groups[side]:
+                if len(self.royal_groups[side][group]) == 1:
+                    self.royal_pieces[side].extend(self.royal_groups[side][group])
         for side in (Side.WHITE, Side.BLACK):
             self.royal_markers[side] = {piece.board_pos for piece in self.royal_pieces[side]}
         if self.ply_count == 1:
@@ -1449,7 +1503,9 @@ class Board(Window):
                 if self.auto_ranged_pieces[side] and not self.auto_capture_markers[side]:
                     self.load_auto_capture_markers(side)
 
-    def is_royal_capture(self, side: Side, move: Move) -> bool:
+    def is_royal_loss(self, side: Side, move: Move) -> bool:
+        if not move or move.is_edit:
+            return False
         piece_loss = set()
         piece_gain = set()
         any_royals = (Royal, QuasiRoyal, RoyalGroup)
@@ -1474,27 +1530,22 @@ class Board(Window):
                     continue
             elif piece_gain:
                 continue
-            if self.royal_piece_mode == 0:
-                if not royal_loss and quasi_royal_loss:
-                    royal_loss = not self.royal_groups[side].get(QuasiRoyal)
-                if not royal_loss and royal_group_loss:
-                    royal_loss = not self.royal_groups[side].get(lost_piece)
-            elif self.royal_piece_mode == 1:  # Force royal pieces
-                royal_loss = True
-            elif self.royal_piece_mode == 2:  # Force quasi-royal pieces
+            if not royal_loss and quasi_royal_loss:
                 royal_loss = not self.royal_groups[side].get(QuasiRoyal)
-            elif self.royal_piece_mode == 3:  # Force royal groups
+            if not royal_loss and royal_group_loss:
                 royal_loss = not self.royal_groups[side].get(lost_piece)
             if royal_loss:
                 return True
         return False
 
-    def load_check(self, side: Side = None) -> bool:
+    def load_check(self, side: Side | None = None):
+        # Can any of the side's royal pieces be captured by the opponent?
+        # When side is not specified, checks for the side that moves now.
         if side is None:
             side = self.turn_side
         self.check_side = Side.NONE
-        if not self.use_check:
-            return False
+        if not {'check', 'checkmate'}.intersection(self.end_rules[side.opponent()]):
+            return
         self.ply_simulation += 1
         for piece in self.movable_pieces[side.opponent()]:
             if isinstance(piece.movement, ProbabilisticMovement):
@@ -1523,18 +1574,83 @@ class Board(Window):
                 break
         self.ply_simulation -= 1
 
+    def load_end_conditions(self, side: Side | None = None):
+        # Did the side meet any of its win conditions?
+        # By default, checks the last side that moved.
+        if side is None:
+            side = self.get_turn_side(-1) or self.turn_side.opponent()
+        opponent = side.opponent()
+        self.game_over = False
+        self.end_value = 0
+        self.end_condition = None
+        self.win_side = Side.NONE
+        if self.edit_mode:
+            return
+        for condition in self.end_rules[side]:
+            win_side = None
+            win_value = 0
+            side_needs = self.end_rules[side][condition]
+            side_count = self.end_data.get(side, {}).get(condition, 0)
+            if 0 < side_needs <= side_count:
+                win_side, win_value = side, side_needs
+            if 0 > side_needs >= -side_count:
+                win_side, win_value = opponent, -side_needs
+            loss_side = None
+            loss_value = 0
+            other_needs = self.end_rules[opponent].get(condition, 0)
+            other_count = self.end_data.get(opponent, {}).get(condition, 0)
+            if 0 < other_needs <= other_count:
+                loss_side, loss_value = side, other_needs
+            if 0 > other_needs >= -other_count:
+                loss_side, loss_value = opponent, -other_needs
+            if win_side and loss_side and win_side != loss_side.opponent():
+                if win_value > loss_value:
+                    loss_side = None
+                if loss_value > win_value:
+                    win_side = None
+                if win_value == loss_value:
+                    resolution = self.end_rules.get(Side.NONE, {}).get(condition, 0)
+                    if resolution >= 0:
+                        loss_side = None
+                    if resolution <= 0:
+                        win_side = None
+            if win_side or loss_side:
+                self.game_over, self.end_condition = True, condition
+                if win_side:
+                    self.win_side, self.end_value = win_side, win_value
+                elif loss_side:
+                    self.win_side, self.end_value = loss_side.opponent(), loss_value
+                break
+
     def load_moves(
         self,
         force_reload: bool = True,
         moves_for: Side | None = None,
         theoretical_moves_for:  Side | None = None
     ) -> None:
+        if self.edit_mode:
+            self.game_over = False
+            self.end_value = 0
+            self.end_condition = None
+            self.win_side = Side.NONE
+            self.moves = {side: {} for side in self.moves}
+            self.chain_moves = {side: {} for side in self.chain_moves}
+            self.theoretical_moves = {side: {} for side in self.theoretical_moves}
+            return
         if force_reload:
             self.game_over = False
+            self.end_value = 0
+            self.end_condition = None
+            self.win_side = Side.NONE
             self.moves_queried = {side: False for side in self.moves_queried}
             self.theoretical_moves_queried = {side: False for side in self.theoretical_moves_queried}
-        self.load_pieces()
+            self.unload_end_data()
         self.load_check()
+        self.load_end_conditions()
+        if self.game_over and self.win_side is not Side.NONE:
+            losing_side = self.win_side.opponent()
+            self.moves[losing_side] = {}
+            self.moves_queried[losing_side] = True
         movable_pieces = {side: self.movable_pieces[side].copy() for side in self.movable_pieces}
         royal_markers = {side: self.royal_markers[side].copy() for side in self.royal_markers}
         royal_pieces = {side: self.royal_pieces[side].copy() for side in self.royal_pieces}
@@ -1547,26 +1663,10 @@ class Board(Window):
         en_passant_markers = deepcopy(self.en_passant_markers)
         royal_ep_targets = deepcopy(self.royal_ep_targets)
         royal_ep_markers = deepcopy(self.royal_ep_markers)
+        end_data = deepcopy(self.end_data)
         opponent = self.turn_side.opponent()
         check_side = self.check_side
         check_sides = {check_side: True if check_side and check_side is not Side.NONE else False}
-        for turn_side in [Side.WHITE, Side.BLACK]:
-            if self.move_history and (
-                not self.use_check or (
-                    self.move_history[-1] and
-                    self.move_history[-1].movement_type == DropMovement and
-                    isinstance(self.move_history[-1].promotion, Piece) and
-                    isinstance(self.move_history[-1].promotion.movement, AutoCaptureMovement)
-                )
-            ):
-                if self.is_royal_capture(turn_side, self.move_history[-1]):
-                    check_side = turn_side
-                    if check_side is not Side.NONE:
-                        check_sides[check_side] = True
-                    self.moves[turn_side] = {}
-                    self.moves_queried[turn_side] = True
-                    self.game_over = True
-                    continue
         last_chain_move = self.chain_start
         if last_chain_move:
             chained_move = last_chain_move
@@ -1624,8 +1724,8 @@ class Board(Window):
                                 self.roll_history[self.ply_count - 1][pos] = piece.movement.roll()
                     self.probabilistic_piece_history[self.ply_count - 1] = signature
             for order in self.get_order():
-                order_rules = self.turn_rules.get(order, []) if self.turn_rules is not None else None
-                if self.use_check and order_rules is not None:
+                order_rules = self.turn_rules.get(order, {})
+                if {'check', 'checkmate'}.intersection(self.end_rules[turn_side]):
                     old_check_side = self.check_side
                     if opponent not in check_sides:
                         if opponent.value in order_rules or -opponent.value in order_rules:
@@ -1635,10 +1735,10 @@ class Board(Window):
                                 check_sides[opponent] = True
                     self.check_side = old_check_side
                 state_rules = [rules for rules in (
-                    order_rules.get(0, None),
-                    order_rules.get(-1 if check_sides.get(Side.WHITE, False) else 1, None),
-                    order_rules.get(-2 if check_sides.get(Side.BLACK, False) else 2, None),
-                ) if rules is not None] if order_rules is not None else None
+                    order_rules.get(0),
+                    order_rules.get(-1 if check_sides.get(Side.WHITE, False) else 1),
+                    order_rules.get(-2 if check_sides.get(Side.BLACK, False) else 2),
+                ) if rules]
                 last_history_tags = set()
                 last_history_types = set()
                 last_history_pieces = set()
@@ -1651,12 +1751,12 @@ class Board(Window):
                         if last_history_move and not last_history_move.is_edit:
                             move_chain = []
                             while last_history_move:
-                                chain = True
+                                valid = True
                                 if last_history_move.is_edit:
-                                    chain = False
-                                if chain and (last_history_move.promotion or last_history_move.piece).side != turn_side:
-                                    chain = False
-                                if chain:
+                                    valid = False
+                                if valid and (last_history_move.promotion or last_history_move.piece).side != turn_side:
+                                    valid = False
+                                if valid:
                                     move_chain.append(last_history_move)
                                 last_history_move = last_history_move.chained_move
                             for last_history_chain_move in move_chain[::-1]:
@@ -1675,161 +1775,186 @@ class Board(Window):
                                 if not board_piece.matches(moved_piece):
                                     continue
                                 (last_history_partial if partial else last_history_pieces).add(board_piece.board_pos)
-                match_types = [
-                    k for rules in state_rules for k in rules
+                allow_last_rules = [
+                    rules[k] for rules in state_rules for k in rules
                     if k == '*' or k in last_history_tags or k in last_history_types
-                    or isinstance(k, tuple) and k[0] is False
-                    and k[1] not in last_history_tags and k[1] not in last_history_types
-                ] if state_rules is not None else None
-                last_type_rules = [
-                    rules[k] for rules in state_rules for k in match_types if k in rules
-                ] if state_rules is not None else None
-                if not self.chain_start:
-                    if last_type_rules:
-                        self.load_pieces()
-                        for last_type_rule in last_type_rules:
-                            piece_rules = last_type_rule.get('*') or {}
-                            type_rules = [rules for rules in [piece_rules.get('*')] if rules]
-                            pass_turn_options = {
-                                x for x in [rules.get('p') for rules in type_rules if rules] if x is not None
-                            }
-                            if 0 in pass_turn_options:
+                    or ('*' in k and fits(k, (*last_history_tags, *last_history_types)))
+                ]
+                block_last_rules = [
+                    rules[k] for rules in allow_last_rules for k in rules
+                    if k is None or k not in last_history_tags and k not in last_history_types
+                    and ('*' not in k or not fits(k, (*last_history_tags, *last_history_types)))
+                ]
+                if not self.chain_start and block_last_rules:
+                    self.load_pieces()
+                    allow_piece_rules = [rules.get('*', {}) for rules in block_last_rules]
+                    block_piece_rules = [rules.get(None, {}) for rules in allow_piece_rules]
+                    allow_type_rules = [rules.get('*', {}) for rules in block_piece_rules]
+                    block_type_rules = [rules.get(None, {}) for rules in allow_type_rules]
+                    allow_pass_rules = [rules.get(s, {}) for rules in block_type_rules for s in ('*', 'pass')]
+                    block_pass_rules = [rules.get(s, {}) for rules in allow_pass_rules for s in rules if s != 'pass']
+                    if 0 in block_pass_rules and self.check_side != turn_side:
+                        self.moves[turn_side]['pass'] = True
+                    elif {1, -1}.intersection(block_pass_rules):
+                        old_check_side = self.check_side
+                        if opponent not in check_sides:
+                            self.load_check(opponent)
+                            if self.check_side == opponent:
+                                check_sides[opponent] = True
+                        self.check_side = old_check_side
+                        if self.check_side != turn_side:
+                            conditions = {1 if check_sides.get(opponent, False) else -1}
+                            if conditions.intersection(block_pass_rules):
                                 self.moves[turn_side]['pass'] = True
-                            elif pass_turn_options.intersection({1, -1}):
-                                old_check_side = self.check_side
-                                if opponent not in check_sides:
-                                    self.load_check(opponent)
-                                    if self.check_side == opponent:
-                                        check_sides[opponent] = True
-                                self.check_side = old_check_side
-                                if self.check_side != turn_side:
-                                    conditions = {0, 1 if check_sides.get(opponent, False) else -1}
-                                    if conditions.intersection(pass_turn_options):
-                                        self.moves[turn_side]['pass'] = True
-                                self.check_side = check_side
-                piece_rule_dict = {}
+                        self.check_side = check_side
+                piece_rules, allow_last_piece_rules, block_last_piece_rules, chain_piece_rules = {}, {}, {}, {}
                 if not self.chain_start and self.use_drops and turn_side in self.drops:
                     side_drops = self.drops[turn_side]
                     for piece_type in self.captured_pieces[turn_side]:
                         if piece_type not in side_drops:
                             continue
-                        if piece_type not in piece_rule_dict:
-                            piece_rule_dict[piece_type] = []
-                            if last_type_rules is None:
-                                piece_rule_dict[piece_type] = None
-                                self.moves[turn_side].setdefault('drop', set()).add(piece_type)
-                                continue
-                            else:
-                                for rules in last_type_rules:
-                                    for k in rules:
-                                        if (
-                                            k == '*' or k == piece_type
-                                            or isinstance(k, tuple) and k[0] is False and k[1] != piece_type
-                                        ):
-                                            piece_rule_dict[piece_type].append(rules[k])
-                        if piece_rule_dict[piece_type] is None:
+                        if piece_type not in piece_rules:
+                            piece_type_string = save_piece_type(piece_type)
+                            allow_piece_rules = [
+                                rules[s] for rules in block_last_rules for s in rules
+                                if s == '*' or s in {piece_type.name, piece_type_string}
+                                or ('*' in s and fits(s, (piece_type.name, piece_type_string)))
+                            ]
+                            block_piece_rules = [
+                                rules[s] for rules in allow_piece_rules for s in rules
+                                if s is None or s not in {piece_type.name, piece_type_string}
+                                and ('*' not in s or not fits(s, (piece_type.name, piece_type_string)))
+                            ]
+                            piece_rules[piece_type] = block_piece_rules
+                        if not piece_rules[piece_type]:
                             continue
-                        type_rules = [rules[s] for s in ['*'] for rules in piece_rule_dict[piece_type] if s in rules]
-                        options = {k: [] for k, v in {'d': self.use_drops}.items() if v}
-                        for rules in type_rules:
-                            for option in options:
-                                if option in rules:
-                                    options[option].append(rules[option])
-                        drop_turn_options = set(options.get('d', ()))
-                        if not drop_turn_options:
+                        drop_type = DropMovement.__name__
+                        allow_type_rules = [
+                            rules[s] for rules in piece_rules[piece_type] for s in rules
+                            if s == '*' or s == drop_type or ('*' in s and fits(s, drop_type))
+                        ]
+                        block_type_rules = [
+                            rules[s] for rules in allow_type_rules for s in rules
+                            if s is None or s != drop_type and ('*' not in s or not fits(s, drop_type))
+                        ]
+                        allow_drop_rules = [
+                            rules.get(s, {}) for rules in block_type_rules for s in ('drop', '*')
+                        ]
+                        block_drop_rules = [
+                            rules.get(s, {}) for rules in allow_drop_rules for s in rules if s != 'drop'
+                        ]
+                        if not block_drop_rules:
                             continue
                         for pos in side_drops[piece_type]:
                             if self.get_piece(pos).is_empty():
                                 self.moves[turn_side].setdefault('drop', set()).add(piece_type)
                                 break
                 for piece in movable_pieces[turn_side] if chain_moves is None else [last_chain_move.piece]:
-                    if type(piece) not in piece_rule_dict:
-                        if last_type_rules is None:
-                            piece_rule_dict[type(piece)] = None
-                        else:
-                            piece_rule_dict[type(piece)] = []
-                            for rules in last_type_rules:
-                                for k in rules:
-                                    if (
-                                        k in ('*', type(piece))
-                                        or isinstance(k, tuple) and k[0] is False and k[1] not in ('', type(piece))
-                                    ):
-                                        piece_rule_dict[type(piece)].append(rules[k])
-                    piece_rules = copy(piece_rule_dict[type(piece)])
-                    if piece_rules is not None:
-                        history_piece_rules = []
-                        for rules in last_type_rules:
-                            for k in rules:
-                                if k == '' and (chain_moves is not None or piece.board_pos in last_history_pieces):
-                                    history_piece_rules.append(rules[k])
-                                if k == (False, '') and (
-                                    chain_moves is not None or
-                                    piece.board_pos not in last_history_pieces and
-                                    piece.board_pos not in last_history_partial
-                                ):
-                                    history_piece_rules.append(rules[k])
-                        if history_piece_rules is not None:
-                            piece_rules.extend(history_piece_rules)
-                        else:
-                            piece_rules = None
-                    if not piece_rules and piece_rules is not None:
+                    piece_type = type(piece)
+                    piece_type_string = save_piece_type(piece_type)
+                    if chain_moves is not None:
+                        if piece_type not in chain_piece_rules:
+                            allow_piece_rules = [
+                                rules[s] for rules in block_last_rules for s in rules
+                                if s in {'*', ''} or s in {piece_type.name, piece_type_string}
+                                or ('*' in s and fits(s, (piece_type.name, piece_type_string)))
+                            ]
+                            block_piece_rules = [
+                                rules[s] for rules in allow_piece_rules for s in rules
+                                if s in {None, ''} or s not in {piece_type.name, piece_type_string}
+                                and ('*' not in s or not fits(s, (piece_type.name, piece_type_string)))
+                            ]
+                            chain_piece_rules[piece_type] = block_piece_rules
+                        piece_rule_list = chain_piece_rules[piece_type]
+                    elif piece.board_pos in last_history_pieces:
+                        if piece_type not in allow_last_piece_rules:
+                            allow_piece_rules = [
+                                rules[s] for rules in block_last_rules for s in rules
+                                if s in {'*', ''} or s in {piece_type.name, piece_type_string}
+                                or ('*' in s and fits(s, (piece_type.name, piece_type_string)))
+                            ]
+                            block_piece_rules = [
+                                rules[s] for rules in allow_piece_rules for s in rules
+                                if s is None or s not in {'', piece_type.name, piece_type_string}
+                                and ('*' not in s or not fits(s, (piece_type.name, piece_type_string)))
+                            ]
+                            allow_last_piece_rules[piece_type] = block_piece_rules
+                        piece_rule_list = allow_last_piece_rules[piece_type]
+                    elif piece.board_pos not in last_history_partial:
+                        if piece_type not in block_last_piece_rules:
+                            allow_piece_rules = [
+                                rules[s] for rules in block_last_rules for s in rules
+                                if s == '*' or s in {piece_type.name, piece_type_string}
+                                or ('*' in s and fits(s, (piece_type.name, piece_type_string)))
+                            ]
+                            block_piece_rules = [
+                                rules[s] for rules in allow_piece_rules for s in rules
+                                if s in {None, ''} or s not in {piece_type.name, piece_type_string}
+                                and ('*' not in s or not fits(s, (piece_type.name, piece_type_string)))
+                            ]
+                            block_last_piece_rules[piece_type] = block_piece_rules
+                        piece_rule_list = block_last_piece_rules[piece_type]
+                    else:
+                        if piece_type not in piece_rules:
+                            allow_piece_rules = [
+                                rules[s] for rules in block_last_rules for s in rules
+                                if s == '*' or s in {piece_type.name, piece_type_string}
+                                or ('*' in s and fits(s, (piece_type.name, piece_type_string)))
+                            ]
+                            block_piece_rules = [
+                                rules[s] for rules in allow_piece_rules for s in rules
+                                if s is None or s not in {'', piece_type.name, piece_type_string}
+                                and ('*' not in s or not fits(s, (piece_type.name, piece_type_string)))
+                            ]
+                            piece_rules[piece_type] = block_piece_rules
+                        piece_rule_list = piece_rules[piece_type]
+                    if not piece_rule_list:
                         continue
                     type_rule_dict = {}
                     for move in piece.moves() if chain_moves is None else chain_moves:
-                        movement_type = move.movement_type.__name__
-                        type_options = {x for x in (move.tag, movement_type) if x}
-                        for move_type in type_options:
-                            if move_type not in type_rule_dict:
-                                if piece_rules is None:
-                                    type_rule_dict[move_type] = None
-                                else:
-                                    type_rule_dict[move_type] = []
-                                    for rules in piece_rules:
-                                        for k in rules:
-                                            if (
-                                                k in ('*', move_type)
-                                                or isinstance(k, tuple) and k[0] is False
-                                                and k[1] not in ('', move.tag, movement_type)
-                                            ):
-                                                type_rule_dict[move_type].append(rules[k])
-                        move_type = move.tag or movement_type
-                        type_rules = copy(type_rule_dict[move_type])
-                        if type_rules is not None:
-                            history_type_rules = []
-                            for rules in piece_rules:
-                                for k in rules:
-                                    if k == '' and move.tag in last_history_tags:
-                                        history_type_rules.append(rules[k])
-                                    if k == (False, '') and move.tag not in last_history_tags:
-                                        history_type_rules.append(rules[k])
-                            if history_type_rules is not None:
-                                type_rules.extend(history_type_rules)
-                            else:
-                                type_rules = None
-                        if not type_rules and type_rules is not None:
+                        move_type = move.tag or (move.movement_type.__name__ if move.movement_type else '')
+                        if move_type not in type_rule_dict:
+                            allow_type_rules = [
+                                rules[s] for rules in piece_rule_list for s in rules
+                                if s == '*' or s == move_type
+                                or s == '' and move.tag in last_history_tags
+                                or ('*' in s and fits(s, move_type))
+                            ]
+                            block_type_rules = [
+                                rules[s] for rules in allow_type_rules for s in rules
+                                if s is None or s != move_type
+                                and (s != '' or move.tag not in last_history_tags)
+                                and ('*' not in s or not fits(s, move_type))
+                            ]
+                            type_rule_dict[move_type] = block_type_rules
+                        type_rule_list = type_rule_dict[move_type]
+                        if not type_rule_list:
                             continue
                         self.update_move(move)
-                        options = {k: [] for k, v in {
-                            'm': not move.captured_piece,
-                            'c': move.captured_piece,
-                            'p': not self.chain_start and 'pass' not in self.moves[turn_side],
+                        move_actions = {k: [] for k, v in {
+                            'move': not move.captured_piece,
+                            'capture': not not move.captured_piece,
+                            'promotion': move.promotion is not None,
                         }.items() if v}
-                        if type_rules is not None:
-                            for rules in type_rules:
-                                for option in options:
-                                    if option in rules:
-                                        options[option].append(rules[option])
-                            pass_turn_options = set(options.pop('p', ()))
-                            make_turn_options = set(sum(options.values(), []))
-                        else:
-                            pass_turn_options = set()
-                            make_turn_options = {0}
-                        if not (make_turn_options or pass_turn_options):
+                        allow_action_rules = [
+                            rules[s] for rules in type_rule_list for s in rules if s == '*' or s in move_actions
+                        ]
+                        block_action_rules = [
+                            rules[s] for rules in allow_action_rules for s in rules if s not in move_actions
+                        ]
+                        pass_actions = {'pass': not self.chain_start and 'pass' not in self.moves[turn_side],}
+                        allow_pass_rules = [
+                            rules[s] for rules in type_rule_list for s in rules if s == '*' or s in pass_actions
+                        ]
+                        block_pass_rules = [
+                            rules[s] for rules in allow_pass_rules for s in rules if s not in pass_actions
+                        ]
+                        if not (block_action_rules or block_pass_rules):
                             continue
-                        if pass_turn_options:
+                        if block_pass_rules:
                             old_check_side = self.check_side
                             if opponent not in check_sides:
-                                if pass_turn_options.intersection({1, -1}):
+                                if {1, -1}.intersection(block_pass_rules):
                                     self.load_pieces()
                                     self.load_check(opponent)
                                     if self.check_side == opponent:
@@ -1837,10 +1962,10 @@ class Board(Window):
                             self.check_side = old_check_side
                             if self.check_side != turn_side:
                                 conditions = {0, 1 if check_sides.get(opponent, False) else -1}
-                                if conditions.intersection(pass_turn_options):
+                                if conditions.intersection(block_pass_rules):
                                     self.moves[turn_side]['pass'] = True
                             self.check_side = check_side
-                        if make_turn_options:
+                        if block_action_rules:
                             self.update_auto_capture_markers(move, True)
                             self.update_auto_captures(move, turn_side.opponent())
                             self.move(move)
@@ -1854,14 +1979,13 @@ class Board(Window):
                             end_early = False
                             self.load_pieces()
                             if (
-                                self.use_check and chained_move
-                                and issubclass(type(move.piece), Slow)
+                                {'check', 'checkmate'}.intersection(self.end_rules[turn_side.opponent()])
+                                and chained_move and issubclass(type(move.piece), Slow)
                                 and move.piece.board_pos in self.royal_markers[turn_side]
                             ):
                                 self.load_check(turn_side)
                                 if self.check_side == turn_side:
-                                    if self.use_check:
-                                        end_early = True
+                                    end_early = True
                             while not end_early and chained_move:
                                 self.update_move(chained_move)
                                 self.move(chained_move)
@@ -1875,8 +1999,8 @@ class Board(Window):
                                 move_chain.append(chained_move)
                                 self.load_pieces()
                                 if (
-                                    self.use_check and chained_move.chained_move
-                                    and issubclass(type(chained_move.piece), Slow)
+                                    {'check', 'checkmate'}.intersection(self.end_rules[turn_side.opponent()])
+                                    and chained_move.chained_move and issubclass(type(chained_move.piece), Slow)
                                     and chained_move.piece.board_pos in self.royal_markers[turn_side]
                                 ):
                                     self.load_check(turn_side)
@@ -1887,24 +2011,24 @@ class Board(Window):
                             if not end_early:
                                 self.load_pieces()
                                 self.load_check(turn_side)
-                            if self.use_check:
-                                if self.is_royal_capture(turn_side, move):
+                            if {'check', 'checkmate'}.intersection(self.end_rules[turn_side.opponent()]):
+                                if self.is_royal_loss(turn_side, move):
                                     self.check_side = turn_side
-                                if self.is_royal_capture(opponent, move):
-                                    check_side = opponent
+                            if {'check', 'checkmate'}.intersection(self.end_rules[self.turn_side]):
+                                if self.is_royal_loss(opponent, move):
                                     self.moves[opponent] = {}
                                     self.moves_queried[opponent] = True
-                                    self.game_over = True
+                                    end_data[self.turn_side]['checkmate'] = 1
                             if self.check_side != turn_side:
                                 old_check_side = self.check_side
                                 new_check_side = Side.NONE
-                                if make_turn_options.intersection({1, -1}):
+                                if {1, -1}.intersection(block_action_rules):
                                     self.load_pieces()
                                     self.load_check(opponent)
                                     new_check_side = self.check_side
                                 self.check_side = old_check_side
                                 conditions = {0, 1 if new_check_side == opponent else -1}
-                                if conditions.intersection(make_turn_options):
+                                if conditions.intersection(block_action_rules):
                                     pos_from, pos_to = move.pos_from, move.pos_to
                                     if pos_from == pos_to and move.captured_piece is not None:
                                         pos_to = move.captured_piece.board_pos
@@ -1935,6 +2059,8 @@ class Board(Window):
                             self.en_passant_markers = deepcopy(en_passant_markers)
                             self.royal_ep_targets = deepcopy(royal_ep_targets)
                             self.royal_ep_markers = deepcopy(royal_ep_markers)
+                            self.royal_markers = {side: royal_markers[side].copy() for side in royal_markers}
+                            self.end_data = deepcopy(end_data)
                 if self.moves[turn_side]:
                     self.moves_queried[turn_side] = True
                     break
@@ -1970,8 +2096,11 @@ class Board(Window):
         self.auto_ranged_pieces = auto_ranged_pieces
         self.auto_capture_markers = auto_capture_markers
         self.check_side = check_side
-        if force_reload and not self.edit_mode and not self.moves.get(self.turn_side, {}):
-            self.game_over = True
+        self.en_passant_targets = en_passant_targets
+        self.en_passant_markers = en_passant_markers
+        self.royal_ep_targets = royal_ep_targets
+        self.royal_ep_markers = royal_ep_markers
+        self.end_data = end_data
 
     def unique_moves(self, side: Side | None = None) -> dict[Side, dict[Position, list[Move]]]:
         if side is None:
@@ -2036,7 +2165,7 @@ class Board(Window):
         self.hide_moves()
         self.update_caption()
         move_sprites = dict()
-        with_markers = not self.should_hide_moves if with_markers is None else with_markers
+        with_markers = not self.hide_move_markers if with_markers is None else with_markers
         pos = self.selected_square or self.hovered_square
         if not pos and self.is_active:
             pos = self.highlight_square
@@ -2370,6 +2499,60 @@ class Board(Window):
                 target_dict[side].clear()
                 marker_dict[side].clear()
 
+    def update_end_data(self, move: Move | None = None) -> None:
+        if self.edit_mode:
+            return
+        opponent = self.turn_side.opponent()
+        if not self.moves.get(self.turn_side):
+            if 'stalemate' in self.end_rules[opponent] and self.check_side != self.turn_side:
+                self.end_data[opponent]['stalemate'] = 1
+            if 'checkmate' in self.end_rules[opponent] and self.check_side == self.turn_side:
+                self.end_data[opponent]['checkmate'] = 1
+        if 'check' in self.end_rules[opponent] and self.check_side == self.turn_side:
+            self.end_data[opponent]['check'] += 1
+        if not move or move.is_edit:
+            return
+        for side in {self.turn_side, self.turn_side.opponent()}:
+            if 'capture' in self.end_rules[side] and self.is_royal_loss(side.opponent(), move):
+                self.end_data[side]['capture'] += 1
+
+    def revert_end_data(self, move: Move | None = None) -> None:
+        if self.edit_mode:
+            return
+        opponent = self.turn_side.opponent()
+        if not self.moves.get(self.turn_side):
+            if 'stalemate' in self.end_rules[opponent] and self.check_side != self.turn_side:
+                self.end_data[opponent]['stalemate'] = 0
+            if 'checkmate' in self.end_rules[opponent] and self.check_side == self.turn_side:
+                self.end_data[opponent]['checkmate'] = 0
+        if 'check' in self.end_rules[opponent] and self.check_side == self.turn_side:
+            self.end_data[opponent]['check'] -= 1
+        if not move or move.is_edit:
+            return
+        for side in {self.turn_side, self.turn_side.opponent()}:
+            if 'capture' in self.end_rules[side] and self.is_royal_loss(side.opponent(), move):
+                self.end_data[side]['capture'] -= 1
+
+    def unload_end_data(self, _: Move | None = None) -> None:
+        if self.edit_mode:
+            return
+        opponent = self.turn_side.opponent()
+        if not self.moves.get(self.turn_side):
+            if 'stalemate' in self.end_rules[opponent] and self.check_side != self.turn_side:
+                self.end_data[opponent]['stalemate'] = 0
+            if 'checkmate' in self.end_rules[opponent] and self.check_side == self.turn_side:
+                self.end_data[opponent]['checkmate'] = 0
+
+    def reload_end_data(self, _: Move | None = None) -> None:
+        if self.edit_mode:
+            return
+        opponent = self.turn_side.opponent()
+        if not self.moves.get(self.turn_side):
+            if 'stalemate' in self.end_rules[opponent] and self.check_side != self.turn_side:
+                self.end_data[opponent]['stalemate'] = 1
+            if 'checkmate' in self.end_rules[opponent] and self.check_side == self.turn_side:
+                self.end_data[opponent]['checkmate'] = 1
+
     def clear_future_history(self, since: int) -> None:
         self.future_move_history = []
         self.roll_history = self.roll_history[:since]
@@ -2419,29 +2602,21 @@ class Board(Window):
                 if next_move.promotion is Unset:
                     finished = True
                     break
-                if self.promotion_piece is None:
+                else:
                     self.log(f"Edit: {self.move_history[-1]}")
             elif next_move.movement_type == DropMovement:
                 pos = next_move.pos_to
                 if not self.not_on_board(pos) and self.get_piece(pos).is_empty():
                     if next_move.promotion is Unset:
                         self.try_drop(next_move)
-                        if self.promotion_piece:
-                            self.move_history.append(next_move)
-                    else:
-                        if next_move.placed_piece is not None:
-                            for i, piece in enumerate(self.captured_pieces[self.turn_side][::-1]):
-                                if piece == next_move.placed_piece:
-                                    self.captured_pieces[self.turn_side].pop(-(i + 1))
-                                    break
-                        promotion_piece = self.promotion_piece
-                        self.promotion_piece = True
-                        self.replace(next_move.piece, next_move.promotion)
-                        self.update_promotion_auto_captures(next_move)
-                        self.promotion_piece = promotion_piece
-                        self.log(f"Drop: {next_move}")
+                    if next_move.promotion is Unset:
                         self.move_history.append(next_move)
-                        self.shift_ply(+1)
+                        finished = True
+                        break
+                    continue
+                else:
+                    finished = False
+                    break
             else:
                 move = self.find_move(next_move.pos_from, next_move.pos_to)
                 if move is None:
@@ -2487,18 +2662,22 @@ class Board(Window):
                         last_move = last_move.chained_move
                     last_move.chained_move = deepcopy(move)
                 if chained_move is Unset and not self.promotion_piece:
+                    self.load_pieces()
                     self.load_moves()
                     chained = True
                 else:
                     self.chain_start = None
                     if self.promotion_piece is None:
                         self.shift_ply(+1)
+                    else:
+                        finished = True
+                        break
             if not chained:
+                self.load_pieces()
+                self.load_moves()
+                self.update_end_data(self.move_history[-1])
                 self.advance_turn()
-            if self.promotion_piece:
-                finished = True
-                break
-            if chained:
+            else:
                 if next_move:
                     next_move = next_move.chained_move
                 if next_move:
@@ -2517,6 +2696,7 @@ class Board(Window):
         return finished
 
     def move(self, move: Move) -> None:
+        self.skip_caption_update = True
         self.deselect_piece()
         if move.piece is not None and move.pos_to is not None:
             # piece was moved to a different square, set its position to the new square
@@ -2593,6 +2773,7 @@ class Board(Window):
             while last_move.chained_move:
                 last_move = last_move.chained_move
             last_move.chained_move = move
+        self.load_pieces()
         if move.chained_move is Unset and not self.promotion_piece:
             self.load_moves()
             self.show_moves(False)
@@ -2604,6 +2785,8 @@ class Board(Window):
             self.chain_start = None
             if self.promotion_piece is None:
                 self.shift_ply(+1)
+                self.load_moves()
+                self.update_end_data(self.move_history[-1])
                 self.compare_history()
             self.advance_turn()
 
@@ -2721,7 +2904,9 @@ class Board(Window):
         else:
             last_move = self.move_history[-1]
             offset = last_move is None or (not last_move.is_edit and self.chain_start is None)
-            self.shift_ply(-offset)
+            if offset:
+                self.revert_end_data(last_move)
+                self.shift_ply(-1)
         last_move = self.move_history.pop()
         if last_move is not None:
             move_chain = [last_move]
@@ -2766,6 +2951,9 @@ class Board(Window):
                 move.piece.movement.reload(move, move.piece)
         self.reload_en_passant_markers()
         future_move_history = self.future_move_history.copy()
+        self.load_pieces()
+        self.load_moves()
+        self.reload_end_data()
         self.advance_turn()
         self.future_move_history = future_move_history
         if self.future_move_history:
@@ -2902,9 +3090,13 @@ class Board(Window):
             or not self.chain_moves.get(self.turn_side, {}).get(tuple(poss))
         ):
             self.chain_start = None
+            self.load_pieces()
             if self.promotion_piece is None:
                 offset = last_move is None or not last_move.is_edit
-                self.shift_ply(+offset)
+                if offset:
+                    self.shift_ply(+1)
+                    self.load_moves()
+                    self.update_end_data(last_move)
                 self.compare_history()
             self.advance_turn()
         elif last_chain_move.chained_move is Unset:
@@ -2916,6 +3108,7 @@ class Board(Window):
                 last_history_move = last_history_move.chained_move
             if last_history_move.pos_from == current_pos:
                 current_pos = last_history_move.pos_to
+            self.load_pieces()
             self.load_moves()
             self.select_piece(current_pos)
 
@@ -2954,6 +3147,9 @@ class Board(Window):
             self.update_en_passant_markers()
             self.move_history.append(None)
             self.shift_ply(+1)
+            self.load_pieces()
+            self.load_moves()
+            self.update_end_data()
             self.compare_history()
             self.advance_turn()
 
@@ -2963,7 +3159,7 @@ class Board(Window):
         if self.promotion_piece:
             self.update_caption()
             return
-        self.game_over = False
+        self.skip_caption_update = False
         self.action_count += 1
         if self.board_config['autosave_act'] and self.action_count >= self.board_config['autosave_act']:
             self.action_count %= self.board_config['autosave_act']
@@ -2974,7 +3170,7 @@ class Board(Window):
         ):
             self.auto_save()
         if self.edit_mode:
-            self.load_pieces()  # loading the new piece positions in order to update the board state
+            self.load_end_conditions()
             self.color_pieces()  # reverting the piece colors to normal in case they were changed
             self.update_caption()  # updating the caption to reflect the edit that was just made
             return  # let's not advance the turn while editing the board to hopefully make things easier for everyone
@@ -2990,42 +3186,64 @@ class Board(Window):
                 self.pass_turn()
                 return
 
-    def update_status(self) -> None:
-        self.load_moves()  # this updates the check status as well
-        self.show_moves()
+    def get_status_string(self) -> str | None:
         if self.game_over:
-            # the game has ended. let's find out who won and show it by changing piece colors
-            if self.check_side:
-                if self.use_check:
-                    # the current player was checkmated, the game ends and the opponent wins
-                    self.log(f"Info: Checkmate! {self.check_side.opponent()} wins.")
+            error = False
+            string = ''
+            if self.end_condition == 'checkmate':
+                string += "Checkmate!"
+            elif self.end_condition == 'stalemate':
+                string += "Stalemate!"
+            elif self.end_condition == 'check':
+                if self.end_value == 1:
+                    string += "Check!"
                 else:
-                    # the current player's royal piece was lost, the game ends and the opponent wins
-                    self.log(f"Info: Game over! {self.check_side.opponent()} wins.")
+                    string += f"{self.end_value}-check!"
+            elif self.end_condition == 'capture':
+                string += "Game over!"
             else:
-                # the current player was stalemated, let's consult the rules to see if it's a draw or a win
-                if isinstance(self.stalemate_rule, dict):
-                    rule = self.stalemate_rule.get(self.turn_side, 0)
-                else:
-                    rule = self.stalemate_rule
-                if rule == 0:  # it's a draw
-                    self.log("Info: Stalemate! It's a draw.")
-                elif rule == 1:  # stalemating player wins, stalemated player loses
-                    self.log(f"Info: Stalemate! {self.turn_side.opponent()} wins.")
-                elif rule == -1:  # stalemating player loses, stalemated player wins
-                    self.log(f"Info: Stalemate! {self.turn_side} wins.")
-                else:  # how did we get here?
-                    self.log("Info: Stalemate! The result is uncertain...")
+                string += "Game over..?"  # this should never happen
+                error = True
+            if self.win_side:
+                string += f" {self.win_side} wins."
+            else:
+                string += " It's a draw."
+            if error:
+                string += f' I think. (Unknown end condition: "{self.end_condition}"'
+            return string
+        elif self.check_side:
+            return f"{self.check_side} is in check!"
         else:
-            if self.check_side:
-                # the game is still going, but the current player is in check
-                self.log(f"Info: {self.check_side} is in check!")
-            else:
-                # the game is still going and there is no check
-                pass
+            return
+
+    def update_status(self) -> None:
+        self.load_end_conditions()
+        self.skip_caption_update = False
+        self.show_moves()
+        status_string = self.get_status_string()
+        if status_string:
+            self.log(f"Info: {status_string}")
         self.color_all_pieces()
 
     def update_caption(self) -> None:
+        if self.skip_caption_update:
+            return
+        prefix = ''
+        if self.board_config['log_prefix'] == 0:
+            prefix = f"Ply {self.ply_count}"
+        if self.board_config['log_prefix'] > 0:
+            if self.turn_data[0] == 0:
+                prefix = "Start"
+            if self.turn_data[0] > 0:
+                prefix = f"Turn {self.turn_data[0]}: {self.turn_data[1]}"
+                if self.board_config['log_prefix'] == 1:
+                    prefix += f" to move"
+                if self.board_config['log_prefix'] > 1:
+                    prefix += f", Move {self.turn_data[2]}"
+                if self.board_config['log_prefix'] > 2:
+                    prefix = f"(Ply {self.ply_count}) {prefix}"
+        if prefix:
+            prefix = f"[{prefix}] "
         selected_square = self.selected_square
         hovered_square = None
         if self.is_active:
@@ -3051,7 +3269,7 @@ class Board(Window):
                     message += f" is placed on {toa(piece.board_pos)}"
                 else:
                     message += f" appears on {toa(piece.board_pos)}"
-                self.set_caption(message)
+                self.set_caption(f"{prefix}{message}")
                 return
             message = f"{piece} on {toa(piece.board_pos)}"
             if not self.edit_mode or (self.move_history and ((m := self.move_history[-1]) and m.is_edit != 1)):
@@ -3073,28 +3291,28 @@ class Board(Window):
                     message += " to an obstacle"
                 else:
                     message += f" to {piece_groups[self.edit_piece_set_id]['name']}"
-            self.set_caption(message)
+            self.set_caption(f"{prefix}{message}")
             return
         piece = self.get_piece(selected_square)
         if piece.is_empty():
             piece = None
-        hide_piece = piece.is_hidden if piece else self.should_hide_pieces
-        hide_moves = (
-            self.edit_mode or self.should_hide_moves or
-            (hide_piece and self.should_hide_moves is not False)
+        hide_piece = piece.is_hidden if piece else self.hide_pieces
+        hide_move_markers = (
+            self.edit_mode or self.hide_move_markers or
+            (hide_piece and self.hide_move_markers is not False)
         )
         if selected_square:
-            if hide_moves and hovered_square:
+            if hide_move_markers and hovered_square:
                 move = Move(
                     pos_from=selected_square,
                     pos_to=hovered_square,
                     piece=piece,
                     is_edit=int(self.edit_mode),
                 )
-                self.set_caption(f"{move}")
+                self.set_caption(f"{prefix}{move}")
                 return
             move = None
-            if not hide_moves and hovered_square:
+            if not hide_move_markers and hovered_square:
                 move = self.find_move(selected_square, hovered_square)
             if move:
                 move = deepcopy(move)
@@ -3125,41 +3343,22 @@ class Board(Window):
                 while move:
                     moves.append(move)
                     move = move.chained_move
-                self.set_caption(f"{'; '.join(str(move) for move in moves)}")
+                self.set_caption(f"{prefix}{'; '.join(str(move) for move in moves)}")
                 return
         if piece or hovered_square:
             if not piece:
                 piece = self.get_piece(hovered_square)
             if not piece.is_empty():
-                self.set_caption(f"{piece} on {toa(piece.board_pos)}")
+                self.set_caption(f"{prefix}{piece} on {toa(piece.board_pos)}")
                 return
         if self.edit_mode:
-            self.set_caption(f"Editing board")
+            self.set_caption(f"{prefix}Editing board")
             return
-        if self.game_over:
-            if self.check_side:
-                if self.use_check:
-                    self.set_caption(f"Checkmate! {self.check_side.opponent()} wins.")
-                else:
-                    self.set_caption(f"Game over! {self.check_side.opponent()} wins.")
-            else:
-                if isinstance(self.stalemate_rule, dict):
-                    rule = self.stalemate_rule.get(self.turn_side, 0)
-                else:
-                    rule = self.stalemate_rule
-                if rule == 0:
-                    self.set_caption(f"Stalemate! It's a draw.")
-                elif rule == 1:
-                    self.set_caption(f"Stalemate! {self.turn_side.opponent()} wins.")
-                elif rule == -1:
-                    self.set_caption(f"Stalemate! {self.turn_side} wins.")
-                else:
-                    self.set_caption(f"Stalemate! The result is undefined.")
+        message = self.get_status_string()
+        if message:
+            self.set_caption(f"{prefix}{message}")
         else:
-            if self.check_side:
-                self.set_caption(f"{self.check_side} is in check!")
-            else:
-                self.set_caption(f"{self.turn_side} to move")
+            self.set_caption(f"{prefix}")
 
     def try_drop(self, move: Move) -> None:
         if move.promotion:
@@ -3173,46 +3372,50 @@ class Board(Window):
             self.replace(move.piece, move.promotion)
             self.update_promotion_auto_captures(move)
             self.promotion_piece = promotion_piece
-            return
-        if self.turn_side not in self.drops:
-            return
-        if not self.captured_pieces[self.turn_side]:
-            return
-        if not self.use_drops and not self.edit_mode:
-            return
-        side_drops = self.drops[self.turn_side]
-        drop_list = []
-        drop_type_list = []
-        drop_indexes = {k: i for i, k in enumerate(side_drops)}
-        for piece_type in sorted(self.captured_pieces[self.turn_side], key=lambda x: drop_indexes.get(x, 0)):
-            if piece_type not in side_drops:
-                continue
-            if piece_type not in self.moves[self.turn_side].get('drop', set()):
-                continue
-            drop_squares = side_drops[piece_type]
-            if move.piece.board_pos not in drop_squares:
-                continue
-            drops = drop_squares[move.piece.board_pos]
-            drop_list.extend(drops)
-            drop_type_list.extend(piece_type for _ in drops)
-        if not drop_list:
-            return
-        if self.auto_moves and self.board_config['fast_drop'] and len(drop_list) == 1:
-            promotion_piece = self.promotion_piece
-            self.promotion_piece = True
-            drop = drop_list[0]
-            if isinstance(drop, Piece):
-                drop = drop.of(drop.side or self.turn_side).on(move.pos_to)
+        else:
+            if self.turn_side not in self.drops:
+                return
+            if not self.captured_pieces[self.turn_side]:
+                return
+            if not self.use_drops and not self.edit_mode:
+                return
+            side_drops = self.drops[self.turn_side]
+            drop_list = []
+            drop_type_list = []
+            drop_indexes = {k: i for i, k in enumerate(side_drops)}
+            for piece_type in sorted(self.captured_pieces[self.turn_side], key=lambda x: drop_indexes.get(x, 0)):
+                if piece_type not in side_drops:
+                    continue
+                if piece_type not in self.moves[self.turn_side].get('drop', set()):
+                    continue
+                drop_squares = side_drops[piece_type]
+                if move.piece.board_pos not in drop_squares:
+                    continue
+                drops = drop_squares[move.piece.board_pos]
+                drop_list.extend(drops)
+                drop_type_list.extend(piece_type for _ in drops)
+            if not drop_list:
+                return
+            if self.auto_moves and self.board_config['fast_drop'] and len(drop_list) == 1:
+                promotion_piece = self.promotion_piece
+                self.promotion_piece = True
+                drop = drop_list[0]
+                if isinstance(drop, Piece):
+                    drop = drop.of(drop.side or self.turn_side).on(move.pos_to)
+                else:
+                    drop = drop(board=self, pos=move.piece.board_pos, side=self.turn_side)
+                move.set(promotion=drop, placed_piece=drop_type_list[0])
+                for i, piece in enumerate(self.captured_pieces[self.turn_side][::-1]):
+                    if piece == type(drop):
+                        self.captured_pieces[self.turn_side].pop(-(i + 1))
+                        break
+                self.replace(move.piece, move.promotion)
+                self.update_promotion_auto_captures(move)
+                self.promotion_piece = promotion_piece
             else:
-                drop = drop(board=self, pos=move.piece.board_pos, side=self.turn_side)
-            move.set(promotion=drop, placed_piece=drop_type_list[0])
-            for i, piece in enumerate(self.captured_pieces[self.turn_side][::-1]):
-                if piece == type(drop):
-                    self.captured_pieces[self.turn_side].pop(-(i + 1))
-                    break
-            self.replace(move.piece, move.promotion)
-            self.update_promotion_auto_captures(move)
-            self.promotion_piece = promotion_piece
+                self.start_promotion(self.get_piece(move.piece.board_pos), drop_list, drop_type_list)
+                return
+        if move.promotion:
             chained_move = move
             while chained_move:
                 move_type = (
@@ -3228,11 +3431,13 @@ class Board(Window):
                     chained_move.set(piece=copy(chained_move.piece))
             self.update_en_passant_markers(move)
             self.move_history.append(deepcopy(move))
-            self.shift_ply(+(not move.is_edit))
+            self.load_pieces()
+            if not move.is_edit:
+                self.shift_ply(+1)
+                self.load_moves()
+                self.update_end_data(self.move_history[-1])
             self.compare_history()
             self.advance_turn()
-            return
-        self.start_promotion(self.get_piece(move.piece.board_pos), drop_list, drop_type_list)
 
     def try_promotion(self, move: Move) -> None:
         promotion_piece = self.promotion_piece
@@ -3409,7 +3614,7 @@ class Board(Window):
 
     def color_all_pieces(self) -> None:
         if self.game_over:
-            if self.check_side:
+            if self.win_side:
                 self.color_pieces(
                     self.check_side,
                     self.color_scheme.get(
@@ -3522,18 +3727,18 @@ class Board(Window):
         if asset_folder is None:
             if piece.is_hidden is False:
                 asset_folder = piece.asset_folder
-            elif self.should_hide_pieces == 1:
+            elif self.hide_pieces == 1:
                 asset_folder = 'other'
-            elif self.should_hide_pieces == 2 and type(piece) in penultima_pieces:
+            elif self.hide_pieces == 2 and type(piece) in penultima_pieces:
                 asset_folder = 'other'
             else:
                 asset_folder = piece.asset_folder
         if file_name is None:
             if piece.is_hidden is False:
                 file_name = piece.file_name
-            elif self.should_hide_pieces == 1:
+            elif self.hide_pieces == 1:
                 file_name = 'ghost'
-            elif self.should_hide_pieces == 2 and type(piece) in penultima_pieces:
+            elif self.hide_pieces == 2 and type(piece) in penultima_pieces:
                 file_name = penultima_pieces[type(piece)]
             else:
                 file_name = piece.file_name
@@ -3542,7 +3747,7 @@ class Board(Window):
         elif piece.is_hidden is False:
             is_hidden = False
         else:
-            is_hidden = bool(self.should_hide_pieces) or Default
+            is_hidden = bool(self.hide_pieces) or Default
         file_name, flip = (file_name[:-1], penultima_flip) if file_name[-1] == '|' else (file_name, False)
         piece.reload(is_hidden=is_hidden, asset_folder=asset_folder, file_name=file_name, flipped_horizontally=flip)
         piece.scale = self.square_size / piece.texture.width
@@ -3792,6 +3997,12 @@ class Board(Window):
                 self.resize(new_width, new_height)
             self.update_highlight(old_highlight)
 
+        if self.game_loaded:
+            self.load_pieces()
+            self.load_moves()
+            self.reload_end_data()
+            self.advance_turn()
+
     def resize(self, width: float, height: float) -> None:
         if self.fullscreen:
             return
@@ -3974,7 +4185,11 @@ class Board(Window):
                             chained_move.piece.move(chained_move)
                             self.update_auto_capture_markers(chained_move)
                             chained_move.set(piece=copy(chained_move.piece))
-                    self.shift_ply(+(not current_move.is_edit))
+                    self.load_pieces()
+                    if not current_move.is_edit:
+                        self.shift_ply(+1)
+                        self.load_moves()
+                        self.update_end_data(self.move_history[-1])
                     self.compare_history()
                     self.advance_turn()
                 return
@@ -4146,6 +4361,9 @@ class Board(Window):
             if not self.promotion_piece:
                 self.log(f"Edit: {self.move_history[-1]}")
                 self.compare_history()
+            self.load_pieces()
+            self.load_moves()
+            self.reload_end_data()
             self.advance_turn()
             if next_selected_square:
                 self.select_piece(next_selected_square)
@@ -4227,6 +4445,7 @@ class Board(Window):
                     while last_move.chained_move:
                         last_move = last_move.chained_move
                     last_move.chained_move = deepcopy(move)
+                self.load_pieces()
                 if not is_final and not self.promotion_piece:
                     self.load_moves()
                     self.show_moves(False)
@@ -4238,6 +4457,8 @@ class Board(Window):
                     self.chain_start = None
                     if self.promotion_piece is None:
                         self.shift_ply(+1)
+                        self.load_moves()
+                        self.update_end_data(self.move_history[-1])
                         self.compare_history()
                     self.advance_turn()
             else:
@@ -4329,7 +4550,7 @@ class Board(Window):
             if modifiers & key.MOD_ALT and modifiers & key.MOD_ACCEL:  # Reset custom data
                 self.log("Info: Clearing custom data")
                 self.reset_custom_data()
-                self.log("Info: Starting new game", bool(self.should_hide_pieces))
+                self.log("Info: Starting new game", bool(self.hide_pieces))
                 self.reset_board()
             elif modifiers & key.MOD_ALT:  # Reload save data
                 data = self.save_data if modifiers & key.MOD_SHIFT else self.load_data
@@ -4345,14 +4566,14 @@ class Board(Window):
                 if modifiers & key.MOD_ACCEL:  # Randomize piece sets (same for both sides)
                     self.log(
                         "Info: Starting new game (with a random piece set)",
-                        bool(self.should_hide_pieces)
+                        bool(self.hide_pieces)
                     )
                     chosen_id = self.set_rng.sample(set_id_list, k=1)[0]
                     self.piece_set_ids = {side: chosen_id for side in self.piece_set_ids}
                 else:  # Randomize piece sets (different for each side)
                     self.log(
                         "Info: Starting new game (with random piece sets)",
-                        bool(self.should_hide_pieces)
+                        bool(self.hide_pieces)
                     )
                     chosen_ids = self.set_rng.sample(set_id_list, k=len(self.piece_set_ids))
                     self.piece_set_ids = {side: set_id for side, set_id in zip(self.piece_set_ids, chosen_ids)}
@@ -4360,7 +4581,7 @@ class Board(Window):
                 self.reset_custom_data()
                 self.reset_board()
             elif modifiers & key.MOD_ACCEL:  # Restart with the same piece sets
-                self.log("Info: Starting new game", bool(self.should_hide_pieces))
+                self.log("Info: Starting new game", bool(self.hide_pieces))
                 self.reset_board(update=None)  # Clear redoing if and only if no moves were made yet, i.e. double Ctrl+R
         if symbol == key.C:
             if modifiers & (key.MOD_SHIFT | key.MOD_ALT):  # Chaos mode
@@ -4378,35 +4599,32 @@ class Board(Window):
                         del self.roll_history[self.ply_count - 1][piece.board_pos]
                         self.probabilistic_piece_history[self.ply_count - 1].discard((piece.board_pos, type(piece)))
                         self.log(f"Info: Probabilistic piece on {toa(piece.board_pos)} updated")
+                        self.reload_end_data()
                         self.advance_turn()
                 else:  # Update all probabilistic pieces
                     self.clear_future_history(self.ply_count - 1)
                     self.log("Info: Probabilistic pieces updated")
+                    self.reload_end_data()
                     self.advance_turn()
         if symbol == key.BRACKETLEFT and modifiers & key.MOD_ACCEL and not partial_move:  # Decrease board size
             width = self.board_width - (0 if modifiers & key.MOD_ALT else 1)
             height = self.board_height - (1 if modifiers & key.MOD_ALT else 0)
             self.resize_board(width, height)
-            self.advance_turn()
         if symbol == key.BRACKETRIGHT and modifiers & key.MOD_ACCEL and not partial_move:  # Increase board size
             width = self.board_width + (0 if modifiers & key.MOD_ALT else 1)
             height = self.board_height + (1 if modifiers & key.MOD_ALT else 0)
             self.resize_board(width, height)
-            self.advance_turn()
         if symbol == key.APOSTROPHE and modifiers & key.MOD_ACCEL and not partial_move:  # Add border row/column
             border_cols = self.border_cols + ([] if modifiers & key.MOD_ALT else [self.board_width])
             border_rows = self.border_rows + ([self.board_height] if modifiers & key.MOD_ALT else [])
             width = self.board_width + (0 if modifiers & key.MOD_ALT else 1)
             height = self.board_height + (1 if modifiers & key.MOD_ALT else 0)
             self.resize_board(width, height, border_cols, border_rows)
-            self.advance_turn()
         if symbol == key.BACKSLASH and modifiers & key.MOD_ACCEL and not partial_move:
             if modifiers & key.MOD_ALT:  # Invert board size
                 self.resize_board(self.board_height, self.board_width, self.border_rows, self.border_cols)
-                self.advance_turn()
             else:  # Reset board size
                 self.resize_board(default_board_width, default_board_height, [], [])
-                self.advance_turn()
         if symbol == key.F11:  # Full screen (toggle)
             self.toggle_fullscreen()
         if symbol == key.MINUS and not self.fullscreen:  # (-) Decrease window size
@@ -4487,23 +4705,21 @@ class Board(Window):
                     self.edit_mode = not self.edit_mode
                     self.log(f"Mode: {'EDIT' if self.edit_mode else 'PLAY'}", False)
                     self.deselect_piece()
+                    self.load_pieces()
+                    self.load_moves()
                     self.hide_moves()
+                    self.reload_end_data()
                     self.advance_turn()
-                    if self.edit_mode:
-                        self.moves = {side: {} for side in self.moves}
-                        self.chain_moves = {side: {} for side in self.chain_moves}
-                        self.theoretical_moves = {side: {} for side in self.theoretical_moves}
-                        self.show_moves()
         if symbol == key.W:  # White
             if modifiers & key.MOD_ALT:  # Reset white set to default
                 self.piece_set_ids[Side.WHITE] = 0
                 set_name_suffix = ''
-                if not self.should_hide_pieces:
+                if not self.hide_pieces:
                     set_name = piece_groups[self.piece_set_ids[Side.WHITE]].get('name')
                     set_name_suffix = f" ({set_name})"
                 self.log(
                     f"Info: Using default piece set for White{set_name_suffix}",
-                    bool(self.should_hide_pieces)
+                    bool(self.hide_pieces)
                 )
                 self.reset_custom_data()
                 self.reset_board()
@@ -4518,7 +4734,7 @@ class Board(Window):
                 ) if self.piece_set_ids[Side.WHITE] is not None else 0
                 which = {-1: 'previous', 1: 'next'}[d]
                 set_name_suffix = ''
-                if not self.should_hide_pieces:
+                if not self.hide_pieces:
                     if self.piece_set_ids[Side.WHITE] < 0:
                         set_name = get_set_name(self.chaos_sets[-self.piece_set_ids[Side.WHITE]])
                     else:
@@ -4526,7 +4742,7 @@ class Board(Window):
                     set_name_suffix = f" ({set_name})"
                 self.log(
                     f"Info: Using {which} piece set for White{set_name_suffix}",
-                    bool(self.should_hide_pieces)
+                    bool(self.hide_pieces)
                 )
                 self.reset_custom_data()
                 self.reset_board()
@@ -4534,12 +4750,12 @@ class Board(Window):
             if modifiers & key.MOD_ALT:  # Reset black set to default
                 self.piece_set_ids[Side.BLACK] = 0
                 set_name_suffix = ''
-                if not self.should_hide_pieces:
+                if not self.hide_pieces:
                     set_name = piece_groups[self.piece_set_ids[Side.BLACK]].get('name')
                     set_name_suffix = f" ({set_name})"
                 self.log(
                     f"Info: Using default piece set for Black{set_name_suffix}",
-                    bool(self.should_hide_pieces)
+                    bool(self.hide_pieces)
                 )
                 self.reset_custom_data()
                 self.reset_board()
@@ -4554,7 +4770,7 @@ class Board(Window):
                 ) if self.piece_set_ids[Side.BLACK] is not None else 0
                 which = {-1: 'previous', 1: 'next'}[d]
                 set_name_suffix = ''
-                if not self.should_hide_pieces:
+                if not self.hide_pieces:
                     if self.piece_set_ids[Side.BLACK] < 0:
                         set_name = get_set_name(self.chaos_sets[-self.piece_set_ids[Side.BLACK]])
                     else:
@@ -4562,7 +4778,7 @@ class Board(Window):
                     set_name_suffix = f" ({set_name})"
                 self.log(
                     f"Info: Using {which} piece set for Black{set_name_suffix}",
-                    bool(self.should_hide_pieces)
+                    bool(self.hide_pieces)
                 )
                 self.reset_custom_data()
                 self.reset_board()
@@ -4571,12 +4787,12 @@ class Board(Window):
                 self.chaos_mode = 0
                 self.piece_set_ids = {side: 0 for side in self.piece_set_ids}
                 set_name_suffix = ''
-                if not self.should_hide_pieces:
+                if not self.hide_pieces:
                     set_name = piece_groups[self.piece_set_ids[Side.WHITE]].get('name')
                     set_name_suffix = f" ({set_name})"
                 self.log(
                     f"Info: Using default piece set{set_name_suffix}",
-                    bool(self.should_hide_pieces)
+                    bool(self.hide_pieces)
                 )
                 self.reset_custom_data()
                 self.reset_board()
@@ -4600,7 +4816,7 @@ class Board(Window):
                     ) if self.piece_set_ids[Side.BLACK] is not None else 0
                     which = {-1: 'previous', 1: 'next'}[d]
                     set_name_suffix = ''
-                    if not self.should_hide_pieces:
+                    if not self.hide_pieces:
                         if self.piece_set_ids[Side.WHITE] < 0:
                             set_name = get_set_name(self.chaos_sets[-self.piece_set_ids[Side.WHITE]])
                         else:
@@ -4608,18 +4824,18 @@ class Board(Window):
                         set_name_suffix = f" ({set_name})"
                     self.log(
                         f"Info: Using {which} piece set{set_name_suffix}",
-                        bool(self.should_hide_pieces)
+                        bool(self.hide_pieces)
                     )
                 else:  # Next player goes first
                     for data in (self.piece_sets, self.piece_set_ids, self.piece_set_names):
                         data[Side.WHITE], data[Side.BLACK] = data[Side.BLACK], data[Side.WHITE]
                     set_name_suffix = ''
-                    if not self.should_hide_pieces:
+                    if not self.hide_pieces:
                         set_names = [self.piece_set_names[side] for side in (Side.WHITE, Side.BLACK)]
                         set_name_suffix = f" ({' vs. '.join(set_names)})"
                     self.log(
                         f"Info: Swapping piece sets{set_name_suffix}",
-                        bool(self.should_hide_pieces)
+                        bool(self.hide_pieces)
                     )
                 self.reset_custom_data()
                 self.reset_board()
@@ -4646,7 +4862,7 @@ class Board(Window):
                     set_names = [self.piece_set_names[side] for side in (Side.WHITE, Side.BLACK)]
                     set_names = list(dict.fromkeys(set_names))
                     set_name_suffix = f"{'s' * (len(set_names) > 1)}"
-                    if not self.should_hide_pieces:
+                    if not self.hide_pieces:
                         set_name_suffix += f" ({' vs. '.join(set_names)})"
                     self.log(f"Info: Placing from current piece set{set_name_suffix}", False)
                 if old_id != self.edit_piece_set_id:
@@ -4658,38 +4874,6 @@ class Board(Window):
                         if len(self.edit_promotions[promotion_side]):
                             self.start_promotion(promotion_piece, self.edit_promotions[promotion_side])
                             self.update_caption()
-        if symbol == key.O and not partial_move:  # Royal pieces
-            old_mode = self.royal_piece_mode
-            old_check = self.use_check
-            if modifiers & key.MOD_ALT and modifiers & key.MOD_SHIFT:  # Toggle checks
-                self.use_check = not self.use_check
-            elif modifiers & key.MOD_ALT:  # Royal group mode (threaten the last royal piece of its kind to check)
-                self.royal_piece_mode = 3
-            elif modifiers & key.MOD_ACCEL and modifiers & key.MOD_SHIFT:  # Default royal mode (depends on superclass)
-                self.royal_piece_mode = 0
-            elif modifiers & key.MOD_SHIFT:  # Royal mode (threaten any royal piece to check)
-                self.royal_piece_mode = 1
-            elif modifiers & key.MOD_ACCEL:  # Quasi-royal mode (threaten the last royal piece to check)
-                self.royal_piece_mode = 2
-            if old_mode != self.royal_piece_mode:
-                if self.royal_piece_mode == 0:
-                    self.log("Info: Using default check rule (piece-dependent)")
-                elif self.royal_piece_mode == 1:
-                    self.log("Info: Using royal check rule (threaten any royal piece)")
-                elif self.royal_piece_mode == 2:
-                    self.log("Info: Using quasi-royal check rule (threaten last royal piece)")
-                elif self.royal_piece_mode == 3:
-                    self.log("Info: Using royal group check rule (threaten last piece of its kind)")
-                else:
-                    self.royal_piece_mode = old_mode
-            if old_check != self.use_check:
-                if self.use_check:
-                    self.log("Info: Checks enabled (checkmate the royal piece to win)")
-                else:
-                    self.log("Info: Checks disabled (capture the royal piece to win)")
-            if old_mode != self.royal_piece_mode or old_check != self.use_check:
-                self.future_move_history = []  # we don't know if we can redo the future moves anymore, so we clear them
-                self.advance_turn()
         if symbol == key.F:
             if modifiers & key.MOD_ACCEL and not modifiers & key.MOD_SHIFT:  # Flip board
                 self.flip_board()
@@ -4703,7 +4887,7 @@ class Board(Window):
                 self.auto_moves = True
             if modifiers & key.MOD_ACCEL and modifiers & key.MOD_SHIFT:  # Fast-forward, but slowly. (Reload history)
                 self.log("Info: Reloading history", False)
-                self.log("Info: Starting new game", bool(self.should_hide_pieces))
+                self.log("Info: Starting new game", bool(self.hide_pieces))
                 if not self.reload_history():
                     self.log("Error: Failed to reload history!")
                 if self.edit_mode:
@@ -4730,29 +4914,29 @@ class Board(Window):
                 self.color_scheme = colors[self.color_index]
                 self.update_colors()
         if symbol == key.H:
-            old_should_hide_pieces = self.should_hide_pieces
+            old_hide_pieces = self.hide_pieces
             old_drops = self.use_drops
             if modifiers & key.MOD_ALT and not partial_move:  # Toggle drops (Crazyhouse mode)
                 self.use_drops = not self.use_drops
             elif modifiers & key.MOD_ACCEL and modifiers & key.MOD_SHIFT:  # Show
-                self.should_hide_pieces = 0
+                self.hide_pieces = 0
             elif modifiers & key.MOD_SHIFT:  # Hide
-                self.should_hide_pieces = 1
+                self.hide_pieces = 1
             elif modifiers & key.MOD_ACCEL:  # Penultima mode
-                self.should_hide_pieces = 2
-            if old_should_hide_pieces != self.should_hide_pieces:
-                if self.should_hide_pieces == 0:
+                self.hide_pieces = 2
+            if old_hide_pieces != self.hide_pieces:
+                if self.hide_pieces == 0:
                     self.log(
                         f"Info: Pieces revealed: "
                         f"{self.piece_set_names[Side.WHITE]} vs. "
                         f"{self.piece_set_names[Side.BLACK]}"
                     )
-                elif self.should_hide_pieces == 1:
+                elif self.hide_pieces == 1:
                     self.log("Info: Pieces hidden")
-                elif self.should_hide_pieces == 2:
+                elif self.hide_pieces == 2:
                     self.log("Info: Penultima mode activated!")
                 else:
-                    self.should_hide_pieces = old_should_hide_pieces
+                    self.hide_pieces = old_hide_pieces
                 self.update_pieces()
                 self.show_moves()
             if old_drops != self.use_drops:
@@ -4764,6 +4948,9 @@ class Board(Window):
                     self.undo_last_finished_move()
                     self.update_caption()
                 self.future_move_history = []  # we don't know if we can redo the future moves anymore, so we clear them
+                self.load_pieces()
+                self.load_moves()
+                self.reload_end_data()
                 self.advance_turn()
         if symbol == key.M:  # Moves
             if modifiers & key.MOD_ALT and not partial_move:  # Clear future move history
@@ -4773,27 +4960,30 @@ class Board(Window):
                 else:
                     self.clear_future_history(self.ply_count - 1)
                     self.log("Info: Probabilistic pieces updated")
+                    self.load_pieces()
+                    self.load_moves()
+                    self.reload_end_data()
                     self.advance_turn()
             else:
-                old_should_hide_moves = self.should_hide_moves
+                old_hide_move_markers = self.hide_move_markers
                 if modifiers & key.MOD_ACCEL and modifiers & key.MOD_SHIFT:  # Default
-                    self.should_hide_moves = None
+                    self.hide_move_markers = None
                 elif modifiers & key.MOD_SHIFT:  # Hide
-                    self.should_hide_moves = True
+                    self.hide_move_markers = True
                 elif modifiers & key.MOD_ACCEL:  # Show
-                    self.should_hide_moves = False
-                if old_should_hide_moves != self.should_hide_moves:
-                    if self.should_hide_moves is None:
+                    self.hide_move_markers = False
+                if old_hide_move_markers != self.hide_move_markers:
+                    if self.hide_move_markers is None:
                         self.log("Info: Move markers default to piece visibility", False)
-                    elif self.should_hide_moves is False:
+                    elif self.hide_move_markers is False:
                         self.log("Info: Move markers default to shown", False)
-                    elif self.should_hide_moves is True:
+                    elif self.hide_move_markers is True:
                         self.log("Info: Move markers default to hidden", False)
                     else:
-                        self.should_hide_moves = old_should_hide_moves
+                        self.hide_move_markers = old_hide_move_markers
                     self.update_pieces()
                     self.show_moves()
-        if symbol == key.K and not self.should_hide_moves:  # Move markers
+        if symbol == key.K and not self.hide_move_markers:  # Move markers
             selected_square = self.selected_square
             if modifiers & key.MOD_ACCEL and modifiers & key.MOD_SHIFT:  # Default
                 self.log("Info: Showing legal moves for moving player", False)
@@ -4963,23 +5153,15 @@ class Board(Window):
             return
         self.log(
             "Game: "
-            f"{self.piece_set_names[Side.WHITE] if not self.should_hide_pieces else '???'} vs. "
-            f"{self.piece_set_names[Side.BLACK] if not self.should_hide_pieces else '???'}"
+            f"{self.piece_set_names[Side.WHITE] if not self.hide_pieces else '???'} vs. "
+            f"{self.piece_set_names[Side.BLACK] if not self.hide_pieces else '???'}"
         )
 
     def log_special_modes(self):
-        if self.should_hide_pieces == 1:
+        if self.hide_pieces == 1:
             self.log("Info: Pieces hidden")
-        if self.should_hide_pieces == 2:
+        if self.hide_pieces == 2:
             self.log("Info: Penultima mode activated!")
-        if self.royal_piece_mode == 1:
-            self.log("Info: Using royal check rule (threaten any royal piece)")
-        if self.royal_piece_mode == 2:
-            self.log("Info: Using quasi-royal check rule (threaten last royal piece)")
-        if self.royal_piece_mode == 3:
-            self.log("Info: Using royal group check rule (threaten last piece of its kind)")
-        if not self.use_check:
-            self.log("Info: Checks disabled (capture the royal piece to win)")
         if self.use_drops:
             self.log("Info: Drops enabled")
 
@@ -5005,15 +5187,9 @@ class Board(Window):
         config['white_id'] = self.piece_set_ids[Side.WHITE]
         config['black_id'] = self.piece_set_ids[Side.BLACK]
         config['edit_id'] = self.edit_piece_set_id
-        config['hide_pieces'] = self.should_hide_pieces
-        config['hide_moves'] = self.should_hide_moves
+        config['hide_pieces'] = self.hide_pieces
+        config['hide_moves'] = self.hide_move_markers
         config['use_drops'] = self.use_drops
-        config['use_check'] = self.use_check
-        config['stalemate'] = (
-            {side.value - 1: value % 3 for side, value in self.stalemate_rule.items()}
-            if isinstance(self.stalemate_rule, dict) else self.stalemate_rule
-        )
-        config['royal_mode'] = self.royal_piece_mode
         config['chaos_mode'] = self.chaos_mode
         config['chaos_seed'] = self.chaos_seed
         config['set_seed'] = self.set_seed

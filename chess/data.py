@@ -45,6 +45,25 @@ config_path = join(base_dir, 'config.ini')
 
 penultima_textures = [f'ghost{s}' if s else None for s in ('R', 'N', 'B', 'Q', None, 'B', 'N', 'R')]
 
+action_types = {
+    v: k for k, vs in {
+        'move': ('m', 'move'),
+        'capture': ('c', 'capture'),
+        'drop': ('d', 'drop'),
+        'promotion': ('p', 'promote', 'promotion'),
+        'pass': ('s', 'skip', 'pass'),  # 's' for 'skip' - 'p' is already taken by 'promote'
+    }.items() for v in vs
+}
+
+end_types = {
+    v: k for k, vs in {
+        'check': ('+', 'check'),
+        'checkmate': ('#', 'mate', 'checkmate'),
+        'stalemate': ('=', 'stale', 'stalemate'),
+        'capture': ('x', '*', 'capture'),
+    }.items() for v in vs
+}
+
 piece_groups: list[dict[str, str | list[type[Piece]]]] = [
     {
         'name': "Fabulous FIDEs",

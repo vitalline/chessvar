@@ -9,8 +9,8 @@ from typing import TYPE_CHECKING, Any
 from warnings import warn
 
 from chess.movement import types as movement_types
+from chess.movement.base import BaseMovement
 from chess.movement.move import Move
-from chess.movement.types import BaseMovement
 from chess.pieces.side import Side
 from chess.movement.util import Position
 from chess.movement.util import to_algebraic as toa, from_algebraic as fra

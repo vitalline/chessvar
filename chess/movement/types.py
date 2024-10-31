@@ -4,6 +4,7 @@ from copy import copy, deepcopy
 from math import ceil, floor
 from typing import TYPE_CHECKING
 
+from chess.movement.base import BaseMovement
 from chess.movement.move import Move
 from chess.movement.util import AnyDirection, Direction, Position, add, sub, mul, ddiv
 from chess.pieces.types import Delayed, Delayed1, Immune, Slow
@@ -12,39 +13,6 @@ from chess.util import Unset, sign
 if TYPE_CHECKING:
     from chess.board import Board
     from chess.pieces.piece import Piece
-
-
-class BaseMovement(object):
-    def __init__(self, board: Board):
-        self.board = board
-        self.total_moves = 0
-
-    def moves(self, pos_from: Position, piece: Piece, theoretical: bool = False):
-        return ()
-
-    def update(self, move: Move, piece: Piece):
-        self.total_moves += 1
-
-    def undo(self, move: Move, piece: Piece):
-        self.total_moves -= 1
-
-    def reload(self, move: Move, piece: Piece):
-        self.undo(move, piece)
-        self.update(move, piece)
-
-    def set_moves(self, count: int):
-        self.total_moves = count
-
-    def __copy_args__(self):
-        return self.board,
-
-    def __copy__(self):
-        clone = self.__class__(*self.__copy_args__())
-        clone.total_moves = self.total_moves
-        return clone
-
-    def __deepcopy__(self, memo):
-        return self.__copy__()
 
 
 class RiderMovement(BaseMovement):
@@ -1078,7 +1046,7 @@ class ChoiceMovement(BaseChoiceMovement):
                                     yield copy(move)
                                 elif key.isdigit() and int(key) == to_piece.side.value:
                                     yield copy(move)
-                                elif to_piece.fits(key):
+                                elif self.board.fits(key, to_piece):
                                     yield copy(move)
 
 
