@@ -4005,7 +4005,7 @@ class Board(Window):
                 self.resize(new_width, new_height)
             self.update_highlight(old_highlight)
 
-        if self.game_loaded:
+        if self.game_loaded and self.save_loaded:
             self.load_pieces()
             self.load_moves()
             self.reload_end_data()
