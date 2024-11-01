@@ -117,7 +117,7 @@ class Board(Window):
         self.set_seed = None  # seed for piece set selection
         self.set_rng = None  # random number generator for piece set selection
         self.initial_turns = 0  # amount of initial turns
-        self.turn_order = [(side, None) for side in (Side.WHITE, Side.BLACK)]  # order of turns
+        self.turn_order = [(Side.WHITE, {}), (Side.BLACK, {})]  # order of turns
         self.turn_data = [0, Side.NONE, 0]  # [turn number, turn side, move number]
         self.turn_side = Side.NONE  # side whose turn it is
         self.turn_rules = None  # rules of movement for the current turn
@@ -197,9 +197,6 @@ class Board(Window):
         self.promotion_area_sprite_list = SpriteList()  # sprites for the promotion area background tiles
         self.promotion_piece_sprite_list = SpriteList()  # sprites for the possible promotion pieces
         self.save_interval = 0  # time since the last autosave
-
-        # initialize turn order data for the first move
-        self.turn_side, self.turn_rules = self.turn_order[0]
 
         # load piece set ids from the config
         for side in self.piece_set_ids:
@@ -349,14 +346,15 @@ class Board(Window):
         )
 
     def shift_ply(self, offset: int) -> None:
+        if self.ply_count <= 0:
+            self.ply_count = 1
+            self.load_turn_rules()
+            self.turn_data = [1, self.turn_side, 1]
+            return
         direction = sign(offset)
         for i in range(abs(offset)):
             turn_side = self.turn_side
             self.ply_count += direction
-            if self.ply_count <= 0:
-                self.ply_count = 1
-                break
-            self.turn_side, self.turn_rules = self.turn_order[self.get_turn()]
             if self.turn_side == turn_side:
                 self.turn_data[2] += direction
             else:
@@ -371,6 +369,7 @@ class Board(Window):
                     self.turn_data[2] = 0
                     while self.get_turn_side(-self.turn_data[2]) == self.turn_side:
                         self.turn_data[2] += 1
+        self.load_turn_rules()
 
     def fits(self, template: str, data: Any):
         if isinstance(data, Move):
@@ -866,14 +865,6 @@ class Board(Window):
             for side in data.get('order', [])
         ]
         self.reset_turn_order()
-        turn_data = data.get('turn')
-        if turn_data is not None:
-            turn_data[1] = Side(turn_data[1])
-        turn_side = self.get_turn_side(0, ply_count)
-        if turn_side != turn_data[1]:
-            self.log(f"Error: Turn side does not match ({turn_side} was {turn_data[1]})")
-            turn_data[1] = turn_side
-        turn_data = turn_data
         self.custom_end_rules = {
             (Side(int(side)) if side.isdigit() else side): rule for side, rule in data.get('end').items()
         }
@@ -964,10 +955,15 @@ class Board(Window):
             self.turn_data = [0, Side.NONE, 0]
             self.turn_rules = None
         else:
+            turn_data = data.get('turn')
+            if turn_data is not None:
+                turn_data[1] = Side(turn_data[1])
             self.ply_count = ply_count
-            self.turn_side = turn_side
             self.turn_data = turn_data
-            self.turn_rules = self.turn_order[self.get_turn()][1]
+            self.load_turn_rules()
+            if  self.turn_side != turn_data[1]:
+                self.log(f"Error: Turn side does not match ({ self.turn_side} was {turn_data[1]})")
+                self.turn_side = turn_data[1]
         self.log_armies()
         if with_history:
             self.shift_ply(+1)
@@ -1263,9 +1259,6 @@ class Board(Window):
                             self.penultima_pieces[player_side][piece] = texture
 
     def reset_turn_order(self) -> None:
-        to_act = lambda s: repack(action_types.get(s, list(s)))
-        to_type = lambda s: t.__name__ if isinstance((t := load_movement_type(s) or s), type) else t
-        from_iter = chain.from_iterable
         start_turns, loop_turns = [], []
         start_ended = False
         for i, turn in enumerate(self.custom_turn_order or [(Side.WHITE, None), (Side.BLACK, None)]):
@@ -1273,15 +1266,32 @@ class Board(Window):
             if side == Side.NONE:
                 start_ended = True
                 continue
+            (loop_turns if start_ended else start_turns).append((side, rules))
+        if start_turns and not loop_turns and not start_ended:
+            start_turns, loop_turns = loop_turns, start_turns
+        self.initial_turns = len(start_turns)
+        self.turn_order = start_turns + loop_turns
+
+    def load_turn_rules(self, offset: int = 0, origin: int | None = None) -> None:
+        turn = self.get_turn(offset, origin)
+        side, rules = self.turn_order[turn]
+        if rules is None:
+            rules = []
+        if isinstance(rules, list):
+            to_act = lambda s: repack(action_types.get(s, list(s)))
+            to_type = lambda s: t.__name__ if isinstance((t := load_movement_type(s) or s), type) else t
+            from_iter = chain.from_iterable
             data = {}
             override_default = False
             for rule in ['default'] + (rules or []):
-                order = int(rule.get('order', 0)) if rule != 'default' else 0
+                order = 0
                 if rule == 'default':
                     rule = {}
-                elif order == 0 and not override_default:
-                    override_default = True
-                    del data[order]
+                elif isinstance(rule, dict):
+                    order = int(rule.get('order', 0))
+                    if order == 0 and not override_default:
+                        override_default = True
+                        del data[order]
                 state = int(rule.get('state', 0))
                 lasts = rule.get('last', '')
                 allow_lasts = [to_type(s) for s in lasts if not s or s[0] != '!'] or ['*']
@@ -1315,11 +1325,9 @@ class Board(Window):
                                             for block_action in block_actions:
                                                 data_allow_action.setdefault(block_action, check)
                                                 # oh my god what have i done IT'S TIME FOR TESTING *~MAKING SCIENCE~*
-            (loop_turns if start_ended else start_turns).append((side, data))
-        if start_turns and not loop_turns and not start_ended:
-            start_turns, loop_turns = loop_turns, start_turns
-        self.initial_turns = len(start_turns)
-        self.turn_order = start_turns + loop_turns
+            rules = data
+            self.turn_order[turn] = side, rules
+        self.turn_side, self.turn_rules = side, rules
 
     def reset_end_rules(self) -> None:
         self.end_data = {}
