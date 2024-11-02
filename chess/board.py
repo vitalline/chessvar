@@ -1609,53 +1609,21 @@ class Board(Window):
         while move:
             if move.captured_piece and move.captured_piece.side == side:
                 is_royal, royal_group = self.get_royal_group(move.captured_piece, side, conditions)
-                if not self.royal_groups.get(side, {}).get(royal_group):
-                    if is_royal == '+':
-                        piece_loss.add(royal_group)
-                    if is_royal == '-':
-                        piece_gain.add(royal_group)
-                elif isinstance(is_royal, int):
-                    if is_royal > 0:
-                        piece_loss.add(royal_group)
-                    if is_royal < 0:
-                        piece_gain.add(royal_group)
+                if royal_group and not self.royal_groups.get(side, {}).get(royal_group):
+                    piece_loss.add(royal_group)
             if move.promotion:
                 if move.piece and move.piece.side == side:
                     is_royal, royal_group = self.get_royal_group(move.piece, side, conditions)
-                    if not self.royal_groups.get(side, {}).get(royal_group):
-                        if is_royal == '+':
-                            piece_loss.add(royal_group)
-                        if is_royal == '-':
-                            piece_gain.add(royal_group)
-                    elif isinstance(is_royal, int):
-                        if is_royal > 0:
-                            piece_loss.add(royal_group)
-                        if is_royal < 0:
-                            piece_gain.add(royal_group)
+                    if royal_group and not self.royal_groups.get(side, {}).get(royal_group):
+                        piece_loss.add(royal_group)
                 if move.promotion and move.promotion.side == side:
                     is_royal, royal_group = self.get_royal_group(move.promotion, side, conditions)
-                    if not self.royal_groups.get(side, {}).get(royal_group):
-                        if is_royal == '+':
-                            piece_gain.add(royal_group)
-                        if is_royal == '-':
-                            piece_loss.add(royal_group)
-                    elif isinstance(is_royal, int):
-                        if is_royal > 0:
-                            piece_gain.add(royal_group)
-                        if is_royal < 0:
-                            piece_loss.add(royal_group)
+                    if royal_group and not self.royal_groups.get(side, {}).get(royal_group):
+                        piece_gain.add(royal_group)
                 if move.promotion and move.placed_piece:
                     is_royal, royal_group = self.get_royal_group(move.placed_piece, side, conditions)
-                    if not self.royal_groups.get(side, {}).get(royal_group):
-                        if is_royal == '+':
-                            piece_loss.add(royal_group)
-                        if is_royal == '-':
-                            piece_gain.add(royal_group)
-                    elif isinstance(is_royal, int):
-                        if is_royal > 0:
-                            piece_loss.add(royal_group)
-                        if is_royal < 0:
-                            piece_gain.add(royal_group)
+                    if royal_group and not self.royal_groups.get(side, {}).get(royal_group):
+                        piece_loss.add(royal_group)
             move = move.chained_move
         if move is Unset:
             return set()  # the chain has not finished yet. who knows, maybe we will gain a new royal piece later on
@@ -1684,9 +1652,20 @@ class Board(Window):
         if not royal_groups:
             return
         royal_groups = deduplicate(royal_groups)
-        safe_royal_groups = set(royal_groups)
-        anti_royal_checks = set()
-        discard = lambda x: safe_royal_groups.discard(self.get_royal_group(x, side, {'check', 'checkmate'})[1])
+        safe_royal_groups = {
+            group for group in royal_groups
+            if self.end_rules[side.opponent()].get('check', {}).get(group, 0) > 0
+            or self.end_rules[side.opponent()].get('checkmate', {}).get(group, 0) > 0
+        }
+        safe_anti_royal_groups = {
+            group for group in royal_groups
+            if self.end_rules[side.opponent()].get('check', {}).get(group, 0) < 0
+            or self.end_rules[side.opponent()].get('checkmate', {}).get(group, 0) < 0
+        }
+        all_royal_groups = safe_royal_groups.copy()
+        anti_royal_checks = {}
+        royal_group = lambda x: self.get_royal_group(x, side, {'check', 'checkmate'})[1]
+        insert = lambda x, p: anti_royal_checks.setdefault(x, set()).add(p)
         self.ply_simulation += 1
         for piece in self.movable_pieces[side.opponent()]:
             if isinstance(piece.movement, ProbabilisticMovement):
@@ -1702,30 +1681,40 @@ class Board(Window):
                     if not chained_move.swapped_piece:
                         if chained_move.pos_to in self.royal_markers[side]:
                             self.check_side = side
-                            discard(self.get_piece(chained_move.pos_to))
-                            if not safe_royal_groups:
-                                break
+                            safe_royal_groups.discard(royal_group(self.get_piece(chained_move.pos_to)))
                         elif chained_move.pos_to in self.anti_royal_markers[side]:
-                            anti_royal_checks.add(chained_move.pos_to)
-                            discard(self.get_piece(chained_move.pos_to))
+                            group = royal_group(self.get_piece(chained_move.pos_to))
+                            if group in safe_anti_royal_groups:
+                                insert(group, chained_move.pos_to)
+                                if len(anti_royal_checks[group]) == len(self.royal_groups[side].get(group, ())):
+                                    safe_anti_royal_groups.discard(group)
+                        if not safe_royal_groups and not safe_anti_royal_groups:
+                            break
                     if chained_move.captured_piece and chained_move.captured_piece.side == side:
                         if chained_move.captured_piece.board_pos in self.royal_markers[side]:
                             self.check_side = side
-                            discard(chained_move.captured_piece)
-                            if not safe_royal_groups:
-                                break
+                            safe_royal_groups.discard(royal_group(chained_move.captured_piece))
                         elif chained_move.captured_piece.board_pos in self.anti_royal_markers[side]:
-                            anti_royal_checks.add(chained_move.captured_piece.board_pos)
-                            discard(chained_move.captured_piece)
+                            group = royal_group(chained_move.captured_piece)
+                            if group in safe_anti_royal_groups:
+                                insert(group, chained_move.captured_piece.board_pos)
+                                if len(anti_royal_checks[group]) == len(self.royal_groups[side].get(group, ())):
+                                    safe_anti_royal_groups.discard(group)
+                        if not safe_royal_groups and not safe_anti_royal_groups:
+                            break
                     chained_move = chained_move.chained_move
                 if self.check_side:
                     break
             if self.check_side:
                 break
         self.ply_simulation -= 1
-        if not self.check_side and anti_royal_checks != self.anti_royal_markers[side]:
+        self.check_groups = [
+            group for group in royal_groups
+            if group in all_royal_groups.difference(safe_royal_groups)
+            or group in safe_anti_royal_groups
+        ]
+        if self.check_groups:
             self.check_side = side
-        self.check_groups = [group for group in royal_groups if group not in safe_royal_groups]
 
     def load_end_conditions(self, side: Side | None = None):
         # Did the side meet any of its win conditions?
@@ -2172,14 +2161,40 @@ class Board(Window):
                             if not end_early:
                                 self.load_pieces()
                                 self.load_check(turn_side)
-                            if {'check', 'checkmate'}.intersection(self.end_rules[turn_side.opponent()]):
-                                if self.get_royal_loss(turn_side, move, {'check', 'checkmate'}):
-                                    self.check_side = turn_side
-                            if {'check', 'checkmate'}.intersection(self.end_rules[self.turn_side]):
-                                if self.get_royal_loss(opponent, move, {'check', 'checkmate'}):
-                                    self.moves[opponent] = {}
-                                    self.moves_queried[opponent] = True
-                                    end_data[self.turn_side]['checkmate'][''] = 1
+                            loss_conditions = {'check', 'checkmate', 'capture'}
+                            if loss_conditions.intersection(self.end_rules[turn_side.opponent()]):
+                                for group in self.get_royal_loss(turn_side, move, loss_conditions):
+                                    for condition in self.end_rules.get(turn_side.opponent(), {}):
+                                        if condition in loss_conditions:
+                                            value = self.end_rules[turn_side.opponent()][condition].get(group, 0)
+                                            if value > 0:
+                                                self.check_side = turn_side
+                            if loss_conditions.intersection(self.end_rules[turn_side]):
+                                for group in self.get_royal_loss(turn_side.opponent(), move, loss_conditions):
+                                    for condition in self.end_rules.get(turn_side, {}):
+                                        if condition in loss_conditions:
+                                            value = self.end_rules[turn_side][condition].get(group, 0)
+                                            if value < 0:
+                                                self.check_side = turn_side
+                            loss_conditions = {'check', 'checkmate'}
+                            if loss_conditions.intersection(self.end_rules[self.turn_side]):
+                                for group in self.get_royal_loss(opponent, move, loss_conditions):
+                                    for condition in self.end_rules.get(self.turn_side, {}):
+                                        if condition in loss_conditions:
+                                            value = self.end_rules[self.turn_side][condition].get(group, 0)
+                                            if value > 0:
+                                                self.moves[opponent] = {}
+                                                self.moves_queried[opponent] = True
+                                                end_data[self.turn_side]['checkmate'][''] = 1
+                            if loss_conditions.intersection(self.end_rules[opponent]):
+                                for group in self.get_royal_loss(self.turn_side, move, loss_conditions):
+                                    for condition in self.end_rules.get(opponent, {}):
+                                        if condition in loss_conditions:
+                                            value = self.end_rules[opponent][condition].get(group, 0)
+                                            if value > 0:
+                                                self.moves[opponent] = {}
+                                                self.moves_queried[opponent] = True
+                                                end_data[self.turn_side]['checkmate'][''] = 1
                             if self.check_side != turn_side:
                                 old_check_side = self.check_side
                                 new_check_side = Side.NONE

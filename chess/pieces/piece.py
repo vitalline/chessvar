@@ -162,7 +162,7 @@ class Piece(Sprite):
                 return True
             case _:
                 return (
-                    what.side is self.side and not isinstance(self, Double)
+                    what.side is self.side and not isinstance(self, (Double, Enemy))
                     or what.side is self.side.opponent() and isinstance(self, Enemy)
                     or isinstance(what, Immune)
                 )
