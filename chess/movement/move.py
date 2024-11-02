@@ -124,7 +124,6 @@ class Move(object):
         )
 
     def __str__(self) -> str:
-        board = self.piece.board
         moved = self.pos_from != self.pos_to
         comma = ','
         if self.pos_from is not None and self.pos_to is not None and moved and not self.swapped_piece:
@@ -162,6 +161,7 @@ class Move(object):
             string = "does something very mysterious"
         if self.piece:
             if self.piece.is_empty() and not (self.promotion and (self.pos_from is None or not moved)):
+                board = self.piece.board
                 side = board.get_promotion_side(self.piece) if self.is_edit == 1 else board.turn_side
                 string = f"{side} {string}"
             elif self.piece.is_empty():
@@ -182,7 +182,7 @@ class Move(object):
                 string += f"{comma} swaps"
             string = f"{string} with {self.swapped_piece} on {toa(self.pos_to)}"
             comma = ','
-        if self.pos_from is not None and not (self.piece and self.piece.is_empty() and not moved) and self.piece:
+        if self.pos_from is not None and self.piece and not (self.piece.is_empty() and not moved):
             if self.promotion is Unset:
                 if self.is_edit == 1:
                     string += f"{comma} is promoted"
