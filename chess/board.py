@@ -588,7 +588,10 @@ class Board(Window):
                 for side, piece_set in self.piece_sets.items()
             },
             'groups': {k: unpack([save_piece_type(t) for t in v]) for k, v in self.piece_groups.items()},
-            'limits': {k: {g: v for g, v in d.items()} for k, d in self.piece_limits.items()},
+            'limits': {
+                k.value if isinstance(k, Side) else k: {g: v for g, v in d.items()} if isinstance(k, Side) else d
+                for k, d in self.piece_limits.items()
+            },
             'pawn': save_piece_type(self.custom_pawn) if self.custom_pawn != Pawn else None,
             'pieces': cnd_alg({
                 p.board_pos: save_piece(p.on(None))
@@ -817,7 +820,8 @@ class Board(Window):
             for piece_type in piece_list:
                 piece_type.group_str = group
         self.piece_limits = {
-            Side(int(k)): {g: v for g, v in d.items()} for k, d in data.get('limits', {}).items()
+            Side(int(k)) if k.isdigit() else k: {g: v for g, v in d.items()} if k.isdigit() else d
+            for k, d in data.get('limits', {}).items()
         }
         self.custom_pawn = load_piece_type(data.get('pawn'), c) or Pawn
         self.custom_promotions = {
@@ -1900,6 +1904,8 @@ class Board(Window):
                             if isinstance(piece.movement, ProbabilisticMovement):
                                 self.roll_history[self.ply_count - 1][pos] = piece.movement.roll()
                     self.probabilistic_piece_history[self.ply_count - 1] = signature
+            limit_groups = {}
+            limit_hits = {}
             for order in self.get_order():
                 order_rules = self.turn_rules.get(order, {})
                 if {'check', 'checkmate'}.intersection(self.end_rules[turn_side]):
@@ -1987,8 +1993,6 @@ class Board(Window):
                 piece_rules, allow_last_piece_rules, block_last_piece_rules, chain_piece_rules = {}, {}, {}, {}
                 if not self.chain_start and self.use_drops and turn_side in self.drops:
                     side_drops = self.drops[turn_side]
-                    limit_groups = {}
-                    limit_hits = {}
                     for piece_type in self.captured_pieces[turn_side]:
                         if piece_type not in side_drops:
                             continue
@@ -2110,11 +2114,45 @@ class Board(Window):
                         if not type_rule_list:
                             continue
                         self.update_move(move)
-                        move_actions = {k: [] for k, v in {
-                            'move': not move.captured_piece,
-                            'capture': not not move.captured_piece,
-                            'promotion': move.promotion is not None,
-                        }.items() if v}
+                        # NB: The logic below considers one promotion per move, and does not keep track of piece amounts
+                        # during the move analysis. Very complex moves can break this. Might need to rethink this later.
+                        move_data = {
+                            'move': True,
+                            'capture': False,
+                            'promotion': False
+                        }
+                        promotion = None
+                        chained_move = move
+                        while chained_move and chained_move.chained_move and (
+                            issubclass(chained_move.movement_type, CastlingMovement) or
+                            isinstance(chained_move.piece.movement, AutoCaptureMovement) or
+                            issubclass(chained_move.chained_move.movement_type, CloneMovement)
+                        ):
+                            move_data['move'] = move_data['move'] and not chained_move.captured_piece
+                            move_data['capture'] = move_data['capture'] or bool(chained_move.captured_piece)
+                            move_data['promotion'] = move_data['promotion'] or bool(chained_move.promotion)
+                            promotion = promotion or chained_move.promotion
+                            chained_move = chained_move.chained_move
+                        if chained_move:
+                            move_data['move'] = move_data['move'] and not chained_move.captured_piece
+                            move_data['capture'] = move_data['capture'] or bool(chained_move.captured_piece)
+                            move_data['promotion'] = move_data['promotion'] or bool(chained_move.promotion)
+                            promotion = promotion or chained_move.promotion
+                        if promotion:
+                            promotion_type = type(promotion) if isinstance(promotion, Piece) else promotion
+                            if promotion_type not in limit_hits:
+                                if promotion_type not in limit_groups:
+                                    limit_groups[promotion_type] = {
+                                        g for g in self.piece_limits.get(turn_side, {}) if self.fits(g, promotion_type)
+                                    }
+                                limit_hits[promotion_type] = False
+                                for g in limit_groups[promotion_type]:
+                                    if self.piece_counts[turn_side].get(g, 0) >= self.piece_limits[turn_side][g]:
+                                        limit_hits[promotion_type] = True
+                                        break
+                            if limit_hits[promotion_type]:
+                                continue
+                        move_actions = {k: [] for k, v in move_data.items() if v}
                         allow_action_rules = [
                             rules[s] for rules in type_rule_list for s in rules if s == '*' or s in move_actions
                         ]
