@@ -1637,7 +1637,6 @@ class Board(Window):
             group for x in self.royal_groups[side] for group in self.royal_groups[side][x]
             if self.end_rules[side.opponent()].get('check', {}).get(group, 0)
             or self.end_rules[side.opponent()].get('checkmate', {}).get(group, 0)
-            and len(self.royal_groups[side][x][group]) == 1
         }
         if not royal_groups:
             return
