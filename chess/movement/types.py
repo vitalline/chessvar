@@ -1012,7 +1012,7 @@ class RandomMovement(ProbabilisticMovement):
 
 
 class BaseChoiceMovement(BaseMultiMovement):
-    def __init__(self, board: Board, movements: dict[type[Piece] | str | None, list[BaseMovement]] | None = None):
+    def __init__(self, board: Board, movements: dict[str, list[BaseMovement]] | None = None):
         if movements is None:
             movements = {}
         self.movement_dict = movements
@@ -1035,19 +1035,18 @@ class ChoiceMovement(BaseChoiceMovement):
                         if key == '*':
                             yield copy(move)
                         else:
+                            invert = False
+                            if key.startswith('!'):
+                                key = key[1:]
+                                invert = True
                             to_piece = self.board.get_piece(move.pos_to)
                             if not key:
-                                if to_piece.is_empty() or piece == to_piece:
+                                if (to_piece.is_empty() or piece == to_piece) != invert:
                                     yield copy(move)
-                            elif isinstance(key, type) and isinstance(to_piece, key):
+                            elif key.isdigit() and (int(key) == to_piece.side.value) != invert:
                                 yield copy(move)
-                            elif isinstance(key, str):
-                                if key == to_piece.side.name:
-                                    yield copy(move)
-                                elif key.isdigit() and int(key) == to_piece.side.value:
-                                    yield copy(move)
-                                elif self.board.fits(key, to_piece):
-                                    yield copy(move)
+                            elif self.board.fits(key, to_piece) != invert:
+                                yield copy(move)
 
 
 class TagMovement(BaseChoiceMovement):

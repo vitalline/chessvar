@@ -232,7 +232,6 @@ def load_custom_movement_type(bases: dict[str, type[BaseMovement]]) -> type[Base
 
 
 def save_movement(movement: BaseMovement | frozenset | None) -> list | str | None:
-    save_key = lambda key: save_piece_type(key) if isinstance(key, type) and issubclass(key, Piece) else key
     def save_arg(arg: Any) -> Any:  # helper function for saving constructor arguments of a movement object:
         if isinstance(arg, BaseMovement):  # the movement here is made out of movement (Multi, Bent, others)
             return save_movement(arg)  # save the movement recursively. not the most efficient, but it works
@@ -245,7 +244,7 @@ def save_movement(movement: BaseMovement | frozenset | None) -> list | str | Non
                 return [save_arg(x) for x in arg]  # no need to sort them, who knows what would that change?
             return sorted([save_arg(x) for x in arg])  # otherwise let's save the arguments in a sorted list
         if isinstance(arg, dict):  # support for saving dicts in movement arguments is a good thing to have.
-            return {save_key(k): save_arg(v) for k, v in arg.items()}  # saving dicts recursively, as always
+            return {k: save_arg(v) for k, v in arg.items()}  # save them recursively. this is to be expected
         return arg  # if it's not a list, tuple, dict, or movement, it's probably a simple value. keep as is
     if movement is None:  # if the movement is None, return None. this is the only case where we return None
         return None  # if the movement is Unset (which I'm pretty sure it never is), return the UNSET_STRING
@@ -258,7 +257,6 @@ def save_movement(movement: BaseMovement | frozenset | None) -> list | str | Non
 
 
 def load_movement(data: list | str | None, board: Board, from_dict: dict | None) -> BaseMovement | frozenset | None:
-    load_key = lambda key: load_piece_type(key, from_dict) or key  # helper function for loading keys in movement args
     def load_arg(arg: Any) -> Any:  # the logic is slightly less complicated in this helper function but only slightly
         if isinstance(arg, list):  # it's a list, so it's either a direction, a movement, or a list of either of those
             if not arg:  # if it's empty, it's an empty list. duh. just return it as is, same as the last helper func.
@@ -269,7 +267,7 @@ def load_movement(data: list | str | None, board: Board, from_dict: dict | None)
                 return tuple(arg)  # so we return it as a tuple, because we use tuples for directions basically always
             return [load_arg(x) for x in arg]  # it's either a list of directions or a list of movements. recurse more
         if isinstance(arg, dict):  # oh hey, dicts are finally useful! hooray! but it means more work to be done here.
-            return {load_key(k): load_arg(v) for k, v in arg.items()}  # it's still as expected, load recursively, etc
+            return {k: load_arg(v) for k, v in arg.items()}  # and still as expected, load recursively, etc., whatever
         return arg  # if it's not a list or dict, it's probably a simple value. no need to do anything. just return it
     if data is None:  # if the data is None, return None. this is, of course, still the only case where we return None
         return None  # if the data is UNSET_STRING, return Unset. similarly, it is the only case where we return Unset
