@@ -42,7 +42,7 @@ from chess.save import condense_algebraic as cnd_alg, expand_algebraic as exp_al
 from chess.save import load_move, load_piece, load_rng, load_piece_type, load_custom_type, load_movement_type
 from chess.save import save_move, save_piece, save_rng, save_piece_type, save_custom_type
 from chess.util import get_filename, is_prefix_of, is_prefix_in, select_save_data, select_save_name
-from chess.util import Default, Unset, base_dir, config_path, deduplicate, fits, sign
+from chess.util import Default, Unset, base_dir, config_path, deduplicate, fits, sign, spell
 
 
 class Board(Window):
@@ -1529,6 +1529,7 @@ class Board(Window):
         self.probabilistic_pieces = {Side.WHITE: [], Side.BLACK: []}
         self.auto_ranged_pieces = {Side.WHITE: [], Side.BLACK: []}
         self.obstacles = []
+        royal_group_values = {Side.WHITE: {}, Side.BLACK: {}}
         for row, col in product(range(self.board_height), range(self.board_width)):
             piece = self.get_piece((row, col))
             side = piece.side
@@ -1536,26 +1537,27 @@ class Board(Window):
                 self.movable_pieces[side].append(piece)
                 is_royal, royal_group = self.get_royal_group(piece, side)
                 if is_royal:
-                    self.royal_groups[side].setdefault(is_royal, {}).setdefault(royal_group, []).append(piece)
+                    self.royal_groups[side].setdefault(royal_group, []).append(piece)
+                    royal_group_values[side][royal_group] = is_royal
                 if isinstance(piece.movement, ProbabilisticMovement):
                     self.probabilistic_pieces[side].append(piece)
                 if isinstance(piece.movement, AutoRangedAutoCaptureRiderMovement):
                     self.auto_ranged_pieces[side].append(piece)
             elif isinstance(piece, Obstacle):
                 self.obstacles.append(piece)
-        for side, groups in self.royal_groups.items():
-            for value, data in groups.items():
-                for group, pieces in data.items():
-                    if len(pieces) == 1:
-                        if value == '+':
-                            self.royal_pieces[side].extend(pieces)
-                        elif value == '-':
-                            self.anti_royal_pieces[side].extend(pieces)
-                    if isinstance(value, int):
-                        if value > 0:
-                            self.royal_pieces[side].extend(pieces)
-                        elif value < 0:
-                            self.anti_royal_pieces[side].extend(pieces)
+        for side, data in self.royal_groups.items():
+            for group, pieces in data.items():
+                value = royal_group_values[side][group]
+                if len(pieces) == 1:
+                    if value == '+':
+                        self.royal_pieces[side].extend(pieces)
+                    elif value == '-':
+                        self.anti_royal_pieces[side].extend(pieces)
+                if isinstance(value, int):
+                    if value > 0:
+                        self.royal_pieces[side].extend(pieces)
+                    elif value < 0:
+                        self.anti_royal_pieces[side].extend(pieces)
         for side in (Side.WHITE, Side.BLACK):
             self.royal_markers[side] = {piece.board_pos for piece in self.royal_pieces[side]}
             self.anti_royal_markers[side] = {piece.board_pos for piece in self.anti_royal_pieces[side]}
@@ -1572,7 +1574,7 @@ class Board(Window):
         while move:
             if move.captured_piece and move.captured_piece.side == side:
                 is_royal, royal_group = self.get_royal_group(move.captured_piece, side, conditions)
-                if not self.royal_groups.get(side, {}).get(is_royal, {}).get(royal_group):
+                if not self.royal_groups.get(side, {}).get(royal_group):
                     if is_royal == '+':
                         piece_loss.add(royal_group)
                     if is_royal == '-':
@@ -1585,7 +1587,7 @@ class Board(Window):
             if move.promotion:
                 if move.piece and move.piece.side == side:
                     is_royal, royal_group = self.get_royal_group(move.piece, side, conditions)
-                    if not self.royal_groups.get(side, {}).get(is_royal, {}).get(royal_group):
+                    if not self.royal_groups.get(side, {}).get(royal_group):
                         if is_royal == '+':
                             piece_loss.add(royal_group)
                         if is_royal == '-':
@@ -1597,7 +1599,7 @@ class Board(Window):
                             piece_gain.add(royal_group)
                 if move.promotion and move.promotion.side == side:
                     is_royal, royal_group = self.get_royal_group(move.promotion, side, conditions)
-                    if not self.royal_groups.get(side, {}).get(is_royal, {}).get(royal_group):
+                    if not self.royal_groups.get(side, {}).get(royal_group):
                         if is_royal == '+':
                             piece_gain.add(royal_group)
                         if is_royal == '-':
@@ -1609,7 +1611,7 @@ class Board(Window):
                             piece_loss.add(royal_group)
                 if move.promotion and move.placed_piece:
                     is_royal, royal_group = self.get_royal_group(move.placed_piece, side, conditions)
-                    if not self.royal_groups.get(side, {}).get(is_royal, {}).get(royal_group):
+                    if not self.royal_groups.get(side, {}).get(royal_group):
                         if is_royal == '+':
                             piece_loss.add(royal_group)
                         if is_royal == '-':
@@ -1640,7 +1642,7 @@ class Board(Window):
         ):
             return
         royal_groups = [
-            group for x in self.royal_groups[side] for group in self.royal_groups[side][x]
+            group for group in self.royal_groups[side]
             if self.end_rules[side.opponent()].get('check', {}).get(group, 0)
             or self.end_rules[side.opponent()].get('checkmate', {}).get(group, 0)
         ]
@@ -3346,7 +3348,7 @@ class Board(Window):
                 if self.end_value == 1:
                     string += "Check!"
                 else:
-                    string += f"{self.end_value}-check!"
+                    string += f"{spell(self.end_value, 10).capitalize()}-check!"
             elif self.end_condition == 'capture':
                 string += "Game over!"
             else:

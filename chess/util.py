@@ -38,6 +38,27 @@ invalid_chars = ':<>|"?*'
 # Translation table to replace invalid characters with underscores.
 invalid_chars_trans_table = str.maketrans(invalid_chars, '_' * len(invalid_chars))
 
+# Dictionary to convert numbers to words.
+number_dict = {
+    0: 'zero', 1: 'one', 2: 'two', 3: 'three', 4: 'four',
+    5: 'five', 6: 'six', 7: 'seven', 8: 'eight', 9: 'nine',
+    10: 'ten', 11: 'eleven', 12: 'twelve', 13: 'thirteen',
+    14: 'fourteen', 15: 'fifteen', 16: 'sixteen', 17: 'seventeen',
+    18: 'eighteen', 19: 'nineteen', 20: 'twenty', 30: 'thirty',
+    40: 'forty', 50: 'fifty', 60: 'sixty', 70: 'seventy',
+    80: 'eighty', 90: 'ninety',  # integers up to 99 should suffice for most purposes
+}
+
+# Function to convert a number to words using the above dictionary.
+def spell(number: int, max_number: int = 99) -> str:
+    if number > 99 or number < 0 or number > max_number:
+        return str(number)
+    if number > 20:
+        tens = number // 10 * 10
+        ones = number % 10
+        return f"{number_dict[tens]}{'-' + number_dict[ones] if ones else ''}"
+    return number_dict[number]
+
 
 # Simple template matching function. Matches a string (or a group thereof) with a template containing '*' as a wildcard.
 def fits(template: str, data: Any) -> bool:
