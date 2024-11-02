@@ -747,7 +747,7 @@ class Board(Window):
         board_size = tuple(data.get('board_size', (self.board_width, self.board_height)))
         borders = [fra(t) for t in data.get('borders', [])]
         borders = [t[1] for t in borders if t[0] == -1], [t[0] for t in borders if t[1] == -1]
-        self.resize_board(*board_size, *borders)
+        self.resize_board(*board_size, *borders, update=False)
         wh = self.board_width, self.board_height
 
         window_size = data.get('window_size')
@@ -4180,6 +4180,7 @@ class Board(Window):
         height: int = 0,
         border_cols: list[int] | None = None,
         border_rows: list[int] | None = None,
+        update: bool = True,
     ) -> None:
         width, height = width or self.board_width, height or self.board_height
         border_cols = self.border_cols if border_cols is None else border_cols
@@ -4302,7 +4303,7 @@ class Board(Window):
                 self.resize(new_width, new_height)
             self.update_highlight(old_highlight)
 
-        if self.game_loaded and self.save_loaded:
+        if update and self.game_loaded:
             self.load_pieces()
             self.load_moves()
             self.reload_end_data()
