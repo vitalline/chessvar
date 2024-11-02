@@ -1584,7 +1584,7 @@ class Board(Window):
             side = piece.side
             if side in self.movable_pieces and not piece.is_empty():
                 self.movable_pieces[side].append(piece)
-                for group in self.piece_limits.get(side, {}):
+                for group in self.piece_limits.get(side, self.piece_limits):
                     if self.fits(group, piece):
                         self.piece_counts[side][group] = self.piece_counts[side].get(group, 0) + 1
                 is_royal, royal_group = self.get_royal_group(piece, side)
@@ -1906,6 +1906,7 @@ class Board(Window):
                             if isinstance(piece.movement, ProbabilisticMovement):
                                 self.roll_history[self.ply_count - 1][pos] = piece.movement.roll()
                     self.probabilistic_piece_history[self.ply_count - 1] = signature
+            limits = self.piece_limits.get(turn_side, self.piece_limits)
             limit_groups = {}
             limit_hits = {}
             for order in self.get_order():
@@ -2028,12 +2029,10 @@ class Board(Window):
                                 drop_type = type(drop) if isinstance(drop, Piece) else drop
                                 if drop_type not in limit_hits:
                                     if drop_type not in limit_groups:
-                                        limit_groups[drop_type] = {
-                                            g for g in self.piece_limits.get(turn_side, {}) if self.fits(g, drop_type)
-                                        }
+                                        limit_groups[drop_type] = {g for g in limits if self.fits(g, drop_type)}
                                     limit_hits[drop_type] = False
                                     for g in limit_groups[drop_type]:
-                                        if self.piece_counts[turn_side].get(g, 0) >= self.piece_limits[turn_side][g]:
+                                        if self.piece_counts[turn_side].get(g, 0) >= limits[g]:
                                             limit_hits[drop_type] = True
                                             break
                                 if limit_hits[drop_type]:
@@ -2142,12 +2141,10 @@ class Board(Window):
                             promotion_type = type(promotion) if isinstance(promotion, Piece) else promotion
                             if promotion_type not in limit_hits:
                                 if promotion_type not in limit_groups:
-                                    limit_groups[promotion_type] = {
-                                        g for g in self.piece_limits.get(turn_side, {}) if self.fits(g, promotion_type)
-                                    }
+                                    limit_groups[promotion_type] = {g for g in limits if self.fits(g, promotion_type)}
                                 limit_hits[promotion_type] = False
                                 for g in limit_groups[promotion_type]:
-                                    if self.piece_counts[turn_side].get(g, 0) >= self.piece_limits[turn_side][g]:
+                                    if self.piece_counts[turn_side].get(g, 0) >= limits[g]:
                                         limit_hits[promotion_type] = True
                                         break
                             if limit_hits[promotion_type]:
@@ -3657,6 +3654,7 @@ class Board(Window):
             drop_list = []
             drop_type_list = []
             drop_indexes = {k: i for i, k in enumerate(side_drops)}
+            limits = self.piece_limits.get(self.turn_side, self.piece_limits)
             limit_groups = {}
             limit_hits = {}
             for piece_type in sorted(self.captured_pieces[self.turn_side], key=lambda x: drop_indexes.get(x, 0)):
@@ -3672,12 +3670,10 @@ class Board(Window):
                     drop_type = type(drop) if isinstance(drop, Piece) else drop
                     if drop_type not in limit_hits:
                         if drop_type not in limit_groups:
-                            limit_groups[drop_type] = {
-                                g for g in self.piece_limits.get(self.turn_side, {}) if self.fits(g, drop_type)
-                            }
+                            limit_groups[drop_type] = {g for g in limits if self.fits(g, drop_type)}
                         limit_hits[drop_type] = False
                         for g in limit_groups[drop_type]:
-                            if self.piece_counts[self.turn_side].get(g, 0) >= self.piece_limits[self.turn_side][g]:
+                            if self.piece_counts[self.turn_side].get(g, 0) >= limits[g]:
                                 limit_hits[drop_type] = True
                                 break
                     if not limit_hits[drop_type]:
@@ -3749,6 +3745,7 @@ class Board(Window):
         side_promotions = self.promotions[move.piece.side]
         if type(move.piece) not in side_promotions:
             return
+        limits = self.piece_limits.get(move.piece.side, self.piece_limits)
         limit_groups = {}
         limit_hits = {}
         promotion_squares = side_promotions[type(move.piece)]
@@ -3760,12 +3757,10 @@ class Board(Window):
                 promotion_type = type(promotion) if isinstance(promotion, Piece) else promotion
                 if promotion_type not in limit_hits:
                     if promotion_type not in limit_groups:
-                        limit_groups[promotion_type] = {
-                            g for g in self.piece_limits.get(move.piece.side, {}) if self.fits(g, promotion_type)
-                        }
+                        limit_groups[promotion_type] = {g for g in limits if self.fits(g, promotion_type)}
                     limit_hits[promotion_type] = False
                     for g in limit_groups[promotion_type]:
-                        if self.piece_counts[move.piece.side].get(g, 0) >= self.piece_limits[move.piece.side][g]:
+                        if self.piece_counts[move.piece.side].get(g, 0) >= limits[g]:
                             limit_hits[promotion_type] = True
                             break
                 if not limit_hits[promotion_type]:
