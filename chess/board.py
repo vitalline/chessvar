@@ -1382,7 +1382,7 @@ class Board(Window):
                     else:
                         self.end_rules.setdefault(side, {}).setdefault(condition, {}).setdefault('', rules)
                         self.end_data.setdefault(side, {}).setdefault(condition, {}).setdefault('', 0)
-            if 'checkmate' not in self.end_rules[side]:
+            if 'checkmate' not in self.end_rules[side] and 'capture' not in self.end_rules[side]:
                 self.end_rules[side]['checkmate'] = {'': 1, "King": 1, "Royal": 1}
                 self.end_data[side]['checkmate'] = {'': 0, "King": 0, "Royal": 0}
             if 'stalemate' not in self.end_rules[side]:
