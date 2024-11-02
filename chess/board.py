@@ -763,8 +763,9 @@ class Board(Window):
         new_flip_mode = data.get('flip_mode', self.flip_mode)
         if new_flip_mode != old_flip_mode:
             self.flip_board()
-        if window_size is not None and square_size is not None and self.square_size != square_size:
-            self.log(f"Error: Square size does not match (was {square_size}, but is {self.square_size})")
+        new_square_size = min(self.width / (self.visual_board_width + 2), self.height / (self.visual_board_height + 2))
+        if window_size is not None and square_size is not None and new_square_size != square_size:
+            self.log(f"Error: Square size does not match (was {square_size}, but is {new_square_size})")
 
         self.color_index = data.get('color_index', self.color_index)
         self.color_scheme = colors[self.color_index] if self.color_index is not None else default_colors
@@ -4319,7 +4320,8 @@ class Board(Window):
         x, y = self.get_location()
         self.set_visible(False)
         self.set_size(round(max(width, min_width)), round(max(height, min_height)))
-        self.log(f"Info: Resized to {self.width}x{self.height}", False)
+        square_size = min(self.width / (self.visual_board_width + 2), self.height / (self.visual_board_height + 2))
+        self.log(f"Info: Resized to {self.width}x{self.height} (Size: {round(square_size, 5)}px)")
         self.set_location(x - (self.width - old_width) // 2, y - (self.height - old_height) // 2)
         if not self.fullscreen:
             self.windowed_size = self.width, self.height
