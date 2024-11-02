@@ -3153,6 +3153,7 @@ class Board(Window):
         self.deselect_piece()
         if not self.move_history:
             return
+        offset = False
         in_promotion = self.promotion_piece is not None
         if in_promotion:
             if self.move_history and self.future_move_history:
@@ -3234,6 +3235,8 @@ class Board(Window):
                 (copies[0] is None) or (copies[1] is None) or
                 (copies[0] is not None and not copies[0].matches(copies[1]))
             ):
+                if not offset:
+                    self.clear_future_history(self.ply_count)
                 self.future_move_history.append(last_move)
         else:
             self.future_move_history.append(last_move)
