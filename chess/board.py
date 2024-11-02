@@ -1833,8 +1833,9 @@ class Board(Window):
                 self.moves[losing_side] = {}
                 self.moves_queried[losing_side] = True
         movable_pieces = {side: self.movable_pieces[side].copy() for side in self.movable_pieces}
+        piece_counts = {side: self.piece_counts[side].copy() for side in self.piece_counts}
         royal_groups = {side: self.royal_groups[side].copy() for side in self.royal_groups}
-        # NB: Making a deep copy of royal groups is unnecessary because they are generated anew each time.
+        # NB: Making a deep copy of piece counts or royal groups is unnecessary since they are generated anew each time.
         royal_pieces = {side: self.royal_pieces[side].copy() for side in self.royal_pieces}
         royal_markers = {side: self.royal_markers[side].copy() for side in self.royal_markers}
         anti_royal_pieces = {side: self.anti_royal_pieces[side].copy() for side in self.anti_royal_pieces}
@@ -2330,6 +2331,7 @@ class Board(Window):
                     self.theoretical_moves[turn_side].setdefault(pos_from, {}).setdefault(pos_to, []).append(move)
             self.theoretical_moves_queried[turn_side] = True
         self.movable_pieces = movable_pieces
+        self.piece_counts = piece_counts
         self.royal_groups = royal_groups
         self.royal_pieces = royal_pieces
         self.royal_markers = royal_markers

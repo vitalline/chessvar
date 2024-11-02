@@ -143,6 +143,13 @@ def debug_info(board: Board) -> list[str]:
         if not board.movable_pieces[side]:
             debug_log[-1] += " None"
     for side in board.piece_set_ids:
+        piece_counts = board.piece_counts.get(side, board.piece_counts)
+        piece_limits = board.piece_limits.get(side, board.piece_limits)
+        debug_log.append(f"{side} piece counts ({len(piece_limits)}):")
+        for group, limit in piece_limits.items():
+            count = piece_counts.get(group, 0)
+            debug_log.append(f"{pad:2}{group}: {count}/{limit}")
+    for side in board.piece_set_ids:
         debug_log.append(f"{side} royal groups ({len(board.royal_groups[side])}):")
         for key, group in board.royal_groups[side].items():
             debug_log.append(f"{pad:2}{key} ({len(group)}):")
