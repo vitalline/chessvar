@@ -139,6 +139,8 @@ class Board(Window):
         self.trickster_color_delta = 0  # but it's not like that's ever going to happen right
         self.trickster_angle_delta = 0  # this is just a normal chess game after all
         self.pieces = []  # list of pieces on the board
+        self.piece_counts = {}  # number of pieces of each type for each side
+        self.piece_limits = {}  # maximum number of pieces of each type for each side
         self.piece_set_ids = {Side.WHITE: 0, Side.BLACK: 0}  # ids of piece sets to use for each side
         self.piece_set_names = {Side.WHITE: '', Side.BLACK: ''}  # names of piece sets to use for each side
         self.edit_piece_set_id = None  # id of piece set used when placing pieces in edit mode, None uses current sets
@@ -586,6 +588,7 @@ class Board(Window):
                 for side, piece_set in self.piece_sets.items()
             },
             'groups': {k: unpack([save_piece_type(t) for t in v]) for k, v in self.piece_groups.items()},
+            'limits': {k: {g: v for g, v in d.items()} for k, d in self.piece_limits.items()},
             'pawn': save_piece_type(self.custom_pawn) if self.custom_pawn != Pawn else None,
             'pieces': cnd_alg({
                 p.board_pos: save_piece(p.on(None))
@@ -813,6 +816,9 @@ class Board(Window):
         for group, piece_list in self.piece_groups.items():
             for piece_type in piece_list:
                 piece_type.group_str = group
+        self.piece_limits = {
+            Side(int(k)): {g: v for g, v in d.items()} for k, d in data.get('limits', {}).items()
+        }
         self.custom_pawn = load_piece_type(data.get('pawn'), c) or Pawn
         self.custom_promotions = {
             Side(int(v)): {
@@ -1150,6 +1156,7 @@ class Board(Window):
             for piece_type in piece_list:
                 piece_type.group_str = None
         self.piece_groups = {}
+        self.piece_limits = {}
         if self.color_index is None:
             self.color_index = 0
         self.color_scheme = colors[self.color_index]
@@ -1556,6 +1563,7 @@ class Board(Window):
 
     def load_pieces(self):
         self.movable_pieces = {Side.WHITE: [], Side.BLACK: []}
+        self.piece_counts = {Side.WHITE: {}, Side.BLACK: {}}
         self.royal_groups = {Side.WHITE: {}, Side.BLACK: {}}
         self.royal_pieces = {Side.WHITE: [], Side.BLACK: []}
         self.royal_markers = {Side.WHITE: set(), Side.BLACK: set()}
@@ -1570,6 +1578,9 @@ class Board(Window):
             side = piece.side
             if side in self.movable_pieces and not piece.is_empty():
                 self.movable_pieces[side].append(piece)
+                for group in self.piece_limits.get(side, {}):
+                    if self.fits(group, piece):
+                        self.piece_counts[side][group] = self.piece_counts[side].get(group, 0) + 1
                 is_royal, royal_group = self.get_royal_group(piece, side)
                 if is_royal:
                     self.royal_groups[side].setdefault(royal_group, []).append(piece)
@@ -1976,6 +1987,8 @@ class Board(Window):
                 piece_rules, allow_last_piece_rules, block_last_piece_rules, chain_piece_rules = {}, {}, {}, {}
                 if not self.chain_start and self.use_drops and turn_side in self.drops:
                     side_drops = self.drops[turn_side]
+                    limit_groups = {}
+                    limit_hits = {}
                     for piece_type in self.captured_pieces[turn_side]:
                         if piece_type not in side_drops:
                             continue
@@ -2005,9 +2018,25 @@ class Board(Window):
                         if not block_drop_rules:
                             continue
                         for pos in side_drops[piece_type]:
+                            for drop in side_drops[piece_type][pos]:
+                                drop_type = type(drop) if isinstance(drop, Piece) else drop
+                                if drop_type not in limit_hits:
+                                    if drop_type not in limit_groups:
+                                        limit_groups[drop_type] = {
+                                            g for g in self.piece_limits.get(turn_side, {}) if self.fits(g, drop_type)
+                                        }
+                                    limit_hits[drop_type] = False
+                                    for g in limit_groups[drop_type]:
+                                        if self.piece_counts[turn_side].get(g, 0) >= self.piece_limits[turn_side][g]:
+                                            limit_hits[drop_type] = True
+                                            break
+                                if limit_hits[drop_type]:
+                                    continue
                             if self.get_piece(pos).is_empty():
                                 self.moves[turn_side].setdefault('drop', set()).add(piece_type)
                                 break
+                        if self.moves[turn_side].get('drop'):
+                            break
                 for piece in movable_pieces[turn_side] if chain_moves is None else [last_chain_move.piece]:
                     piece_type = type(piece)
                     if chain_moves is not None:
@@ -3587,6 +3616,8 @@ class Board(Window):
             drop_list = []
             drop_type_list = []
             drop_indexes = {k: i for i, k in enumerate(side_drops)}
+            limit_groups = {}
+            limit_hits = {}
             for piece_type in sorted(self.captured_pieces[self.turn_side], key=lambda x: drop_indexes.get(x, 0)):
                 if piece_type not in side_drops:
                     continue
@@ -3595,7 +3626,21 @@ class Board(Window):
                 drop_squares = side_drops[piece_type]
                 if move.piece.board_pos not in drop_squares:
                     continue
-                drops = drop_squares[move.piece.board_pos]
+                drops = []
+                for drop in drop_squares[move.piece.board_pos]:
+                    drop_type = type(drop) if isinstance(drop, Piece) else drop
+                    if drop_type not in limit_hits:
+                        if drop_type not in limit_groups:
+                            limit_groups[drop_type] = {
+                                g for g in self.piece_limits.get(self.turn_side, {}) if self.fits(g, drop_type)
+                            }
+                        limit_hits[drop_type] = False
+                        for g in limit_groups[drop_type]:
+                            if self.piece_counts[self.turn_side].get(g, 0) >= self.piece_limits[self.turn_side][g]:
+                                limit_hits[drop_type] = True
+                                break
+                    if not limit_hits[drop_type]:
+                        drops.append(drop)
                 drop_list.extend(drops)
                 drop_type_list.extend(piece_type for _ in drops)
             if not drop_list:
@@ -3663,11 +3708,27 @@ class Board(Window):
         side_promotions = self.promotions[move.piece.side]
         if type(move.piece) not in side_promotions:
             return
+        limit_groups = {}
+        limit_hits = {}
         promotion_squares = side_promotions[type(move.piece)]
         for square in (move.pos_to, move.pos_from):
             if square not in promotion_squares:
                 continue
-            promotions = promotion_squares[square]
+            promotions = []
+            for promotion in promotion_squares[square]:
+                promotion_type = type(promotion) if isinstance(promotion, Piece) else promotion
+                if promotion_type not in limit_hits:
+                    if promotion_type not in limit_groups:
+                        limit_groups[promotion_type] = {
+                            g for g in self.piece_limits.get(move.piece.side, {}) if self.fits(g, promotion_type)
+                        }
+                    limit_hits[promotion_type] = False
+                    for g in limit_groups[promotion_type]:
+                        if self.piece_counts[move.piece.side].get(g, 0) >= self.piece_limits[move.piece.side][g]:
+                            limit_hits[promotion_type] = True
+                            break
+                if not limit_hits[promotion_type]:
+                    promotions.append(promotion)
             if not promotions:
                 return
             if self.auto_moves and self.board_config['fast_promotion'] and len(promotions) == 1:
