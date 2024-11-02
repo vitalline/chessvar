@@ -144,15 +144,10 @@ def debug_info(board: Board) -> list[str]:
             debug_log[-1] += " None"
     for side in board.piece_set_ids:
         debug_log.append(f"{side} royal groups ({len(board.royal_groups[side])}):")
-        groups = {
-            key: board.royal_groups[side][key] for key in sorted(  # this should put mixin classes before pieces
-                board.royal_groups[side], key=lambda x: (1, x.name) if issubclass(x, Piece) else (0, x.__name__)
-            )
-        }
-        for key, group in groups.items():
-            debug_log.append(f"{pad:2}\"{key}\" ({len(group)}):")
+        for key, group in board.royal_groups[side].items():
+            debug_log.append(f"{pad:2}{key} ({len(group)}):")
             for piece in group:
-                debug_log.append(f"{pad:2}{toa(piece.board_pos)} {piece.board_pos}: {piece.name}")
+                debug_log.append(f"{pad:4}{toa(piece.board_pos)} {piece.board_pos}: {piece.name}")
             if not group:
                 debug_log[-1] += " None"
         if not board.royal_groups[side]:
@@ -297,12 +292,12 @@ def debug_info(board: Board) -> list[str]:
         debug_log[-1] += " None"
     debug_log.append(f"Custom pieces ({len(board.custom_pieces)}):")
     for piece, data in board.custom_pieces.items():
-        debug_log.append(f"{pad:2}'{piece}': {save_custom_type(data)}")
+        debug_log.append(f"{pad:2}{piece}: {save_custom_type(data)}")
     if not board.custom_pieces:
         debug_log[-1] += " None"
     debug_log.append(f"Past custom pieces ({len(board.past_custom_pieces)}):")
     for piece, data in board.past_custom_pieces.items():
-        debug_log.append(f"{pad:2}'{piece}': {save_custom_type(data)}")
+        debug_log.append(f"{pad:2}{piece}: {save_custom_type(data)}")
     if not board.past_custom_pieces:
         debug_log[-1] += " None"
     if board.custom_pawn != fide.Pawn:
@@ -438,10 +433,6 @@ def debug_info(board: Board) -> list[str]:
                 allow_last_rules = state_rules[allow_last]
                 for block_last in sorted(allow_last_rules):
                     block_last_rules = allow_last_rules[block_last]
-                    if isinstance(allow_last, str) and allow_last not in {'*'}:
-                        allow_last = f'"{allow_last}"'
-                    if isinstance(block_last, str) and block_last not in {None}:
-                        block_last = f'"{block_last}"'
                     last_string = (
                         "Any last move" if allow_last == '*' and block_last is None else
                         f"Last move was {allow_last}" if block_last is None else
@@ -453,10 +444,6 @@ def debug_info(board: Board) -> list[str]:
                         allow_piece_rules = block_last_rules[allow_piece]
                         for block_piece in sorted(allow_piece_rules):
                             block_piece_rules = allow_piece_rules[block_piece]
-                            if isinstance(allow_piece, str) and allow_piece not in {'*', ''}:
-                                allow_piece = f'"{allow_piece}"'
-                            if isinstance(block_piece, str) and block_piece not in {None, ''}:
-                                block_piece = f'"{block_piece}"'
                             piece_string = (
                                 "Any piece" if allow_piece == '*' and block_piece is None else
                                 "Piece moved" if allow_piece == '' and block_piece is None else
@@ -472,10 +459,6 @@ def debug_info(board: Board) -> list[str]:
                                 allow_type_rules = block_piece_rules[allow_type]
                                 for block_type in sorted(allow_type_rules):
                                     block_type_rules = allow_type_rules[block_type]
-                                    if isinstance(allow_type, str) and allow_type not in {'*', ''}:
-                                        allow_type = f'"{allow_type}"'
-                                    if isinstance(block_type, str) and block_type not in {None, ''}:
-                                        block_type = f'"{block_type}"'
                                     type_string = (
                                         "Any move" if allow_type == '*' and block_type is None else
                                         "Tag used" if allow_type == '' and block_type is None else
@@ -551,8 +534,16 @@ def debug_info(board: Board) -> list[str]:
         for rule in board.end_rules[side]:
             debug_log.append(f"{pad:2}{rule.capitalize()}:")
             for group in board.end_rules[side][rule]:
-                group_string = f'"{group}"' if group else "Any"
+                group_string = f"{group}" if group else "Any"
                 group_value = board.end_rules[side][rule][group]
+                debug_log.append(f"{pad:4}{group_string}: {group_value}")
+    for side in board.end_data:
+        debug_log.append(f"Win progress for {side}:")
+        for rule in board.end_data[side]:
+            debug_log.append(f"{pad:2}{rule.capitalize()}:")
+            for group in board.end_data[side][rule]:
+                group_string = f"{group}" if group else "Any"
+                group_value = board.end_data[side][rule][group]
                 debug_log.append(f"{pad:4}{group_string}: {group_value}")
     possible_moves = sum((
         sum(v.values(), []) for k, v in board.moves.get(board.turn_side, {}).items() if not isinstance(k, str)
