@@ -8,7 +8,7 @@ from arcade import Color, Sprite, load_texture
 from chess.movement.base import BaseMovement
 from chess.movement.types import is_active
 from chess.pieces.side import Side
-from chess.pieces.types import Double, Immune
+from chess.pieces.types import Double, Enemy, Immune
 from chess.util import CUSTOM_PREFIX, Default, get_texture_path
 
 if TYPE_CHECKING:
@@ -162,7 +162,8 @@ class Piece(Sprite):
                 return True
             case _:
                 return (
-                    self.side is what.side and not isinstance(self, Double)
+                    what.side is self.side and not isinstance(self, Double)
+                    or what.side is self.side.opponent() and isinstance(self, Enemy)
                     or isinstance(what, Immune)
                 )
 
@@ -177,7 +178,8 @@ class Piece(Sprite):
             case _:
                 return (
                     what.side is not Side.NONE
-                    and (self.side is not what.side or isinstance(self, Double))
+                    and (what.side is not self.side or isinstance(self, Double)
+                    or what.side is not self.side.opponent() and isinstance(self, Enemy))
                     and not isinstance(what, Immune)
                 )
 
