@@ -873,11 +873,6 @@ class Board(Window):
                 side: get_set_name(self.piece_sets[side], self.piece_set_ids[side] is None) for side in self.piece_sets
             }
 
-        self.reset_drops()
-        self.reset_promotions()
-        self.reset_edit_promotions()
-        self.reset_penultima_pieces()
-
         self.custom_layout = {p: load_piece(v, self, c).on(p) for p, v in exp_alg(data.get('layout', {}), *wh).items()}
 
         ply_count = data.get('ply', self.ply_count)
@@ -919,6 +914,11 @@ class Board(Window):
                     if group not in self.end_data[side][condition]:
                         continue
                     self.end_data[side][condition][group] = end_data[s][c][g]
+
+        self.reset_drops()
+        self.reset_promotions()
+        self.reset_edit_promotions()
+        self.reset_penultima_pieces()
 
         self.move_history = [load_move(d, self, c) for d in data.get('moves', [])]
         self.future_move_history = [load_move(d, self, c) for d in data.get('future', [])[::-1]]
