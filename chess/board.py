@@ -2041,8 +2041,6 @@ class Board(Window):
                             if self.get_piece(pos).is_empty():
                                 self.moves[turn_side].setdefault('drop', set()).add(piece_type)
                                 break
-                        if self.moves[turn_side].get('drop'):
-                            break
                 for piece in movable_pieces[turn_side] if chain_moves is None else [last_chain_move.piece]:
                     piece_type = type(piece)
                     if chain_moves is not None:
