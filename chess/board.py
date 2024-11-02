@@ -1218,7 +1218,9 @@ class Board(Window):
                     continue
                 for i, piece_type in enumerate(trimmed_set):
                     if piece_type not in drops and not issubclass(piece_type, NoPiece):
-                        has_moved = i in {0, len(trimmed_set) - 1} or self.get_royal_group(piece_type, drop_side)[0]
+                        if self.get_royal_group(piece_type, drop_side)[0]:
+                            continue
+                        has_moved = i in {0, len(trimmed_set) - 1}
                         if has_moved:
                             piece = piece_type(self)
                             piece.movement.set_moves(1)
