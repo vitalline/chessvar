@@ -145,8 +145,7 @@ class Board(Window):
         self.chaos_mode = self.board_config['chaos_mode']  # 0: no, 1: match pos, 2: match pos asym, 3: any, 4: any asym
         self.chaos_sets = {}  # piece sets generated in chaos mode
         self.piece_sets = {Side.WHITE: [], Side.BLACK: []}  # types of pieces each side starts with
-        self.piece_group_data = {}  # groups of pieces that share certain properties
-        self.piece_groups = {Side.WHITE: {}, Side.BLACK: {}}  # pieces that belong to each group
+        self.piece_groups = {}  # groups of pieces that share certain properties
         self.drops = {Side.WHITE: {}, Side.BLACK: {}}  # drop options, as {side: {was: {pos: as}}}
         self.promotions = {Side.WHITE: {}, Side.BLACK: {}}  # promotion options, as {side: {from: {pos: [to]}}}
         self.edit_promotions = {Side.WHITE: [], Side.BLACK: []}  # types of pieces each side can place in edit mode
@@ -585,7 +584,7 @@ class Board(Window):
                 side.value: [save_piece_type(t) if t is not NoPiece else '' for t in piece_set]
                 for side, piece_set in self.piece_sets.items()
             },
-            'groups': {k: [save_piece_type(t) for t in v] for k, v in self.piece_group_data.items()},
+            'groups': {k: unpack([save_piece_type(t) for t in v]) for k, v in self.piece_groups.items()},
             'pawn': save_piece_type(self.custom_pawn) if self.custom_pawn != Pawn else None,
             'pieces': cnd_alg({
                 p.board_pos: save_piece(p.on(None))
@@ -794,9 +793,12 @@ class Board(Window):
         custom_data = data.get('custom', {})
         self.custom_pieces = {k: load_custom_type(v, k) for k, v in custom_data.items()}
         c = self.custom_pieces
-        self.piece_group_data = {k: [load_piece_type(t, c) for t in v] for k, v in data.get('groups', {}).items()}
-        for k, v in self.piece_group_data.items():
-            self.custom_pieces[v].group_str = k
+        self.piece_groups = {
+            k: [load_piece_type(t, c) for t in repack(v)] for k, v in data.get('groups', {}).items()
+        }
+        for group, piece_list in self.piece_groups.items():
+            for piece_type in piece_list:
+                piece_type.group_str = group
         self.custom_pawn = load_piece_type(data.get('pawn'), c) or Pawn
         self.custom_promotions = {
             Side(int(v)): {
@@ -1115,7 +1117,10 @@ class Board(Window):
         self.custom_extra_drops = {}
         self.custom_turn_order = []
         self.custom_end_rules = {}
-        self.piece_group_data = {}
+        for group, piece_list in self.piece_groups.items():
+            for piece_type in piece_list:
+                piece_type.group_str = None
+        self.piece_groups = {}
         if self.color_index is None:
             self.color_index = 0
         self.color_scheme = colors[self.color_index]

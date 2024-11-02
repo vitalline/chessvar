@@ -287,6 +287,14 @@ def debug_info(board: Board) -> list[str]:
         debug_log.append(f"{pad:2}{toa(piece.board_pos)} {piece.board_pos}: {piece.name}")
     if not board.obstacles:
         debug_log[-1] += " None"
+    debug_log.append(f"Piece groups ({len(board.piece_groups)}):")
+    for group in board.piece_groups:
+        debug_log.append(
+            f"{pad:2}{group} ({len(board.piece_groups[group])}): "
+            f"{', '.join(piece.name for piece in board.piece_groups[group])}"
+        )
+    if not board.piece_groups:
+        debug_log[-1] += " None"
     debug_log.append(f"Custom pieces ({len(board.custom_pieces)}):")
     for piece, data in board.custom_pieces.items():
         debug_log.append(f"{pad:2}'{piece}': {save_custom_type(data)}")
@@ -545,7 +553,7 @@ def debug_info(board: Board) -> list[str]:
             for group in board.end_rules[side][rule]:
                 group_string = f'"{group}"' if group else "Any"
                 group_value = board.end_rules[side][rule][group]
-                debug_log.append(f"{pad:4}{group}: {group_value}")
+                debug_log.append(f"{pad:4}{group_string}: {group_value}")
     possible_moves = sum((
         sum(v.values(), []) for k, v in board.moves.get(board.turn_side, {}).items() if not isinstance(k, str)
     ), [])
