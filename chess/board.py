@@ -453,7 +453,8 @@ class Board(Window):
                 condition: {
                     group: 0 for group in data
                 } for condition, data in rules.items()
-            } for side, rules in self.end_rules.items() if side is not Side.NONE
+            } for side, rules in self.end_rules.items()
+            if side is not Side.NONE
         }
         self.end_value = 0
         self.end_condition = None
@@ -652,6 +653,19 @@ class Board(Window):
                     group: value for group, value in rules.items()
                 } if isinstance(rules, dict) else rules
                 for side, rules in self.custom_end_rules.items()
+            },
+            'count': {
+                side.value: data for side in self.end_data if (data := {
+                    shorthand: values for shorthand in self.custom_end_rules.get(side, self.custom_end_rules)
+                    if (values := {
+                        group: value
+                        for group, value in self.end_data[side].get(end_types.get(shorthand), {}).items() if (
+                            (condition := end_types.get(shorthand)) in {'check', 'capture'} or condition == 'checkmate'
+                            and ((need := self.end_rules.get(side, {}).get(condition, {}).get(group, 0))
+                            and isinstance(need, int) and abs(need) > 1)
+                        ) and value > 0
+                    }) and end_types.get(shorthand) in self.end_data[side]
+                })
             },
             'edit': self.edit_mode,
             'edit_promotion': self.edit_piece_set_id,
@@ -891,6 +905,20 @@ class Board(Window):
             for side, rules in data.get('end').items()
         }
         self.reset_end_rules()
+        end_data = data.get('count', {})
+        for s in end_data:
+            side = Side(int(s))
+            if side not in self.end_data:
+                continue
+            for c in end_data[s]:
+                condition = end_types.get(c)
+                if condition not in self.end_data[side]:
+                    continue
+                for g in end_data[s][c]:
+                    group = g
+                    if group not in self.end_data[side][condition]:
+                        continue
+                    self.end_data[side][condition][group] = end_data[s][c][g]
 
         self.move_history = [load_move(d, self, c) for d in data.get('moves', [])]
         self.future_move_history = [load_move(d, self, c) for d in data.get('future', [])[::-1]]
@@ -1023,7 +1051,7 @@ class Board(Window):
             if not with_history and not self.edit_mode:
                 self.load_pieces()
                 self.load_moves()
-                self.update_end_data()
+                self.reload_end_data()
                 self.update_status()
             selection = data.get('selection')
             if selection:
@@ -1048,7 +1076,8 @@ class Board(Window):
                 condition: {
                     group: 0 for group in data
                 } for condition, data in rules.items()
-            } for side, rules in self.end_rules.items() if side is not Side.NONE
+            } for side, rules in self.end_rules.items()
+            if side is not Side.NONE
         }
         self.end_value = 0
         self.end_condition = None
