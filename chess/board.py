@@ -3366,6 +3366,10 @@ class Board(Window):
 
     def update_status(self) -> None:
         self.load_end_conditions()
+        if self.game_over and self.win_side is not Side.NONE:
+            losing_side = self.win_side.opponent()
+            self.moves[losing_side] = {}
+            self.moves_queried[losing_side] = True
         self.skip_caption_update = False
         self.show_moves()
         status_string = self.get_status_string()
