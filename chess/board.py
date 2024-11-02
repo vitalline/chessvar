@@ -1358,47 +1358,31 @@ class Board(Window):
         self.turn_side, self.turn_rules = side, rules
 
     def reset_end_rules(self) -> None:
-        self.end_data = {}
-        if not self.custom_end_rules:
-            self.end_rules = {
-                side: {
-                    "checkmate": {'': 1, "King": 1},
-                    "stalemate": {'': 0},
-                } for side in (Side.WHITE, Side.BLACK)
-            }
-            self.end_data = {
-                side: {
-                    "checkmate": {'': 0, "King": 0},
-                    "stalemate": {'': 0},
-                } for side in (Side.WHITE, Side.BLACK)
-            }
-            return
         self.end_rules = {}
+        self.end_data = {}
         for side in (Side.WHITE, Side.BLACK):
-            side_rules = self.custom_end_rules.get(side, self.custom_end_rules)
+            self.end_rules[side] = {}
+            self.end_data[side] = {}
+            side_rules = self.custom_end_rules.get(side, self.custom_end_rules) if self.custom_end_rules else {}
             for condition, rules in side_rules.items():
                 condition = end_types.get(condition)
                 if condition is not None:
                     if isinstance(rules, dict):
                         if condition == 'checkmate':
-                            self.end_rules.setdefault(side, {}).setdefault(condition, {}).setdefault('', 1)
-                            self.end_data.setdefault(side, {}).setdefault(condition, {}).setdefault('', 0)
+                            self.end_rules[side].setdefault(condition, {}).setdefault('', 1)
+                            self.end_data[side].setdefault(condition, {}).setdefault('', 0)
                         for group, value in rules.items():
-                            self.end_rules.setdefault(side, {}).setdefault(condition, {}).setdefault(group, value)
-                            self.end_data.setdefault(side, {}).setdefault(condition, {}).setdefault(group, 0)
+                            self.end_rules[side].setdefault(condition, {}).setdefault(group, value)
+                            self.end_data[side].setdefault(condition, {}).setdefault(group, 0)
                     else:
                         self.end_rules.setdefault(side, {}).setdefault(condition, {}).setdefault('', rules)
                         self.end_data.setdefault(side, {}).setdefault(condition, {}).setdefault('', 0)
-        for side in (Side.WHITE, Side.BLACK):
-            if side not in self.end_rules:
-                self.end_rules[side] = {
-                    "checkmate": {'': 1, "King": 1},
-                    "stalemate": {'': 0},
-                }
-                self.end_data[side] = {
-                    "checkmate": {'': 0, "King": 0},
-                    "stalemate": {'': 0},
-                }
+            if 'checkmate' not in self.end_rules[side]:
+                self.end_rules[side]['checkmate'] = {'': 1, "King": 1}
+                self.end_data[side]['checkmate'] = {'': 0, "King": 0}
+            if 'stalemate' not in self.end_rules[side]:
+                self.end_rules[side]['stalemate'] = {'': 0}
+                self.end_data[side]['stalemate'] = {'': 0}
 
     def get_piece_sets(
         self,
@@ -1509,13 +1493,13 @@ class Board(Window):
 
     def get_royal_group(self, piece: Piece | type[Piece], side: Side) -> tuple[int, str]:
         opponent = side.opponent()
-        end_rules = self.end_rules.get(opponent)
+        end_rules = self.end_rules[opponent]
         if not end_rules:
             return 0, ''
         for group, value in end_rules.get('check', {}).items():
             if self.fits(group, piece):
                 return sign(value), group
-        end_data = self.end_data.get(opponent, {})
+        end_data = self.end_data[opponent]
         for group, value in end_rules.get('checkmate', {}).items():
             if self.fits(group, piece):
                 if value in {'+', '-'}:
@@ -1708,8 +1692,8 @@ class Board(Window):
             side_groups, opponent_groups, side_values, opponent_values, resolution_groups = (
                 self.end_rules[side][condition],
                 self.end_rules[opponent].get(condition, {}),
-                self.end_data.get(side, {}).get(condition, {}),
-                self.end_data.get(opponent, {}).get(condition, {}),
+                self.end_data[side].get(condition, {}),
+                self.end_data[opponent].get(condition, {}),
                 self.end_rules.get(Side.NONE, {}).get(condition, {}),
             )
             for group in side_groups:
