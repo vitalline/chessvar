@@ -2935,7 +2935,7 @@ class Board(Window):
                     only_move = pos_from
                     continue
                 else:
-                    only_move = None
+                    only_move = False
                     break
             for pos_to in moves[pos_from]:
                 for move in moves[pos_from][pos_to]:
@@ -2944,11 +2944,15 @@ class Board(Window):
                     if only_move is None:
                         only_move = move
                     elif isinstance(only_move, str):
-                        only_move = None
+                        only_move = False
                         break
                     elif not only_move.matches(move):
-                        only_move = None
+                        only_move = False
                         break
+                if only_move is False:
+                    break
+            if only_move is False:
+                break
         if isinstance(only_move, Move):
             self.auto(only_move)
             return True
@@ -3081,6 +3085,8 @@ class Board(Window):
             turn_side = self.get_turn_side(+1)
             if log_turn_pass:
                 self.log(f"Undo: Pass: {turn_side} to move")
+        self.chain_start = None
+        self.chain_moves = {side: {} for side in self.chain_moves}
         if self.move_history:
             move = self.move_history[-1]
             if move is not None and move.is_edit != 1 and move.movement_type != DropMovement:
@@ -3310,8 +3316,6 @@ class Board(Window):
             self.color_pieces()  # reverting the piece colors to normal in case they were changed
             self.update_caption()  # updating the caption to reflect the edit that was just made
             return  # let's not advance the turn while editing the board to hopefully make things easier for everyone
-        self.chain_start = None
-        self.chain_moves = {side: {} for side in self.chain_moves}
         self.update_status()
         self.draw(0)
         if self.auto_moves and self.board_config['fast_moves'] and not self.game_over:
