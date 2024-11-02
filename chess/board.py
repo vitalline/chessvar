@@ -453,7 +453,7 @@ class Board(Window):
                 condition: {
                     group: 0 for group in data
                 } for condition, data in rules.items()
-            } for side, rules in self.end_rules.items()
+            } for side, rules in self.end_rules.items() if side is not Side.NONE
         }
         self.end_value = 0
         self.end_condition = None
@@ -1048,7 +1048,7 @@ class Board(Window):
                 condition: {
                     group: 0 for group in data
                 } for condition, data in rules.items()
-            } for side, rules in self.end_rules.items()
+            } for side, rules in self.end_rules.items() if side is not Side.NONE
         }
         self.end_value = 0
         self.end_condition = None
@@ -1388,6 +1388,12 @@ class Board(Window):
             if 'stalemate' not in self.end_rules[side]:
                 self.end_rules[side]['stalemate'] = {'': 0}
                 self.end_data[side]['stalemate'] = {'': 0}
+        if Side.NONE in self.custom_end_rules:
+            self.end_rules[Side.NONE] = {}
+            for condition, value in self.custom_end_rules[Side.NONE].items():
+                condition = end_types.get(condition)
+                if condition is not None:
+                    self.end_rules[Side.NONE].setdefault(condition, value)
 
     def get_piece_sets(
         self,
@@ -1705,10 +1711,12 @@ class Board(Window):
         if self.edit_mode:
             return
         for condition in self.end_rules[side]:
+            win_side = None
+            win_value = 0
+            loss_side = None
+            loss_value = 0
+            draw = False
             for group in self.end_rules[side][condition]:
-                draw = False
-                win_side = None
-                win_value = 0
                 side_needs = self.end_rules[side][condition][group]
                 side_count = self.end_data[side].get(condition, {}).get(group, 0)
                 if side_needs in {'+', '-'}:
@@ -1719,8 +1727,6 @@ class Board(Window):
                     win_side, win_value = opponent, -side_needs
                 if 0 == side_needs and side_count:
                     draw = True
-                loss_side = None
-                loss_value = 0
                 other_needs = self.end_rules[opponent].get(condition, {}).get(group, None)
                 other_count = self.end_data[opponent].get(condition, {}).get(group, 0)
                 if other_needs is not None:
@@ -1732,34 +1738,34 @@ class Board(Window):
                         loss_side, loss_value = opponent, -other_needs
                     if 0 == other_needs and other_count:
                         draw = True
-                if win_side and loss_side and win_side != loss_side.opponent():
-                    if win_value > loss_value:
-                        loss_side = None
-                    if loss_value > win_value:
-                        win_side = None
-                    if win_value == loss_value:
-                        resolution = self.end_rules.get(Side.NONE, {}).get(condition, {}).get(group, 0)
-                        if resolution >= 0:
-                            loss_side = None
-                        if resolution <= 0:
-                            win_side = None
-                        if resolution == 0:
-                            draw = True
-                if win_side and draw or loss_side and draw:
-                    resolution = self.end_rules.get(Side.NONE, {}).get(condition, {}).get(group, 0)
+            if win_side and loss_side and win_side != loss_side.opponent():
+                if win_value > loss_value:
+                    loss_side = None
+                if loss_value > win_value:
+                    win_side = None
+                if win_value == loss_value:
+                    resolution = self.end_rules.get(Side.NONE, {}).get(condition, 0)
                     if resolution >= 0:
                         loss_side = None
-                        draw = False
                     if resolution <= 0:
                         win_side = None
-                        draw = False
-                if win_side or loss_side or draw:
-                    self.game_over, self.end_condition = True, condition
-                    if win_side:
-                        self.win_side, self.end_value = win_side, win_value
-                    elif loss_side:
-                        self.win_side, self.end_value = loss_side.opponent(), loss_value
-                    return
+                    if resolution == 0:
+                        draw = True
+            if win_side and draw or loss_side and draw:
+                resolution = self.end_rules.get(Side.NONE, {}).get(condition, 0)
+                if resolution >= 0:
+                    loss_side = None
+                    draw = False
+                if resolution <= 0:
+                    win_side = None
+                    draw = False
+            if win_side or loss_side or draw:
+                self.game_over, self.end_condition = True, condition
+                if win_side:
+                    self.win_side, self.end_value = win_side, win_value
+                elif loss_side:
+                    self.win_side, self.end_value = loss_side.opponent(), loss_value
+                return
 
     def load_moves(
         self,
