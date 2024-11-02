@@ -18,22 +18,16 @@ from chess.movement.util import to_algebraic_map as tom, from_algebraic_map as f
 from chess.pieces import types as piece_types
 from chess.pieces.piece import Piece
 from chess.pieces.groups.util import NonMovingPiece, NoPiece
-from chess.util import Unset
+from chess.util import Unset, CUSTOM_PREFIX, UNSET_STRING
 
 if TYPE_CHECKING:
     from chess.board import Board
-
-
-UNSET_STRING = '*'
-
-CUSTOM_PREFIX = '_custom_'
 
 MOVEMENT_SUFFIXES = ('Movement', 'Rider')
 
 TYPE_CONFLICTS = {
     x: s for s in (map(frozenset, (
         (piece_types.Delayed, piece_types.Delayed1),
-        (piece_types.Royal, piece_types.QuasiRoyal, piece_types.RoyalGroup),
     ))) for x in s
 }
 
@@ -125,9 +119,7 @@ def save_piece_type(piece_type: type[Piece] | frozenset | None) -> str | None:
         return None
     if piece_type is Unset:
         return UNSET_STRING
-    if piece_type.__name__.startswith(CUSTOM_PREFIX):
-        return piece_type.__name__.removeprefix(CUSTOM_PREFIX)
-    return f"{piece_type.__module__.rsplit('.', 1)[-1]}.{piece_type.__name__}"
+    return piece_type.type()
 
 
 def load_piece_type(data: str | None, from_dict: dict | None) -> type[Piece] | frozenset | None:

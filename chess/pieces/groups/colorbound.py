@@ -1,7 +1,6 @@
 from chess.movement import types
 from chess.movement.util import rot
 from chess.pieces.piece import Piece
-from chess.pieces.types import Royal
 
 
 class Bede(Piece):
@@ -61,7 +60,7 @@ class Archbishop(Piece):
 # Note: The reason we redefine the King class here is that colorbound Rook-like pieces should preserve color on castling
 # This implementation castles three squares kingside and two squares queenside - the CwDA rule for Colorbound Clobberers
 # This version of the King should also be used for all other armies in which the Rook replacements are colorbound pieces
-class King(Piece, Royal):
+class King(Piece):
     name = 'King'
     file_name = 'K'
     asset_folder = 'classic'

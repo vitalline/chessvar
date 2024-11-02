@@ -12,7 +12,6 @@ from chess.movement.util import to_alpha as b26, to_algebraic as toa, from_algeb
 from chess.pieces.groups import classic as fide
 from chess.pieces.piece import Piece
 from chess.pieces.side import Side
-from chess.pieces.types import QuasiRoyal
 from chess.save import save_piece_type, save_custom_type, unpack, repack
 from chess.util import get_filename
 
@@ -144,12 +143,6 @@ def debug_info(board: Board) -> list[str]:
         if not board.movable_pieces[side]:
             debug_log[-1] += " None"
     for side in board.piece_set_ids:
-        debug_log.append(f"{side} royal pieces ({len(board.royal_pieces[side])}):")
-        for piece in board.royal_pieces[side]:
-            debug_log.append(f"{pad:2}{toa(piece.board_pos)} {piece.board_pos}: {piece.name}")
-        if not board.royal_pieces[side]:
-            debug_log[-1] += " None"
-    for side in board.piece_set_ids:
         debug_log.append(f"{side} royal groups ({len(board.royal_groups[side])}):")
         groups = {
             key: board.royal_groups[side][key] for key in sorted(  # this should put mixin classes before pieces
@@ -157,13 +150,24 @@ def debug_info(board: Board) -> list[str]:
             )
         }
         for key, group in groups.items():
-            name = key.name if issubclass(key, Piece) else {QuasiRoyal: "Quasi-royal"}.get(key, key.__name__)
-            debug_log.append(f"{pad:2}{name} ({len(group)}):")
+            debug_log.append(f"{pad:2}\"{key}\" ({len(group)}):")
             for piece in group:
                 debug_log.append(f"{pad:2}{toa(piece.board_pos)} {piece.board_pos}: {piece.name}")
             if not group:
                 debug_log[-1] += " None"
         if not board.royal_groups[side]:
+            debug_log[-1] += " None"
+    for side in board.piece_set_ids:
+        debug_log.append(f"{side} royal pieces ({len(board.royal_pieces[side])}):")
+        for piece in board.royal_pieces[side]:
+            debug_log.append(f"{pad:2}{toa(piece.board_pos)} {piece.board_pos}: {piece.name}")
+        if not board.royal_pieces[side]:
+            debug_log[-1] += " None"
+    for side in board.piece_set_ids:
+        debug_log.append(f"{side} anti-royal pieces ({len(board.anti_royal_pieces[side])}):")
+        for piece in board.anti_royal_pieces[side]:
+            debug_log.append(f"{pad:2}{toa(piece.board_pos)} {piece.board_pos}: {piece.name}")
+        if not board.anti_royal_pieces[side]:
             debug_log[-1] += " None"
     for side in board.piece_set_ids:
         debug_log.append(f"{side} probabilistic pieces ({len(board.probabilistic_pieces[side])}):")
@@ -394,25 +398,6 @@ def debug_info(board: Board) -> list[str]:
         k: f"Pieces {v} be dropped on the board" for k, v in {False: "cannot", True: "can"}.items()
     }.get(board.use_drops, "Unknown")
     debug_log.append(f"Use drops: {board.use_drops} - {drop_mode}")
-    check_mode = {
-        k: f"{v} the royal piece to win" for k, v in {False: "Capture", True: "Checkmate"}.items()
-    }.get(board.use_check, "Unknown")
-    debug_log.append(f"Use check: {board.use_check} - {check_mode}")
-    stalemate_modes = {0: "draws", 1: "loses", -1: "wins"}
-    if isinstance(board.stalemate_rule, dict):
-        for side, mode in board.stalemate_rule.items():
-            stalemate_mode = f"{side} {stalemate_modes.get(mode, '???')} when stalemated"
-            debug_log.append(f"Stalemate rule: {stalemate_mode}")
-    else:
-        stalemate_mode = f"Player {stalemate_modes.get(board.stalemate_rule, '???')} when stalemated"
-        debug_log.append(f"Stalemate rule: {stalemate_mode}")
-    royal_mode = {
-        0: "Default",
-        1: "Force royal (Threaten Any)",
-        2: "Force quasi-royal (Threaten Last)",
-        3: "Force royal groups (Threaten Last of a Kind)",
-    }.get(board.royal_piece_mode, "Unknown")
-    debug_log.append(f"Royal mode: {board.royal_piece_mode} - {royal_mode}")
     chaos_mode = {
         0: "Off",
         1: "Chaos (Matching Pieces)",
@@ -553,6 +538,14 @@ def debug_info(board: Board) -> list[str]:
             debug_log.append(f"{pad:2}{pad}{i + 1}: {turn_side}{turn_suffix}")
     if not start and not loop:
         debug_log[-1] += " None"
+    for side in board.end_rules:
+        debug_log.append(f"Win conditions for {side}:")
+        for rule in board.end_rules[side]:
+            debug_log.append(f"{pad:2}{rule.capitalize()}:")
+            for group in board.end_rules[side][rule]:
+                group_string = f'"{group}"' if group else "Any"
+                group_value = board.end_rules[side][rule][group]
+                debug_log.append(f"{pad:4}{group}: {group_value}")
     possible_moves = sum((
         sum(v.values(), []) for k, v in board.moves.get(board.turn_side, {}).items() if not isinstance(k, str)
     ), [])

@@ -5,6 +5,8 @@ from datetime import datetime
 from tkinter import filedialog
 from typing import Any
 
+# Lambda function to return the sign of a number. Returns 1 for positive numbers, -1 for negative numbers, and 0 for 0.
+sign = lambda x: (x > 0) - (x < 0)
 
 # Dummy value used to indicate reverting to default value in functions where None indicates retaining the current value.
 Default = object()
@@ -12,11 +14,17 @@ Default = object()
 # Dummy value used to indicate a value that has not been set and should be set to a non-None value (e.g. for promotion).
 Unset = frozenset()
 
-# Lambda function to return the sign of a number. Returns 1 for positive numbers, -1 for negative numbers, and 0 for 0.
-sign = lambda x: (x > 0) - (x < 0)
+# String used to represent Unset values in JSON files.
+UNSET_STRING = '*'
+
+# Prefix for custom piece and/or movement classes.
+CUSTOM_PREFIX = '_custom_'
 
 # Path to the directory where the game is running.
 base_dir = os.path.abspath(os.curdir)
+
+# Path to the game's configuration file.
+config_path = os.path.join(base_dir, 'config.ini')
 
 # Placeholder texture path for non-existent files.
 default_texture = "assets/util/missingno.png"
@@ -30,12 +38,18 @@ invalid_chars_trans_table = str.maketrans(invalid_chars, '_' * len(invalid_chars
 
 # Simple template matching function. Matches a string (or a group thereof) with a template containing '*' as a wildcard.
 def fits(template: str, data: Any) -> bool:
+    if not template:
+        return False
+    if data is None:
+        return False
     if not isinstance(data, str):
         return any(fits(template, s) for s in data)
     if template == '*':
         return True
     if template == data:
         return True
+    if '*' not in template:
+        return False
     template_start = template[0] == '*'
     template_end = template[-1] == '*'
     template = template.strip('*')

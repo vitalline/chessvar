@@ -1062,3 +1062,16 @@ class TagMovement(BaseChoiceMovement):
                     for move in movement.moves(pos_from, piece, theoretical):
                         yield copy(move).set(tag=key or None)
 
+
+# Movements that do not move the piece, instead interacting with the game in other, more mysterious ways. Intrigued yet?
+passive_movements = (
+    DropMovement,
+    CloneMovement,
+    RangedMovement,
+    AutoCaptureMovement,
+)
+
+is_active = lambda move: (
+    move and not move.is_edit and move.pos_from and move.pos_to and
+    (move.pos_from != move.pos_to or move.movement_type and not issubclass(move.movement_type, passive_movements))
+)

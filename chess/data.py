@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 from math import ceil
-from os.path import join
 from random import Random
 
 from chess.pieces.groups import classic as fide
@@ -25,7 +24,6 @@ from chess.pieces.groups import zebra as zb
 from chess.pieces.groups.util import NoPiece
 from chess.pieces.piece import Piece
 from chess.pieces.side import Side
-from chess.util import base_dir
 
 
 default_board_width = 8
@@ -40,8 +38,6 @@ size_step = 5.0
 
 base_rng = Random()
 max_seed = 2 ** 32 - 1
-
-config_path = join(base_dir, 'config.ini')
 
 penultima_textures = [f'ghost{s}' if s else None for s in ('R', 'N', 'B', 'Q', None, 'B', 'N', 'R')]
 

@@ -6,18 +6,6 @@ class Immune(object):
     # Cannot be captured by other pieces
     pass
 
-class Royal(object):
-    # Subject to check and checkmate rules
-    pass
-
-class QuasiRoyal(object):
-    # Considered royal if it is the only quasi-royal piece owned by the player
-    pass
-
-class RoyalGroup(object):
-    # Considered royal if it is the only piece of its type owned by the player
-    pass
-
 class Slow(object):
     # Can be captured en passant on any squares it moved through during the last move chain
     pass

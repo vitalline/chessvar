@@ -5,10 +5,11 @@ from typing import TYPE_CHECKING
 
 from arcade import Color, Sprite, load_texture
 
-from chess.movement import types
+from chess.movement.base import BaseMovement
+from chess.movement.types import is_active
 from chess.pieces.side import Side
 from chess.pieces.types import Double, Immune
-from chess.util import Default, get_texture_path
+from chess.util import CUSTOM_PREFIX, Default, get_texture_path
 
 if TYPE_CHECKING:
     from chess.board import Board
@@ -16,30 +17,17 @@ if TYPE_CHECKING:
     from chess.movement.util import Position
 
 
-# Movements that do not move the piece, instead interacting with the game in other, more mysterious ways. Intrigued yet?
-passive_movements = (
-    types.DropMovement,
-    types.CloneMovement,
-    types.RangedMovement,
-    types.AutoCaptureMovement,
-)
-
-
-is_active = lambda move: (
-    move and not move.is_edit and move.pos_from and move.pos_to and
-    (move.pos_from != move.pos_to or move.movement_type and not issubclass(move.movement_type, passive_movements))
-)
-
-
 class Piece(Sprite):
     name = '(Piece)'
     file_name = 'none'
     asset_folder = 'util'
+    type_str = None
+    group_str = None
 
     def __init__(
         self,
         board: Board,
-        movement: types.BaseMovement | None = None,
+        movement: BaseMovement | None = None,
         pos: Position | None = None,
         side: Side = Side.NONE,
         **kwargs
@@ -56,7 +44,7 @@ class Piece(Sprite):
         self.texture_side = self.side
         self.texture_name = self.file_name
         super().__init__(
-            get_texture_path(self.texture_path),
+            get_texture_path(self.texture_path()),
             flipped_horizontally=self.flipped_horizontally,
             flipped_vertically=self.flipped_vertically,
         )
@@ -120,6 +108,11 @@ class Piece(Sprite):
 
     def __str__(self):
         return f"{self.side} {'???' if self.is_hidden else self.name}".strip()
+
+    def __repr__(self):
+        if self.board_pos:
+            return f"{self.side} {self.name} at {self.board_pos}" + (' (Hidden)' if self.is_hidden else '')
+        return f"{self.side} {self.name}" + (' (Hidden)' if self.is_hidden else '')
 
     def __copy__(self):
         return self.of(self.side)
@@ -188,7 +181,19 @@ class Piece(Sprite):
                     and not isinstance(what, Immune)
                 )
 
-    @property
+    @classmethod
+    def type(cls) -> str:
+        if cls.type_str is None:
+            if cls.__name__.startswith(CUSTOM_PREFIX):
+                cls.type_str = cls.__name__.removeprefix(CUSTOM_PREFIX)
+            else:
+                cls.type_str = f"{cls.__module__.rsplit('.', 1)[-1]}.{cls.__name__}"
+        return cls.type_str
+
+    @classmethod
+    def group(cls) -> str:
+        return cls.group_str
+
     def texture_path(self) -> str:
         return f"assets/{self.texture_folder}/{self.texture_side.file_prefix()}{self.texture_name}.png"
 
@@ -206,7 +211,7 @@ class Piece(Sprite):
         self.texture_folder = asset_folder or self.texture_folder
         self.texture_side = side or self.texture_side
         self.texture_name = file_name or self.texture_name
-        texture_path = get_texture_path(self.texture_path)
+        texture_path = get_texture_path(self.texture_path())
         if flipped_horizontally is None:
             flipped_horizontally = self.flipped_horizontally
         else:
