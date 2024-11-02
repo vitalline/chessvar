@@ -1954,6 +1954,7 @@ class Board(Window):
                                     if last_history_chain_move.movement_type:
                                         last_history_types.add(last_history_chain_move.movement_type.__name__)
                                     if last_history_chain_move.tag:
+                                        last_history_types.add(last_history_chain_move.tag)
                                         last_history_tags.add(last_history_chain_move.tag)
                                 board_piece = self.get_piece(last_history_chain_move.pos_to)
                                 if board_piece.is_empty():
@@ -1962,15 +1963,18 @@ class Board(Window):
                                 if not board_piece.matches(moved_piece):
                                     continue
                                 (last_history_partial if partial else last_history_pieces).add(board_piece.board_pos)
+                                if not partial:
+                                    piece_type = type(board_piece)
+                                    last_history_types.update({piece_type.group(), piece_type.name, piece_type.type()})
                 allow_last_rules = [
                     rules[k] for rules in state_rules for k in rules
-                    if k == '*' or k in last_history_tags or k in last_history_types
-                    or ('*' in k and fits(k, (*last_history_tags, *last_history_types)))
+                    if k == '*' or k in last_history_types
+                    or ('*' in k and fits(k, last_history_types))
                 ]
                 block_last_rules = [
                     rules[k] for rules in allow_last_rules for k in rules
-                    if k is None or k not in last_history_tags and k not in last_history_types
-                    and ('*' not in k or not fits(k, (*last_history_tags, *last_history_types)))
+                    if k is None or k not in last_history_types
+                    and ('*' not in k or not fits(k, last_history_types))
                 ]
                 if not self.chain_start and block_last_rules:
                     self.load_pieces()
