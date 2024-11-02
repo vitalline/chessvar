@@ -1362,14 +1362,14 @@ class Board(Window):
         if not self.custom_end_rules:
             self.end_rules = {
                 side: {
-                    "checkmate": {'*': 1, "King": 1},
-                    "stalemate": {'*': 0},
+                    "checkmate": {'': 1, "King": 1},
+                    "stalemate": {'': 0},
                 } for side in (Side.WHITE, Side.BLACK)
             }
             self.end_data = {
                 side: {
-                    "checkmate": {'*': 0, "King": 0},
-                    "stalemate": {'*': 0},
+                    "checkmate": {'': 0, "King": 0},
+                    "stalemate": {'': 0},
                 } for side in (Side.WHITE, Side.BLACK)
             }
             return
@@ -1381,23 +1381,23 @@ class Board(Window):
                 if condition is not None:
                     if isinstance(rules, dict):
                         if condition == 'checkmate':
-                            self.end_rules.setdefault(side, {}).setdefault(condition, {}).setdefault('*', 1)
-                            self.end_data.setdefault(side, {}).setdefault(condition, {}).setdefault('*', 0)
+                            self.end_rules.setdefault(side, {}).setdefault(condition, {}).setdefault('', 1)
+                            self.end_data.setdefault(side, {}).setdefault(condition, {}).setdefault('', 0)
                         for group, value in rules.items():
                             self.end_rules.setdefault(side, {}).setdefault(condition, {}).setdefault(group, value)
                             self.end_data.setdefault(side, {}).setdefault(condition, {}).setdefault(group, 0)
                     else:
-                        self.end_rules.setdefault(side, {}).setdefault(condition, {}).setdefault('*', rules)
-                        self.end_data.setdefault(side, {}).setdefault(condition, {}).setdefault('*', 0)
+                        self.end_rules.setdefault(side, {}).setdefault(condition, {}).setdefault('', rules)
+                        self.end_data.setdefault(side, {}).setdefault(condition, {}).setdefault('', 0)
         for side in (Side.WHITE, Side.BLACK):
             if side not in self.end_rules:
                 self.end_rules[side] = {
-                    "checkmate": {'*': 1, "King": 1},
-                    "stalemate": {'*': 0},
+                    "checkmate": {'': 1, "King": 1},
+                    "stalemate": {'': 0},
                 }
                 self.end_data[side] = {
-                    "checkmate": {'*': 0, "King": 0},
-                    "stalemate": {'*': 0},
+                    "checkmate": {'': 0, "King": 0},
+                    "stalemate": {'': 0},
                 }
 
     def get_piece_sets(
@@ -1577,45 +1577,53 @@ class Board(Window):
         while move:
             if move.captured_piece and move.captured_piece.side == side:
                 is_royal, royal_group = self.get_royal_group(move.captured_piece, side)
-                if is_royal == '+':
-                    piece_loss.add(royal_group)
-                elif is_royal == '-':
-                    piece_gain.add(royal_group)
-                elif is_royal > 0:
-                    piece_loss.add(royal_group)
-                elif is_royal < 0:
-                    piece_gain.add(royal_group)
+                if not self.royal_groups.get(side, {}).get(is_royal, {}).get(royal_group):
+                    if is_royal == '+':
+                        piece_loss.add(royal_group)
+                    if is_royal == '-':
+                        piece_gain.add(royal_group)
+                elif isinstance(is_royal, int):
+                    if is_royal > 0:
+                        piece_loss.add(royal_group)
+                    if is_royal < 0:
+                        piece_gain.add(royal_group)
             if move.promotion:
                 if move.piece and move.piece.side == side:
                     is_royal, royal_group = self.get_royal_group(move.piece, side)
-                    if is_royal == '+':
-                        piece_loss.add(royal_group)
-                    elif is_royal == '-':
-                        piece_gain.add(royal_group)
-                    elif is_royal > 0:
-                        piece_loss.add(royal_group)
-                    elif is_royal < 0:
-                        piece_gain.add(royal_group)
+                    if not self.royal_groups.get(side, {}).get(is_royal, {}).get(royal_group):
+                        if is_royal == '+':
+                            piece_loss.add(royal_group)
+                        if is_royal == '-':
+                            piece_gain.add(royal_group)
+                    elif isinstance(is_royal, int):
+                        if is_royal > 0:
+                            piece_loss.add(royal_group)
+                        if is_royal < 0:
+                            piece_gain.add(royal_group)
                 if move.promotion and move.promotion.side == side:
                     is_royal, royal_group = self.get_royal_group(move.promotion, side)
-                    if is_royal == '+':
-                        piece_gain.add(royal_group)
-                    elif is_royal == '-':
-                        piece_loss.add(royal_group)
-                    elif is_royal > 0:
-                        piece_gain.add(royal_group)
-                    elif is_royal < 0:
-                        piece_loss.add(royal_group)
+                    if not self.royal_groups.get(side, {}).get(is_royal, {}).get(royal_group):
+                        if is_royal == '+':
+                            piece_gain.add(royal_group)
+                        if is_royal == '-':
+                            piece_loss.add(royal_group)
+                    elif isinstance(is_royal, int):
+                        if is_royal > 0:
+                            piece_gain.add(royal_group)
+                        if is_royal < 0:
+                            piece_loss.add(royal_group)
                 if move.promotion and move.placed_piece:
                     is_royal, royal_group = self.get_royal_group(move.placed_piece, side)
-                    if is_royal == '+':
-                        piece_loss.add(royal_group)
-                    elif is_royal == '-':
-                        piece_gain.add(royal_group)
-                    elif is_royal > 0:
-                        piece_loss.add(royal_group)
-                    elif is_royal < 0:
-                        piece_gain.add(royal_group)
+                    if not self.royal_groups.get(side, {}).get(is_royal, {}).get(royal_group):
+                        if is_royal == '+':
+                            piece_loss.add(royal_group)
+                        if is_royal == '-':
+                            piece_gain.add(royal_group)
+                    elif isinstance(is_royal, int):
+                        if is_royal > 0:
+                            piece_loss.add(royal_group)
+                        if is_royal < 0:
+                            piece_gain.add(royal_group)
             move = move.chained_move
         if move is Unset:
             return set()  # the chain has not finished yet. who knows, maybe we will gain a new royal piece later on
@@ -2143,7 +2151,7 @@ class Board(Window):
                                 if self.get_royal_loss(opponent, move):
                                     self.moves[opponent] = {}
                                     self.moves_queried[opponent] = True
-                                    end_data[self.turn_side]['checkmate']['*'] = 1
+                                    end_data[self.turn_side]['checkmate'][''] = 1
                             if self.check_side != turn_side:
                                 old_check_side = self.check_side
                                 new_check_side = Side.NONE
@@ -2191,7 +2199,9 @@ class Board(Window):
             else:
                 self.moves_queried[turn_side] = True
         if theoretical_moves_for is None:
-            if self.game_over and self.check_side == opponent:
+            self.end_data = deepcopy(end_data)
+            self.load_end_conditions()
+            if self.game_over and self.win_side == self.turn_side:
                 theoretical_moves_for = Side.NONE
             else:
                 theoretical_moves_for = opponent
@@ -2630,12 +2640,12 @@ class Board(Window):
             return
         opponent = self.turn_side.opponent()
         if not self.moves.get(self.turn_side) and self.moves_queried.get(self.turn_side, False):
-            if 'stalemate' in self.end_rules[opponent] and self.check_side != self.turn_side:
-                self.end_data[opponent]['stalemate']['*'] = 1
             if 'checkmate' in self.end_rules[opponent] and self.check_side == self.turn_side:
-                self.end_data[opponent]['checkmate']['*'] = 1
+                self.end_data[opponent]['checkmate'][''] = 1
+            if 'stalemate' in self.end_rules[opponent] and self.check_side != self.turn_side:
+                self.end_data[opponent]['stalemate'][''] = 1
         if 'check' in self.end_rules[opponent] and self.check_side == self.turn_side:
-            self.end_data[opponent]['check']['*'] += 1
+            self.end_data[opponent]['check'][''] += 1
             for group in self.check_groups:
                 self.end_data[opponent]['check'][group] += 1
         if not move or move.is_edit:
@@ -2654,12 +2664,12 @@ class Board(Window):
             return
         opponent = self.turn_side.opponent()
         if not self.moves.get(self.turn_side) and self.moves_queried.get(self.turn_side, False):
-            if 'stalemate' in self.end_rules[opponent] and self.check_side != self.turn_side:
-                self.end_data[opponent]['stalemate']['*'] = 0
             if 'checkmate' in self.end_rules[opponent] and self.check_side == self.turn_side:
-                self.end_data[opponent]['checkmate']['*'] = 0
+                self.end_data[opponent]['checkmate'][''] = 0
+            if 'stalemate' in self.end_rules[opponent] and self.check_side != self.turn_side:
+                self.end_data[opponent]['stalemate'][''] = 0
         if 'check' in self.end_rules[opponent] and self.check_side == self.turn_side:
-            self.end_data[opponent]['check']['*'] -= 1
+            self.end_data[opponent]['check'][''] -= 1
             for group in self.check_groups:
                 self.end_data[opponent]['check'][group] -= 1
         if not move or move.is_edit:
@@ -2674,24 +2684,21 @@ class Board(Window):
                     self.end_data[side]['capture'][group] -= 1
 
     def unload_end_data(self, _: Move | None = None) -> None:
-        if self.edit_mode:
-            return
-        opponent = self.turn_side.opponent()
-        if not self.moves.get(self.turn_side) and self.moves_queried.get(self.turn_side, False):
-            if 'stalemate' in self.end_rules[opponent] and self.check_side != self.turn_side:
-                self.end_data[opponent]['stalemate']['*'] = 0
-            if 'checkmate' in self.end_rules[opponent] and self.check_side == self.turn_side:
-                self.end_data[opponent]['checkmate']['*'] = 0
+        for side in {self.turn_side, self.turn_side.opponent()}:
+            if 'checkmate' in self.end_rules[side]:
+                self.end_data[side]['checkmate'][''] = 0
+            if 'stalemate' in self.end_rules[side]:
+                self.end_data[side]['stalemate'][''] = 0
 
     def reload_end_data(self, _: Move | None = None) -> None:
         if self.edit_mode:
             return
         opponent = self.turn_side.opponent()
         if not self.moves.get(self.turn_side) and self.moves_queried.get(self.turn_side, False):
-            if 'stalemate' in self.end_rules[opponent] and self.check_side != self.turn_side:
-                self.end_data[opponent]['stalemate']['*'] = 1
             if 'checkmate' in self.end_rules[opponent] and self.check_side == self.turn_side:
-                self.end_data[opponent]['checkmate']['*'] = 1
+                self.end_data[opponent]['checkmate'][''] = 1
+            if 'stalemate' in self.end_rules[opponent] and self.check_side != self.turn_side:
+                self.end_data[opponent]['stalemate'][''] = 1
 
     def clear_future_history(self, since: int) -> None:
         self.future_move_history = []
