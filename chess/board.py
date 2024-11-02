@@ -33,7 +33,7 @@ from chess.movement.util import Position, add, to_alpha as b26
 from chess.movement.util import to_algebraic as toa, from_algebraic as fra
 from chess.pieces.groups.classic import Pawn, King
 from chess.pieces.groups.colorbound import King as CBKing
-from chess.pieces.groups.util import NoPiece, Obstacle, Block, Wall
+from chess.pieces.groups.util import NoPiece, Obstacle, Block, Border, Wall
 from chess.pieces.piece import Piece, is_active
 from chess.pieces.side import Side
 from chess.pieces.types import Delayed, Delayed1, Slow
@@ -1263,14 +1263,14 @@ class Board(Window):
     def reset_edit_promotions(self, piece_sets: dict[Side, list[type[Piece]]] | None = None) -> None:
         if is_prefix_of('custom', self.edit_piece_set_id):
             self.edit_promotions = {
-                side: [Block, Wall]
+                side: [Border, Block, Wall]
                 + [piece_type for _, piece_type in self.custom_pieces.items()]
                 + [piece_type for k, piece_type in self.past_custom_pieces.items() if k not in self.custom_pieces]
                 for side in self.edit_promotions
             }
             return
         if is_prefix_of('wall', self.edit_piece_set_id):
-            self.edit_promotions = {side: [Block, Wall] for side in self.edit_promotions}
+            self.edit_promotions = {side: [Border, Block, Wall] for side in self.edit_promotions}
             return
         if piece_sets is None:
             if self.edit_piece_set_id is None:
@@ -2410,19 +2410,18 @@ class Board(Window):
                         return copy(to_moves[0])
         return None
 
-    def show_moves(self, with_markers: bool | None = None) -> None:
+    def show_moves(self, with_markers: bool = True) -> None:
         self.hide_moves()
         self.update_caption()
         move_sprites = dict()
-        with_markers = not self.hide_move_markers if with_markers is None else with_markers
+        if self.hide_move_markers:
+            with_markers = False
         pos = self.selected_square or self.hovered_square
         if not pos and self.is_active:
             pos = self.highlight_square
         if self.on_board(pos) and with_markers:
             piece = self.get_piece(pos)
-            if with_markers is None:
-                with_markers = not piece.is_hidden
-            if not piece.is_empty() and with_markers:
+            if self.hide_move_markers is False or not piece.is_hidden and not piece.is_empty():
                 if self.display_theoretical_moves.get(piece.side, False):
                     move_dict = self.theoretical_moves.get(piece.side, {})
                 elif self.display_moves.get(piece.side, False):
@@ -3625,7 +3624,7 @@ class Board(Window):
         if piece or hovered_square:
             if not piece:
                 piece = self.get_piece(hovered_square)
-            if not piece.is_empty():
+            if not piece.is_empty() and (self.edit_mode or not isinstance(piece, Border)):
                 self.set_caption(f"{prefix}{piece} on {toa(piece.board_pos)}")
                 return
         if self.edit_mode:
@@ -3842,17 +3841,18 @@ class Board(Window):
                 if type(promotion_piece) != promoted_from:
                     promotion_piece.promoted_from = promoted_from
             if self.edit_mode and is_prefix_in(['custom', 'wall'], self.edit_piece_set_id):
-                promotion_piece.reload(is_hidden=False, flipped_horizontally=False)
+                promotion_piece.reload(should_hide=False, flipped_horizontally=False)
             elif issubclass(promotion, (King, CBKing)) and promotion not in self.piece_sets[side]:
                 if self.edit_mode and self.edit_piece_set_id is not None:
+                    promotion_piece.should_hide = False
                     promotion_piece.is_hidden = False
                 self.update_piece(promotion_piece, asset_folder='other')
             elif not self.edit_mode or self.edit_piece_set_id is None:
                 self.update_piece(promotion_piece, penultima_flip=True)
             else:
-                promotion_piece.reload(is_hidden=False, flipped_horizontally=False)
+                promotion_piece.reload(should_hide=False, flipped_horizontally=False)
             promotion_piece.scale = self.square_size / promotion_piece.texture.width
-            if isinstance(promotion_piece, Wall):
+            if isinstance(promotion_piece, (Border, Wall)):
                 promotion_piece.scale *= 0.8
             if not promotion_piece.is_empty() and not isinstance(promotion_piece, Obstacle):
                 promotion_piece.set_color(
@@ -4032,7 +4032,7 @@ class Board(Window):
             penultima_flip = (self.chaos_mode in {2, 4}) and (set_id is None or set_id < 0)
         penultima_pieces = self.penultima_pieces.get(piece.side, {})
         if asset_folder is None:
-            if piece.is_hidden is False:
+            if piece.should_hide is False:
                 asset_folder = piece.asset_folder
             elif self.hide_pieces == 1:
                 asset_folder = 'other'
@@ -4041,7 +4041,7 @@ class Board(Window):
             else:
                 asset_folder = piece.asset_folder
         if file_name is None:
-            if piece.is_hidden is False:
+            if piece.should_hide is False:
                 file_name = piece.file_name
             elif self.hide_pieces == 1:
                 file_name = 'ghost'
@@ -4051,8 +4051,6 @@ class Board(Window):
                 file_name = piece.file_name
         if penultima_hide is not None:
             is_hidden = penultima_hide
-        elif piece.is_hidden is False:
-            is_hidden = False
         else:
             is_hidden = bool(self.hide_pieces) or Default
         file_name, flip = (file_name[:-1], penultima_flip) if file_name[-1] == '|' else (file_name, False)
@@ -4065,14 +4063,14 @@ class Board(Window):
         for piece in self.promotion_piece_sprite_list:
             if isinstance(piece, Piece) and not piece.is_empty():
                 if self.edit_mode and is_prefix_in(['custom', 'wall'], self.edit_piece_set_id):
-                    piece.reload(is_hidden=False, flipped_horizontally=False)
+                    piece.reload(should_hide=False, flipped_horizontally=False)
                 # that issubclass call is there because PyCharm doesn't recognize that piece is a Piece
                 elif issubclass(type(piece), (King, CBKing)) and type(piece) not in self.piece_sets[piece.side]:
                     self.update_piece(piece, asset_folder='other')
                 elif not self.edit_mode or self.edit_piece_set_id is None:
                     self.update_piece(piece, penultima_flip=True)
                 else:
-                    piece.reload(is_hidden=False, flipped_horizontally=False)
+                    piece.reload(should_hide=False, flipped_horizontally=False)
 
     def update_sprite(
         self,

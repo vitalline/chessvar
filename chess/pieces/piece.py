@@ -7,6 +7,7 @@ from arcade import Color, Sprite, load_texture
 
 from chess.movement.base import BaseMovement
 from chess.movement.types import is_active
+from chess.movement.util import Position, to_algebraic
 from chess.pieces.side import Side
 from chess.pieces.types import Double, Enemy, Immune
 from chess.util import CUSTOM_PREFIX, Default, get_texture_path
@@ -14,7 +15,6 @@ from chess.util import CUSTOM_PREFIX, Default, get_texture_path
 if TYPE_CHECKING:
     from chess.board import Board
     from chess.movement.move import Move
-    from chess.movement.util import Position
 
 
 class Piece(Sprite):
@@ -39,6 +39,7 @@ class Piece(Sprite):
         self.promoted_from = None
         self.flipped_horizontally = False
         self.flipped_vertically = False
+        self.should_hide = None
         self.is_hidden = None
         self.texture_folder = self.asset_folder
         self.texture_side = self.side
@@ -110,9 +111,21 @@ class Piece(Sprite):
         return f"{self.side} {'???' if self.is_hidden else self.name}".strip()
 
     def __repr__(self):
+        string = f"{self.side} {self.name}"
         if self.board_pos:
-            return f"{self.side} {self.name} at {self.board_pos}" + (' (Hidden)' if self.is_hidden else '')
-        return f"{self.side} {self.name}" + (' (Hidden)' if self.is_hidden else '')
+            string = f"{self.board_pos} {string} at {to_algebraic(self.board_pos)}"
+        suffixes = []
+        if self.movement and self.movement.total_moves:
+            suffixes.append(f"Moves: {self.movement.total_moves}")
+        if self.promoted_from:
+            suffixes.append(f"From: {self.promoted_from}")
+        if self.should_hide is not None:
+            suffixes.append("Always hide" if self.should_hide else "Never hide")
+        elif self.is_hidden:
+            suffixes.append("Hidden")
+        if suffixes:
+            string += f" ({', '.join(suffixes)})"
+        return f"<{string}>"
 
     def __copy__(self):
         return self.of(self.side)
@@ -129,6 +142,7 @@ class Piece(Sprite):
         clone.movement = copy(self.movement)
         clone.promoted_from = self.promoted_from
         clone.scale = self.scale
+        clone.should_hide = self.should_hide
         clone.is_hidden = self.is_hidden
         return clone
 
@@ -143,7 +157,7 @@ class Piece(Sprite):
         return (
             type(self) is type(other)
             and self.side == other.side
-            and bool(self.is_hidden) == bool(other.is_hidden)
+            and bool(self.should_hide) == bool(other.should_hide)
             and (
                 self.movement == other.movement and self.movement is None
                 or other.movement is not None and self.movement.total_moves == other.movement.total_moves
@@ -205,10 +219,14 @@ class Piece(Sprite):
         side: Side = None,
         file_name: str = None,
         is_hidden: bool = None,
+        should_hide: bool = None,
         flipped_horizontally: bool = None,
         flipped_vertically: bool = None,
     ):
-        if is_hidden is not None:
+        if should_hide is not None:
+            self.should_hide = None if should_hide is Default else should_hide
+            self.is_hidden = self.should_hide
+        if self.should_hide is None and is_hidden is not None:
             self.is_hidden = None if is_hidden is Default else is_hidden
         self.texture_folder = asset_folder or self.texture_folder
         self.texture_side = side or self.texture_side

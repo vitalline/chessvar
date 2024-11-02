@@ -188,8 +188,8 @@ def save_piece(piece: Piece | frozenset | None) -> dict | str | None:
         'side': piece.side.value if not isinstance(piece, NonMovingPiece) else None,
         'from': save_piece_type(piece.promoted_from) if piece.promoted_from else None,
         'moves': piece.movement.total_moves if piece.movement else None,
-        'show': True if piece.is_hidden is False else None,
-    }.items() if v}
+        'show': not piece.should_hide if piece.should_hide is not None else None,
+    }.items() if v or (k == 'show' and v is False)}
 
 
 def load_piece(data: dict | str | None, board: Board, from_dict: dict | None) -> Piece | frozenset | None:
@@ -207,7 +207,9 @@ def load_piece(data: dict | str | None, board: Board, from_dict: dict | None) ->
         side=side,
     )
     piece.promoted_from = load_piece_type(data.get('from'), from_dict)
-    piece.is_hidden = False if data.get('show') is True else None
+    show_piece = data.get('show')
+    if show_piece is not None:
+        piece.is_hidden = piece.should_hide = not show_piece
     if piece.movement:
         piece.movement.set_moves(data.get('moves', 0))
     piece.scale = board.square_size / piece.texture.width

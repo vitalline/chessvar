@@ -234,8 +234,8 @@ def debug_info(board: Board) -> list[str]:
                             suffixes.append(f"Moves: {to_piece.movement.total_moves}")
                         if to_piece.promoted_from:
                             suffixes.append(f"Promoted from: {to_piece.promoted_from.name}")
-                        if to_piece.is_hidden is False:
-                            suffixes.append('Never hide')
+                        if to_piece.should_hide is not None:
+                            suffixes.append("Always hide" if to_piece.should_hide else "Never hide")
                     suffix = f" ({', '.join(suffixes)})" if suffixes else ''
                     piece_list.append(f"{to_piece.name}{suffix}")
                 piece_list = ', '.join(string for string in piece_list)
@@ -268,8 +268,8 @@ def debug_info(board: Board) -> list[str]:
                             suffixes.append(f"Moves: {to_piece.movement.total_moves}")
                         if to_piece.promoted_from:
                             suffixes.append(f"Promoted from: {to_piece.promoted_from.name}")
-                        if to_piece.is_hidden is False:
-                            suffixes.append('Never hide')
+                        if to_piece.should_hide is not None:
+                            suffixes.append("Always hide" if to_piece.should_hide else "Never hide")
                     suffix = f" ({', '.join(suffixes)})" if suffixes else ''
                     piece_list.append(f"{to_piece.name}{suffix}")
                 piece_list = ', '.join(string for string in piece_list)
@@ -318,8 +318,8 @@ def debug_info(board: Board) -> list[str]:
             suffixes.append(f"Moves: {piece.movement.total_moves}")
         if piece.promoted_from:
             suffixes.append(f"Promoted from: {piece.promoted_from.name}")
-        if piece.is_hidden is False:
-            suffixes.append('Never hide')
+        if piece.should_hide is not None:
+            suffixes.append("Always hide" if piece.should_hide else "Never hide")
         suffix = f" ({', '.join(suffixes)})" if suffixes else ''
         debug_log.append(f"{pad:2}{toa(pos)} {pos}: {piece}{suffix}")
     if not board.custom_layout:
@@ -347,8 +347,8 @@ def debug_info(board: Board) -> list[str]:
                             suffixes.append(f"Moves: {to_piece.movement.total_moves}")
                         if to_piece.promoted_from:
                             suffixes.append(f"Promoted from: {to_piece.promoted_from.name}")
-                        if to_piece.is_hidden is False:
-                            suffixes.append('Never hide')
+                        if to_piece.should_hide is not None:
+                            suffixes.append("Always hide" if to_piece.should_hide else "Never hide")
                     suffix = f" ({', '.join(suffixes)})" if suffixes else ''
                     piece_list.append(f"{to_piece.name}{suffix}")
                 piece_list = ', '.join(string for string in piece_list)
@@ -380,8 +380,8 @@ def debug_info(board: Board) -> list[str]:
                             suffixes.append(f"Moves: {to_piece.movement.total_moves}")
                         if to_piece.promoted_from:
                             suffixes.append(f"Promoted from: {to_piece.promoted_from.name}")
-                        if to_piece.is_hidden is False:
-                            suffixes.append('Never hide')
+                        if to_piece.should_hide is not None:
+                            suffixes.append("Always hide" if to_piece.should_hide else "Never hide")
                     suffix = f" ({', '.join(suffixes)})" if suffixes else ''
                     piece_list.append(f"{to_piece.name}{suffix}")
                 piece_list = ', '.join(string for string in piece_list)

@@ -47,6 +47,11 @@ class Block(Obstacle):
     file_name = 'block'
 
 
+class Border(Obstacle, Immune):
+    name = 'Border'
+    file_name = 'square'
+
+
 class Wall(Obstacle, Immune):
     name = 'Wall'
     file_name = 'wall'
