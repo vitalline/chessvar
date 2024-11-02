@@ -50,10 +50,6 @@ Alt + M: clear future move history (twice: also clear future rolls)
 Ctrl + K: show valid moves for both sides
 Shift + K: show theoretical moves for both sides
 Ctrl + Shift + K: show valid moves for current player, theoretical moves for other player
-Ctrl + O: force check/mate if one's last royal piece is threatened
-Shift + O: force check/mate if any of one's royal pieces is threatened
-Ctrl + Shift + O: restore default behavior for check/mate (piece-dependent)
-Alt + O: toggle between win by checkmate and by royal piece capture
 Alt + H: toggle drops (crazyhouse mode)
 
 UI hotkeys:
