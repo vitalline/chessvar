@@ -3756,17 +3756,17 @@ class Board(Window):
         if self.game_over:
             if self.win_side:
                 self.color_pieces(
-                    self.check_side,
+                    self.win_side,
                     self.color_scheme.get(
-                        f"{self.check_side.key()}loss_color",
-                        self.color_scheme['loss_color']
+                        f"{self.win_side.key()}win_color",
+                        self.color_scheme['win_color']
                     ),
                 )
                 self.color_pieces(
-                    self.check_side.opponent(),
+                    self.win_side.opponent(),
                     self.color_scheme.get(
-                        f"{self.check_side.opponent().key()}win_color",
-                        self.color_scheme['win_color']
+                        f"{self.win_side.opponent().key()}loss_color",
+                        self.color_scheme['loss_color']
                     ),
                 )
             else:
