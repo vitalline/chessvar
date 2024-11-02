@@ -42,7 +42,7 @@ from chess.save import condense_algebraic as cnd_alg, expand_algebraic as exp_al
 from chess.save import load_move, load_piece, load_rng, load_piece_type, load_custom_type, load_movement_type
 from chess.save import save_move, save_piece, save_rng, save_piece_type, save_custom_type
 from chess.util import get_filename, is_prefix_of, is_prefix_in, select_save_data, select_save_name
-from chess.util import Default, Unset, base_dir, config_path, fits, sign
+from chess.util import Default, Unset, base_dir, config_path, deduplicate, fits, sign
 
 
 class Board(Window):
@@ -1639,15 +1639,17 @@ class Board(Window):
             and not (self.royal_pieces[side] or self.anti_royal_pieces[side])
         ):
             return
-        royal_groups = {
+        royal_groups = [
             group for x in self.royal_groups[side] for group in self.royal_groups[side][x]
             if self.end_rules[side.opponent()].get('check', {}).get(group, 0)
             or self.end_rules[side.opponent()].get('checkmate', {}).get(group, 0)
-        }
+        ]
         if not royal_groups:
             return
-        all_royal_groups = royal_groups.copy()
+        royal_groups = deduplicate(royal_groups)
+        safe_royal_groups = set(royal_groups)
         anti_royal_checks = set()
+        discard = lambda x: safe_royal_groups.discard(self.get_royal_group(x, side, {'check', 'checkmate'})[1])
         self.ply_simulation += 1
         for piece in self.movable_pieces[side.opponent()]:
             if isinstance(piece.movement, ProbabilisticMovement):
@@ -1663,23 +1665,21 @@ class Board(Window):
                     if not chained_move.swapped_piece:
                         if chained_move.pos_to in self.royal_markers[side]:
                             self.check_side = side
-                            if len(royal_groups) <= 1:
+                            discard(self.get_piece(chained_move.pos_to))
+                            if not safe_royal_groups:
                                 break
                         elif chained_move.pos_to in self.anti_royal_markers[side]:
                             anti_royal_checks.add(chained_move.pos_to)
-                        royal_groups.discard(
-                            self.get_royal_group(self.get_piece(chained_move.pos_to), side, {'check', 'checkmate'})[1]
-                        )
+                            discard(self.get_piece(chained_move.pos_to))
                     if chained_move.captured_piece and chained_move.captured_piece.side == side:
                         if chained_move.captured_piece.board_pos in self.royal_markers[side]:
                             self.check_side = side
-                            if len(royal_groups) <= 1:
+                            discard(chained_move.captured_piece)
+                            if not safe_royal_groups:
                                 break
                         elif chained_move.captured_piece.board_pos in self.anti_royal_markers[side]:
                             anti_royal_checks.add(chained_move.captured_piece.board_pos)
-                        royal_groups.discard(
-                            self.get_royal_group(chained_move.captured_piece, side, {'check', 'checkmate'})[1]
-                        )
+                            discard(chained_move.captured_piece)
                     chained_move = chained_move.chained_move
                 if self.check_side:
                     break
@@ -1688,7 +1688,7 @@ class Board(Window):
         self.ply_simulation -= 1
         if not self.check_side and anti_royal_checks != self.anti_royal_markers[side]:
             self.check_side = side
-        self.check_groups = all_royal_groups.difference(royal_groups)
+        self.check_groups = [group for group in royal_groups if group not in safe_royal_groups]
 
     def load_end_conditions(self, side: Side | None = None):
         # Did the side meet any of its win conditions?
@@ -2636,9 +2636,9 @@ class Board(Window):
             if 'stalemate' in self.end_rules[opponent] and self.check_side != self.turn_side:
                 self.end_data[opponent]['stalemate'][''] = 1
         if 'check' in self.end_rules[opponent] and self.check_side == self.turn_side:
-            self.end_data[opponent]['check'][''] += 1
-            for group in self.check_groups:
-                self.end_data[opponent]['check'][group] += 1
+            for group in ('', *self.check_groups):
+                if group in self.end_data[opponent]['check']:
+                    self.end_data[opponent]['check'][group] += 1
         if not move or move.is_edit:
             return
         for side in {self.turn_side, self.turn_side.opponent()}:
@@ -2646,10 +2646,12 @@ class Board(Window):
                 continue
             if 'checkmate' in self.end_rules[side]:
                 for group in self.get_royal_loss(side.opponent(), move, {'checkmate'}):
-                    self.end_data[side]['checkmate'][group] += 1
+                    if group in self.end_data[side]['checkmate']:
+                        self.end_data[side]['checkmate'][group] += 1
             if 'capture' in self.end_rules[side]:
                 for group in self.get_royal_loss(side.opponent(), move, {'capture'}):
-                    self.end_data[side]['capture'][group] += 1
+                    if group in self.end_data[side]['capture']:
+                        self.end_data[side]['capture'][group] += 1
 
     def revert_end_data(self, move: Move | None = None) -> None:
         if self.edit_mode:
@@ -2661,9 +2663,9 @@ class Board(Window):
             if 'stalemate' in self.end_rules[opponent] and self.check_side != self.turn_side:
                 self.end_data[opponent]['stalemate'][''] = 0
         if 'check' in self.end_rules[opponent] and self.check_side == self.turn_side:
-            self.end_data[opponent]['check'][''] -= 1
-            for group in self.check_groups:
-                self.end_data[opponent]['check'][group] -= 1
+            for group in ('', *self.check_groups):
+                if group in self.end_data[opponent]['check']:
+                    self.end_data[opponent]['check'][group] -= 1
         if not move or move.is_edit:
             return
         for side in {self.turn_side, self.turn_side.opponent()}:
@@ -2671,17 +2673,12 @@ class Board(Window):
                 continue
             if 'checkmate' in self.end_rules[side]:
                 for group in self.get_royal_loss(side.opponent(), move, {'checkmate'}):
-                    self.end_data[side]['checkmate'][group] -= 1
+                    if group in self.end_data[side]['checkmate']:
+                        self.end_data[side]['checkmate'][group] -= 1
             if 'capture' in self.end_rules[side]:
                 for group in self.get_royal_loss(side.opponent(), move, {'capture'}):
-                    self.end_data[side]['capture'][group] -= 1
-
-    def unload_end_data(self, _: Move | None = None) -> None:
-        for side in {self.turn_side, self.turn_side.opponent()}:
-            if 'checkmate' in self.end_rules[side]:
-                self.end_data[side]['checkmate'][''] = 0
-            if 'stalemate' in self.end_rules[side]:
-                self.end_data[side]['stalemate'][''] = 0
+                    if group in self.end_data[side]['capture']:
+                        self.end_data[side]['capture'][group] -= 1
 
     def reload_end_data(self, _: Move | None = None) -> None:
         if self.edit_mode:
@@ -2692,6 +2689,13 @@ class Board(Window):
                 self.end_data[opponent]['checkmate'][''] = 1
             if 'stalemate' in self.end_rules[opponent] and self.check_side != self.turn_side:
                 self.end_data[opponent]['stalemate'][''] = 1
+
+    def unload_end_data(self, _: Move | None = None) -> None:
+        for side in {self.turn_side, self.turn_side.opponent()}:
+            if 'checkmate' in self.end_rules[side]:
+                self.end_data[side]['checkmate'][''] = 0
+            if 'stalemate' in self.end_rules[side]:
+                self.end_data[side]['stalemate'][''] = 0
 
     def clear_future_history(self, since: int) -> None:
         self.future_move_history = []

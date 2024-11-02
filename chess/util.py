@@ -5,7 +5,10 @@ from datetime import datetime
 from tkinter import filedialog
 from typing import Any
 
-# Lambda function to return the sign of a number. Returns 1 for positive numbers, -1 for negative numbers, and 0 for 0.
+# Lambda function to remove duplicates from a list while preserving order.
+deduplicate = lambda lst: list(dict.fromkeys(lst))
+
+# Lambda function to return the sign of a number. Returns +1 for positive numbers, -1 for negative numbers, and 0 for 0.
 sign = lambda x: (x > 0) - (x < 0)
 
 # Dummy value used to indicate reverting to default value in functions where None indicates retaining the current value.
@@ -87,6 +90,11 @@ def is_prefix_of(string: Any, prefix: Any) -> bool:
 # Function to check if a string is a prefix of any string in a list, ignoring case.
 def is_prefix_in(strings: list[Any], prefix: Any) -> bool:
     return any(is_prefix_of(string, prefix) for string in strings)
+
+
+# Function to check if a string has a prefix from a list of prefixes, ignoring case.
+def has_prefix_in(string: Any, prefixes: list[Any]) -> bool:
+    return any(is_prefix_of(string, prefix) for prefix in prefixes)
 
 
 # Function to select a file to open. Returns the path of the selected file.
