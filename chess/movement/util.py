@@ -136,7 +136,9 @@ def to_algebraic(pos: Position | None) -> str:
 
 
 def from_algebraic(pos: str) -> Position | None:
-    if str == UNKNOWN_COORDINATE_STRING:
+    if not pos:
+        return None
+    if pos == UNKNOWN_COORDINATE_STRING:
         return None
     pos = pos.lower()
     if pos[0] == '*' and pos[-1] == '*':  # '*' (or '**') means all positions
@@ -149,6 +151,13 @@ def from_algebraic(pos: str) -> Position | None:
     return int(pos[split_index:]) - 1, from_alpha(pos[:split_index]) - 1  # return as (rank, file), or (y, x)
     # this is the opposite of the usual (x, y) coordinate system OR the usual (file, rank) algebraic notation
     # the board is represented as a list of lists, so the rank is the outer list and goes first when indexing
+
+
+def is_algebraic(pos: str) -> bool:
+    try:
+        return from_algebraic(pos) is not None
+    except ValueError:
+        return False
 
 
 def to_algebraic_map(poss: list[Position], width: int, height: int) -> dict[str, list[Position]]:

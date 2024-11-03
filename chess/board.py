@@ -30,7 +30,7 @@ from chess.movement.types import AutoCaptureMovement, AutoRangedAutoCaptureRider
 from chess.movement.types import CastlingMovement, CastlingPartnerMovement
 from chess.movement.types import CloneMovement, DropMovement, ProbabilisticMovement
 from chess.movement.util import Position, add, to_alpha as b26
-from chess.movement.util import to_algebraic as toa, from_algebraic as fra
+from chess.movement.util import to_algebraic as toa, from_algebraic as fra, is_algebraic as isa
 from chess.pieces.groups.classic import Pawn, King
 from chess.pieces.groups.colorbound import King as CBKing
 from chess.pieces.groups.util import NoPiece, Obstacle, Block, Border, Wall
@@ -116,6 +116,7 @@ class Board(Window):
         self.roll_rng = None  # random number generator for probabilistic movement
         self.set_seed = None  # seed for piece set selection
         self.set_rng = None  # random number generator for piece set selection
+        self.areas = {}  # special areas on the board
         self.initial_turns = 0  # amount of initial turns
         self.turn_order = [(Side.WHITE, {}), (Side.BLACK, {})]  # order of turns
         self.turn_data = [0, Side.NONE, 0]  # [turn number, turn side, move number]
@@ -124,7 +125,8 @@ class Board(Window):
         self.end_rules = {}  # conditions under which the game ends
         self.end_data = {}  # additional data for the game end rules
         self.end_condition = None  # condition that has been met to end the game
-        self.end_value = 0  # value of the game ending contition, if applicable
+        self.end_value = 0  # value of the game ending condition, if applicable
+        self.end_group = None  # group of the game ending condition, if applicable
         self.win_side = Side.NONE  # side that has won the game, if any
         self.check_side = Side.NONE  # side that is currently in check, if any
         self.check_groups = set()  # groups that are currently in check
@@ -152,6 +154,7 @@ class Board(Window):
         self.promotions = {Side.WHITE: {}, Side.BLACK: {}}  # promotion options, as {side: {from: {pos: [to]}}}
         self.edit_promotions = {Side.WHITE: [], Side.BLACK: []}  # types of pieces each side can place in edit mode
         self.movable_pieces = {Side.WHITE: [], Side.BLACK: []}  # pieces that can be moved by each side
+        self.area_groups = {Side.WHITE: {}, Side.BLACK: {}}  # groups of pieces that have reached certain positions
         self.royal_groups = {Side.WHITE: {}, Side.BLACK: {}}  # groups that are currently considered royal
         self.royal_pieces = {Side.WHITE: [], Side.BLACK: []}  # these have to stay on the board and should be protected
         self.royal_markers = {Side.WHITE: set(), Side.BLACK: set()}  # squares where the side's royal pieces are
@@ -455,10 +458,10 @@ class Board(Window):
                 condition: {
                     group: 0 for group in data
                 } for condition, data in rules.items()
-            } for side, rules in self.end_rules.items()
-            if side is not Side.NONE
+            } for side, rules in self.end_data.items()
         }
         self.end_value = 0
+        self.end_group = None
         self.end_condition = None
         self.win_side = Side.NONE
         self.game_over = False
@@ -571,6 +574,12 @@ class Board(Window):
             'variant': self.variant,
             'board_size': [*wh],
             'borders': [toa((-1, col)) for col in self.border_cols] + [toa((row, -1)) for row in self.border_rows],
+            'areas': {
+                name: {
+                    side.value: unpack([toa(pos) for pos in area]) for side, area in data.items()
+                } if isinstance(data, dict) else unpack([toa(pos) for pos in data])
+                for name, data in self.areas.items()
+            },
             'window_size': list(self.windowed_size),
             'square_size': self.windowed_square_size,
             'flip_mode': self.flip_mode,
@@ -661,16 +670,14 @@ class Board(Window):
                 for side, rules in self.custom_end_rules.items()
             },
             'count': {
-                side.value: data for side in self.end_data if (data := {
-                    shorthand: values for shorthand in self.custom_end_rules.get(side, self.custom_end_rules)
-                    if (values := {
-                        group: value
-                        for group, value in self.end_data[side].get(end_types.get(shorthand), {}).items() if (
-                            (condition := end_types.get(shorthand)) in {'check', 'capture'} or condition == 'checkmate'
+                side.value: short_side_data for side, side_data in self.end_data.items() if (short_side_data := {
+                    word: data for word in self.custom_end_rules.get(side, self.custom_end_rules) if (data := {
+                        group: v for group, v in side_data.get(end_types.get(word), {}).items() if v and (
+                            (condition := end_types.get(word)) in {'check', 'capture'} or condition == 'checkmate'
                             and ((need := self.end_rules.get(side, {}).get(condition, {}).get(group, 0))
                             and isinstance(need, int) and abs(need) > 1)
-                        ) and value > 0
-                    }) and end_types.get(shorthand) in self.end_data[side]
+                        )
+                    })
                 })
             },
             'edit': self.edit_mode,
@@ -723,6 +730,7 @@ class Board(Window):
         self.clear_en_passant_markers()
         self.clear_auto_capture_markers()
         self.end_value = 0
+        self.end_group = None
         self.end_condition = None
         self.win_side = Side.NONE
         self.game_over = False
@@ -766,6 +774,13 @@ class Board(Window):
         new_square_size = min(self.width / (self.visual_board_width + 2), self.height / (self.visual_board_height + 2))
         if window_size is not None and square_size is not None and new_square_size != square_size:
             self.log(f"Error: Square size does not match (was {square_size}, but is {new_square_size})")
+
+        self.areas = {
+            name: {
+                Side(int(side)): [fra(pos) for pos in repack(area)] for side, area in data.items()
+            } if isinstance(data, dict) else [fra(pos) for pos in repack(data)]
+            for name, data in data.get('areas', {}).items()
+        }
 
         self.color_index = data.get('color_index', self.color_index)
         self.color_scheme = colors[self.color_index] if self.color_index is not None else default_colors
@@ -917,7 +932,7 @@ class Board(Window):
             if side not in self.end_data:
                 continue
             for c in end_data[s]:
-                condition = end_types.get(c)
+                condition = end_types.get(c, c)
                 if condition not in self.end_data[side]:
                     continue
                 for g in end_data[s][c]:
@@ -1087,10 +1102,10 @@ class Board(Window):
                 condition: {
                     group: 0 for group in data
                 } for condition, data in rules.items()
-            } for side, rules in self.end_rules.items()
-            if side is not Side.NONE
+            } for side, rules in self.end_data.items()
         }
         self.end_value = 0
+        self.end_group = None
         self.end_condition = None
         self.win_side = Side.NONE
         self.game_over = False
@@ -1148,6 +1163,7 @@ class Board(Window):
         else:
             self.past_custom_pieces = {**self.past_custom_pieces, **self.custom_pieces}
         self.variant = ''
+        self.areas = {}
         self.alias_dict = {}
         self.custom_drops = {}
         self.custom_pawn = Pawn
@@ -1219,7 +1235,7 @@ class Board(Window):
                     continue
                 for i, piece_type in enumerate(trimmed_set):
                     if piece_type not in drops and not issubclass(piece_type, NoPiece):
-                        if self.get_royal_group(piece_type, drop_side)[0]:
+                        if self.is_royal(piece_type, drop_side):
                             continue
                         has_moved = i in {0, len(trimmed_set) - 1}
                         if has_moved:
@@ -1254,7 +1270,7 @@ class Board(Window):
                     if (
                         piece_type not in used_piece_set
                         and not issubclass(piece_type, NoPiece)
-                        and not self.get_royal_group(piece_type, side)[0]
+                        and not self.is_royal(piece_type, side)
                     ):
                         used_piece_set.add(piece_type)
                         promotion_types.append(piece_type)
@@ -1413,18 +1429,25 @@ class Board(Window):
             self.end_data[side] = {}
             side_rules = self.custom_end_rules.get(side, self.custom_end_rules) if self.custom_end_rules else {}
             for condition, rules in side_rules.items():
-                condition = end_types.get(condition)
-                if condition is not None:
-                    if isinstance(rules, dict):
-                        if condition == 'checkmate':
-                            self.end_rules[side].setdefault(condition, {}).setdefault('', 1)
-                            self.end_data[side].setdefault(condition, {}).setdefault('', 0)
-                        for group, value in rules.items():
-                            self.end_rules[side].setdefault(condition, {}).setdefault(group, value)
+                is_area = True
+                if condition in end_types:
+                    condition = end_types[condition]
+                    is_area = False
+                elif condition not in self.areas and not isa(condition):
+                    continue
+                if isinstance(rules, dict):
+                    if condition == 'checkmate':
+                        self.end_rules[side].setdefault(condition, {}).setdefault('', 1)
+                        self.end_data[side].setdefault(condition, {}).setdefault('', 0)
+                    for group, value in rules.items():
+                        self.end_rules[side].setdefault(condition, {}).setdefault(group, value)
+                        if not is_area:
                             self.end_data[side].setdefault(condition, {}).setdefault(group, 0)
-                    else:
-                        self.end_rules.setdefault(side, {}).setdefault(condition, {}).setdefault('', rules)
-                        self.end_data.setdefault(side, {}).setdefault(condition, {}).setdefault('', 0)
+                elif is_area:
+                    self.end_rules.setdefault(side, {}).setdefault(condition, {}).setdefault('*', rules)
+                else:
+                    self.end_rules.setdefault(side, {}).setdefault(condition, {}).setdefault('', rules)
+                    self.end_data.setdefault(side, {}).setdefault(condition, {}).setdefault('', 0)
             if 'checkmate' not in self.end_rules[side] and 'capture' not in self.end_rules[side]:
                 self.end_rules[side]['checkmate'] = {'': 1, "King": 1, "Royal": 1}
                 self.end_data[side]['checkmate'] = {'': 0, "King": 0, "Royal": 0}
@@ -1545,32 +1568,100 @@ class Board(Window):
         self.reset_custom_data()
         self.reset_board()
 
-    def get_royal_group(self, piece: Piece | type[Piece], side: Side, conditions: set | None = None) -> tuple[int, str]:
+    def is_royal(self, piece: Piece | type[Piece], side: Side, conditions: set | None = None) -> int:
+        return self.get_royal_state(piece, side, conditions)[0]
+
+    def get_royal_group(self, piece: Piece | type[Piece], side: Side, conditions: set | None = None) -> str:
+        return self.get_royal_state(piece, side, conditions)[1]
+
+    def get_royal_state(self, piece: Piece | type[Piece], side: Side, conditions: set | None = None) -> tuple[int, str]:
         if conditions is not None and not conditions:
             return 0, ''
+        if conditions is None:
+            conditions = {'check', 'checkmate', 'capture'}
         opponent = side.opponent()
+        end_data = self.end_data[opponent]
         end_rules = self.end_rules[opponent]
         if not end_rules:
             return 0, ''
-        if conditions is None:
-            conditions = set(end_rules)
-        if 'check' in conditions:
-            for group, value in end_rules.get('check', {}).items():
-                if self.fits(group, piece):
-                    return sign(value), group
-        end_data = self.end_data[opponent]
-        for condition in conditions.intersection(('checkmate', 'capture')):
+        for condition in self.end_rules:
+            if condition not in conditions:
+                continue
+            if condition == 'check':
+                for group, value in end_rules.get(condition, {}).items():
+                    if self.fits(group, piece):
+                        return sign(value), group
+            elif condition in {'checkmate', 'capture'}:
+                for group, value in end_rules.get(condition, {}).items():
+                    if self.fits(group, piece):
+                        if value in {'+', '-'}:
+                            return value, group
+                        elif isinstance(value, int) and abs(end_data.get(group, 0) + abs(sign(value))) >= abs(value):
+                            return sign(value), group
+        return 0, ''
+
+    def in_area(self, area: str, pos: Position, side: Side) -> bool:
+        if area in self.areas:
+            if isinstance(self.areas[area], dict):
+                area = self.areas[area].get(side)
+            else:
+                area = self.areas[area]
+        else:
+            area = [fra(area)]
+        for area_pos in area:
+            if all(i in {-1, j} for i, j in zip(area_pos, pos)):
+                return True
+        return False
+
+    def get_area_groups(self, piece: Piece, side: Side) -> list[tuple[str, str]]:
+        end_rules = self.end_rules[side]
+        groups = []
+        for condition in end_rules:
+            if condition in {'check', 'checkmate', 'capture', 'stalemate'}:
+                continue
+            if not self.in_area(condition, piece.board_pos, side):
+                continue
             for group, value in end_rules.get(condition, {}).items():
                 if self.fits(group, piece):
-                    if value in {'+', '-'}:
-                        return value, group
-                    elif isinstance(value, int) and abs(end_data.get(group, 0) + abs(sign(value))) >= abs(value):
-                        return sign(value), group
-        return 0, ''
+                    groups.append((condition, group))
+        return groups
+
+    def get_new_area_count(self, area: str, group: str, side: Side, max_count: int = 0) -> int:
+        if not self.move_history:
+            return 0
+        index = 1
+        last_moves = []
+        for move in self.move_history[::-1]:
+            if self.get_turn_side(-index) != side:
+                break
+            if not move:
+                last_moves.append(move)
+                continue
+            if move.is_edit:
+                last_moves.append(move)
+                continue
+            move_chain = [move]
+            while move_chain[-1].chained_move:
+                move_chain.append(move_chain[-1].chained_move)
+            last_moves.extend(move_chain[::-1])
+            index += 1
+        count = 0
+        for move in last_moves[::-1]:
+            piece = move.promotion or move.piece
+            moved = move.promotion or move.pos_to != move.pos_from
+            if not moved or not piece or piece.side != side:
+                continue
+            if self.in_area(area, move.pos_to, side):
+                if self.fits(group, piece):
+                    count += 1
+                    if max_count and count >= max_count:
+                        break
+        return count
 
     def load_pieces(self):
         self.movable_pieces = {Side.WHITE: [], Side.BLACK: []}
         self.piece_counts = {Side.WHITE: {}, Side.BLACK: {}}
+        self.area_groups = {Side.WHITE: {}, Side.BLACK: {}}
         self.royal_groups = {Side.WHITE: {}, Side.BLACK: {}}
         self.royal_pieces = {Side.WHITE: [], Side.BLACK: []}
         self.royal_markers = {Side.WHITE: set(), Side.BLACK: set()}
@@ -1588,7 +1679,9 @@ class Board(Window):
                 for group in self.piece_limits.get(side, self.piece_limits):
                     if self.fits(group, piece):
                         self.piece_counts[side][group] = self.piece_counts[side].get(group, 0) + 1
-                is_royal, royal_group = self.get_royal_group(piece, side)
+                for area, group in self.get_area_groups(piece, side):
+                    self.area_groups[side].setdefault(area, {}).setdefault(group, []).append(piece)
+                is_royal, royal_group = self.get_royal_state(piece, side)
                 if is_royal:
                     self.royal_groups[side].setdefault(royal_group, []).append(piece)
                     royal_group_values[side][royal_group] = is_royal
@@ -1626,20 +1719,20 @@ class Board(Window):
         piece_gain = set()
         while move:
             if move.captured_piece and move.captured_piece.side == side:
-                is_royal, royal_group = self.get_royal_group(move.captured_piece, side, conditions)
+                is_royal, royal_group = self.get_royal_state(move.captured_piece, side, conditions)
                 if royal_group and not self.royal_groups.get(side, {}).get(royal_group):
                     piece_loss.add(royal_group)
             if move.promotion:
                 if move.piece and move.piece.side == side:
-                    is_royal, royal_group = self.get_royal_group(move.piece, side, conditions)
+                    is_royal, royal_group = self.get_royal_state(move.piece, side, conditions)
                     if royal_group and not self.royal_groups.get(side, {}).get(royal_group):
                         piece_loss.add(royal_group)
                 if move.promotion and move.promotion.side == side:
-                    is_royal, royal_group = self.get_royal_group(move.promotion, side, conditions)
+                    is_royal, royal_group = self.get_royal_state(move.promotion, side, conditions)
                     if royal_group and not self.royal_groups.get(side, {}).get(royal_group):
                         piece_gain.add(royal_group)
                 if move.promotion and move.placed_piece:
-                    is_royal, royal_group = self.get_royal_group(move.placed_piece, side, conditions)
+                    is_royal, royal_group = self.get_royal_state(move.placed_piece, side, conditions)
                     if royal_group and not self.royal_groups.get(side, {}).get(royal_group):
                         piece_loss.add(royal_group)
             move = move.chained_move
@@ -1682,7 +1775,7 @@ class Board(Window):
         }
         all_royal_groups = safe_royal_groups.copy()
         anti_royal_checks = {}
-        royal_group = lambda x: self.get_royal_group(x, side, {'check', 'checkmate'})[1]
+        royal_group = lambda x: self.get_royal_group(x, side, {'check', 'checkmate'})
         insert = lambda x, p: anti_royal_checks.setdefault(x, set()).add(p)
         self.ply_simulation += 1
         for piece in self.movable_pieces[side.opponent()]:
@@ -1742,38 +1835,63 @@ class Board(Window):
         opponent = side.opponent()
         self.game_over = False
         self.end_value = 0
+        self.end_group = None
         self.end_condition = None
         self.win_side = Side.NONE
         if self.edit_mode:
             return
         for condition in self.end_rules[side]:
-            win_side = None
-            win_value = 0
-            loss_side = None
-            loss_value = 0
+            win_side, win_group, win_value = None, None, 0
+            loss_side, loss_group, loss_value = None, None, 0
             draw = False
             for group in self.end_rules[side][condition]:
                 side_needs = self.end_rules[side][condition][group]
-                side_count = self.end_data[side].get(condition, {}).get(group, 0)
                 if side_needs in {'+', '-'}:
                     side_needs = int(side_needs + '1')
+                if condition in self.end_data[side]:
+                    side_count = self.end_data[side][condition].get(group, 0)
+                else:
+                    side_count = len(self.area_groups[side].get(condition, {}).get(group, ()))
+                    if isinstance(side_needs, str) and side_needs[-1] == '!':
+                        side_needs = int(side_needs[:-1])
                 if 0 < side_needs <= side_count:
-                    win_side, win_value = side, side_needs
+                    win_side, win_value, win_group = side, side_needs, group
                 if 0 > side_needs >= -side_count:
-                    win_side, win_value = opponent, -side_needs
+                    win_side, win_value, win_group = opponent, -side_needs, group
                 if 0 == side_needs and side_count:
                     draw = True
                 other_needs = self.end_rules[opponent].get(condition, {}).get(group, None)
-                other_count = self.end_data[opponent].get(condition, {}).get(group, 0)
                 if other_needs is not None:
                     if other_needs in {'+', '-'}:
                         other_needs = int(other_needs + '1')
+                    if condition in self.end_data[opponent]:
+                        other_count = self.end_data[opponent][condition].get(group, 0)
+                    else:
+                        other_count = len(self.area_groups[opponent].get(condition, {}).get(group, ()))
+                        if isinstance(other_needs, str) and other_needs[-1] == '!':
+                            other_needs = int(other_needs[:-1])
                     if 0 < other_needs <= other_count:
                         loss_side, loss_value = side, other_needs
                     if 0 > other_needs >= -other_count:
                         loss_side, loss_value = opponent, -other_needs
                     if 0 == other_needs and other_count:
                         draw = True
+                if win_side and not loss_side and not draw:
+                    if condition not in self.end_data[side]:
+                        side_needs = self.end_rules[side][condition][group]
+                        if isinstance(side_needs, str) and side_needs[-1] == '!':
+                            side_needs = int(side_needs[:-1])
+                            if side_count >= side_needs:
+                                win_side, win_group, win_value = None, None, 0
+                                side_count -= self.get_new_area_count(
+                                    condition, group, side, side_needs - side_count + 1
+                                )
+                                if 0 < side_needs <= side_count:
+                                    win_side, win_value, win_group = side, side_needs, group
+                                if 0 > side_needs >= -side_count:
+                                    win_side, win_value, win_group = opponent, -side_needs, group
+                                if 0 == side_needs and side_count:
+                                    draw = True
             if win_side and loss_side and win_side != loss_side.opponent():
                 if win_value > loss_value:
                     loss_side = None
@@ -1798,9 +1916,9 @@ class Board(Window):
             if win_side or loss_side or draw:
                 self.game_over, self.end_condition = True, condition
                 if win_side:
-                    self.win_side, self.end_value = win_side, win_value
+                    self.win_side, self.end_group, self.end_value = win_side, win_group, win_value
                 elif loss_side:
-                    self.win_side, self.end_value = loss_side.opponent(), loss_value
+                    self.win_side, self.end_group, self.end_value = loss_side.opponent(), loss_group, loss_value
                 return
 
     def load_moves(
@@ -1812,6 +1930,7 @@ class Board(Window):
         if self.edit_mode:
             self.game_over = False
             self.end_value = 0
+            self.end_group = None
             self.end_condition = None
             self.win_side = Side.NONE
             self.moves = {side: {} for side in self.moves}
@@ -1821,6 +1940,7 @@ class Board(Window):
         if force_reload:
             self.game_over = False
             self.end_value = 0
+            self.end_group = None
             self.end_condition = None
             self.win_side = Side.NONE
             self.moves_queried = {side: False for side in self.moves_queried}
@@ -1835,8 +1955,8 @@ class Board(Window):
                 self.moves_queried[losing_side] = True
         movable_pieces = {side: self.movable_pieces[side].copy() for side in self.movable_pieces}
         piece_counts = {side: self.piece_counts[side].copy() for side in self.piece_counts}
+        area_groups = {side: self.area_groups[side].copy() for side in self.area_groups}
         royal_groups = {side: self.royal_groups[side].copy() for side in self.royal_groups}
-        # NB: Making a deep copy of piece counts or royal groups is unnecessary since they are generated anew each time.
         royal_pieces = {side: self.royal_pieces[side].copy() for side in self.royal_pieces}
         royal_markers = {side: self.royal_markers[side].copy() for side in self.royal_markers}
         anti_royal_pieces = {side: self.anti_royal_pieces[side].copy() for side in self.anti_royal_pieces}
@@ -2337,6 +2457,7 @@ class Board(Window):
             self.theoretical_moves_queried[turn_side] = True
         self.movable_pieces = movable_pieces
         self.piece_counts = piece_counts
+        self.area_groups = area_groups
         self.royal_groups = royal_groups
         self.royal_pieces = royal_pieces
         self.royal_markers = royal_markers
@@ -3473,7 +3594,12 @@ class Board(Window):
                 else:
                     string += f"{spell(self.end_value, 10).capitalize()}-check!"
             elif self.end_condition == 'capture':
-                string += "Game over!"
+                if end_group := self.end_group.strip('*'):
+                    string += f"{end_group} captured!"
+                else:
+                    string += "Game over!"
+            elif self.end_condition in {k for d in self.area_groups.values() for k in d}:
+                string += "Goal reached!"
             else:
                 string += "Game over..?"  # this should never happen
                 error = True
@@ -3482,7 +3608,7 @@ class Board(Window):
             else:
                 string += " It's a draw."
             if error:
-                string += f' I think. (Unknown end condition: "{self.end_condition}"'
+                string += f' I think. (Unknown end condition: "{self.end_condition}")'
             return string
         elif self.check_side:
             return f"{self.check_side} is in check!"
@@ -3505,7 +3631,7 @@ class Board(Window):
     def update_caption(self) -> None:
         if self.skip_caption_update:
             return
-        prefix = ''
+        prefix = prefix_text = ''
         if self.board_config['log_prefix'] == 0:
             prefix = f"Ply {self.ply_count}"
         if self.board_config['log_prefix'] > 0:
@@ -3513,13 +3639,12 @@ class Board(Window):
                 prefix = "Start"
             if self.turn_data[0] > 0:
                 prefix = f"Turn {self.turn_data[0]}: {self.turn_data[1]}"
-                if self.board_config['log_prefix'] == 1:
-                    prefix += f" to move"
                 if self.board_config['log_prefix'] > 1:
                     prefix += f", Move {self.turn_data[2]}"
                 if self.board_config['log_prefix'] > 2:
                     prefix = f"(Ply {self.ply_count}) {prefix}"
         if prefix:
+            prefix_text = prefix
             prefix = f"[{prefix}] "
         selected_square = self.selected_square
         hovered_square = None
@@ -3635,7 +3760,7 @@ class Board(Window):
         if message:
             self.set_caption(f"{prefix}{message}")
         else:
-            self.set_caption(f"{prefix}")
+            self.set_caption(f"[{prefix_text} to move]")
 
     def try_drop(self, move: Move) -> None:
         if move.promotion:

@@ -56,7 +56,7 @@ end_types = {
         'check': ('+', 'check'),
         'checkmate': ('#', 'mate', 'checkmate'),
         'stalemate': ('=', 'stale', 'stalemate'),
-        'capture': ('x', '*', 'capture'),
+        'capture': ('x', 'capture'),
     }.items() for v in vs
 }
 
