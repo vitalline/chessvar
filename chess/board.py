@@ -31,6 +31,7 @@ from chess.movement.types import CastlingMovement, CastlingPartnerMovement
 from chess.movement.types import CloneMovement, DropMovement, ProbabilisticMovement
 from chess.movement.util import Position, add, to_alpha as b26
 from chess.movement.util import to_algebraic as toa, from_algebraic as fra, is_algebraic as isa
+from chess.movement.util import to_algebraic_map as tom, from_algebraic_map as frm
 from chess.pieces.groups.classic import Pawn, King
 from chess.pieces.groups.colorbound import King as CBKing
 from chess.pieces.groups.util import NoPiece, Obstacle, Block, Border, Wall
@@ -174,6 +175,7 @@ class Board(Window):
         self.custom_pawn = Pawn  # custom pawn type
         self.custom_pieces = {}  # custom piece types
         self.custom_layout = {}  # custom starting layout of the board
+        self.custom_areas = {}  # custom areas on the board
         self.custom_promotions = {}  # custom promotion options
         self.custom_drops = {}  # custom drop options
         self.custom_extra_drops = {}  # custom extra drops, as {side: [was]}
@@ -576,9 +578,9 @@ class Board(Window):
             'borders': [toa((-1, col)) for col in self.border_cols] + [toa((row, -1)) for row in self.border_rows],
             'areas': {
                 name: {
-                    side.value: unpack([toa(pos) for pos in area]) for side, area in data.items()
-                } if isinstance(data, dict) else unpack([toa(pos) for pos in data])
-                for name, data in self.areas.items()
+                    side.value: unpack(list(tom(area, *wh))) for side, area in data.items()
+                } if isinstance(data, dict) else unpack(list(tom(data, *wh)))
+                for name, data in self.custom_areas.items()
             },
             'window_size': list(self.windowed_size),
             'square_size': self.windowed_square_size,
@@ -758,6 +760,14 @@ class Board(Window):
         self.resize_board(*board_size, *borders, update=False)
         wh = self.board_width, self.board_height
 
+        self.custom_areas = {
+            name: {
+                Side(int(side)): set(frm(repack(area), *wh)) for side, area in data.items()
+            } if isinstance(data, dict) else set(frm(repack(data), *wh))
+            for name, data in data.get('areas', {}).items()
+        }
+        self.reset_areas()
+
         window_size = data.get('window_size')
         square_size = data.get('square_size')
         if window_size is not None:
@@ -774,13 +784,6 @@ class Board(Window):
         new_square_size = min(self.width / (self.visual_board_width + 2), self.height / (self.visual_board_height + 2))
         if window_size is not None and square_size is not None and new_square_size != square_size:
             self.log(f"Error: Square size does not match (was {square_size}, but is {new_square_size})")
-
-        self.areas = {
-            name: {
-                Side(int(side)): [fra(pos) for pos in repack(area)] for side, area in data.items()
-            } if isinstance(data, dict) else [fra(pos) for pos in repack(data)]
-            for name, data in data.get('areas', {}).items()
-        }
 
         self.color_index = data.get('color_index', self.color_index)
         self.color_scheme = colors[self.color_index] if self.color_index is not None else default_colors
@@ -1163,8 +1166,8 @@ class Board(Window):
         else:
             self.past_custom_pieces = {**self.past_custom_pieces, **self.custom_pieces}
         self.variant = ''
-        self.areas = {}
         self.alias_dict = {}
+        self.custom_areas = {}
         self.custom_drops = {}
         self.custom_pawn = Pawn
         self.custom_pieces = {}
@@ -1184,6 +1187,7 @@ class Board(Window):
         for side in self.piece_set_ids:
             if self.piece_set_ids[side] is None:
                 self.piece_set_ids[side] = 0
+        self.reset_areas()
         self.reset_turn_order()
         self.reset_end_rules()
 
@@ -1349,6 +1353,21 @@ class Board(Window):
                             texture += '|'
                         if piece not in self.penultima_pieces[player_side]:
                             self.penultima_pieces[player_side][piece] = texture
+
+    def reset_areas(self) -> None:
+        self.areas = {Side.WHITE: {}, Side.BLACK: {}}
+        for side in self.areas:
+            for name, area in self.custom_areas.get(side, {}).items():
+                if not area:
+                    continue
+                self.areas[side][name] = area
+            for name, area in self.custom_areas:
+                if not area or isinstance(area, dict):
+                    continue
+                self.areas[side][name] = area
+            if Pawn.name not in self.areas[side]:
+                rows = range(2) if side == Side.WHITE else range(self.board_height - 2, self.board_height)
+                self.areas[side][Pawn.name] = {(row, col) for row in rows for col in range(self.board_width)}
 
     def reset_turn_order(self) -> None:
         start_turns, loop_turns = [], []
@@ -1601,17 +1620,13 @@ class Board(Window):
         return 0, ''
 
     def in_area(self, area: str, pos: Position, side: Side) -> bool:
-        if area in self.areas:
-            if isinstance(self.areas[area], dict):
-                area = self.areas[area].get(side)
-            else:
-                area = self.areas[area]
-        else:
-            area = [fra(area)]
-        for area_pos in area:
-            if all(i in {-1, j} for i, j in zip(area_pos, pos)):
-                return True
-        return False
+        if side in self.areas:
+            if area in self.areas[side]:
+                return pos in self.areas[side][area]
+        try:
+            return all(i in {-1, j} for i, j in zip(fra(area), pos))
+        except ValueError:
+            return False
 
     def get_area_groups(self, piece: Piece, side: Side) -> list[tuple[str, str]]:
         end_rules = self.end_rules[side]

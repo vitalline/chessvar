@@ -92,12 +92,12 @@ class Pawn(Piece):
             types.MultiMovement(
                 board,
                 move=[
-                    types.IndexMovement(
+                    types.AreaMovement(
                         board,
-                        [
-                            [types.EnPassantTargetRiderMovement(board, [(1, 0, 2)])],
-                            [types.RiderMovement(board, [(1, 0, 1)])],
-                        ],
+                        {
+                            self.name: [types.EnPassantTargetRiderMovement(board, [(1, 0, 2)])],
+                            '!' + self.name: [types.RiderMovement(board, [(1, 0, 1)])],
+                        }
                     )
                 ],
                 capture=[

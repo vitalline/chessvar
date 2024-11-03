@@ -1030,12 +1030,7 @@ class ChoiceMovement(BaseChoiceMovement):
                     yield copy(move)
         else:
             for key in self.movement_dict:
-                if key.startswith('!'):
-                    value = key[1:]
-                    invert = True
-                else:
-                    value = key
-                    invert = False
+                value, invert = (key[1:], True) if key.startswith('!') else (key, False)
                 for movement in self.movement_dict[key]:
                     for move in movement.moves(pos_from, piece, theoretical):
                         if key == '*':
@@ -1049,6 +1044,16 @@ class ChoiceMovement(BaseChoiceMovement):
                                 yield copy(move)
                             elif self.board.fits(value, to_piece) != invert:
                                 yield copy(move)
+
+
+class AreaMovement(BaseChoiceMovement):
+    def moves(self, pos_from: Position, piece: Piece, theoretical: bool = False):
+        for key in self.movement_dict:
+            value, invert = (key[1:], True) if key.startswith('!') else (key, False)
+            if self.board.in_area(value, pos_from, piece.side) != invert:
+                for movement in self.movement_dict[key]:
+                    for move in movement.moves(pos_from, piece, theoretical):
+                        yield copy(move)
 
 
 class TagMovement(BaseChoiceMovement):
