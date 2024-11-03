@@ -1448,6 +1448,8 @@ class Board(Window):
             self.end_data[side] = {}
             side_rules = self.custom_end_rules.get(side, self.custom_end_rules) if self.custom_end_rules else {}
             for condition, rules in side_rules.items():
+                if isinstance(condition, Side):
+                    continue
                 is_area = True
                 if condition in end_types:
                     condition = end_types[condition]
@@ -1603,7 +1605,7 @@ class Board(Window):
         end_rules = self.end_rules[opponent]
         if not end_rules:
             return 0, ''
-        for condition in self.end_rules:
+        for condition in end_rules:
             if condition not in conditions:
                 continue
             if condition == 'check':
