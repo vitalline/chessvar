@@ -8,8 +8,10 @@ from typing import TYPE_CHECKING, TextIO
 
 from chess.data import get_piece_types, get_set_name, piece_groups
 from chess.movement.types import DropMovement
-from chess.movement.util import to_alpha as b26, to_algebraic as toa, from_algebraic as fra, from_algebraic_map as frm
-from chess.pieces.groups import classic as fide
+from chess.movement.util import to_alpha as b26
+from chess.movement.util import to_algebraic as toa, from_algebraic as fra
+from chess.movement.util import to_algebraic_map as tom, from_algebraic_map as frm
+from chess.pieces.groups.classic import Pawn
 from chess.pieces.piece import Piece
 from chess.pieces.side import Side
 from chess.save import save_piece_type, save_custom_type, unpack, repack
@@ -85,20 +87,20 @@ def debug_info(board: Board) -> list[str]:
     debug_log.append(f"Board size: {board.board_width}x{board.board_height}")
     debug_log.append("Borders:")
     if board.border_cols or board.border_rows:
-        file_splits = (f'{b26(x)}/{b26(x + 1)}' for x in board.border_cols)
+        file_splits = list(f'{b26(x)}/{b26(x + 1)}' for x in board.border_cols)
         if file_splits:
             debug_log.append(
-                f"{pad:2}Files: {', '.join(file_splits)} {tuple(board.border_cols)}"
+                f"{pad:2}Files ({len(file_splits)}): {', '.join(file_splits)} {tuple(board.border_cols)}"
             )
         else:
-            debug_log.append(f"{pad:2}Files: None")
-        rank_splits = (f'{x}/{x + 1}' for x in board.border_rows)
+            debug_log.append(f"{pad:2}Files (0): None")
+        rank_splits = list(f'{x}/{x + 1}' for x in board.border_rows)
         if board.border_rows:
             debug_log.append(
-                f"{pad:2}Ranks: {', '.join(rank_splits)} {tuple(board.border_rows)}"
+                f"{pad:2}Ranks ({len(rank_splits)}): {', '.join(rank_splits)} {tuple(board.border_rows)}"
             )
         else:
-            debug_log.append(f"{pad:2}Ranks: None")
+            debug_log.append(f"{pad:2}Ranks (0): None")
     else:
         debug_log[-1] += " None"
     debug_log.append(f"Screen size: {board.width}x{board.height}")
@@ -149,6 +151,13 @@ def debug_info(board: Board) -> list[str]:
         for group, limit in piece_limits.items():
             count = piece_counts.get(group, 0)
             debug_log.append(f"{pad:2}{group}: {count}/{limit}")
+    for side in board.piece_set_ids:
+        poss = board.areas.get(side, {}).get(Pawn.name) or []
+        if poss:
+            strs = list(tom(poss, board.board_width, board.board_height))
+            debug_log.append(f"{side} pawn area ({len(poss)}): {', '.join(f'{pos} {fra(pos)}' for pos in strs)}")
+        else:
+            debug_log.append(f"{side} pawn area (0): None")
     for side in board.piece_set_ids:
         debug_log.append(f"{side} royal groups ({len(board.royal_groups[side])}):")
         for key, group in board.royal_groups[side].items():
@@ -307,10 +316,30 @@ def debug_info(board: Board) -> list[str]:
         debug_log.append(f"{pad:2}{piece}: {save_custom_type(data)}")
     if not board.past_custom_pieces:
         debug_log[-1] += " None"
-    if board.custom_pawn != fide.Pawn:
+    if board.custom_pawn != Pawn:
         debug_log.append(f"Custom pawn: {board.custom_pawn.name} ({save_piece_type(board.custom_pawn)})")
     else:
         debug_log.append("Custom pawn: None")
+    debug_log.append(f"Custom areas ({len(board.custom_areas)}):")
+    for area, data in board.custom_areas.items():
+        if isinstance(data, dict):
+            debug_log.append(f"{pad:2}{area}:")
+            for side in (Side.WHITE, Side.BLACK):
+                poss = data.get(side) or []
+                if poss:
+                    strs = list(tom(poss, board.board_width, board.board_height))
+                    debug_log.append(f"{pad:4}{side} ({len(poss)}): {', '.join(f'{pos} {fra(pos)}' for pos in strs)}")
+                else:
+                    debug_log.append(f"{pad:4}{side} (0): None")
+        else:
+            poss = data or []
+            if poss:
+                strs = list(tom(poss, board.board_width, board.board_height))
+                debug_log.append(f"{pad:2}{area} ({len(poss)}): {', '.join(f'{pos} {fra(pos)}' for pos in strs)}")
+            else:
+                debug_log.append(f"{pad:2}{area} (0): None")
+    if not board.custom_areas:
+        debug_log[-1] += " None"
     debug_log.append(f"Custom layout ({len(board.custom_layout)}):")
     for pos, piece in board.custom_layout.items():
         suffixes = []
@@ -331,7 +360,7 @@ def debug_info(board: Board) -> list[str]:
         for piece in promotions:
             debug_log.append(f"{pad:2}{piece.name} ({len(promotions[piece])}):")
             compressed = data.get(str(side.value), {}).get(save_piece_type(piece), {})
-            from_mapping = frm(list(compressed), board.width, board.height)
+            from_mapping = frm(list(compressed), board.board_width, board.board_height)
             mapping = {}
             for pos, value in from_mapping.items():
                 if value not in mapping:
@@ -364,7 +393,7 @@ def debug_info(board: Board) -> list[str]:
         for piece in drops:
             debug_log.append(f"{pad:2}{piece.name} ({len(drops[piece])}):")
             compressed = data.get(str(side.value), {}).get(save_piece_type(piece), {})
-            from_mapping = frm(list(compressed), board.width, board.height)
+            from_mapping = frm(list(compressed), board.board_width, board.board_height)
             mapping = {}
             for pos, value in from_mapping.items():
                 if value not in mapping:
