@@ -1042,7 +1042,7 @@ class BaseChoiceMovement(BaseMultiMovement):
         if movements is None:
             movements = {}
         self.movement_dict = {key: repack(value) for key, value in movements.items()}
-        super().__init__(board, sum(movements.values(), []))
+        super().__init__(board, sum(self.movement_dict.values(), []))
 
     def __copy_args__(self):
         return self.board, {key: unpack(value) for key, value in self.movement_dict.items()}
