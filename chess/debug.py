@@ -194,12 +194,17 @@ def debug_info(board: Board) -> list[str]:
             side_section_data = section_data.get(side) or {}
             debug_log.append(f"{side} {section_type} ({len(side_section_data)}):")
             for pos in sorted(side_section_data):
-                piece_poss = side_section_data[pos]
+                piece_poss = {p for p in side_section_data[pos] if not isinstance(p, (type, str))}
                 poss_string = ', '.join(f'{toa(xy)} {xy}' for xy in sorted(piece_poss))
                 debug_log.append(f"{pad:2}{toa(pos)} {pos}: (From {len(piece_poss)}) {poss_string or 'None'}")
             if not side_section_data:
                 debug_log[-1] += " None"
-    for section, section_data in (('promotion', board.promotions), ('drop', board.drops)):
+    for section, section_data, custom_section in (
+        ('promotion', board.promotions, board.custom_promotions),
+        ('drop', board.drops, board.custom_drops),
+    ):
+        if custom_section:
+            continue
         for side in board.piece_set_ids:
             section_rules = section_data.get(side) or {}
             debug_log.append(f"{side} {section} rules ({len(section_rules)}):")
@@ -308,7 +313,9 @@ def debug_info(board: Board) -> list[str]:
                         suffix = f" ({', '.join(suffixes)})" if suffixes else ''
                         piece_list.append(f"{to_piece.name}{suffix}")
                     piece_list = ', '.join(string for string in piece_list)
-                    debug_log.append(f"{pad:4}{value} {fra(value)}: {piece_list if piece_list else 'None'}")
+                    if value not in board.areas.get(side, {}):
+                        value = f"{value} {fra(value)}"
+                    debug_log.append(f"{pad:4}{value}: {piece_list if piece_list else 'None'}")
                 if not section_rules[piece]:
                     debug_log[-1] += " None"
             if not section_rules:
@@ -342,10 +349,10 @@ def debug_info(board: Board) -> list[str]:
     debug_log.append(f"Current turn: {board.turn_data[0]}")
     debug_log.append(f"Current side: {board.turn_side if board.turn_side else 'None'}")
     debug_log.append(f"Current move: {board.turn_data[2]}")
-    debug_log.append(f"Movement rules ({len(board.turn_rules)}):")
+    debug_log.append(f"Movement rules:")
     for order in board.get_order():
         order_rules = board.turn_rules.get(order) or {}
-        debug_log.append(f"{pad:2}Priority {order} ({len(order_rules)}):")
+        debug_log.append(f"{pad:2}Priority {order}:")
         states = [x for x in [0, 1, -1, 2, -2] if x in order_rules]
         for state in states:
             state_rules = order_rules[state]
@@ -356,10 +363,10 @@ def debug_info(board: Board) -> list[str]:
                 -1: "White is in check",
                 -2: "Black is in check"
             }.get(state, "Unknown")
-            debug_log.append(f"{pad:4}State {state} ({state_string}) ({len(state_rules)}):")
+            debug_log.append(f"{pad:4}State {state} ({state_string}):")
             for allow_last in sorted(state_rules):
                 allow_last_rules = state_rules[allow_last]
-                for block_last in sorted(allow_last_rules):
+                for block_last in sorted(allow_last_rules, key=lambda x: '' if x is None else f' {x}'):
                     block_last_rules = allow_last_rules[block_last]
                     last_string = (
                         "Any last move" if allow_last == '*' and block_last is None else
@@ -367,10 +374,10 @@ def debug_info(board: Board) -> list[str]:
                         f"Last move was NOT {block_last}" if allow_last == '*' else
                         f"Last move was {allow_last}, NOT {block_last}"
                     )
-                    debug_log.append(f"{pad:6}{last_string} ({len(block_last_rules)}):")
-                    for allow_piece in sorted(block_last_rules):
+                    debug_log.append(f"{pad:6}{last_string}:")
+                    for allow_piece in sorted(block_last_rules, key=lambda x: '' if x is None else f' {x}'):
                         allow_piece_rules = block_last_rules[allow_piece]
-                        for block_piece in sorted(allow_piece_rules):
+                        for block_piece in sorted(allow_piece_rules, key=lambda x: '' if x is None else f' {x}'):
                             block_piece_rules = allow_piece_rules[block_piece]
                             piece_string = (
                                 "Any piece" if allow_piece == '*' and block_piece is None else
@@ -382,10 +389,10 @@ def debug_info(board: Board) -> list[str]:
                                 f"NOT {block_piece}" if allow_piece == '*' else
                                 f"{allow_piece}, NOT {block_piece}"
                             )
-                            debug_log.append(f"{pad:8}{piece_string} ({len(block_piece_rules)}):")
-                            for allow_type in sorted(block_piece_rules):
+                            debug_log.append(f"{pad:8}{piece_string}:")
+                            for allow_type in sorted(block_piece_rules, key=lambda x: '' if x is None else f' {x}'):
                                 allow_type_rules = block_piece_rules[allow_type]
-                                for block_type in sorted(allow_type_rules):
+                                for block_type in sorted(allow_type_rules, key=lambda x: '' if x is None else f' {x}'):
                                     block_type_rules = allow_type_rules[block_type]
                                     type_string = (
                                         "Any move" if allow_type == '*' and block_type is None else
@@ -397,7 +404,7 @@ def debug_info(board: Board) -> list[str]:
                                         f"NOT {block_type}" if allow_type == '*' else
                                         f"{allow_type}, NOT {block_type}"
                                     )
-                                    debug_log.append(f"{pad:10}{type_string} ({len(block_type_rules)}):")
+                                    debug_log.append(f"{pad:10}{type_string}:")
                                     for allow_action in block_type_rules:
                                         allow_action_rules = block_type_rules[allow_action]
                                         allow_string = 'turn pass' if allow_action == 'pass' else allow_action
