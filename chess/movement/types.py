@@ -565,13 +565,13 @@ class IndexMovement(BaseMultiMovement):
     def __init__(
         self,
         board: Board,
-        movement_index: list[UnpackedList[BaseMovement]] | None = None,
+        movement_index: tuple[UnpackedList[BaseMovement]] | None = None,
         iteration_type: int = 0,
         iteration_div: int = 0,
         iteration_sub: int = 0,
         cycle_mode: int = 0,
     ):
-        self.movement_index = [repack(movements or []) for movements in (movement_index or [])]
+        self.movement_index = tuple(repack(movements or []) for movements in (movement_index or []))
         self.iteration_type = iteration_type
         self.iteration_div = iteration_div
         self.iteration_sub = iteration_sub
@@ -601,7 +601,7 @@ class IndexMovement(BaseMultiMovement):
 
     def __copy_args__(self):
         return (
-            self.board, [unpack(movements) for movements in self.movement_index],
+            self.board, tuple(unpack(movements) for movements in self.movement_index),
             self.iteration_type, self.iteration_div, self.iteration_sub, self.cycle_mode
         )
 

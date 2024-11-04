@@ -251,6 +251,8 @@ def save_movement(movement: BaseMovement | frozenset | None) -> list | str | Non
                 return list(arg)  # it is important to preserve order here because directions have it fixed!
             if isinstance(arg[0], BaseMovement):  # this is a list of movements, so we save them recursively
                 return [save_arg(x) for x in arg]  # no need to sort them, who knows what would that change?
+            if isinstance(arg, tuple):  # tuples tend to be used for things that have order, like directions
+                return [save_arg(x) for x in arg]  # if we sort them, that order is lost. we save them as is
             return sorted([save_arg(x) for x in arg])  # otherwise let's save the arguments in a sorted list
         if isinstance(arg, dict):  # support for saving dicts in movement arguments is a good thing to have.
             return {k: save_arg(v) for k, v in arg.items()}  # save them recursively. this is to be expected
