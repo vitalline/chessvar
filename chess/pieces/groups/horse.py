@@ -67,8 +67,8 @@ class Marauder(Piece):
             types.MultiMovement(board, [
                 types.RepeatMovement(board, [
                     types.RiderMovement(board, [(i, j, 1)]),
-                    types.RiderMovement(board, [(i, 0, 1), (0, j, 1)])
-                ]) for i, j in rot([(1, 1)])
+                    types.RiderMovement(board, [(i or k, j or k, 1) for k in (1, -1)])
+                ]) for i, j in rot([(1, 0)])
             ]),
             **kwargs
         )
