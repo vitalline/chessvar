@@ -2232,7 +2232,7 @@ class Board(Window):
                             ]
                             block_piece_rules = [
                                 rules[s] for rules in allow_piece_rules for s in rules
-                                if s is None or not self.fits(s, piece_type)
+                                if s is None or s and not self.fits(s, piece_type)
                             ]
                             allow_last_piece_rules[piece_type] = block_piece_rules
                         piece_rule_list = allow_last_piece_rules[piece_type]
@@ -2256,7 +2256,7 @@ class Board(Window):
                             ]
                             block_piece_rules = [
                                 rules[s] for rules in allow_piece_rules for s in rules
-                                if s is None or not self.fits(s, piece_type)
+                                if s is None or s and not self.fits(s, piece_type)
                             ]
                             piece_rules[piece_type] = block_piece_rules
                         piece_rule_list = piece_rules[piece_type]
