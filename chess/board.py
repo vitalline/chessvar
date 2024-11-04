@@ -5692,11 +5692,16 @@ class Board(Window):
             return
         makedirs(dirname(path), exist_ok=True)
         with open(path, mode='w', encoding='utf-8') as file:
+            first_line = True
             for string in self.save_info:
+                if first_line:
+                    first_line = False
+                else:
+                    file.write('\n')
                 if isinstance(string, str):
-                    file.write(f"# {string}\n")
+                    file.write(f"# {string}")
                 elif string is None:
-                    file.write(f"{data}\n")
+                    file.write(f"{data}")
         self.save_data = data
         self.save_path = path
         saved = 'Auto-saved' if auto else 'Saved'
