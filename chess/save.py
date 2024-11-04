@@ -18,7 +18,7 @@ from chess.movement.util import to_algebraic_map as tom, from_algebraic_map as f
 from chess.pieces import types as piece_types
 from chess.pieces.piece import Piece
 from chess.pieces.groups.util import NonMovingPiece, NoPiece
-from chess.util import Unset, CUSTOM_PREFIX, UNSET_STRING
+from chess.util import CUSTOM_PREFIX, UNSET_STRING, Unset
 
 if TYPE_CHECKING:
     from chess.board import Board
@@ -34,10 +34,6 @@ TYPE_CONFLICTS = {
 
 AnyJsonType = str | int | float | bool | None
 AnyJson = dict | list | AnyJsonType
-
-
-unpack = lambda l: l[0] if len(l) == 1 else l
-repack = lambda l: l if isinstance(l, list) else [l]
 
 
 def make_tuple(thing: AnyJson) -> tuple | AnyJsonType:

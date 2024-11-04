@@ -39,12 +39,11 @@ from chess.pieces.groups.util import NoPiece, Obstacle, Block, Border, Wall
 from chess.pieces.piece import Piece, is_active
 from chess.pieces.side import Side
 from chess.pieces.types import Delayed, Delayed1, Slow
-from chess.save import condense, expand, unpack, repack
-from chess.save import condense_algebraic as cnd_alg, expand_algebraic as exp_alg
+from chess.save import condense, expand, condense_algebraic as cnd_alg, expand_algebraic as exp_alg
 from chess.save import load_move, load_piece, load_rng, load_piece_type, load_custom_type, load_movement_type
 from chess.save import save_move, save_piece, save_rng, save_piece_type, save_custom_type
 from chess.util import get_filename, is_prefix_of, is_prefix_in, select_save_data, select_save_name
-from chess.util import Default, Unset, base_dir, config_path, deduplicate, fits, sign, spell
+from chess.util import Default, Unset, base_dir, config_path, deduplicate, fits, sign, spell, unpack, repack
 
 
 class Board(Window):
