@@ -1800,13 +1800,13 @@ class Board(Window):
         royal_groups = deduplicate(royal_groups)
         safe_royal_groups = {
             group for group in royal_groups
-            if (check := end_rules.get('check', {}).get(group, 0)) == '+' or isinstance(check, int) and check > 0
-            or (mate := end_rules.get('checkmate', {}).get(group, 0)) == '+' or isinstance(mate, int) and mate > 0
+            if ((check := end_rules.get('check', {}).get(group, 0)) == '+' or isinstance(check, int) and check > 0)
+            or ((mate := end_rules.get('checkmate', {}).get(group, 0)) == '+' or isinstance(mate, int) and mate > 0)
         }
         safe_anti_royal_groups = {
             group for group in royal_groups
-            if (check := end_rules.get('check', {}).get(group, 0)) == '-' or isinstance(check, int) and check < 0
-            or (mate := end_rules.get('checkmate', {}).get(group, 0)) == '-' or isinstance(mate, int) and mate < 0
+            if ((check := end_rules.get('check', {}).get(group, 0)) == '-' or isinstance(check, int) and check < 0)
+            or ((mate := end_rules.get('checkmate', {}).get(group, 0)) == '-' or isinstance(mate, int) and mate < 0)
         }
         all_royal_groups = safe_royal_groups.copy()
         anti_royal_checks = {}
@@ -2432,7 +2432,7 @@ class Board(Window):
                                 self.check_side = old_check_side
                                 conditions = {0, 1 if new_check_side == opponent else -1}
                                 if conditions.intersection(block_action_rules):
-                                    pos_from, pos_to = move.pos_from, move.pos_to
+                                    pos_from, pos_to = move.pos_from, move.pos_to or move.pos_from
                                     if pos_from == pos_to and move.captured_piece is not None:
                                         pos_to = move.captured_piece.board_pos
                                     self.moves[turn_side].setdefault(pos_from, {}).setdefault(pos_to, []).append(move)
@@ -2489,7 +2489,7 @@ class Board(Window):
             self.theoretical_moves[turn_side] = {}
             for piece in movable_pieces[turn_side]:
                 for move in piece.moves(theoretical=True):
-                    pos_from, pos_to = move.pos_from, move.pos_to
+                    pos_from, pos_to = move.pos_from, move.pos_to or move.pos_from
                     self.theoretical_moves[turn_side].setdefault(pos_from, {}).setdefault(pos_to, []).append(move)
             self.theoretical_moves_queried[turn_side] = True
         self.movable_pieces = movable_pieces
@@ -4042,6 +4042,7 @@ class Board(Window):
             self.promotion_piece_sprite_list.append(promotion_piece)
             self.promotion_area[pos] = promotion_piece
             self.promotion_area_drops[pos] = drop
+        self.update_caption()
 
     def apply_edit_promotion(self, move: Move) -> None:
         if move.is_edit and move.movement_type != DropMovement and move.promotion is not None:

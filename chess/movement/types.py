@@ -882,6 +882,8 @@ class InverseMovement(BaseMultiMovement):
             for move in movement.moves(pos_from, inverse_piece, theoretical):
                 move.piece = piece
                 move.movement_type = type(self)
+                if move.pos_from == move.pos_to:
+                    move.pos_to = None
                 yield move
 
 
