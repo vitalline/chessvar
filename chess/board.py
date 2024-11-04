@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from collections import defaultdict
 from copy import copy, deepcopy
 from itertools import chain, product, zip_longest
 from json import dumps, loads, JSONDecodeError
@@ -89,6 +90,7 @@ class Board(Window):
         self.load_data = None  # last loaded data
         self.load_dict = None  # last loaded data, parsed from JSON
         self.load_path = None  # path to the last loaded data file
+        self.save_info = [None]  # list of comment strings in save data
         self.save_data = None  # last saved data
         self.save_path = None  # path to the last saved data file
         self.save_loaded = False  # whether a save was successfully loaded
@@ -576,14 +578,17 @@ class Board(Window):
 
     def dump_board(self, partial: bool = False) -> str:
         wh = self.board_width, self.board_height
+        whn = *wh, {}
+        whc = *wh, {k: v for k, v in self.custom_areas.items() if isinstance(v, set)}
+        wha = defaultdict(lambda: whn, {side: (*wh, self.areas.get(side) or {}) for side in (Side.WHITE, Side.BLACK)})
         data = {
             'variant': self.variant,
             'board_size': [*wh],
             'borders': [toa((-1, col)) for col in self.border_cols] + [toa((row, -1)) for row in self.border_rows],
             'areas': {
                 name: {
-                    side.value: unpack(list(tom(area, *wh))) for side, area in data.items()
-                } if isinstance(data, dict) else unpack(list(tom(data, *wh)))
+                    side.value: unpack(list(tom(area, *whn))) for side, area in data.items()
+                } if isinstance(data, dict) else unpack(list(tom(data, *whn)))
                 for name, data in self.custom_areas.items()
             },
             'window_size': list(self.windowed_size),
@@ -611,16 +616,16 @@ class Board(Window):
             'pieces': cnd_alg({
                 p.board_pos: save_piece(p.on(None))
                 for pieces in [*self.movable_pieces.values(), self.obstacles] for p in pieces
-            }, *wh),
+            }, *whc),
             'custom': {k: save_custom_type(v) for k, v in self.custom_pieces.items()},
-            'layout': cnd_alg({pos: save_piece(p.on(None)) for pos, p in self.custom_layout.items()}, *wh),
+            'layout': cnd_alg({pos: save_piece(p.on(None)) for pos, p in self.custom_layout.items()}, *whc),
             'promotions': {
                 side.value: {
                     save_piece_type(f): cnd_alg({
                         p: unpack([
                             (save_piece if isinstance(t, Piece) else save_piece_type)(t) for t in l
                         ]) for p, l in s.items()
-                    }, *wh) for f, s in d.items()
+                    }, *wha[side]) for f, s in d.items()
                 } for side, d in self.custom_promotions.items()
             },
             'drops': {
@@ -629,7 +634,7 @@ class Board(Window):
                         p: unpack([
                             (save_piece if isinstance(t, Piece) else save_piece_type)(t) for t in l
                         ]) for p, l in s.items()
-                    }, *wh) for f, s in d.items()
+                    }, *wha[side]) for f, s in d.items()
                 } for side, d in self.custom_drops.items()
             },
             'extra': {
@@ -762,15 +767,18 @@ class Board(Window):
         borders = [fra(t) for t in data.get('borders', [])]
         borders = [t[1] for t in borders if t[0] == -1], [t[0] for t in borders if t[1] == -1]
         self.resize_board(*board_size, *borders, update=False)
-        wh = self.board_width, self.board_height
 
+        wh = self.board_width, self.board_height
+        whn = *wh, {}
         self.custom_areas = {
             name: {
-                Side(int(side)): set(frm(repack(area), *wh)) for side, area in data.items()
-            } if isinstance(data, dict) else set(frm(repack(data), *wh))
+                Side(int(side)): set(frm(repack(area), *whn)) for side, area in data.items()
+            } if isinstance(data, dict) else set(frm(repack(data), *whn))
             for name, data in data.get('areas', {}).items()
         }
         self.reset_areas()
+        whc = *wh, {k: v for k, v in self.custom_areas.items() if isinstance(v, set)}
+        wha = defaultdict(lambda: whn, {side: (*wh, self.areas.get(side) or {}) for side in (Side.WHITE, Side.BLACK)})
 
         window_size = data.get('window_size')
         square_size = data.get('square_size')
@@ -852,7 +860,7 @@ class Board(Window):
                 load_piece_type(f, c): {
                     p: [
                         (load_piece_type(t, c) if isinstance(t, str) else load_piece(t, self, c)) for t in repack(l)
-                    ] for p, l in exp_alg(s, *wh).items()
+                    ] for p, l in exp_alg(s, *wha[Side(int(v))]).items()
                 } for f, s in d.items()
             } for v, d in data.get('promotions', {}).items()
         }
@@ -861,7 +869,7 @@ class Board(Window):
                 load_piece_type(f, c): {
                     p: [
                         (load_piece_type(t, c) if isinstance(t, str) else load_piece(t, self, c)) for t in repack(l)
-                    ] for p, l in exp_alg(s, *wh).items()
+                    ] for p, l in exp_alg(s, *wha[Side(int(v))]).items()
                 } for f, s in d.items()
             } for v, d in data.get('drops', {}).items()
         }
@@ -906,7 +914,7 @@ class Board(Window):
                 side: get_set_name(self.piece_sets[side], self.piece_set_ids[side] is None) for side in self.piece_sets
             }
 
-        self.custom_layout = {p: load_piece(v, self, c).on(p) for p, v in exp_alg(data.get('layout', {}), *wh).items()}
+        self.custom_layout = {p: load_piece(v, self, c).on(p) for p, v in exp_alg(data.get('layout', {}), *whc).items()}
 
         ply_count = data.get('ply', self.ply_count)
         if ply_count <= 0:
@@ -990,7 +998,7 @@ class Board(Window):
         if self.roll_rng is None:
             self.roll_rng = Random(self.roll_seed)
 
-        pieces = exp_alg(data.get('pieces', {}), *wh)
+        pieces = exp_alg(data.get('pieces', {}), *whc)
         self.pieces = []
 
         for row in range(self.board_height):
@@ -1169,6 +1177,7 @@ class Board(Window):
             self.custom_pieces = self.past_custom_pieces
         else:
             self.past_custom_pieces = {**self.past_custom_pieces, **self.custom_pieces}
+        self.save_info = [None]
         self.variant = ''
         self.alias_dict = {}
         self.custom_areas = {}

@@ -154,7 +154,7 @@ def debug_info(board: Board) -> list[str]:
     for side in board.piece_set_ids:
         poss = board.areas.get(side, {}).get(Pawn.name) or []
         if poss:
-            strs = list(tom(poss, board.board_width, board.board_height))
+            strs = list(tom(poss, board.board_width, board.board_height, {}))
             debug_log.append(f"{side} pawn area ({len(poss)}): {', '.join(f'{pos} {fra(pos)}' for pos in strs)}")
         else:
             debug_log.append(f"{side} pawn area (0): None")
@@ -327,14 +327,14 @@ def debug_info(board: Board) -> list[str]:
             for side in (Side.WHITE, Side.BLACK):
                 poss = data.get(side) or []
                 if poss:
-                    strs = list(tom(poss, board.board_width, board.board_height))
+                    strs = list(tom(poss, board.board_width, board.board_height, {}))
                     debug_log.append(f"{pad:4}{side} ({len(poss)}): {', '.join(f'{pos} {fra(pos)}' for pos in strs)}")
                 else:
                     debug_log.append(f"{pad:4}{side} (0): None")
         else:
             poss = data or []
             if poss:
-                strs = list(tom(poss, board.board_width, board.board_height))
+                strs = list(tom(poss, board.board_width, board.board_height, {}))
                 debug_log.append(f"{pad:2}{area} ({len(poss)}): {', '.join(f'{pos} {fra(pos)}' for pos in strs)}")
             else:
                 debug_log.append(f"{pad:2}{area} (0): None")
@@ -360,7 +360,7 @@ def debug_info(board: Board) -> list[str]:
         for piece in promotions:
             debug_log.append(f"{pad:2}{piece.name} ({len(promotions[piece])}):")
             compressed = data.get(str(side.value), {}).get(save_piece_type(piece), {})
-            from_mapping = frm(list(compressed), board.board_width, board.board_height)
+            from_mapping = frm(list(compressed), board.board_width, board.board_height, board.areas.get(side) or {})
             mapping = {}
             for pos, value in from_mapping.items():
                 if value not in mapping:
@@ -393,7 +393,7 @@ def debug_info(board: Board) -> list[str]:
         for piece in drops:
             debug_log.append(f"{pad:2}{piece.name} ({len(drops[piece])}):")
             compressed = data.get(str(side.value), {}).get(save_piece_type(piece), {})
-            from_mapping = frm(list(compressed), board.board_width, board.board_height)
+            from_mapping = frm(list(compressed), board.board_width, board.board_height, board.areas.get(side) or {})
             mapping = {}
             for pos, value in from_mapping.items():
                 if value not in mapping:

@@ -84,17 +84,23 @@ def expand(data: AnyJson, alias_dict: dict, recursive: bool = False) -> AnyJson:
     return data
 
 
-def condense_algebraic(data: dict[Position, AnyJson], width: int, height: int) -> dict[str, AnyJson]:
+def condense_algebraic(
+    data: dict[Position, AnyJson],
+    width: int,
+    height: int,
+    areas: dict[str, set[Position]],
+) -> dict[str, AnyJson]:
     data_groups = {}
     for key, value in data.items():
         data_groups.setdefault(make_tuple(value), set()).add(key)
     result = {}
     order = {}
     for group in data_groups.values():
-        mapping = tom(list(group), width, height)
+        mapping = tom(list(group), width, height, areas)
         for notation, poss in mapping.items():
             if not poss:
                 continue
+            order_key = (-2, notation) if notation in areas else fra(notation)
             value = data[poss[0]]
             for pos in poss[1:]:
                 if data[pos] != value:
@@ -102,12 +108,17 @@ def condense_algebraic(data: dict[Position, AnyJson], width: int, height: int) -
                         result[order.setdefault(pos2, toa(pos2))] = data[pos2]
                     break
             else:
-                result[order.setdefault(fra(notation), notation)] = value
+                result[order.setdefault(order_key, notation)] = value
     return {v: result[v] for _, v in sorted(order.items(), key=lambda x: x[0])}
 
 
-def expand_algebraic(data: dict[str, AnyJson], width: int, height: int) -> dict[Position, AnyJson]:
-    mapping = frm(list(data), width, height)
+def expand_algebraic(
+    data: dict[str, AnyJson],
+    width: int,
+    height: int,
+    areas: dict[str, set[Position]],
+) -> dict[Position, AnyJson]:
+    mapping = frm(list(data), width, height, areas)
     result = {}
     for pos, notation in mapping.items():
         result[pos] = copy(data[notation])
