@@ -878,10 +878,11 @@ class RangedMultiMovement(RangedMovement, MultiMovement):
 class InverseMovement(BaseMultiMovement):
     def moves(self, pos_from: Position, piece: Piece, theoretical: bool = False):
         inverse_piece = piece.of(piece.side.opponent())
-        for move in super().moves(pos_from, inverse_piece, theoretical):
-            move.piece = piece
-            move.movement_type = type(self)
-            yield move
+        for movement in self.movements:
+            for move in movement.moves(pos_from, inverse_piece, theoretical):
+                move.piece = piece
+                move.movement_type = type(self)
+                yield move
 
 
 class CloneMovement(BaseMultiMovement):
@@ -1076,32 +1077,38 @@ class RelayMovement(BaseChoiceMovement):
     ):
         if movements is None:
             movements = {}
-        self.movement_dict = {key: (repack(value[0]), repack(value[1])) for key, value in movements.items()}
-        super().__init__(board, {key: sum(value, []) for key, value in self.movement_dict.items()})
+        movement_dict = {
+            key: (repack(packed[0]), repack(packed[1]))
+            if len(packed := value if isinstance(value, (list, tuple)) else [value]) > 1
+            else (repack(packed[0]), repack(copy(packed[0])))
+            for key, value in movements.items()
+        }
+        super().__init__(board, {key: sum(list(value), []) for key, value in movement_dict.items()})
+        self.movement_dict = movement_dict
 
     def moves(self, pos_from: Position, piece: Piece, theoretical: bool = False):
         relay_piece = piece.of(piece.side.opponent())
         for key in self.movement_dict:
             value, invert = (key[1:], True) if key.startswith('!') else (key, False)
-            for relays, movements in self.movement_dict[key]:
-                is_relayed = not key
-                if not is_relayed:
-                    for relay in relays:
-                        for move in relay.moves(pos_from, relay_piece, theoretical):
-                            to_piece = self.board.get_piece(move.pos_to)
-                            if value.isdigit() and (int(value) == to_piece.side.value):
-                                is_relayed = True
-                                break
-                            elif self.board.fits(value, to_piece):
-                                is_relayed = True
-                                break
-                        if is_relayed:
+            relays, movements = self.movement_dict[key]
+            is_relayed = not key
+            if not is_relayed:
+                for relay in relays:
+                    for move in relay.moves(pos_from, relay_piece, theoretical):
+                        to_piece = self.board.get_piece(move.pos_to)
+                        if value.isdigit() and (int(value) == to_piece.side.value):
+                            is_relayed = True
                             break
-                if is_relayed == invert:
-                    continue
-                for movement in movements:
-                    for move in movement.moves(pos_from, piece, theoretical):
-                        yield copy(move)
+                        elif self.board.fits(value, to_piece) and to_piece.side == piece.side:
+                            is_relayed = True
+                            break
+                    if is_relayed:
+                        break
+            if is_relayed == invert:
+                continue
+            for movement in movements:
+                for move in movement.moves(pos_from, piece, theoretical):
+                    yield copy(move)
 
     def __copy_args__(self):
         return self.board, {key: (unpack(value[0]), unpack(value[1])) for key, value in self.movement_dict.items()}
