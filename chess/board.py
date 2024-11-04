@@ -1756,23 +1756,24 @@ class Board(Window):
             return set()
         piece_loss = set()
         piece_gain = set()
+        royal_groups = self.royal_groups.get(side, {})
         while move:
             if move.captured_piece and move.captured_piece.side == side:
-                royal_group = self.get_royal_group(move.captured_piece, side, conditions)
-                if royal_group and not self.royal_groups.get(side, {}).get(royal_group):
+                is_royal, royal_group = self.get_royal_state(move.captured_piece, side, conditions)
+                if royal_group and (isinstance(is_royal, int) or not royal_groups.get(royal_group)):
                     piece_loss.add(royal_group)
             if move.promotion:
                 if move.piece and move.piece.side == side:
-                    royal_group = self.get_royal_group(move.piece, side, conditions)
-                    if royal_group and not self.royal_groups.get(side, {}).get(royal_group):
+                    is_royal, royal_group = self.get_royal_state(move.piece, side, conditions)
+                    if royal_group and (isinstance(is_royal, int) or not royal_groups.get(royal_group)):
                         piece_loss.add(royal_group)
                 if move.promotion and move.promotion.side == side:
-                    royal_group = self.get_royal_group(move.promotion, side, conditions)
-                    if royal_group and not self.royal_groups.get(side, {}).get(royal_group):
+                    is_royal, royal_group = self.get_royal_state(move.promotion, side, conditions)
+                    if royal_group and (isinstance(is_royal, int) or not royal_groups.get(royal_group)):
                         piece_gain.add(royal_group)
                 if move.promotion and move.placed_piece:
-                    royal_group = self.get_royal_group(move.placed_piece, side, conditions)
-                    if royal_group and not self.royal_groups.get(side, {}).get(royal_group):
+                    is_royal, royal_group = self.get_royal_state(move.placed_piece, side, conditions)
+                    if royal_group and (isinstance(is_royal, int) or not royal_groups.get(royal_group)):
                         piece_loss.add(royal_group)
             move = move.chained_move
         if move is Unset:
