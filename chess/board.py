@@ -169,6 +169,8 @@ class Board(Window):
         self.royal_ep_markers = {Side.WHITE: {}, Side.BLACK: {}}  # where the side's royals can be captured e.p.
         self.auto_ranged_pieces = {Side.WHITE: [], Side.BLACK: []}  # pieces that auto-capture anywhere they can move to
         self.auto_capture_markers = {Side.WHITE: {}, Side.BLACK: {}}  # squares where the side's pieces can auto-capture
+        self.relay_pieces = {Side.WHITE: {}, Side.BLACK: {}}  # pieces that are relaying powers onto certain squares
+        self.relay_markers = {Side.WHITE: {}, Side.BLACK: {}}  # squares the side's pieces are relaying their powers to
         self.probabilistic_pieces = {Side.WHITE: [], Side.BLACK: []}  # pieces that can move probabilistically
         self.probabilistic_piece_history = []  # list of probabilistic piece positions for every ply
         self.obstacles = []  # list of obstacles (neutral pieces that block movement and cannot move)
@@ -456,6 +458,7 @@ class Board(Window):
         self.save_interval = 0
 
         self.deselect_piece()
+        self.clear_relay_markers()
         self.clear_en_passant_markers()
         self.clear_auto_capture_markers()
         self.reset_captures()
@@ -737,6 +740,7 @@ class Board(Window):
         success = True
 
         self.deselect_piece()
+        self.clear_relay_markers()
         self.clear_en_passant_markers()
         self.clear_auto_capture_markers()
         self.end_value = 0
@@ -1108,6 +1112,7 @@ class Board(Window):
         self.save_interval = 0
 
         self.deselect_piece()
+        self.clear_relay_markers()
         self.clear_en_passant_markers()
         self.clear_auto_capture_markers()
         self.reset_captures()
@@ -2005,6 +2010,8 @@ class Board(Window):
         en_passant_markers = deepcopy(self.en_passant_markers)
         royal_ep_targets = deepcopy(self.royal_ep_targets)
         royal_ep_markers = deepcopy(self.royal_ep_markers)
+        relay_markers = deepcopy(self.relay_markers)
+        relay_pieces = deepcopy(self.relay_pieces)
         end_data = deepcopy(self.end_data)
         opponent = self.turn_side.opponent()
         check_side = self.check_side
@@ -2457,12 +2464,14 @@ class Board(Window):
                             for chained_move in move_chain[::-1]:
                                 self.undo(chained_move)
                                 self.revert_auto_capture_markers(chained_move)
-                            self.check_side = check_side
                             self.en_passant_targets = deepcopy(en_passant_targets)
                             self.en_passant_markers = deepcopy(en_passant_markers)
                             self.royal_ep_targets = deepcopy(royal_ep_targets)
                             self.royal_ep_markers = deepcopy(royal_ep_markers)
+                            self.relay_markers = deepcopy(relay_markers)
+                            self.relay_pieces = deepcopy(relay_pieces)
                             self.end_data = deepcopy(end_data)
+                            self.check_side = check_side
                 if self.moves[turn_side]:
                     self.moves_queried[turn_side] = True
                     break
@@ -2503,11 +2512,13 @@ class Board(Window):
         self.probabilistic_pieces = probabilistic_pieces
         self.auto_ranged_pieces = auto_ranged_pieces
         self.auto_capture_markers = auto_capture_markers
-        self.check_side = check_side
         self.en_passant_targets = en_passant_targets
         self.en_passant_markers = en_passant_markers
         self.royal_ep_targets = royal_ep_targets
         self.royal_ep_markers = royal_ep_markers
+        self.relay_markers = relay_markers
+        self.relay_pieces = relay_pieces
+        self.check_side = check_side
         self.end_data = end_data
 
     def unique_moves(self, side: Side | None = None) -> dict[Side, dict[Position, list[Move]]]:
@@ -2897,7 +2908,7 @@ class Board(Window):
             )
             self.shift_ply(ply_count - self.ply_count)
 
-    def clear_en_passant_markers(self,) -> None:
+    def clear_en_passant_markers(self) -> None:
         for target_dict, marker_dict in (
             (self.en_passant_targets, self.en_passant_markers),
             (self.royal_ep_targets, self.royal_ep_markers),
@@ -2905,6 +2916,53 @@ class Board(Window):
             for side in target_dict:
                 target_dict[side].clear()
                 marker_dict[side].clear()
+
+    def update_relay_markers(self, move: Move | None = None):
+        while move:
+            if move.piece and move.pos_from != move.pos_to or move.promotion:
+                markers = self.relay_markers.get(move.piece.side, {}).pop(move.pos_from, set())
+                pieces = self.relay_pieces.get(move.piece.side, {})
+                for group, pos in markers:
+                    if group in pieces and pos in pieces[group]:
+                        pieces[group].pop(pos, None)
+            if move.captured_piece:
+                markers = self.relay_markers.get(move.captured_piece.side, {}).pop(move.captured_piece.board_pos, set())
+                pieces = self.relay_pieces.get(move.captured_piece.side, {})
+                for group, pos in markers:
+                    if group in pieces and pos in pieces[group]:
+                        pieces[group].pop(pos, None)
+            if move.swapped_piece:
+                markers = self.relay_markers.get(move.swapped_piece.side, {}).pop(move.pos_to, set())
+                pieces = self.relay_pieces.get(move.swapped_piece.side, {})
+                for group, pos in markers:
+                    if group in pieces and pos in pieces[group]:
+                        pieces[group].pop(pos, None)
+            move = move.chained_move
+
+    def revert_relay_markers(self, move: Move | None = None):
+        move_chain = []
+        while move:
+            move_chain.append(move)
+            move = move.chained_move
+        for move in move_chain[::-1]:
+            if move.piece and move.pos_from != move.pos_to or move.promotion:
+                piece = move.promotion or move.piece
+                markers = self.relay_markers.get(piece.side, {}).pop(move.pos_to, set())
+                pieces = self.relay_pieces.get(piece.side, {})
+                for group, pos in markers:
+                    if group in pieces and pos in pieces[group]:
+                        pieces[group].pop(pos, None)
+            if move.swapped_piece:
+                markers = self.relay_markers.get(move.swapped_piece.side, {}).pop(move.pos_from, set())
+                pieces = self.relay_pieces.get(move.swapped_piece.side, {})
+                for group, pos in markers:
+                    if group in pieces and pos in pieces[group]:
+                        pieces[group].pop(pos, None)
+
+    def clear_relay_markers(self) -> None:
+        for target_dict in (self.relay_pieces, self.relay_markers):
+            for side in target_dict:
+                target_dict[side].clear()
 
     def update_end_data(self, move: Move | None = None) -> None:
         if self.edit_mode:
@@ -3177,6 +3235,8 @@ class Board(Window):
         if not self.ply_simulation:
             # update markers for possible en passant captures
             self.update_en_passant_markers(move)
+            # as well as for relay moves
+            self.update_relay_markers(move)
 
     def auto(self, move: Move) -> None:
         self.update_auto_capture_markers(move, True)
@@ -3309,6 +3369,9 @@ class Board(Window):
         ):
             # call movement.undo() to restore movement state before the move (e.g. pawn double move, castling rights)
             move.piece.movement.undo(move, move.piece)
+        if not self.ply_simulation:
+            # revert markers for relay moves
+            self.revert_relay_markers(move)
 
     def undo_last_move(self) -> None:
         self.deselect_piece()

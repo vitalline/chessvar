@@ -1089,23 +1089,31 @@ class RelayMovement(BaseChoiceMovement):
         self.movement_dict = movement_dict
 
     def moves(self, pos_from: Position, piece: Piece, theoretical: bool = False):
-        relay_piece = piece.of(piece.side.opponent())
+        relay_piece_dict = self.board.relay_pieces.get(piece.side, {})
+        relay_marker_dict = self.board.relay_markers.get(piece.side, {})
+        relay_tester = piece.of(piece.side.opponent())
         for key in self.movement_dict:
             value, invert = (key[1:], True) if key.startswith('!') else (key, False)
             relays, movements = self.movement_dict[key]
-            is_relayed = not key
-            if not is_relayed:
-                for relay in relays:
-                    for move in relay.moves(pos_from, relay_piece, theoretical):
-                        to_piece = self.board.get_piece(move.pos_to)
-                        if value.isdigit() and (int(value) == to_piece.side.value):
+            is_relayed = False
+            if not key:
+                is_relayed = True
+            else:
+                if key not in relay_piece_dict or pos_from not in relay_piece_dict[key]:
+                    relay_piece_dict.setdefault(key, {})[pos_from] = set()
+                    for relay in relays:
+                        for move in relay.moves(pos_from, relay_tester, theoretical):
+                            relay_piece_dict[key][pos_from].add(move.pos_to)
+                            relay_marker_dict.setdefault(move.pos_to, set()).add((key, pos_from))
+                if key in relay_piece_dict and pos_from in relay_piece_dict[key]:
+                    for pos in relay_piece_dict[key][pos_from]:
+                        relay_piece = self.board.get_piece(pos)
+                        if value.isdigit() and (int(value) == relay_piece.side.value):
                             is_relayed = True
-                            break
-                        elif self.board.fits(value, to_piece) and to_piece.side == piece.side:
+                        elif relay_piece.side == piece.side and self.board.fits(value, relay_piece):
                             is_relayed = True
+                        if is_relayed:
                             break
-                    if is_relayed:
-                        break
             if is_relayed == invert:
                 continue
             for movement in movements:
