@@ -25,8 +25,6 @@ DEFAULT_CONFIG = {
         'update_roll_seed': True,
         'block_ids': '',
         'block_ids_chaos': '',
-        'log_prefix': 1,
-        'log_turn_pass': '',
         'recursive_aliases': True,
         'save_indent': '',
         'save_update_mode': 0,
@@ -36,6 +34,10 @@ DEFAULT_CONFIG = {
         'autosave_ply': 0,
         'autosave_time': 0,
         'verbose': True,
+        'log_pass': '',
+        'log_prefix': 1,
+        'status_prefix': 1,
+        'status_string': True,
     },
 }
 
@@ -55,11 +57,14 @@ class Config(dict):
         for section in self.base_config:
             for item in self.base_config[section]:
                 self[item] = self.base_config[section][item]
-                if type(DEFAULT_CONFIG.get(section, {}).get(item, {})) is bool:
-                    self[item] = self.base_config.getboolean(section, item)
-                if type(DEFAULT_CONFIG.get(section, {}).get(item, {})) is int:
-                    self[item] = self.base_config.getint(section, item)
-                if item == 'log_turn_pass':
+                try:
+                    if type(DEFAULT_CONFIG.get(section, {}).get(item, {})) is bool:
+                        self[item] = self.base_config.getboolean(section, item)
+                    if type(DEFAULT_CONFIG.get(section, {}).get(item, {})) is int:
+                        self[item] = self.base_config.getint(section, item)
+                except ValueError:
+                    self[item] = DEFAULT_CONFIG[section][item]
+                if item in {'log_pass', 'status_string', 'verbose'}:
                     try:
                         self[item] = self.base_config.getboolean(section, item)
                     except ValueError:

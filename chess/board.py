@@ -134,6 +134,7 @@ class Board(Window):
         self.use_drops = self.board_config['use_drops']  # whether pieces can be dropped
         self.hide_pieces = self.board_config['hide_pieces'] % 3  # 0: don't hide, 1: hide all, 2: penultima mode
         self.hide_move_markers = self.board_config['hide_moves']  # whether to hide the move markers; None uses above
+        self.hide_edit_pieces = False  # whether to mark pieces placed in edit mode as hidden
         self.auto_moves = True  # whether to skip move animations if allowed
         self.flip_mode = False  # whether the board is flipped
         self.edit_mode = False  # allows to edit the board position if set to True
@@ -235,7 +236,10 @@ class Board(Window):
         self.chaos_rng = Random(self.chaos_seed)
 
         # log verbose data
-        self.log(f"Info: Verbose output: {'ON' if self.verbose else 'OFF'}", False)
+        if self.verbose is None:
+            self.log(f"Info: Output suppressed", False)
+        else:
+            self.log(f"Info: Verbose output: {'ON' if self.verbose else 'OFF'}", False)
         self.log(f"Info: Roll seed: {self.roll_seed}", False)
         self.log(f"Info: Piece set seed: {self.set_seed}", False)
         self.log(f"Info: Chaos set seed: {self.chaos_seed}", False)
@@ -2995,11 +2999,11 @@ class Board(Window):
         while True:
             chained = False
             if next_move is None:
-                log_turn_pass = self.board_config['log_turn_pass']
-                if log_turn_pass is None:
-                    log_turn_pass = set(self.moves[self.turn_side]) != {'pass'}
+                log_pass = self.board_config['log_pass']
+                if log_pass is None:
+                    log_pass = set(self.moves[self.turn_side]) != {'pass'}
                 turn_side = self.get_turn_side(+1)
-                if log_turn_pass:
+                if log_pass:
                     self.log(f"Pass: {turn_side} to move")
                 self.move_history.append(None)
                 self.shift_ply(+1)
@@ -3354,11 +3358,11 @@ class Board(Window):
                 self.log(f"Undo: {move_type}: {logged_move}")
                 in_promotion = False
         else:
-            log_turn_pass = self.board_config['log_turn_pass']
-            if log_turn_pass is None:
-                log_turn_pass = set(self.moves[self.turn_side]) != {'pass'}
+            log_pass = self.board_config['log_pass']
+            if log_pass is None:
+                log_pass = set(self.moves[self.turn_side]) != {'pass'}
             turn_side = self.get_turn_side(+1)
-            if log_turn_pass:
+            if log_pass:
                 self.log(f"Undo: Pass: {turn_side} to move")
         self.chain_start = None
         self.chain_moves = {side: {} for side in self.chain_moves}
@@ -3446,11 +3450,11 @@ class Board(Window):
                 return
         last_chain_move = last_move
         if self.future_move_history[-1] is None:
-            log_turn_pass = self.board_config['log_turn_pass']
-            if log_turn_pass is None:
-                log_turn_pass = set(self.moves[self.turn_side]) != {'pass'}
+            log_pass = self.board_config['log_pass']
+            if log_pass is None:
+                log_pass = set(self.moves[self.turn_side]) != {'pass'}
             turn_side = self.get_turn_side(+1)
-            if log_turn_pass:
+            if log_pass:
                 self.log(f"Redo: Pass: {turn_side} to move")
             self.update_en_passant_markers()
             self.move_history.append(deepcopy(last_move))
@@ -3557,11 +3561,11 @@ class Board(Window):
             if count == start_count:
                 return
         for _ in range(index - self.ply_count):
-            log_turn_pass = self.board_config['log_turn_pass']
-            if log_turn_pass is None:
-                log_turn_pass = set(self.moves[self.turn_side]) != {'pass'}
+            log_pass = self.board_config['log_pass']
+            if log_pass is None:
+                log_pass = set(self.moves[self.turn_side]) != {'pass'}
             turn_side = self.get_turn_side(+1)
-            if log_turn_pass:
+            if log_pass:
                 self.log(f"Pass: {turn_side} to move")
             self.update_en_passant_markers()
             self.move_history.append(None)
@@ -3654,21 +3658,31 @@ class Board(Window):
     def update_caption(self) -> None:
         if self.skip_caption_update:
             return
-        prefix = prefix_text = ''
-        if self.board_config['log_prefix'] == 0:
+        if self.board_config['status_string'] is None:
+            return
+        prefix = ''
+        if self.board_config['status_prefix'] == 0:
             prefix = f"Ply {self.ply_count}"
-        if self.board_config['log_prefix'] > 0:
+        if self.board_config['status_prefix'] > 0:
             if self.turn_data[0] == 0:
                 prefix = "Start"
             if self.turn_data[0] > 0:
                 prefix = f"Turn {self.turn_data[0]}: {self.turn_data[1]}"
-                if self.board_config['log_prefix'] > 1:
+                if self.board_config['status_prefix'] > 1:
                     prefix += f", Move {self.turn_data[2]}"
-                if self.board_config['log_prefix'] > 2:
+                if self.board_config['status_prefix'] > 2:
                     prefix = f"(Ply {self.ply_count}) {prefix}"
+        if not self.board_config['status_string']:
+            if prefix:
+                if self.board_config['status_prefix'] == 1 and self.turn_data[0] > 0:
+                    self.set_caption(f"{prefix} to move")
+                else:
+                    self.set_caption(prefix)
+            else:
+                self.set_caption('Chess')
+            return
         if prefix:
-            prefix_text = prefix
-            prefix = f"[{prefix}] "
+            prefix = f"[{prefix}]"
         selected_square = self.selected_square
         hovered_square = None
         if self.is_active:
@@ -3694,7 +3708,7 @@ class Board(Window):
                     message += f" is placed on {toa(piece.board_pos)}"
                 else:
                     message += f" appears on {toa(piece.board_pos)}"
-                self.set_caption(f"{prefix}{message}")
+                self.set_caption(f"{prefix} {message}")
                 return
             message = f"{piece} on {toa(piece.board_pos)}"
             if not self.edit_mode or (self.move_history and ((m := self.move_history[-1]) and m.is_edit != 1)):
@@ -3716,7 +3730,7 @@ class Board(Window):
                     message += " to an obstacle"
                 else:
                     message += f" to {piece_groups[self.edit_piece_set_id]['name']}"
-            self.set_caption(f"{prefix}{message}")
+            self.set_caption(f"{prefix} {message}")
             return
         piece = self.get_piece(selected_square)
         if piece.is_empty():
@@ -3734,7 +3748,7 @@ class Board(Window):
                     piece=piece,
                     is_edit=int(self.edit_mode),
                 )
-                self.set_caption(f"{prefix}{move}")
+                self.set_caption(f"{prefix} {move}")
                 return
             move = None
             if not hide_move_markers and hovered_square:
@@ -3768,22 +3782,26 @@ class Board(Window):
                 while move:
                     moves.append(move)
                     move = move.chained_move
-                self.set_caption(f"{prefix}{'; '.join(str(move) for move in moves)}")
+                self.set_caption(f"{prefix} {'; '.join(str(move) for move in moves)}")
                 return
         if piece or hovered_square:
             if not piece:
                 piece = self.get_piece(hovered_square)
             if not piece.is_empty() and (self.edit_mode or not isinstance(piece, Border)):
-                self.set_caption(f"{prefix}{piece} on {toa(piece.board_pos)}")
+                self.set_caption(f"{prefix} {piece} on {toa(piece.board_pos)}")
                 return
         if self.edit_mode:
-            self.set_caption(f"{prefix}Editing board")
+            self.set_caption(f"{prefix} Editing board")
             return
         message = self.get_status_string()
         if message:
-            self.set_caption(f"{prefix}{message}")
+            self.set_caption(f"{prefix} {message}")
+        elif self.board_config['status_prefix'] == 0 or self.turn_data[0] == 0:
+            self.set_caption(f"{prefix} {self.turn_data[1]} to move")
+        elif self.board_config['status_prefix'] == 1:
+            self.set_caption(f"[{prefix[1:-1] or '???'} to move]")
         else:
-            self.set_caption(f"[{prefix_text} to move]")
+            self.set_caption(prefix)
 
     def try_drop(self, move: Move) -> None:
         if move.promotion:
@@ -5483,8 +5501,12 @@ class Board(Window):
                 self.activate()
             else:  # Log
                 if modifiers & key.MOD_ACCEL and modifiers & key.MOD_SHIFT:  # Toggle verbose
-                    self.verbose = not self.verbose
-                    self.log(f"Info: Verbose output: {'ON' if self.verbose else 'OFF'}", False)
+                    if self.verbose is None:
+                        # The granular log and status settings should really be changeable with hotkeys. Will add later.
+                        pass
+                    else:
+                        self.verbose = not self.verbose
+                        self.log(f"Info: Verbose output: {'ON' if self.verbose else 'OFF'}", False)
                 elif modifiers & key.MOD_ACCEL:  # Save log
                     self.save_log()
                     self.log("Info: Log file saved", False)
@@ -5600,6 +5622,8 @@ class Board(Window):
         self.verbose_data.append(string)
         if important:
             self.log_data.append(string)
+        if self.verbose is None:
+            return
         if important or self.verbose:
             print(string)
 
