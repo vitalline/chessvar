@@ -1052,10 +1052,11 @@ class Board(Window):
             self.ply_count = ply_count
             self.turn_data = turn_data
             self.load_turn_rules()
-            if  self.turn_side != turn_data[1]:
+            if self.turn_side != turn_data[1]:
                 self.log(f"Error: Turn side does not match ({ self.turn_side} was {turn_data[1]})")
                 self.turn_side = turn_data[1]
         self.log_armies()
+        self.log_info()
         if with_history:
             self.shift_ply(+1)
         self.log_special_modes()
@@ -5417,7 +5418,7 @@ class Board(Window):
                 elif self.hide_pieces == 1:
                     self.log("Info: Pieces hidden")
                 elif self.hide_pieces == 2:
-                    self.log("Info: Penultima mode activated!")
+                    self.log("Info: Penultima mode active")
                 else:
                     self.hide_pieces = old_hide_pieces
                 self.update_pieces()
@@ -5587,8 +5588,31 @@ class Board(Window):
             if not isfile(save_path):
                 return
             self.log(f"Info: Loading from {path}")
+            self.save_info = []
+            save_data = ''
+            save_data_start, save_data_end = False, False
             with open(save_path, mode='r', encoding='utf-8') as file:
-                save_data = file.read()
+                for line in file.read().splitlines():
+                    stripped_line = line.strip()
+                    if not stripped_line:
+                        continue
+                    if stripped_line[0] == '#':
+                        if save_data_start:
+                            save_data_end = True
+                        self.save_info.append(stripped_line[1:].strip())
+                    elif not save_data_start:
+                        save_data_start = True
+                        self.save_info.append(None)
+                        save_data = line
+                    elif save_data_end:
+                        self.log("Error: Comments within save data are not supported")
+                        save_data = ''
+                    else:
+                        save_data = f"{save_data}\n{line}"
+                if not save_data:
+                    self.log_info()
+                    self.save_info.append(None)
+                    return
             if self.load_board(save_data, with_history=update_mode & 1 if should_update else with_history):
                 if should_update:
                     self.save(save_path)
@@ -5604,7 +5628,11 @@ class Board(Window):
             return
         makedirs(dirname(path), exist_ok=True)
         with open(path, mode='w', encoding='utf-8') as file:
-            file.write(data)
+            for string in self.save_info:
+                if isinstance(string, str):
+                    file.write(f"# {string}\n")
+                elif string is None:
+                    file.write(f"{data}\n")
         self.save_data = data
         self.save_path = path
         saved = 'Auto-saved' if auto else 'Saved'
@@ -5636,6 +5664,15 @@ class Board(Window):
         if important or self.verbose:
             print(string)
 
+    def log_info(self, info: list[str | None] | None = None):
+        if not self.board_config['log_info']:
+            return
+        if info is None:
+            info = self.save_info
+        for line in info:
+            if isinstance(line, str):
+                self.log(f"Note: {line}", False)
+
     def log_armies(self):
         if self.variant or self.custom_layout:
             self.log(f"Game: {self.variant or 'Custom'}")
@@ -5650,7 +5687,7 @@ class Board(Window):
         if self.hide_pieces == 1:
             self.log("Info: Pieces hidden")
         if self.hide_pieces == 2:
-            self.log("Info: Penultima mode activated!")
+            self.log("Info: Penultima mode active")
         if self.use_drops:
             self.log("Info: Drops enabled")
 
