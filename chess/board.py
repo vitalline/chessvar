@@ -1361,12 +1361,12 @@ class Board(Window):
     def reset_areas(self) -> None:
         self.areas = {Side.WHITE: {}, Side.BLACK: {}}
         for side in self.areas:
-            for name, area in self.custom_areas.get(side, {}).items():
+            for name, area in self.custom_areas.items():
+                if isinstance(area, dict):
+                    if side not in area:
+                        continue
+                    area = area[side]
                 if not area:
-                    continue
-                self.areas[side][name] = area
-            for name, area in self.custom_areas:
-                if not area or isinstance(area, dict):
                     continue
                 self.areas[side][name] = area
             if Pawn.name not in self.areas[side]:
