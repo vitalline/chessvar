@@ -6,7 +6,7 @@ from copy import deepcopy, copy
 from json import dumps
 from typing import TYPE_CHECKING, TextIO
 
-from chess.data import get_piece_types, get_set_name, piece_groups
+from chess.data import end_types, get_piece_types, get_set_name, piece_groups
 from chess.movement.types import DropMovement
 from chess.movement.util import to_alpha as b26
 from chess.movement.util import to_algebraic as toa, from_algebraic as fra
@@ -15,7 +15,7 @@ from chess.pieces.groups.classic import Pawn
 from chess.pieces.piece import Piece
 from chess.pieces.side import Side
 from chess.save import save_piece_type, save_custom_type, unpack, repack
-from chess.util import get_filename
+from chess.util import get_filename, sign, spell, spell_ordinal as spell_ord
 
 if TYPE_CHECKING:
     from chess.board import Board
@@ -508,20 +508,22 @@ def debug_info(board: Board) -> list[str]:
                                     debug_log.append(f"{pad:10}{type_string} ({len(block_type_rules)}):")
                                     for allow_action in block_type_rules:
                                         allow_action_rules = block_type_rules[allow_action]
+                                        allow_string = 'turn pass' if allow_action == 'pass' else allow_action
                                         for block_action in sorted(allow_action_rules):
+                                            check_rule = allow_action_rules[block_action]
+                                            block_string = 'turn pass' if block_action == 'pass' else block_action
                                             action_string = (
                                                 "Any action" if allow_action == '*' and block_action is None else
-                                                f"{allow_action.capitalize()}" if block_action is None else
-                                                f"NOT {block_action}" if allow_action == '*' else
-                                                f"{allow_action.capitalize()}, NOT {block_action}"
+                                                f"{allow_string.capitalize()}" if block_action is None else
+                                                f"NOT {block_string}" if allow_action == '*' else
+                                                f"{allow_string.capitalize()}, NOT {block_string}"
                                             )
-                                            check_rule = allow_action_rules[block_action]
                                             check_string = {
-                                                0: "Any",
-                                                1: "Only as check",
-                                                -1: "Never as check",
-                                            }.get(check_rule, "Unknown")
-                                            debug_log.append(f"{pad:12}{action_string}: {check_rule} ({check_string})")
+                                                0: action_string,
+                                                1: f"{action_string}: Only as check",
+                                                -1: f"{action_string}: Never as check",
+                                            }.get(check_rule, f"{action_string}: Unknown")
+                                            debug_log.append(f"{pad:12}{check_string} ({check_rule})")
     start, loop = [], []
     start_ended = False
     for data in board.custom_turn_order:
@@ -565,22 +567,56 @@ def debug_info(board: Board) -> list[str]:
             debug_log.append(f"{pad:2}{pad}{i + 1}: {turn_side}{turn_suffix}")
     if not start and not loop:
         debug_log[-1] += " None"
+    standard_conditions = set(end_types.values())
+    generic_strings = {'': 'the pieces', '*': 'any piece'}
     for side in board.end_rules:
-        debug_log.append(f"Win conditions for {side}:")
+        debug_log.append(f"End conditions for {side}:")
         for rule in board.end_rules[side]:
-            debug_log.append(f"{pad:2}{rule.capitalize()}:")
+            if rule in standard_conditions:
+                rule_string = rule.capitalize()
+                end_data = board.end_data.get(side, {}).get(rule, {})
+            else:
+                if side in board.areas and rule in board.areas[side]:
+                    rule_string = f"Reach {rule} with"
+                else:
+                    try:
+                        pos = fra(rule)
+                        if pos == (-1, -1):
+                            rule_string = f"Have"
+                        elif pos[0] == -1:
+                            rule_string = f"Reach the {b26(pos[1] + 1)}-file with"
+                        elif pos[1] == -1:
+                            rule_string = f"Reach the {spell_ord(pos[0] + 1, 0)} rank with"
+                        else:
+                            rule_string = f"Reach {toa(pos)} with"
+                    except ValueError:
+                        rule_string = f"Reach {rule} with"
+                end_data = board.area_groups.get(side, {}).get(rule, {})
             for group in board.end_rules[side][rule]:
-                group_string = f"{group}" if group else "Any"
                 group_value = board.end_rules[side][rule][group]
-                debug_log.append(f"{pad:4}{group_string}: {group_value}")
-    for side in board.end_data:
-        debug_log.append(f"Win progress for {side}:")
-        for rule in board.end_data[side]:
-            debug_log.append(f"{pad:2}{rule.capitalize()}:")
-            for group in board.end_data[side][rule]:
-                group_string = f"{group}" if group else "Any"
-                group_value = board.end_data[side][rule][group]
-                debug_log.append(f"{pad:4}{group_string}: {group_value}")
+                if rule in standard_conditions and group_value in {'+', '-'}:
+                    group_value = int(group_value + '1')
+                    group_string = f"last {generic_strings.get(group, group)}"
+                elif isinstance(group_value, str) and group_value[-1:] == '!':
+                    group_string = group_value[:-1] or '1'
+                    group_value = int(group_string + ('1' if group_string in {'+', '-'} else ''))
+                    group_string = f"{spell(abs(group_value) or 1)} of {generic_strings.get(group, group)} and stay"
+                else:
+                    group_value = int(group_value)
+                    group_string = f"{spell(abs(group_value) or 1)} of {generic_strings.get(group, group)}"
+                group_result = {1: "win", 0: "draw", -1: "lose"}.get(sign(group_value))
+                if rule in standard_conditions:
+                    end_value = end_data.get(group) or 0
+                else:
+                    end_group = end_data.get(group) or ()
+                    end_value = len(end_group)
+                    if end_value:
+                        pieces = [f'{p.name} on {toa(p.board_pos)} {p.board_pos}'.strip() for p in end_group]
+                        # that str.strip() call is there just in case Piece.board_pos is None for some reason
+                        end_value = f"{end_value} - {', '.join(pieces)}"
+                full_rule = f"{rule_string} {group_string} to {group_result}"
+                ratio = f"{end_value}/{abs(group_value) or 1}"
+                debug_log.append(f"{pad:2}{full_rule}: {ratio}")
     possible_moves = sum((
         sum(v.values(), []) for k, v in board.moves.get(board.turn_side, {}).items() if not isinstance(k, str)
     ), [])

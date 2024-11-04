@@ -1,6 +1,7 @@
 import os
 import sys
 
+from collections import defaultdict
 from datetime import datetime
 from tkinter import filedialog
 from typing import Any
@@ -39,25 +40,71 @@ invalid_chars = ':<>|"?*'
 invalid_chars_trans_table = str.maketrans(invalid_chars, '_' * len(invalid_chars))
 
 # Dictionary to convert numbers to words.
-number_dict = {
+numbers = {
     0: 'zero', 1: 'one', 2: 'two', 3: 'three', 4: 'four',
     5: 'five', 6: 'six', 7: 'seven', 8: 'eight', 9: 'nine',
     10: 'ten', 11: 'eleven', 12: 'twelve', 13: 'thirteen',
     14: 'fourteen', 15: 'fifteen', 16: 'sixteen', 17: 'seventeen',
     18: 'eighteen', 19: 'nineteen', 20: 'twenty', 30: 'thirty',
     40: 'forty', 50: 'fifty', 60: 'sixty', 70: 'seventy',
-    80: 'eighty', 90: 'ninety',  # integers up to 99 should suffice for most purposes
+    80: 'eighty', 90: 'ninety',  # ... and so on
+    # integers up to 99 should suffice for now
 }
 
 # Function to convert a number to words using the above dictionary.
-def spell(number: int, max_number: int = 99) -> str:
-    if number > 99 or number < 0 or number > max_number:
+def spell(number: int, limit: int = 100) -> str:
+    if number > 99 or number < 0 or number >= limit:
         return str(number)
-    if number > 20:
+    if number in numbers:
+        return numbers[number]
+    if number > 19:
         tens = number // 10 * 10
         ones = number % 10
-        return f"{number_dict[tens]}{'-' + number_dict[ones] if ones else ''}"
-    return number_dict[number]
+        if ones:
+            return spell(tens) + '-' + spell(ones)
+        return str(number)
+    return str(number)
+
+
+# Dictionary to get the ordinal suffix for a number.
+ordinal_suffixes = defaultdict(lambda: 'th', {1: 'st', 2: 'nd', 3: 'rd'})
+
+
+# Function to convert a number to an ordinal string (e.g. 1 -> '1st', 2 -> '2nd', 3 -> '3rd', 4 -> '4th', etc.).
+def ordinal(number: int) -> str:
+    if 10 <= number % 100 <= 20:
+        return f"{number}th"
+    return f"{number}{ordinal_suffixes[number % 10]}"
+
+
+# Dictionary to get the ordinal form of a number.
+ordinals = {
+    1: 'first', 2: 'second', 3: 'third',
+    5: 'fifth', 8: 'eighth', 9: 'ninth',
+    12: 'twelfth', # others are regular
+}
+
+
+# Function to convert a number to an ordinal string using the above dictionary.
+def spell_ordinal(number: int, limit: int = 100) -> str:
+    if number > 99 or number < 0 or number >= limit:
+        return ordinal(number)
+    if number in ordinals:
+        return ordinals[number]
+    if number > 19:
+        tens = number // 10 * 10
+        ones = number % 10
+        if ones:
+            return spell(tens) + '-' + spell_ordinal(ones)
+        return spell(tens).replace('ty', 'tie') + 'th'
+    return spell(number) + 'th'
+
+
+# Function to get the correct form of a word based on a number (e.g. '1 apple', '2 apples').
+def form(number: int, singular: str, plural: str = None) -> str:
+    if plural is None:
+        plural = singular + 's'
+    return singular if number % 10 == 1 and number % 100 != 11 else plural
 
 
 # Simple template matching function. Matches a string (or a group thereof) with a template containing '*' as a wildcard.

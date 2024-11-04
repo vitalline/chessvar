@@ -1465,7 +1465,7 @@ class Board(Window):
                         if not is_area:
                             self.end_data[side].setdefault(condition, {}).setdefault(group, 0)
                 elif is_area:
-                    self.end_rules.setdefault(side, {}).setdefault(condition, {}).setdefault('*', rules)
+                    self.end_rules.setdefault(side, {}).setdefault(condition, {}).setdefault('', rules)
                 else:
                     self.end_rules.setdefault(side, {}).setdefault(condition, {}).setdefault('', rules)
                     self.end_data.setdefault(side, {}).setdefault(condition, {}).setdefault('', 0)
@@ -1622,12 +1622,16 @@ class Board(Window):
         return 0, ''
 
     def in_area(self, area: str, pos: Position, side: Side) -> bool:
+        if area == '*':  # all squares on the board, guaranteed to be True
+            return True
         if side in self.areas:
-            if area in self.areas[side]:
+            if area == '':  # any defined area on the board
+                return any(pos in self.areas[side][a] for a in self.areas[side])
+            if area in self.areas[side]:  # a specific area on the board
                 return pos in self.areas[side][area]
-        try:
+        try:  # treating as notation (possibly generic)
             return all(i in {-1, j} for i, j in zip(fra(area), pos))
-        except ValueError:
+        except ValueError:  # if all else fails...
             return False
 
     def get_area_groups(self, piece: Piece, side: Side) -> list[tuple[str, str]]:
@@ -1639,7 +1643,7 @@ class Board(Window):
             if not self.in_area(condition, piece.board_pos, side):
                 continue
             for group, value in end_rules.get(condition, {}).items():
-                if self.fits(group, piece):
+                if group == '' or self.fits(group, piece):
                     groups.append((condition, group))
         return groups
 
@@ -1863,14 +1867,14 @@ class Board(Window):
             draw = False
             for group in self.end_rules[side][condition]:
                 side_needs = self.end_rules[side][condition][group]
+                if condition in self.end_data[side]:
+                    side_count = self.end_data[side][condition].get(group) or 0
+                else:
+                    side_count = len(self.area_groups[side].get(condition, {}).get(group) or ())
+                    if isinstance(side_needs, str) and side_needs[-1:] == '!':
+                        side_needs = side_needs[:-1] or '1'
                 if side_needs in {'+', '-'}:
                     side_needs = int(side_needs + '1')
-                if condition in self.end_data[side]:
-                    side_count = self.end_data[side][condition].get(group, 0)
-                else:
-                    side_count = len(self.area_groups[side].get(condition, {}).get(group, ()))
-                    if isinstance(side_needs, str) and side_needs[-1] == '!':
-                        side_needs = int(side_needs[:-1])
                 if 0 < side_needs <= side_count:
                     win_side, win_value, win_group = side, side_needs, group
                 if 0 > side_needs >= -side_count:
@@ -1879,14 +1883,14 @@ class Board(Window):
                     draw = True
                 other_needs = self.end_rules[opponent].get(condition, {}).get(group, None)
                 if other_needs is not None:
+                    if condition in self.end_data[opponent]:
+                        other_count = self.end_data[opponent][condition].get(group) or 0
+                    else:
+                        other_count = len(self.area_groups[opponent].get(condition, {}).get(group) or ())
+                        if isinstance(other_needs, str) and other_needs[-1:] == '!':
+                            other_needs = other_needs[:-1] or '1'
                     if other_needs in {'+', '-'}:
                         other_needs = int(other_needs + '1')
-                    if condition in self.end_data[opponent]:
-                        other_count = self.end_data[opponent][condition].get(group, 0)
-                    else:
-                        other_count = len(self.area_groups[opponent].get(condition, {}).get(group, ()))
-                        if isinstance(other_needs, str) and other_needs[-1] == '!':
-                            other_needs = int(other_needs[:-1])
                     if 0 < other_needs <= other_count:
                         loss_side, loss_value = side, other_needs
                     if 0 > other_needs >= -other_count:
@@ -1896,8 +1900,10 @@ class Board(Window):
                 if win_side and not loss_side and not draw:
                     if condition not in self.end_data[side]:
                         side_needs = self.end_rules[side][condition][group]
-                        if isinstance(side_needs, str) and side_needs[-1] == '!':
-                            side_needs = int(side_needs[:-1])
+                        if isinstance(side_needs, str) and side_needs[-1:] == '!':
+                            side_needs = side_needs[:-1] or '1'
+                            if side_needs in {'+', '-'}:
+                                side_needs = int(side_needs + '1')
                             if side_count >= side_needs:
                                 win_side, win_group, win_value = None, None, 0
                                 side_count -= self.get_new_area_count(
@@ -1915,7 +1921,7 @@ class Board(Window):
                 if loss_value > win_value:
                     win_side = None
                 if win_value == loss_value:
-                    resolution = self.end_rules.get(Side.NONE, {}).get(condition, 0)
+                    resolution = self.end_rules.get(Side.NONE, {}).get(condition) or 0
                     if resolution >= 0:
                         loss_side = None
                     if resolution <= 0:
@@ -1923,7 +1929,7 @@ class Board(Window):
                     if resolution == 0:
                         draw = True
             if win_side and draw or loss_side and draw:
-                resolution = self.end_rules.get(Side.NONE, {}).get(condition, 0)
+                resolution = self.end_rules.get(Side.NONE, {}).get(condition) or 0
                 if resolution >= 0:
                     loss_side = None
                     draw = False
@@ -3614,7 +3620,7 @@ class Board(Window):
                 if end_group := self.end_group.strip('*'):
                     string += f"{end_group} captured!"
                 else:
-                    string += "Game over!"
+                    string += "Piece captured!"
             elif self.end_condition in {k for d in self.area_groups.values() for k in d}:
                 string += "Goal reached!"
             else:
