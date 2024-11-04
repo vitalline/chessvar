@@ -13,7 +13,7 @@ class Paladin(Piece):
             board,
             types.MultiMovement(
                 board,
-                move_or_capture=[types.RiderMovement(board, rot([(1, 2, 1), (2, 1, 1)]))],
+                both=[types.RiderMovement(board, rot([(1, 2, 1), (2, 1, 1)]))],
                 move=[types.RiderMovement(board, rot([(1, 0, 1)]))],
                 capture=[types.RiderMovement(board, rot([(1, 1, 1)]))]
             ),
@@ -31,7 +31,7 @@ class Guarddog(Piece):
             board,
             types.MultiMovement(
                 board,
-                move_or_capture=[types.RiderMovement(board, symv([(1, 2), (-2, 1)]))],
+                both=[types.RiderMovement(board, symv([(1, 2), (-2, 1)]))],
                 move=[types.RiderMovement(board, [(1, 0)])],
                 capture=[types.RiderMovement(board, symv([(1, 1)]))]
             ),
@@ -66,7 +66,7 @@ class Dowager(Piece):
             board,
             types.MultiMovement(
                 board,
-                move_or_capture=[types.RiderMovement(board, symv([(2, 1), (-1, 2)]))],
+                both=[types.RiderMovement(board, symv([(2, 1), (-1, 2)]))],
                 move=[types.RiderMovement(board, rot([(1, 0)]))],
                 capture=[types.RiderMovement(board, rot([(1, 1)]))]
             ),

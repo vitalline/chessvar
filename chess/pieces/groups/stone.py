@@ -50,7 +50,7 @@ class Stele(Piece):
                     types.MultiMovement(board, capture=[
                         types.RiderMovement(board, [(i, j, 1)])
                     ]),
-                    types.MultiMovement(board, move_or_capture=[
+                    types.MultiMovement(board, both=[
                         types.RiderMovement(board, [
                             (k, l, 1) for k, l in rot([(1, 1)]) + [(0, 0)] if (i, j) != (-k, -l)
                         ])
@@ -81,7 +81,7 @@ class Caryatid(Piece):
                     types.MultiMovement(board, capture=[
                         types.RiderMovement(board, [(i, j, 1)])
                     ]),
-                    types.MultiMovement(board, move_or_capture=[
+                    types.MultiMovement(board, both=[
                         types.RiderMovement(board, [
                             (k, l, 1) for k, l in rot([(1, 0)]) + [(0, 0)] if (i, j) != (-k, -l)
                         ])

@@ -63,7 +63,7 @@ class Eagle(Piece):
                     types.MultiMovement(board, capture=[
                         types.RiderMovement(board, [(i, j, 1)])
                     ]),
-                    types.MultiMovement(board, move_or_capture=[
+                    types.MultiMovement(board, both=[
                         types.RiderMovement(board, [(i, j, 1), (0, 0)])
                     ])
                 ]) for i, j in symv([(1, 1)])

@@ -4,19 +4,11 @@ import sys
 from collections import defaultdict
 from datetime import datetime
 from tkinter import filedialog
-from typing import Any
+from typing import Any, TypeVar
 
-# Lambda function to remove duplicates from a list while preserving order.
-deduplicate = lambda lst: list(dict.fromkeys(lst))
 
 # Lambda function to return the sign of a number. Returns +1 for positive numbers, -1 for negative numbers, and 0 for 0.
 sign = lambda x: (x > 0) - (x < 0)
-
-# Lambda function to turn any list into a single element if it has only one element, or return the list as is otherwise.
-unpack = lambda l: l[0] if len(l) == 1 else l
-
-# Lambda function to turn any object into a list containing that object if it's not already a list, otherwise return it.
-repack = lambda l: l if isinstance(l, list) else [l]
 
 # Dummy value used to indicate reverting to default value in functions where None indicates retaining the current value.
 Default = object()
@@ -111,6 +103,25 @@ def form(number: int, singular: str, plural: str = None) -> str:
     if plural is None:
         plural = singular + 's'
     return singular if number % 10 == 1 and number % 100 != 11 else plural
+
+
+T = TypeVar('T')
+UnpackedList = list[T] | T
+
+
+# Function to remove duplicate entries from a list while preserving order.
+def deduplicate(l: list[T]) -> list[T]:
+    return list(dict.fromkeys(l))
+
+
+# Function to turn any list into its single element if it has exactly one element. If not, it returns the original list.
+def unpack(l: list[T]) -> UnpackedList[T]:
+    return l[0] if isinstance(l, list) and len(l) == 1 else l
+
+
+# Function to turn any object into a list containing it, unless it already is a list, in which case it's returned as is.
+def repack(l: UnpackedList[T]) -> list[T]:
+    return l if isinstance(l, list) else [l]
 
 
 # Simple template matching function. Matches a string (or a group thereof) with a template containing '*' as a wildcard.

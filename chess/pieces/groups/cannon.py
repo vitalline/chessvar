@@ -13,10 +13,11 @@ class Howitzer(Piece):
             board,
             types.MultiMovement(
                 board,
-                move_or_capture=[
+                both=[
                     types.RiderMovement(board, rot([(1, 0, 1)])),
                     types.SpaciousRiderMovement(board, rot([(1, 0)]))
-                ], move=[
+                ],
+                move=[
                     types.CannonRiderMovement(board, rot([(1, 0)]))
                 ]
             ),
@@ -34,7 +35,7 @@ class Mortar(Piece):
             board,
             types.MultiMovement(
                 board,
-                move_or_capture=[
+                both=[
                     types.RiderMovement(board, rot([(1, 0, 1)])),
                     types.SpaciousRiderMovement(board, rot([(1, 0)]))
                 ],

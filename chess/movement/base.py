@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from copy import deepcopy
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
@@ -39,4 +40,6 @@ class BaseMovement(object):
         return clone
 
     def __deepcopy__(self, memo):
-        return self.__copy__()
+        clone = self.__class__(*(deepcopy(x, memo) for x in self.__copy_args__()))
+        clone.total_moves = self.total_moves
+        return clone

@@ -13,7 +13,7 @@ class Merlion(Piece):
             board,
             types.MultiMovement(
                 board,
-                move_or_capture=[types.RiderMovement(board, rot([(2, 0, 1), (2, 2, 1)]))],
+                both=[types.RiderMovement(board, rot([(2, 0, 1), (2, 2, 1)]))],
                 capture=[types.RiderMovement(board, rot([(1, 0, 1), (1, 1, 1)]))]
             ),
             **kwargs
@@ -64,7 +64,7 @@ class IPaladess(Piece):
             board,
             types.MultiMovement(
                 board,
-                move_or_capture=[types.RiderMovement(board, symv([(1, 2, 1), (2, 1, 1)]))],
+                both=[types.RiderMovement(board, symv([(1, 2, 1), (2, 1, 1)]))],
                 move=[types.RiderMovement(board, rot([(1, 1)]))],
                 capture=[types.RiderMovement(board, rot([(1, 0)]))]
             ),
