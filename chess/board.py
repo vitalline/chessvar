@@ -2022,8 +2022,6 @@ class Board(Window):
         en_passant_markers = deepcopy(self.en_passant_markers)
         royal_ep_targets = deepcopy(self.royal_ep_targets)
         royal_ep_markers = deepcopy(self.royal_ep_markers)
-        relay_markers = deepcopy(self.relay_markers)
-        relay_pieces = deepcopy(self.relay_pieces)
         end_data = deepcopy(self.end_data)
         opponent = self.turn_side.opponent()
         check_side = self.check_side
@@ -2510,8 +2508,6 @@ class Board(Window):
                             self.en_passant_markers = deepcopy(en_passant_markers)
                             self.royal_ep_targets = deepcopy(royal_ep_targets)
                             self.royal_ep_markers = deepcopy(royal_ep_markers)
-                            self.relay_markers = deepcopy(relay_markers)
-                            self.relay_pieces = deepcopy(relay_pieces)
                             self.end_data = deepcopy(end_data)
                             self.check_side = check_side
                 if self.moves[turn_side]:
@@ -2558,8 +2554,6 @@ class Board(Window):
         self.en_passant_markers = en_passant_markers
         self.royal_ep_targets = royal_ep_targets
         self.royal_ep_markers = royal_ep_markers
-        self.relay_markers = relay_markers
-        self.relay_pieces = relay_pieces
         self.check_side = check_side
         self.end_data = end_data
 
