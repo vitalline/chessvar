@@ -4138,6 +4138,7 @@ class Board(Window):
             self.promotion_piece_sprite_list.append(promotion_piece)
             self.promotion_area[pos] = promotion_piece
             self.promotion_area_drops[pos] = drop
+        self.skip_caption_update = False
         self.update_caption()
 
     def apply_edit_promotion(self, move: Move) -> None:
