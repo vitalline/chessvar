@@ -50,7 +50,7 @@ Alt + M: clear future move history (twice: also clear future rolls)
 Ctrl + K: show valid moves for both sides
 Shift + K: show theoretical moves for both sides
 Ctrl + Shift + K: show valid moves for current player, theoretical moves for other player
-Alt + H: toggle drops (crazyhouse mode)
+Ctrl + O: toggle drops (crazyhouse mode)
 
 UI hotkeys:
 Ctrl + [-]: make window smaller (-5px/square)
@@ -92,6 +92,8 @@ Shift + P: cycle replacement pieces forward (+1)
   ... + Ctrl: cycle replacement pieces backward (-1)
 Alt + P: place custom pieces
 Alt + Shift + P: place wall pieces
+Alt + H: toggle showing placed pieces
+Alt + Shift + H: toggle hiding placed pieces
 Ctrl + X: update probabilistic pieces (only selected piece if one exists)
 Ctrl + "[": remove last file
  ... + Alt: remove last rank

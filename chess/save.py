@@ -17,7 +17,7 @@ from chess.movement.util import to_algebraic as toa, from_algebraic as fra
 from chess.movement.util import to_algebraic_map as tom, from_algebraic_map as frm
 from chess.pieces import types as piece_types
 from chess.pieces.piece import Piece
-from chess.pieces.groups.util import NonMovingPiece, NoPiece
+from chess.pieces.util import NonMovingPiece, NoPiece
 from chess.util import CUSTOM_PREFIX, UNSET_STRING, Unset
 
 if TYPE_CHECKING:

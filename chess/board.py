@@ -35,14 +35,14 @@ from chess.movement.util import to_algebraic as toa, from_algebraic as fra, is_a
 from chess.movement.util import to_algebraic_map as tom, from_algebraic_map as frm
 from chess.pieces.groups.classic import Pawn, King
 from chess.pieces.groups.colorbound import King as CBKing
-from chess.pieces.groups.util import NoPiece, Obstacle, Block, Border, Wall
 from chess.pieces.piece import Piece, is_active
 from chess.pieces.side import Side
 from chess.pieces.types import Delayed, Delayed1, Slow
+from chess.pieces.util import NoPiece, Obstacle, Block, Border, Wall
 from chess.save import condense, expand, condense_algebraic as cnd_alg, expand_algebraic as exp_alg
 from chess.save import load_move, load_piece, load_rng, load_piece_type, load_custom_type, load_movement_type
 from chess.save import save_move, save_piece, save_rng, save_piece_type, save_custom_type
-from chess.util import get_filename, is_prefix_of, is_prefix_in, select_save_data, select_save_name
+from chess.util import get_filename, is_prefix_of, select_save_data, select_save_name
 from chess.util import Default, Unset, base_dir, config_path, deduplicate, fits, sign, spell, unpack, repack
 
 
@@ -4116,17 +4116,14 @@ class Board(Window):
                     promoted_from = promoted_from or type(piece)
                 if type(promotion_piece) != promoted_from:
                     promotion_piece.promoted_from = promoted_from
-            if self.edit_mode and is_prefix_in(['custom', 'wall'], self.edit_piece_set_id):
-                promotion_piece.reload(should_hide=False, flipped_horizontally=False)
-            elif issubclass(promotion, (King, CBKing)) and promotion not in self.piece_sets[side]:
-                if self.edit_mode and self.edit_piece_set_id is not None:
-                    promotion_piece.should_hide = False
-                    promotion_piece.is_hidden = False
-                self.update_piece(promotion_piece, asset_folder='other')
-            elif not self.edit_mode or self.edit_piece_set_id is None:
-                self.update_piece(promotion_piece, penultima_flip=True)
-            else:
-                promotion_piece.reload(should_hide=False, flipped_horizontally=False)
+            if issubclass(promotion, Piece) and not issubclass(promotion, NoPiece):
+                if issubclass(promotion, (King, CBKing)) and promotion not in self.piece_sets[side]:
+                    self.update_piece(promotion_piece, asset_folder='other')
+                elif self.edit_mode and self.edit_piece_set_id is not None and not isinstance(piece, Obstacle):
+                    promotion_piece.should_hide = self.hide_edit_pieces
+                    self.update_piece(promotion_piece, penultima_hide=False)
+                else:
+                    self.update_piece(promotion_piece, penultima_flip=True)
             promotion_piece.scale = self.square_size / promotion_piece.texture.width
             if isinstance(promotion_piece, (Border, Wall)):
                 promotion_piece.scale *= 0.8
@@ -4313,7 +4310,7 @@ class Board(Window):
                 asset_folder = piece.asset_folder
             elif self.hide_pieces == 1:
                 asset_folder = 'other'
-            elif self.hide_pieces == 2 and type(piece) in penultima_pieces:
+            elif self.hide_pieces == 2 and type(piece) in penultima_pieces and penultima_hide is not False:
                 asset_folder = 'other'
             else:
                 asset_folder = piece.asset_folder
@@ -4322,7 +4319,7 @@ class Board(Window):
                 file_name = piece.file_name
             elif self.hide_pieces == 1:
                 file_name = 'ghost'
-            elif self.hide_pieces == 2 and type(piece) in penultima_pieces:
+            elif self.hide_pieces == 2 and type(piece) in penultima_pieces and penultima_hide is not False:
                 file_name = penultima_pieces[type(piece)]
             else:
                 file_name = piece.file_name
@@ -4338,16 +4335,14 @@ class Board(Window):
         for piece in sum(self.movable_pieces.values(), []):
             self.update_piece(piece)
         for piece in self.promotion_piece_sprite_list:
-            if isinstance(piece, Piece) and not piece.is_empty():
-                if self.edit_mode and is_prefix_in(['custom', 'wall'], self.edit_piece_set_id):
-                    piece.reload(should_hide=False, flipped_horizontally=False)
-                # that issubclass call is there because PyCharm doesn't recognize that piece is a Piece
-                elif issubclass(type(piece), (King, CBKing)) and type(piece) not in self.piece_sets[piece.side]:
+            if isinstance(piece, Piece) and not isinstance(piece, NoPiece):
+                if isinstance(piece, (King, CBKing)) and type(piece) not in self.piece_sets[piece.side]:
                     self.update_piece(piece, asset_folder='other')
-                elif not self.edit_mode or self.edit_piece_set_id is None:
-                    self.update_piece(piece, penultima_flip=True)
+                elif self.edit_mode and self.edit_piece_set_id is not None and not isinstance(piece, Obstacle):
+                    piece.should_hide = self.hide_edit_pieces
+                    self.update_piece(piece, penultima_hide=False)
                 else:
-                    piece.reload(should_hide=False, flipped_horizontally=False)
+                    self.update_piece(piece, penultima_flip=True)
 
     def update_sprite(
         self,
@@ -5436,6 +5431,22 @@ class Board(Window):
                     )
                 self.reset_custom_data()
                 self.reset_board()
+        if symbol == key.O and modifiers & key.MOD_ACCEL and not partial_move:  # Toggle drops (Crazyhouse mode)
+            self.use_drops = not self.use_drops
+            if self.use_drops:
+                self.log("Info: Drops enabled")
+            else:
+                self.log("Info: Drops disabled")
+            if not self.use_drops and not self.edit_mode and self.promotion_piece and self.promotion_piece.is_empty():
+                self.undo_last_finished_move()
+                self.update_caption()
+            self.future_move_history = []  # we don't know if we can redo all the future moves anymore, so we clear them
+            self.unload_end_data()
+            self.load_pieces()
+            self.load_check()
+            self.load_moves()
+            self.reload_end_data()
+            self.advance_turn()
         if symbol == key.P:  # Promotion
             if self.edit_mode:
                 old_id = self.edit_piece_set_id
@@ -5510,17 +5521,26 @@ class Board(Window):
                 self.log(f"Info: Using {which} color scheme (ID {self.color_index})", False)
                 self.color_scheme = colors[self.color_index]
                 self.update_colors()
-        if symbol == key.H:
+        if symbol == key.H:  # Hide pieces
             old_hide_pieces = self.hide_pieces
-            old_drops = self.use_drops
-            if modifiers & key.MOD_ALT and not partial_move:  # Toggle drops (Crazyhouse mode)
-                self.use_drops = not self.use_drops
+            old_hide_edit_pieces = self.hide_edit_pieces
+            if modifiers & key.MOD_ALT and modifiers & key.MOD_SHIFT:  # Mark as hidden
+                self.hide_edit_pieces = None if self.hide_edit_pieces is True else True
+            elif modifiers & key.MOD_ALT:  # Mark as shown
+                self.hide_edit_pieces = None if self.hide_edit_pieces is False else False
             elif modifiers & key.MOD_ACCEL and modifiers & key.MOD_SHIFT:  # Show
                 self.hide_pieces = 0
             elif modifiers & key.MOD_SHIFT:  # Hide
                 self.hide_pieces = 1
             elif modifiers & key.MOD_ACCEL:  # Penultima mode
                 self.hide_pieces = 2
+            if old_hide_edit_pieces != self.hide_edit_pieces:
+                if self.hide_edit_pieces:
+                    self.log("Info: Newly placed pieces are now marked as hidden", False)
+                elif self.hide_edit_pieces is not None:
+                    self.log("Info: Newly placed pieces are now marked as shown", False)
+                else:
+                    self.log("Info: Newly placed pieces are no longer marked", False)
             if old_hide_pieces != self.hide_pieces:
                 if self.hide_pieces == 0:
                     self.log(
@@ -5536,21 +5556,6 @@ class Board(Window):
                     self.hide_pieces = old_hide_pieces
                 self.update_pieces()
                 self.show_moves()
-            if old_drops != self.use_drops:
-                if self.use_drops:
-                    self.log("Info: Drops enabled")
-                else:
-                    self.log("Info: Drops disabled")
-                if old_drops and not self.edit_mode and self.promotion_piece and self.promotion_piece.is_empty():
-                    self.undo_last_finished_move()
-                    self.update_caption()
-                self.future_move_history = []  # we don't know if we can redo the future moves anymore, so we clear them
-                self.unload_end_data()
-                self.load_pieces()
-                self.load_check()
-                self.load_moves()
-                self.reload_end_data()
-                self.advance_turn()
         if symbol == key.M:  # Moves
             if modifiers & key.MOD_ALT and not partial_move:  # Clear future move history
                 self.log("Info: Future move history cleared", False)
@@ -5565,7 +5570,7 @@ class Board(Window):
                     self.load_moves()
                     self.reload_end_data()
                     self.advance_turn()
-            else:
+            else:  # Move visibility
                 old_hide_move_markers = self.hide_move_markers
                 if modifiers & key.MOD_ACCEL and modifiers & key.MOD_SHIFT:  # Default
                     self.hide_move_markers = None
@@ -5584,7 +5589,7 @@ class Board(Window):
                         self.hide_move_markers = old_hide_move_markers
                     self.update_pieces()
                     self.show_moves()
-        if symbol == key.K and not self.hide_move_markers:  # Move markers
+        if symbol == key.K and not self.hide_move_markers:  # Move marker mode
             selected_square = self.selected_square
             if modifiers & key.MOD_ACCEL and modifiers & key.MOD_SHIFT:  # Default
                 self.log("Info: Showing legal moves for moving player", False)

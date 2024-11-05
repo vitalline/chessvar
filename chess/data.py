@@ -21,9 +21,9 @@ from chess.pieces.groups import splash as sp, starbound as st, stone as so, swit
 from chess.pieces.groups import thrash as th
 from chess.pieces.groups import wide as wd
 from chess.pieces.groups import zebra as zb
-from chess.pieces.groups.util import NoPiece
 from chess.pieces.piece import Piece
 from chess.pieces.side import Side
+from chess.pieces.util import NoPiece
 
 
 default_board_width = 8

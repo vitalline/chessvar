@@ -36,7 +36,18 @@ class Obstacle(NonMovingPiece):
 
     def __init__(self, board, **kwargs):
         super().__init__(board, **kwargs)
-        self.color = board.color_scheme.get('wall_color', board.color_scheme['background_color'])
+        self.should_hide = False
+        self.is_hidden = False
+        self.set_color()
+
+    def reload(self, *args, **kwargs):
+        self.should_hide = False
+        self.is_hidden = False
+        self.set_color()
+        return
+
+    def set_color(self, *args, **kwargs):
+        self.color = self.board.color_scheme.get('wall_color', self.board.color_scheme['background_color'])
 
     def is_empty(self):
         return False

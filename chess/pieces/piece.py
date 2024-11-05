@@ -228,6 +228,8 @@ class Piece(Sprite):
             self.is_hidden = self.should_hide
         if self.should_hide is None and is_hidden is not None:
             self.is_hidden = None if is_hidden is Default else is_hidden
+        if self.should_hide is not None and self.is_hidden is not None:
+            self.is_hidden = self.should_hide
         self.texture_folder = asset_folder or self.texture_folder
         self.texture_side = side or self.texture_side
         self.texture_name = file_name or self.texture_name
