@@ -9,12 +9,11 @@ from chess.movement.base import BaseMovement
 from chess.movement.types import is_active
 from chess.movement.util import Position, to_algebraic
 from chess.pieces.side import Side
-from chess.pieces.types import Double, Enemy, Immune
+from chess.pieces.types import Double, Enemy, Empty, Immune
 from chess.util import CUSTOM_PREFIX, Default, get_texture_path
 
 if TYPE_CHECKING:
     from chess.board import Board
-    from chess.movement.move import Move
 
 
 class Piece(Sprite):
@@ -52,16 +51,6 @@ class Piece(Sprite):
         if self.board_pos is not None:
             self.position = self.board.get_screen_position(self.board_pos)
 
-    def is_empty(self):
-        return not self.side
-
-    @classmethod
-    def is_colorbound(cls):
-        return getattr(cls, 'colorbound', False)
-
-    def move(self, move: Move):
-        self.board.move(move)
-
     def moves(self, theoretical: bool = False):
         if self.movement:
             for move in self.movement.moves(self.board_pos, self, theoretical):
@@ -89,9 +78,7 @@ class Piece(Sprite):
                                                 board_pos=square,
                                                 side=self.side,
                                             )
-                                        promoted_from = piece.promoted_from or self.promoted_from
-                                        if not self.is_empty():
-                                            promoted_from = promoted_from or type(self)
+                                        promoted_from = piece.promoted_from or self.promoted_from or type(self)
                                         if type(piece) != promoted_from:
                                             piece.promoted_from = promoted_from
                                         copy_move = copy(move)
@@ -169,33 +156,51 @@ class Piece(Sprite):
             return False
         if what == self:
             return False
-        match self.side:
-            case Side.ANY:
-                return False
-            case Side.NONE:
-                return True
-            case _:
-                return (
-                    what.side is self.side and not isinstance(self, (Double, Enemy))
-                    or what.side is self.side.opponent() and isinstance(self, Enemy)
-                    or isinstance(what, Immune)
-                )
+        if isinstance(what, Immune):
+            return True
+        if what.side is Side.NONE:
+            return False
+        if what.side is Side.ANY:
+            return True
+        if what.side is self.side:
+            return not isinstance(self, (Double, Enemy))
+        if what.side is self.side.opponent():
+            return isinstance(self, Enemy)
+        return False
 
     def captures(self, what: Piece):
         if not what:
             return False
-        match self.side:
-            case Side.ANY:
-                return True
-            case Side.NONE:
-                return False
-            case _:
-                return (
-                    what.side is not Side.NONE
-                    and (what.side is not self.side or isinstance(self, Double)
-                    or what.side is not self.side.opponent() and isinstance(self, Enemy))
-                    and not isinstance(what, Immune)
-                )
+        if isinstance(what, Immune):
+            return False
+        if what.side is Side.NONE:
+            return False
+        if what.side is Side.ANY:
+            return True
+        if what.side is self.side:
+            return isinstance(self, (Double, Enemy))
+        if what.side is self.side.opponent():
+            return not isinstance(self, Enemy)
+        return True
+
+    def skips(self, what: Piece):
+        if not what:
+            return False
+        if not issubclass(type(what), Empty):
+            return False
+        if what.side is Side.NONE:
+            return True
+        if what.side is Side.ANY:
+            return False
+        if what.side is self.side:
+            return not isinstance(self, Enemy)
+        if what.side is self.side.opponent():
+            return isinstance(self, Enemy)
+        return True
+
+    @classmethod
+    def is_colorbound(cls):
+        return getattr(cls, 'colorbound', False)
 
     @classmethod
     def type(cls) -> str:

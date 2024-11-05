@@ -131,7 +131,7 @@ class Move(object):
                 string = f"on {toa(self.pos_from)} is moved to {toa(self.pos_to)}"
             else:
                 string = f"on {toa(self.pos_from)} goes to {toa(self.pos_to)}"
-        elif self.pos_from is None or (self.piece and self.piece.is_empty() and not moved):
+        elif self.pos_from is None or (self.piece and self.piece.side is Side.NONE and not moved):
             if self.movement_type is not None and self.movement_type.__name__ == 'DropMovement':
                 if self.promotion is Unset:
                     string = f"wants to place something on {toa(self.pos_to)}"
@@ -160,11 +160,11 @@ class Move(object):
         else:
             string = "does something very mysterious"
         if self.piece:
-            if self.piece.is_empty() and not (self.promotion and (self.pos_from is None or not moved)):
+            if self.piece.side is Side.NONE and not (self.promotion and (self.pos_from is None or not moved)):
                 board = self.piece.board
                 side = board.get_promotion_side(self.piece) if self.is_edit == 1 else board.turn_side
                 string = f"{side} {string}"
-            elif self.piece.is_empty():
+            elif self.piece.side is Side.NONE:
                 string = f"{self.promotion} {string}"
             else:
                 string = f"{self.piece} {string}"
@@ -182,7 +182,7 @@ class Move(object):
                 string += f"{comma} swaps"
             string = f"{string} with {self.swapped_piece} on {toa(self.pos_to)}"
             comma = ','
-        if self.pos_from is not None and self.piece and not (self.piece.is_empty() and not moved):
+        if self.pos_from is not None and self.piece and not (self.piece.side is Side.NONE and not moved):
             if self.promotion is Unset:
                 if self.is_edit == 1:
                     string += f"{comma} is promoted"

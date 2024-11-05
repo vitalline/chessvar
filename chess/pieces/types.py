@@ -1,9 +1,13 @@
-class Double(object):
-    # Can capture other pieces of its owner
+class Empty(object):
+    # Can be passed through by non-opposing pieces
     pass
 
 class Enemy(object):
     # Can only capture pieces that do not belong to its opponent
+    pass
+
+class Double(object):
+    # Can capture any piece that can be captured
     pass
 
 class Immune(object):

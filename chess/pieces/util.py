@@ -1,38 +1,23 @@
 from chess.pieces.piece import Piece
 from chess.pieces.side import Side
-from chess.pieces.types import Immune
+from chess.pieces.types import Empty, Immune
 
 
-class NonMovingPiece(Piece):
-    name = '(Non-moving Piece)'
-    file_name = 'none'
-    asset_folder = 'util'
+class DefaultSidePiece(Piece):
+    name = '(Default-Side Piece)'
     default_side = Side.NONE
 
     def __init__(self, board, **kwargs):
-        kwargs['side'] = self.default_side
-        kwargs['movement'] = None
+        if kwargs.get('side') is None:
+            kwargs['side'] = self.default_side
         super().__init__(board, **kwargs)
 
     def __str__(self):
-        return '???' if self.is_hidden else self.name.strip()
-
-    def of(self, side: Side) -> Piece:
-        side = self.default_side
-        return super().of(side)
+        return self.name.strip() if self.side is self.default_side else super().__str__()
 
 
-class NoPiece(NonMovingPiece):
-    name = '(Nothing)'
-
-    def is_empty(self):
-        return True
-
-
-class Obstacle(NonMovingPiece):
-    name = '(Obstacle)'
-    file_name = 'square'
-    default_side = Side.NEUTRAL
+class BackgroundPiece(DefaultSidePiece):
+    name = '(Background Piece)'
 
     def __init__(self, board, **kwargs):
         super().__init__(board, **kwargs)
@@ -44,13 +29,45 @@ class Obstacle(NonMovingPiece):
         self.should_hide = False
         self.is_hidden = False
         self.set_color()
-        return
 
     def set_color(self, *args, **kwargs):
         self.color = self.board.color_scheme.get('wall_color', self.board.color_scheme['background_color'])
 
-    def is_empty(self):
-        return False
+
+class Shield(BackgroundPiece, Empty):
+    name = 'Shield'
+    file_name = 'shield'
+    asset_folder = 'other'
+    default_side = Side.NEUTRAL
+
+
+class Void(BackgroundPiece, Empty, Immune):
+    name = 'Void'
+    file_name = 'void'
+    asset_folder = 'other'
+    default_side = Side.NEUTRAL
+
+
+class NoSidePiece(DefaultSidePiece, Empty):
+    name = '(No-Side Piece)'
+
+    def __init__(self, board, **kwargs):
+        kwargs['side'] = self.default_side
+        super().__init__(board, **kwargs)
+
+    def of(self, side: Side) -> Piece:
+        side = self.default_side
+        return super().of(side)
+
+
+class NoPiece(NoSidePiece, Empty):
+    name = '(Nothing)'
+
+
+class Obstacle(NoSidePiece, BackgroundPiece):
+    name = '(Obstacle)'
+    asset_folder = 'other'
+    default_side = Side.NEUTRAL
 
 
 class Block(Obstacle):
@@ -58,11 +75,12 @@ class Block(Obstacle):
     file_name = 'block'
 
 
-class Border(Obstacle, Immune):
-    name = 'Border'
-    file_name = 'square'
-
-
 class Wall(Obstacle, Immune):
     name = 'Wall'
     file_name = 'wall'
+
+
+class Border(Obstacle, Immune):
+    name = 'Border'
+    file_name = 'square'
+    asset_folder = 'util'

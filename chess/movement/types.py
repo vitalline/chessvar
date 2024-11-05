@@ -7,7 +7,7 @@ from typing import TYPE_CHECKING
 from chess.movement.base import BaseMovement
 from chess.movement.move import Move
 from chess.movement.util import AnyDirection, Direction, Position, add, sub, mul, ddiv
-from chess.pieces.types import Delayed, Delayed1, Immune, Slow
+from chess.pieces.types import Immune, Slow, Delayed, Delayed1
 from chess.util import UnpackedList, Unset, sign, repack, unpack
 
 if TYPE_CHECKING:
@@ -130,10 +130,13 @@ class RiderMovement(BaseMovement):
             or len(direction) > 2 and direction[2] and self.steps >= direction[2]
             or ((
                 isinstance((next_piece := self.board.get_piece(next_pos_to)), Immune)
-                and next_piece.movement is None
-            ) if theoretical else (  # the "move.pos_from != move.pos_to" check below is necessary for Inverse and Relay
-                piece.blocked_by(self.board.get_piece(next_pos_to)) or (move.pos_from != move.pos_to and
-                (piece.captures(captured_piece := self.board.get_piece(move.pos_to)) and piece != captured_piece))
+                and not piece.skips(next_piece) and next_piece.movement is None
+            ) if theoretical else (
+                (piece.blocked_by(next_piece := self.board.get_piece(next_pos_to))
+                and not piece.skips(next_piece)) or (move.pos_from != move.pos_to and (
+                piece != (captured_piece := self.board.get_piece(move.pos_to))
+                and piece.captures(captured_piece) and not piece.skips(captured_piece)))
+                # the "move.pos_from != move.pos_to" check for the captured piece is necessary for Inverse and Relay, as
                 # without it, the hypothetical "opposing piece" used to simulate the movement would try to capture ours!
             ))
         )
@@ -306,7 +309,7 @@ class RangedMovement(BaseMovement):
             move = copy(move)
             if not theoretical:
                 captured_piece = move.captured_piece or self.board.get_piece(move.pos_to)
-                if not captured_piece.is_empty():
+                if captured_piece.side:
                     move.captured_piece = captured_piece
                     move.pos_to = move.pos_from
                     move.movement_type = RangedMovement
@@ -429,8 +432,6 @@ class CastlingMovement(BaseMovement):
         if self.board.not_on_board(other_piece_pos_to):
             return ()
         other_piece = self.board.get_piece(other_piece_pos)
-        if other_piece.is_empty():
-            return ()
         if other_piece.side != piece.side:
             return ()
         if other_piece.movement.total_moves:
@@ -686,7 +687,7 @@ class RepeatBentMovement(BaseMultiMovement):
                 if (
                     not stop and move is not None and len(direction) > 2 and direction[2] and
                     move.pos_to == add(pos_from, piece.side.direction(mul(direction[:2], direction[2])))
-                    and (theoretical or self.board.get_piece(move.pos_to).is_empty())
+                    and (theoretical or not self.board.get_piece(move.pos_to).side)
                 ):
                     for bent_move in self.moves(move.pos_to, piece, theoretical, true_index + 1):
                         yield copy(bent_move).set(pos_from=pos_from)
@@ -1064,7 +1065,7 @@ class ChoiceMovement(BaseChoiceMovement):
                         else:
                             to_piece = self.board.get_piece(move.pos_to)
                             if not value:
-                                if (to_piece.is_empty() or piece == to_piece) != invert:
+                                if (piece == to_piece or not to_piece.side) != invert:
                                     yield copy(move)
                             elif value.isdigit() and (int(value) == to_piece.side.value) != invert:
                                 yield copy(move)

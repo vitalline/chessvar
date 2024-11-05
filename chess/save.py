@@ -17,7 +17,7 @@ from chess.movement.util import to_algebraic as toa, from_algebraic as fra
 from chess.movement.util import to_algebraic_map as tom, from_algebraic_map as frm
 from chess.pieces import types as piece_types
 from chess.pieces.piece import Piece
-from chess.pieces.util import NonMovingPiece, NoPiece
+from chess.pieces.util import DefaultSidePiece, NoPiece
 from chess.util import CUSTOM_PREFIX, UNSET_STRING, Unset
 
 if TYPE_CHECKING:
@@ -189,10 +189,11 @@ def save_piece(piece: Piece | frozenset | None) -> dict | str | None:
         return UNSET_STRING
     if isinstance(piece, NoPiece):
         return toa(piece.board_pos) if piece.board_pos else None
+    dsp = DefaultSidePiece
     return {k: v for k, v in {
         'cls': save_piece_type(type(piece)),
         'pos': toa(piece.board_pos) if piece.board_pos else None,
-        'side': piece.side.value if not isinstance(piece, NonMovingPiece) else None,
+        'side': piece.side.value if not isinstance(piece, dsp) or piece.side != piece.default_side else None,
         'from': save_piece_type(piece.promoted_from) if piece.promoted_from else None,
         'moves': piece.movement.total_moves if piece.movement else None,
         'show': not piece.should_hide if piece.should_hide is not None else None,
@@ -220,7 +221,7 @@ def load_piece(data: dict | str | None, board: Board, from_dict: dict | None) ->
     if piece.movement:
         piece.movement.set_moves(data.get('moves', 0))
     piece.scale = board.square_size / piece.texture.width
-    if not piece.is_empty():
+    if not isinstance(piece, NoPiece):
         board.update_piece(piece)
     return piece
 
