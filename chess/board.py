@@ -1231,22 +1231,9 @@ class Board(Window):
             piece_sets = self.piece_sets
         self.drops = {}
         drop_squares = [(i, j) for i in range(self.board_height) for j in range(self.board_width)]
-        pawn_drop_squares = {
-            Side.WHITE: [(i, j) for i in range(2, self.board_height) for j in range(self.board_width)],
-            Side.BLACK: [(i, j) for i in range(0, self.board_height - 2) for j in range(self.board_width)],
-        }
-        pawn_drop_squares_2 = {
-            Side.WHITE: [(1, j) for j in range(self.board_width)],
-            Side.BLACK: [(self.board_height - 2, j) for j in range(self.board_width)],
-        }
+        pawn_drop_squares = [(i, j) for i in range(1, self.board_height - 1) for j in range(self.board_width)]
         for drop_side in piece_sets:
-            drops = {self.custom_pawn: {}}
-            pawn = self.custom_pawn(self)
-            pawn.movement.set_moves(1)
-            for pos in pawn_drop_squares[drop_side]:
-                drops[self.custom_pawn][pos] = [pawn]
-            for pos in pawn_drop_squares_2[drop_side]:
-                drops[self.custom_pawn][pos] = [self.custom_pawn]
+            drops = {self.custom_pawn: {pos: [self.custom_pawn] for pos in pawn_drop_squares}}
             for side in (drop_side, drop_side.opponent()):
                 if not piece_sets[side]:
                     continue
