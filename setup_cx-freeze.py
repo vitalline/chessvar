@@ -29,7 +29,7 @@ setup(
         'include_files': gen_data_files(['assets']) + [(s,) * 2 for s in ('readme.txt', 'cwda_2024.txt')]
     }},
     executables=[
-        Executable('main.py', target_name='chess.exe', base='Win32GUI'),
-        Executable('main.py', target_name='chess_debug.exe')
+        Executable('main.py', target_name='chessvar.exe'),
+        Executable('main.py', target_name='chessvarw.exe', base='Win32GUI'),
     ]
 )
