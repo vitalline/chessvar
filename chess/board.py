@@ -788,15 +788,22 @@ class Board(Window):
 
         subs_dict = {}
         for side, piece_set in self.piece_sets.items():
-            value = side.value()
+            value = side.value
             subs_dict[value] = {}
             i = 0
             for piece_type in piece_set:
                 if piece_type and not issubclass(piece_type, NoPiece):
                     i += 1
                     subs_dict[value][i] = save_piece_type(piece_type)
-            pawns = self.custom_pawns.get(value) if isinstance(self.custom_pawns, dict) else self.custom_pawns
-            for i, pawn in (pawns if pawns is not None else [Pawn]):
+            if isinstance(self.custom_pawns, dict):
+                pawns = self.custom_pawns.get(value)
+            else:
+                pawns = self.custom_pawns
+            if pawns is None:
+                pawns = {0: Pawn}
+            elif isinstance(pawns, list):
+                pawns = {i: Pawn for i in range(len(pawns))}
+            for i, pawn in pawns.items():
                 subs_dict[value][-i] = save_piece_type(pawn)
         for i in {x for side_dict in subs_dict.values() for x in side_dict.keys()}:
             value = None
@@ -807,7 +814,7 @@ class Board(Window):
                     value = None
                     break
             if value is not None:
-                subs_dict.setdefault(Side.NONE.value(), {})[i] = value
+                subs_dict.setdefault(Side.NONE.value, {})[i] = value
         data = substitute(data, subs_dict)
 
         self.variant = data.get('variant', '')
@@ -946,7 +953,7 @@ class Board(Window):
         self.piece_sets, self.piece_set_names = self.get_piece_sets()
         saved_piece_sets = {
             Side(int(v)): [load_piece_type(t, c) or NoPiece for t in d] for v, d in data.get('sets', {}).items()
-        }
+        } or self.piece_sets
         update_sets = False
         for side in self.piece_sets:
             if self.piece_set_ids[side] is None:
@@ -993,7 +1000,7 @@ class Board(Window):
             (Side(int(side)) if side.isdigit() else side): {
                 group: value for group, value in rules.items()
             } if isinstance(rules, dict) else rules
-            for side, rules in data.get('end').items()
+            for side, rules in data.get('end', {}).items()
         }
         self.reset_end_rules()
         end_data = data.get('count', {})
@@ -1102,7 +1109,9 @@ class Board(Window):
             self.turn_rules = None
         else:
             turn_data = data.get('turn')
-            if turn_data is not None:
+            if turn_data is None:
+                turn_data = self.turn_data
+            else:
                 turn_data[1] = Side(turn_data[1])
             self.ply_count = ply_count
             self.turn_data = turn_data

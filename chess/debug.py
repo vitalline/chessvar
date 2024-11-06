@@ -274,7 +274,7 @@ def debug_info(board: Board) -> list[str]:
                         suffixes = []
                         if isinstance(to_piece, Piece):
                             if to_piece.side not in (
-                                {piece.default_side} if isinstance(piece, DefaultSidePiece) else {Side.NONE, side}
+                                {piece.default_side} if isinstance(piece, UtilityPiece) else {Side.NONE, side}
                             ):
                                 suffixes.append(f"Side: {to_piece.side}")
                             if to_piece.movement and to_piece.movement.total_moves:
@@ -297,7 +297,7 @@ def debug_info(board: Board) -> list[str]:
         piece_list = ', '.join(
             ((
                 f"{piece.side}" if isinstance(piece, Piece)
-                and not (isinstance(piece, DefaultSidePiece)
+                and not (isinstance(piece, UtilityPiece)
                 and piece.side is piece.default_side) else ""
             ) + name(piece, side)) if piece else 'None' for piece in side_data
         )
@@ -332,7 +332,7 @@ def debug_info(board: Board) -> list[str]:
     debug_log.append(f"Custom layout ({len(board.custom_layout)}):")
     for pos, piece in board.custom_layout.items():
         piece_name = name(piece)
-        if piece.side is not (piece.default_side if isinstance(piece, DefaultSidePiece) else Side.NONE):
+        if piece.side is not (piece.default_side if isinstance(piece, UtilityPiece) else Side.NONE):
             piece_name = f"{piece.side} {piece_name}"
         suffixes = []
         if piece.movement and piece.movement.total_moves:
