@@ -6017,6 +6017,9 @@ class Board(Window):
         if self.variant or self.custom_layout:
             self.log(f"Game: {self.variant or 'Custom'}")
             return
+        if self.piece_set_ids[Side.WHITE] == self.piece_set_ids[Side.BLACK] == 0 and not self.hide_pieces:
+            self.log("Game: Chess")
+            return
         self.log(
             "Game: "
             f"{self.piece_set_names[Side.WHITE] if not self.hide_pieces else '???'} vs. "
