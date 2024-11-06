@@ -15,7 +15,7 @@ from chess.pieces.groups.classic import Pawn
 from chess.pieces.piece import Piece
 from chess.pieces.side import Side
 from chess.save import save_piece_type, save_custom_type
-from chess.util import get_filename, sign, spell, spell_ordinal, unpack, repack
+from chess.util import get_filename, sign, pluralize, spell, spell_ordinal, unpack, repack
 
 if TYPE_CHECKING:
     from chess.board import Board
@@ -436,7 +436,7 @@ def debug_info(board: Board) -> list[str]:
         loop = [(Side.WHITE, None), (Side.BLACK, None)]
     start_count = 0
     start_index = 0
-    debug_log.append(f"Move order ({len(start) + len(loop)}):")
+    debug_log.append(f"Turn order ({len(start) + len(loop)}):")
     for section_name, section in (('Start', start), ('Loop', loop)):
         if section:
             if start_count or not start_index:
@@ -458,43 +458,97 @@ def debug_info(board: Board) -> list[str]:
     if not start and not loop:
         debug_log[-1] += " None"
     standard_conditions = set(end_types.values())
-    generic_strings = {'': 'the pieces', '*': 'any piece'}
     for side in board.end_rules:
-        debug_log.append(f"End conditions for {side}:")
+        if side:
+            debug_log.append(f"End conditions for {side}:")
+        else:
+            debug_log.append("Conflict resolution rules:")
         for rule in board.end_rules[side]:
             if rule in standard_conditions:
-                rule_string = rule.capitalize()
+                rule_start = rule.capitalize()
                 end_data = board.end_data.get(side, {}).get(rule, {})
             else:
                 if side in board.areas and rule in board.areas[side]:
-                    rule_string = f"Reach {rule} with"
+                    rule_start = f"Reach {rule} with"
                 else:
                     try:
                         pos = fra(rule)
                         if pos == (-1, -1):
-                            rule_string = f"Have"
+                            rule_start = f"Have"
                         elif pos[0] == -1:
-                            rule_string = f"Reach the {b26(pos[1] + 1)}-file with"
+                            rule_start = f"Reach the {b26(pos[1] + 1)}-file with"
                         elif pos[1] == -1:
-                            rule_string = f"Reach the {spell_ordinal(pos[0] + 1, 0)} rank with"
+                            rule_start = f"Reach the {spell_ordinal(pos[0] + 1, 0)} rank with"
                         else:
-                            rule_string = f"Reach {toa(pos)} with"
+                            rule_start = f"Reach {toa(pos)} with"
                     except ValueError:
-                        rule_string = f"Reach {rule} with"
+                        rule_start = f"Reach {rule} with"
                 end_data = board.area_groups.get(side, {}).get(rule, {})
-            for group in board.end_rules[side][rule]:
-                group_value = board.end_rules[side][rule][group]
-                if rule in standard_conditions and group_value in {'+', '-'}:
+            if isinstance(board.end_rules[side][rule], dict):
+                end_rules = board.end_rules[side][rule]
+            else:
+                end_rules = {'': board.end_rules[side][rule]}
+                end_data = {'': end_data}
+            for group in end_rules:
+                rule_string = rule_start
+                opponent = f"{side.opponent()}"
+                group_string = ''
+                group_value = end_rules[group]
+                two = lambda x: f'"{x}"' if any(ch in group for ch in '*.') else pluralize(x)
+                one = lambda x: f'"{x}"' if any(ch in group for ch in '*.') else x
+                if side is Side.NONE:
+                    rule_string = f"Be the one to {rule_string[0].lower() + rule_string[1:]}"
+                    if group in {'', '*'}:
+                        group_string = True  # only show the rule string
+                        rule_string = rule_string.removesuffix(' with')
+                    else:
+                        group_string = f"a {one(group)}"
+                elif rule in standard_conditions and group_value in {'+', '-'}:
                     group_value = int(group_value + '1')
-                    group_string = f"last {generic_strings.get(group, group)}"
+                    prefix = "all of" if rule == 'capture' else "the last of"
+                    if group in {'', '*'}:
+                        group_string = f"{prefix} {opponent}'s pieces"
+                    elif rule == 'capture':
+                        group_string = f"all {opponent} {two(group)}"
+                    else:
+                        group_string = f"the last {opponent} {one(group)}"
+                elif rule in standard_conditions and group in {'', '*'}:
+                    times = abs(int(group_value)) or 1
+                    if rule == 'capture':
+                        if times > 1:
+                            group_string = f"{spell(times)} of {opponent}'s pieces"
+                        else:
+                            group_string = f"a {opponent} piece"
+                    elif times > 1:
+                        group_string = f"{group_string} {spell(times)} times"
+                    else:
+                        group_string = opponent
                 elif isinstance(group_value, str) and group_value[-1:] == '!':
-                    group_string = group_value[:-1] or '1'
-                    group_value = int(group_string + ('1' if group_string in {'+', '-'} else ''))
-                    group_string = f"{spell(abs(group_value) or 1)} of {generic_strings.get(group, group)} and stay"
+                    value_string = group_value[:-1] or '1'
+                    group_value = int(value_string + ('1' if value_string in {'+', '-'} else ''))
+                    rule_string = f"Be the only one to {rule_string[0].lower() + rule_string[1:]}"
                 else:
                     group_value = int(group_value)
-                    group_string = f"{spell(abs(group_value) or 1)} of {generic_strings.get(group, group)}"
+                if not group_string:
+                    group_string = 'piece' if group in {'', '*'} else group
+                    times = abs(int(group_value)) or 1
+                    if rule in standard_conditions:
+                        if times > 1:
+                            group_string = f"{spell(times)} {opponent} {two(group_string)}"
+                        else:
+                            group_string = f"a {opponent} {one(group_string)}"
+                    elif times > 1:
+                        group_string = f"{spell(times)} {two(group_string)}"
+                    else:
+                        group_string = f"a {one(group_string)}"
+                if group_string is not True:
+                    rule_string = f"{rule_string} {group_string}"
                 group_result = {1: "win", 0: "draw", -1: "lose"}.get(sign(group_value))
+                full_rule = f"{rule_string} to {group_result}"
+                if side is Side.NONE:
+                    debug_log.append(f"{pad:2}{full_rule}")
+                    continue
+                group_data = ''
                 if rule in standard_conditions:
                     end_value = end_data.get(group) or 0
                 else:
@@ -503,10 +557,9 @@ def debug_info(board: Board) -> list[str]:
                     if end_value:
                         pieces = [f'{p.name} on {toa(p.board_pos)} {p.board_pos}'.strip() for p in end_group]
                         # that str.strip() call is there just in case Piece.board_pos is None for some reason
-                        end_value = f"{end_value} - {', '.join(pieces)}"
-                full_rule = f"{rule_string} {group_string} to {group_result}"
+                        group_data = f" - {', '.join(pieces)}"
                 ratio = f"{end_value}/{abs(group_value) or 1}"
-                debug_log.append(f"{pad:2}{full_rule}: {ratio}")
+                debug_log.append(f"{pad:2}{full_rule}: {ratio}{group_data}")
     possible_moves = sum((
         sum(v.values(), []) for k, v in board.moves.get(board.turn_side, {}).items() if not isinstance(k, str)
     ), [])

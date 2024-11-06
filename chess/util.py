@@ -99,10 +99,19 @@ def spell_ordinal(number: int, limit: int = 100) -> str:
 
 
 # Function to get the correct form of a word based on a number (e.g. '1 apple', '2 apples').
-def form(number: int, singular: str, plural: str = None) -> str:
+def pluralize(number: int | str, singular: str | None = None, plural: str | None = None) -> str:
+    if isinstance(number, str):
+        number, singular, plural = 2, number, singular
+    if singular is None:
+        return spell_ordinal(number)  # just in case
     if plural is None:
-        plural = singular + 's'
-    return singular if number % 10 == 1 and number % 100 != 11 else plural
+        if singular.endswith('y'):
+            plural = singular[:-1] + 'ies'
+        elif any(singular.endswith(suffix) for suffix in ('s', 'x', 'z', 'ch', 'sh', 'zh')):
+            plural = singular + 'es'
+        else:
+            plural = singular + 's'
+    return singular if number == 1 else plural
 
 
 T = TypeVar('T')

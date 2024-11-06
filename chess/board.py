@@ -1462,7 +1462,7 @@ class Board(Window):
     def reset_end_rules(self) -> None:
         self.end_rules = {}
         self.end_data = {}
-        for side in (Side.WHITE, Side.BLACK):
+        for side in [Side.WHITE, Side.BLACK] + ([Side.NONE] if Side.NONE in self.custom_end_rules else []):
             self.end_rules[side] = {}
             self.end_data[side] = {}
             side_rules = self.custom_end_rules.get(side, self.custom_end_rules) if self.custom_end_rules else {}
@@ -1488,18 +1488,15 @@ class Board(Window):
                 else:
                     self.end_rules.setdefault(side, {}).setdefault(condition, {}).setdefault('', rules)
                     self.end_data.setdefault(side, {}).setdefault(condition, {}).setdefault('', 0)
+            if side is Side.NONE:
+                continue
             if 'checkmate' not in self.end_rules[side] and 'capture' not in self.end_rules[side]:
                 self.end_rules[side]['checkmate'] = {'': 1, "King": 1, "Royal": 1}
                 self.end_data[side]['checkmate'] = {'': 0, "King": 0, "Royal": 0}
             if 'stalemate' not in self.end_rules[side]:
                 self.end_rules[side]['stalemate'] = {'': 0}
                 self.end_data[side]['stalemate'] = {'': 0}
-        if Side.NONE in self.custom_end_rules:
-            self.end_rules[Side.NONE] = {}
-            for condition, value in self.custom_end_rules[Side.NONE].items():
-                condition = end_types.get(condition)
-                if condition is not None:
-                    self.end_rules[Side.NONE].setdefault(condition, value)
+
 
     def get_piece_sets(
         self,
@@ -1919,9 +1916,9 @@ class Board(Window):
                     if other_needs in {'+', '-'}:
                         other_needs = int(other_needs + '1')
                     if 0 < other_needs <= other_count:
-                        loss_side, loss_value = side, other_needs
+                        loss_side, loss_value, loss_group = side, other_needs, group
                     if 0 > other_needs >= -other_count:
-                        loss_side, loss_value = opponent, -other_needs
+                        loss_side, loss_value, loss_group = opponent, -other_needs, group
                     if 0 == other_needs and other_count:
                         draw = True
                 if win_side and not loss_side and not draw:
@@ -1942,13 +1939,17 @@ class Board(Window):
                                     win_side, win_value, win_group = opponent, -side_needs, group
                                 if 0 == side_needs and side_count:
                                     draw = True
+            resolution_rules = self.end_rules.get(side, {}).get(condition, {})
             if win_side and loss_side and win_side != loss_side.opponent():
                 if win_value > loss_value:
                     loss_side = None
                 if loss_value > win_value:
                     win_side = None
                 if win_value == loss_value:
-                    resolution = self.end_rules.get(Side.NONE, {}).get(condition) or 0
+                    resolution = 0
+                    if win_group == loss_group:
+                        resolution = resolution_rules.get(win_group)
+                    resolution = resolution or resolution_rules.get('') or 0
                     if resolution >= 0:
                         loss_side = None
                     if resolution <= 0:
@@ -1956,7 +1957,10 @@ class Board(Window):
                     if resolution == 0:
                         draw = True
             if win_side and draw or loss_side and draw:
-                resolution = self.end_rules.get(Side.NONE, {}).get(condition) or 0
+                resolution = 0
+                if win_group == loss_group:
+                    resolution = resolution_rules.get(win_group)
+                resolution = resolution or resolution_rules.get('') or 0
                 if resolution >= 0:
                     loss_side = None
                     draw = False
