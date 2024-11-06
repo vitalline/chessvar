@@ -20,7 +20,7 @@ from arcade import get_screens, start_render
 from chess.color import colors, default_colors, trickster_colors
 from chess.color import average, darken, desaturate, lighten, saturate
 from chess.config import Config
-from chess.data import base_rng, max_seed, get_set, get_set_name
+from chess.data import base_rng, max_seed, get_set_data, get_set_name
 from chess.data import default_board_width, default_board_height, default_size
 from chess.data import min_width, min_height, min_size, max_size, size_step
 from chess.data import action_types, end_types, penultima_textures, piece_groups
@@ -1526,7 +1526,7 @@ class Board(Window):
                     piece_names[side] = chaos_set[1]
                 else:
                     piece_group = piece_groups[piece_set_ids[side]]
-                    piece_sets[side] = get_set(side, piece_set_ids[side]).copy()
+                    piece_sets[side] = get_set_data(side, piece_set_ids[side]).copy()
                     piece_names[side] = piece_group.get('name', '-')
                 if self.board_width != len(piece_sets[side]):
                     offset = (self.board_width - len(piece_sets[side])) / 2
@@ -1556,7 +1556,7 @@ class Board(Window):
             random_set_ids = self.chaos_rng.sample(piece_set_ids, k=len(group))
             for j, poss in enumerate(group):
                 for pos in poss:
-                    piece_set[pos] = get_set(side, random_set_ids[j])[pos]
+                    piece_set[pos] = get_set_data(side, random_set_ids[j])[pos]
         return piece_set, get_set_name(piece_set)
 
     def get_extremely_random_set(self, side: Side, asymmetrical: bool = False) -> tuple[list[type[Piece]], str]:
@@ -1565,7 +1565,7 @@ class Board(Window):
         piece_pos_ids = [i for i in range(4)] + [7]
         piece_poss = [
             (i, j) for i in piece_set_ids for j in piece_pos_ids
-            if j < 4 or get_set(side, i)[j] != get_set(side, i)[7 - j]
+            if j < 4 or (set_data := get_set_data(side, i))[j] != set_data[7 - j]
         ]
         random_set_ids = self.chaos_rng.sample(piece_poss, k=7 if asymmetrical else 4)
         if asymmetrical:
@@ -1576,7 +1576,7 @@ class Board(Window):
         for i, group in enumerate(random_set_poss):
             set_id, set_pos = random_set_ids[i]
             for j, pos in enumerate(group):
-                random_set = get_set(side, set_id)
+                random_set = get_set_data(side, set_id)
                 piece_set[pos] = random_set[set_pos]
                 if self.chaos_mode == 3 and set_pos != 3 and j > 0:
                     if random_set[set_pos] != random_set[7 - set_pos]:
@@ -4212,7 +4212,7 @@ class Board(Window):
             )
         new_piece.scale = self.square_size / new_piece.texture.width
         self.piece_sprite_list.append(new_piece)
-        if (new_type := save_piece_type(type(new_piece))) in self.past_custom_pieces:
+        if type(new_piece) == self.past_custom_pieces.get(new_type := save_piece_type(type(new_piece))):
             self.custom_pieces[new_type] = self.past_custom_pieces[new_type]
             del self.past_custom_pieces[new_type]
 

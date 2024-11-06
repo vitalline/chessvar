@@ -248,14 +248,14 @@ piece_groups: list[dict[str, str | list[type[Piece]]]] = [
 
 def get_piece_types(side: Side = Side.WHITE) -> dict[type[Piece], str]:
     piece_types = {
-        get_set(side, i)[j]
+        get_set_data(side, i)[j]
         for i in range(len(piece_groups)) for j in [i for i in range(4)] + [7]
-        if j < 4 or get_set(side, i)[j] != get_set(side, i)[7 - j]
+        if j < 4 or get_set_data(side, i)[j] != get_set_data(side, i)[7 - j]
     } | {fide.Pawn, fide.King, cb.King}
     return {t: t.name + (' (CB)' if t.is_colorbound() or t == cb.King else '') for t in piece_types}
 
 
-def get_set(side: Side, set_id: int) -> list[type[Piece]]:
+def get_set_data(side: Side, set_id: int) -> list[type[Piece]]:
     piece_group = piece_groups[set_id]
     return piece_group.get(f"set_{side.key()[0]}", piece_group.get('set', [NoPiece] * default_board_width))
 
