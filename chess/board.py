@@ -2768,7 +2768,6 @@ class Board(Window):
                     move_dict = self.theoretical_moves.get(piece.side, {})
                 elif self.display_moves.get(piece.side, False):
                     move_dict = self.moves.get(piece.side, {})
-                    use_type_markers = False
                 pos_dict = {k: v for k, v in move_dict.get(pos, {}).items()}
                 if  not use_type_markers and self.can_pass() and pos not in pos_dict:
                     pos_dict[pos] = [False]
@@ -2781,7 +2780,7 @@ class Board(Window):
                             move_marker_list.append(False)
                             move_marker_set.add(False)
                         elif not use_type_markers:
-                            if 'a' in move.marks:
+                            if not move.is_legal:
                                 continue
                             if move_marker_set or move_marker_list:
                                 break
@@ -2802,6 +2801,8 @@ class Board(Window):
                                 move_marker_list.append(move_marker_seven)
                                 move_marker_set.add(move_marker_seven)
                                 move_marker_seven = ''
+                    if not move_marker_list:
+                        continue
                     if not use_type_markers:
                         mark = Sprite(f"assets/util/{'move' if move_marker_list[0] else 'capture'}.png")
                         mark.color = self.color_scheme[f"{'selection' if self.selected_square else 'highlight'}_color"]
@@ -2836,7 +2837,7 @@ class Board(Window):
                             mark.angle = angle
                             self.type_sprite_list.append(mark)
                             move_sprites[pos_to].append(mark)
-                with_move = False
+                        with_move = False
         if with_move and self.move_history and not self.edit_mode:
             move = self.move_history[-1]
             if move is not None and not move.is_edit:

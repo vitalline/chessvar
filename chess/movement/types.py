@@ -103,11 +103,11 @@ class RiderMovement(BaseMovement):
                                 pos_from=move.pos_to, pos_to=royal_ep_markers[move.pos_to],
                                 movement_type=RoyalEnPassantMovement, piece=piece,
                                 captured_piece=self.board.get_piece(royal_ep_markers[move.pos_to]),
-                            ),
+                            ).mark(self.default_mark),
                             Move(
                                 pos_from=move.pos_to, pos_to=move.pos_to,
                                 movement_type=move.movement_type, piece=piece,
-                            ),
+                            ).mark(self.default_mark),
                         ):
                             yield copy(move).set(chained_move=chained_move)
                     else:
@@ -716,7 +716,7 @@ class RepeatBentMovement(BaseMultiMovement):
                         if self.start_index <= index and self.skip_count <= true_index:
                             yield copy(move)
                         else:
-                            yield copy(move).unmark('n').mark('a')
+                            yield copy(move).set(is_legal=False).unmark('n').mark('a')
                     if stop:
                         break
                 if (
@@ -998,16 +998,16 @@ class ColorMovement(BaseMultiMovement):
         super().__init__(board, self.light + self.dark)
 
     def moves(self, pos_from: Position, piece: Piece, theoretical: bool = False):
-        if theoretical or self.board.is_light_square(pos_from):
+        if (legal := self.board.is_light_square(pos_from)) or theoretical:
             for movement in self.light:
                 for move in movement.moves(pos_from, piece, theoretical):
                     move.movement_type = type(self)
-                    yield copy(move).unmark('n').mark('w')
-        if theoretical or self.board.is_dark_square(pos_from):
+                    yield copy(move).set(is_legal=legal).unmark('n').mark('w')
+        if (legal := self.board.is_dark_square(pos_from)) or theoretical:
             for movement in self.dark:
                 for move in movement.moves(pos_from, piece, theoretical):
                     move.movement_type = type(self)
-                    yield copy(move).unmark('n').mark('b')
+                    yield copy(move).set(is_legal=legal).unmark('n').mark('b')
 
     def __copy_args__(self):
         return self.board, unpack(self.light), unpack(self.dark)
@@ -1029,27 +1029,27 @@ class SideMovement(BaseMultiMovement):
         super().__init__(board, self.left + self.right)
 
     def moves(self, pos_from: Position, piece: Piece, theoretical: bool = False):
-        if theoretical or pos_from[1] < ceil(self.board.board_width / 2):
+        if (legal := pos_from[1] < ceil(self.board.board_width / 2)) or theoretical:
             for movement in self.left:
                 for move in movement.moves(pos_from, piece, theoretical):
                     move.movement_type = type(self)
-                    yield copy(move).unmark('n').mark('[')
-        if theoretical or pos_from[1] >= floor(self.board.board_width / 2):
+                    yield copy(move).set(is_legal=legal).unmark('n').mark('[')
+        if (legal := pos_from[1] >= floor(self.board.board_width / 2)) or theoretical:
             for movement in self.right:
                 for move in movement.moves(pos_from, piece, theoretical):
                     move.movement_type = type(self)
-                    yield copy(move).unmark('n').mark(']')
+                    yield copy(move).set(is_legal=legal).unmark('n').mark(']')
         position = pos_from[0] * piece.side.direction()
-        if theoretical or position < ceil(self.board.board_height / 2) * piece.side.direction():
+        if (legal := position < ceil(self.board.board_height / 2) * piece.side.direction()) or theoretical:
             for movement in self.bottom:
                 for move in movement.moves(pos_from, piece, theoretical):
                     move.movement_type = type(self)
-                    yield copy(move).unmark('n').mark('(')
-        if theoretical or position >= floor(self.board.board_height / 2) * piece.side.direction():
+                    yield copy(move).set(is_legal=legal).unmark('n').mark('(')
+        if (legal := position >= floor(self.board.board_height / 2) * piece.side.direction()) or theoretical:
             for movement in self.top:
                 for move in movement.moves(pos_from, piece, theoretical):
                     move.movement_type = type(self)
-                    yield copy(move).unmark('n').mark(')')
+                    yield copy(move).set(is_legal=legal).unmark('n').mark(')')
 
     def __copy_args__(self):
         return self.board, unpack(self.left), unpack(self.right), unpack(self.bottom), unpack(self.top)
@@ -1095,28 +1095,24 @@ class BaseChoiceMovement(BaseMultiMovement):
 
 class ChoiceMovement(BaseChoiceMovement):
     def moves(self, pos_from: Position, piece: Piece, theoretical: bool = False):
-        if theoretical:
-            for key in self.movement_dict:
-                mark = 'i!' if key.startswith('!') else 'i'
-                for movement in self.movement_dict[key]:
-                    for move in movement.moves(pos_from, piece, theoretical):
-                        yield copy(move).unmark('n').mark(mark)
-        else:
-            for key in self.movement_dict:
-                value, invert = (key[1:], True) if key.startswith('!') else (key, False)
-                for movement in self.movement_dict[key]:
-                    for move in movement.moves(pos_from, piece, theoretical):
-                        if key == '*':
-                            yield copy(move)
-                        else:
-                            to_piece = self.board.get_piece(move.pos_to)
-                            if not value:
-                                if (piece == to_piece or not to_piece.side) != invert:
-                                    yield copy(move)
-                            elif value.isdigit() and (int(value) == to_piece.side.value) != invert:
-                                yield copy(move)
-                            elif self.board.fits(value, to_piece) != invert:
-                                yield copy(move)
+        for key in self.movement_dict:
+            value, invert = (key[1:], True) if key.startswith('!') else (key, False)
+            for movement in self.movement_dict[key]:
+                for move in movement.moves(pos_from, piece, theoretical):
+                    if key == '*':
+                        yield copy(move)
+                    else:
+                        legal = False
+                        mark = 'i!' if invert else 'i'
+                        to_piece = self.board.get_piece(move.pos_to)
+                        if not value:
+                            if (piece == to_piece or not to_piece.side) != invert:
+                                legal = True
+                        elif value.isdigit() and (int(value) == to_piece.side.value) != invert:
+                            legal = True
+                        elif self.board.fits(value, to_piece) != invert:
+                            legal = True
+                        yield copy(move).set(is_legal=legal).unmark('n').mark(mark)
 
 
 class RelayMovement(BaseChoiceMovement):
@@ -1141,12 +1137,13 @@ class RelayMovement(BaseChoiceMovement):
         relay_tester = piece.of(piece.side.opponent())
         for key in self.movement_dict:
             value, invert = (key[1:], True) if key.startswith('!') else (key, False)
-            mark = 'r!' if invert else 'r'
             relays, movements = self.movement_dict[key]
             is_relayed = False
             if not key:
+                mark = None
                 is_relayed = True
             else:
+                mark = 'r!' if invert else 'r'
                 if key not in relay_piece_dict or pos_from not in relay_piece_dict[key]:
                     relay_piece_dict.setdefault(key, {})[pos_from] = set()
                     for relay in relays:
@@ -1166,7 +1163,7 @@ class RelayMovement(BaseChoiceMovement):
                 continue
             for movement in movements:
                 for move in movement.moves(pos_from, piece, theoretical):
-                    yield copy(move).unmark('n').mark(mark)
+                    yield copy(move) if not mark else copy(move).set(is_legal=is_relayed).unmark('n').mark(mark)
 
     def __copy_args__(self):
         return self.board, {key: (unpack(value[0]), unpack(value[1])) for key, value in self.movement_dict.items()}
@@ -1177,10 +1174,10 @@ class AreaMovement(BaseChoiceMovement):
         for key in self.movement_dict:
             value, invert = (key[1:], True) if key.startswith('!') else (key, False)
             mark = 'e!' if invert else 'e'
-            if theoretical or self.board.in_area(value, pos_from, piece.side) != invert:
+            if (legal := self.board.in_area(value, pos_from, piece.side) != invert) or theoretical:
                 for movement in self.movement_dict[key]:
                     for move in movement.moves(pos_from, piece, theoretical):
-                        yield copy(move).unmark('n').mark(mark)
+                        yield copy(move).set(is_legal=legal).unmark('n').mark(mark)
 
 
 class BoundMovement(BaseChoiceMovement):
@@ -1190,8 +1187,8 @@ class BoundMovement(BaseChoiceMovement):
             mark = 'd!' if invert else 'd'
             for movement in self.movement_dict[key]:
                 for move in movement.moves(pos_from, piece, theoretical):
-                    if theoretical or self.board.in_area(value, move.pos_to, piece.side) != invert:
-                        yield copy(move).unmark('n').mark(mark)
+                    if (legal := self.board.in_area(value, move.pos_to, piece.side) != invert) or theoretical:
+                        yield copy(move).set(is_legal=legal).unmark('n').mark(mark)
 
 
 class TagMovement(BaseChoiceMovement):

@@ -25,7 +25,8 @@ class Move(object):
         chained_move: Move | frozenset | None = None,
         marks: str = '',
         tag: str | None = None,
-        is_edit: int = 0
+        is_edit: int = 0,
+        is_legal: bool = True
     ):
         self.pos_from = pos_from
         self.pos_to = pos_to
@@ -39,6 +40,7 @@ class Move(object):
         self.marks = marks
         self.tag = tag
         self.is_edit = is_edit
+        self.is_legal = is_legal
 
     def mark(self, marks: str) -> Move:
         self.marks = self.marks.strip(marks) + marks
@@ -61,7 +63,8 @@ class Move(object):
         chained_move: Move | frozenset | type(Default) | None = None,
         marks: str | None = None,
         tag: str | None = None,
-        is_edit: int | None = None
+        is_edit: int | None = None,
+        is_legal: bool | None = None
     ) -> Move:
         self.pos_from = pos_from or self.pos_from
         self.pos_to = pos_to or self.pos_to
@@ -81,6 +84,7 @@ class Move(object):
         self.marks = marks or self.marks
         self.tag = tag or self.tag
         self.is_edit = is_edit if is_edit is not None else self.is_edit
+        self.is_legal = is_legal if is_legal is not None else self.is_legal
         return self
 
     def matches(self, other: Move) -> bool:
@@ -119,7 +123,8 @@ class Move(object):
             self.chained_move,
             self.marks,
             self.tag,
-            self.is_edit
+            self.is_edit,
+            self.is_legal
         )
 
     def __deepcopy__(self, memo):
@@ -135,7 +140,8 @@ class Move(object):
             self.chained_move.__deepcopy__(memo) if self.chained_move else self.chained_move,
             self.marks,
             self.tag,
-            self.is_edit
+            self.is_edit,
+            self.is_legal
         )
 
     def __str__(self) -> str:
