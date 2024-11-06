@@ -554,6 +554,7 @@ class EnPassantRiderMovement(RiderMovement):
                 if not move.captured_piece and move.pos_to in marker_dict:
                     move.captured_piece = self.board.get_piece(marker_dict[move.pos_to])
                     move.movement_type = type(self)
+                    move.mark('f')
             yield move
 
 
