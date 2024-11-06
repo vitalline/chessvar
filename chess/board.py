@@ -1283,6 +1283,10 @@ class Board(Window):
             for pieces in (
                 piece_sets[side][split[side] - 1::-1], piece_sets[side.opponent()][split[side.opponent()] - 1::-1],
                 piece_sets[side][split[side] + 1:], piece_sets[side.opponent()][split[side.opponent()] + 1:],
+                [
+                    *piece_sets[side.opponent()][split[side.opponent()]:split[side.opponent()] + 1],
+                    *piece_sets[side][split[side]:split[side] + 1],
+                ],
             ):
                 promotion_types = []
                 for piece_type in pieces:
