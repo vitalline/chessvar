@@ -2203,6 +2203,8 @@ class Board(Window):
                     order_rules.get(-1 if check_sides.get(Side.WHITE, False) else 1),
                     order_rules.get(-2 if check_sides.get(Side.BLACK, False) else 2),
                 ) if rules]
+                last_history_to = set()
+                last_history_fro = set()
                 last_history_tags = set()
                 last_history_types = set()
                 last_history_pieces = set()
@@ -2224,6 +2226,8 @@ class Board(Window):
                                     move_chain.append(last_history_move)
                                 last_history_move = last_history_move.chained_move
                             for last_history_chain_move in move_chain[::-1]:
+                                last_history_to.add(last_history_chain_move.pos_to)
+                                last_history_fro.add(last_history_chain_move.pos_from)
                                 partial = False
                                 if issubclass(last_history_chain_move.movement_type, CastlingPartnerMovement):
                                     partial = True
@@ -2244,14 +2248,17 @@ class Board(Window):
                                     piece_type = type(board_piece)
                                     last_history_types.update({piece_type.group(), piece_type.name, piece_type.type()})
                 allow_last_rules = [
-                    rules[k] for rules in state_rules for k in rules
-                    if k == '*' or k in last_history_types
-                    or ('*' in k and fits(k, last_history_types))
+                    rules[k] for rules in state_rules for k in rules if
+                    k == '*' or k in last_history_types or ('*' in k and fits(k, last_history_types))
+                    or k and k[0] == '>' and any(self.in_area(k[1:], pos, turn_side) for pos in last_history_to)
+                    or k and k[-1] == '>' and any(self.in_area(k[:-1], pos, turn_side) for pos in last_history_fro)
                 ]
                 block_last_rules = [
                     rules[k] for rules in allow_last_rules for k in rules
                     if k is None or k not in last_history_types
                     and ('*' not in k or not fits(k, last_history_types))
+                    and (not k or k[0] != '>' or not any(self.in_area(k[1:], p, turn_side) for p in last_history_to))
+                    and (not k or k[-1] != '>' or not any(self.in_area(k[:-1], p, turn_side) for p in last_history_fro))
                 ]
                 if not self.chain_start and block_last_rules:
                     self.load_pieces()
@@ -2292,21 +2299,25 @@ class Board(Window):
                         if not piece_rules[piece_type]:
                             continue
                         drop_type = DropMovement.__name__
-                        allow_type_rules = [
-                            rules[s] for rules in piece_rules[piece_type] for s in rules if self.fits(s, drop_type)
-                        ]
-                        block_type_rules = [
-                            rules[s] for rules in allow_type_rules for s in rules if not self.fits(s, drop_type)
-                        ]
-                        allow_drop_rules = [
-                            rules.get(s, {}) for rules in block_type_rules for s in ('drop', '*')
-                        ]
-                        block_drop_rules = [
-                            rules.get(s, {}) for rules in allow_drop_rules for s in rules if s != 'drop'
-                        ]
-                        if not block_drop_rules:
-                            continue
                         for pos in side_drops[piece_type]:
+                            allow_type_rules = [
+                                rules[s] for rules in piece_rules[piece_type] for s in rules if self.fits(s, drop_type)
+                                or s and s[0] == '>' and self.in_area(s[1:], pos, turn_side)
+                                or s and s[-1] == '>' and self.in_area(s[:-1], pos, turn_side)
+                            ]
+                            block_type_rules = [
+                                rules[s] for rules in allow_type_rules for s in rules if not self.fits(s, drop_type)
+                                and (not s or s[0] != '>' or not self.in_area(s[1:], pos, turn_side))
+                                and (not s or s[-1] != '>' or not self.in_area(s[:-1], pos, turn_side))
+                            ]
+                            allow_drop_rules = [
+                                rules.get(s, {}) for rules in block_type_rules for s in ('drop', '*')
+                            ]
+                            block_drop_rules = [
+                                rules.get(s, {}) for rules in allow_drop_rules for s in rules if s != 'drop'
+                            ]
+                            if not block_drop_rules:
+                                continue
                             for drop in side_drops[piece_type][pos]:
                                 drop_type = type(drop) if isinstance(drop, Piece) else drop
                                 if drop_type not in limit_hits:
@@ -2383,12 +2394,16 @@ class Board(Window):
                                 if s == '*' or s == move_type
                                 or s == '' and move.tag in last_history_tags
                                 or ('*' in s and fits(s, move_type))
+                                or s and s[0] == '>' and self.in_area(s[1:], move.pos_to, turn_side)
+                                or s and s[-1] == '>' and self.in_area(s[:-1], move.pos_from, turn_side)
                             ]
                             block_type_rules = [
                                 rules[s] for rules in allow_type_rules for s in rules
                                 if s is None or s != move_type
                                 and (s != '' or move.tag not in last_history_tags)
                                 and ('*' not in s or not fits(s, move_type))
+                                and (not s or s[0] != '>' or not self.in_area(s[1:], move.pos_to, turn_side))
+                                and (not s or s[-1] != '>' or not self.in_area(s[:-1], move.pos_from, turn_side))
                             ]
                             type_rule_dict[move_type] = block_type_rules
                         type_rule_list = type_rule_dict[move_type]

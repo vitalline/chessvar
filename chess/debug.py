@@ -433,11 +433,17 @@ def debug_info(board: Board) -> list[str]:
                 allow_last_rules = state_rules[allow_last]
                 for block_last in sorted(allow_last_rules, key=lambda x: '' if x is None else f' {x}'):
                     block_last_rules = allow_last_rules[block_last]
+                    allow_last_string, block_last_string = (
+                        string if not string else
+                        f"to {string[1:]}" if string[0] == '>' else
+                        f"from {string[:-1]}" if string[-1] == '>' else
+                        string for string in (allow_last, block_last)
+                    )
                     last_string = (
                         "Any last move" if allow_last == '*' and block_last is None else
-                        f"Last move was {allow_last}" if block_last is None else
-                        f"Last move was NOT {block_last}" if allow_last == '*' else
-                        f"Last move was {allow_last}, NOT {block_last}"
+                        f"Last move was {allow_last_string}" if block_last is None else
+                        f"Last move was NOT {block_last_string}" if allow_last == '*' else
+                        f"Last move was {allow_last_string}, NOT {block_last_string}"
                     )
                     debug_log.append(f"{pad:6}{last_string}:")
                     for allow_piece in sorted(block_last_rules, key=lambda x: '' if x is None else f' {x}'):
@@ -459,15 +465,23 @@ def debug_info(board: Board) -> list[str]:
                                 allow_type_rules = block_piece_rules[allow_type]
                                 for block_type in sorted(allow_type_rules, key=lambda x: '' if x is None else f' {x}'):
                                     block_type_rules = allow_type_rules[block_type]
+                                    allow_type_string, block_type_string = (
+                                        string if not string else
+                                        f"to {string[1:]}" if string[0] == '>' else
+                                        f"from {string[:-1]}" if string[-1] == '>' else
+                                        string for string in (allow_type, block_type)
+                                    )
                                     type_string = (
                                         "Any move" if allow_type == '*' and block_type is None else
                                         "Tag used" if allow_type == '' and block_type is None else
                                         "Tag NOT used" if allow_type == '*' and block_type == '' else
-                                        f"{allow_type}, NOT used" if allow_type != '*' and block_type == '' else
-                                        f"NOT {block_type}, used" if allow_type == '' and block_type is not None else
-                                        f"{allow_type}" if block_type is None else
-                                        f"NOT {block_type}" if allow_type == '*' else
-                                        f"{allow_type}, NOT {block_type}"
+                                        f"{allow_type_string}, NOT used"
+                                        if allow_type != '*' and block_type == '' else
+                                        f"NOT {block_type_string}, used"
+                                        if allow_type == '' and block_type is not None else
+                                        f"{allow_type_string}" if block_type is None else
+                                        f"NOT {block_type_string}" if allow_type == '*' else
+                                        f"{allow_type_string}, NOT {block_type_string}"
                                     )
                                     debug_log.append(f"{pad:10}{type_string}:")
                                     for allow_action in block_type_rules:
