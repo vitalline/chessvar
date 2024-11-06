@@ -621,16 +621,19 @@ class IndexMovement(BaseMultiMovement):
             else:
                 index = len(self.movement_index) - 1
                 mark = ''
-        movements = self.movements[slice(
+        range_index = (
             0 if self.iteration_type < 0 else index,
             0 if self.iteration_type > 0 else index + 1,
-        )]
-        for movement in movements:
+        )
+        for i, movement in enumerate(self.movements):
             for move in movement.moves(pos_from, piece, theoretical):
-                if mark:
-                    yield copy(move).unmark('n').mark(mark)
+                if range_index[0] <= i < range_index[1]:
+                    if mark:
+                        yield copy(move).unmark('n').mark(mark)
+                    else:
+                        yield copy(move)
                 else:
-                    yield copy(move)
+                    yield copy(move).set(is_legal=False).unmark('n').mark(mark + '!')
 
     def __copy_args__(self):
         return (
