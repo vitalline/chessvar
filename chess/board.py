@@ -39,7 +39,7 @@ from chess.pieces.piece import Piece, is_active
 from chess.pieces.side import Side
 from chess.pieces.types import Delayed, Delayed1, Slow
 from chess.pieces.util import NoPiece, Obstacle, Block, Border, Shield, Void, Wall
-from chess.save import condense, expand, condense_algebraic as cnd_alg, expand_algebraic as exp_alg
+from chess.save import condense, expand, condense_algebraic as cnd_alg, expand_algebraic as exp_alg, substitute
 from chess.save import load_move, load_piece, load_rng, load_piece_type, load_custom_type, load_movement_type
 from chess.save import save_move, save_piece, save_rng, save_piece_type, save_custom_type
 from chess.util import get_filename, is_prefix_of, select_save_data, select_save_name
@@ -785,6 +785,30 @@ class Board(Window):
             del data['alias']
         if self.alias_dict:
             data = expand(data, self.alias_dict, self.board_config['recursive_aliases'])
+
+        subs_dict = {}
+        for side, piece_set in self.piece_sets.items():
+            value = side.value()
+            subs_dict[value] = {}
+            i = 0
+            for piece_type in piece_set:
+                if piece_type and not issubclass(piece_type, NoPiece):
+                    i += 1
+                    subs_dict[value][i] = save_piece_type(piece_type)
+            pawns = self.custom_pawns.get(value) if isinstance(self.custom_pawns, dict) else self.custom_pawns
+            for i, pawn in (pawns if pawns is not None else [Pawn]):
+                subs_dict[value][-i] = save_piece_type(pawn)
+        for i in {x for side_dict in subs_dict.values() for x in side_dict.keys()}:
+            value = None
+            for side, side_dict in subs_dict.items():
+                if value is None:
+                    value = side_dict.get(i)
+                elif value != side_dict.get(i):
+                    value = None
+                    break
+            if value is not None:
+                subs_dict.setdefault(Side.NONE.value(), {})[i] = value
+        data = substitute(data, subs_dict)
 
         self.variant = data.get('variant', '')
 
@@ -1547,8 +1571,11 @@ class Board(Window):
             if side is Side.NONE:
                 continue
             if 'checkmate' not in self.end_rules[side] and 'capture' not in self.end_rules[side]:
-                self.end_rules[side]['checkmate'] = {'': 1, "King": 1, "Royal": 1}
-                self.end_data[side]['checkmate'] = {'': 0, "King": 0, "Royal": 0}
+                self.end_rules[side]['checkmate'] = {'': 1, "King": 1}
+                self.end_data[side]['checkmate'] = {'': 0, "King": 0}
+                if "Royal" in self.piece_groups:
+                    self.end_rules[side]['checkmate']["Royal"] = 1
+                    self.end_data[side]['checkmate']["Royal"] = 0
             if 'stalemate' not in self.end_rules[side]:
                 self.end_rules[side]['stalemate'] = {'': 0}
                 self.end_data[side]['stalemate'] = {'': 0}

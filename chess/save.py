@@ -28,9 +28,12 @@ MOVEMENT_SUFFIXES = ('Movement', 'Rider')
 TYPE_CONFLICTS = {
     x: s for s in (map(frozenset, (
         (piece_types.Delayed, piece_types.Delayed1),
+        (piece_types.Double, piece_types.Enemy),
     ))) for x in s
 }
 
+NumericMap = list[str] | dict[int, str]
+StringMap = dict[str, str]
 
 AnyJsonType = str | int | float | bool | None
 AnyJson = dict | list | AnyJsonType
@@ -118,6 +121,37 @@ def expand_algebraic(
     result = {}
     for pos, notation in mapping.items():
         result[pos] = copy(data[notation])
+    return result
+
+
+def substitute(data: AnyJson, subs: NumericMap | dict[int, NumericMap], side: Side = Side.NONE) -> AnyJson:
+    result = data
+    if isinstance(data, dict):
+        result = {}
+        for k, v in data.items():
+            try:
+                result[k] = substitute(v, subs, Side(int(k)))
+            except ValueError:
+                result[substitute(k, subs, side)] = substitute(v, subs, side)
+    if isinstance(data, list):
+        result = [substitute(x, subs, side) for x in data]
+    if isinstance(data, str):
+        start = data.find('{')
+        if start != -1:
+            end = data.find('}', start)
+            if end != -1:
+                key = data[start + 1 : end].split(':', 1)
+                try:
+                    key = [int(v) for v in key]
+                    if isinstance(subs, list) and len(key) == 1:
+                        result = subs[key[0]]
+                    elif isinstance(subs, dict) and len(key) == 1:
+                        result = subs[side.value()][key[0]]
+                    elif isinstance(subs, dict) and len(key) == 2:
+                        result = subs[key[0]][key[1]]
+                    result = substitute(result, subs, side)
+                except (ValueError, IndexError, KeyError):
+                    pass
     return result
 
 
