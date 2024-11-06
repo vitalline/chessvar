@@ -520,7 +520,7 @@ def debug_info(board: Board) -> list[str]:
                         else:
                             group_string = f"a {opponent} piece"
                     elif times > 1:
-                        group_string = f"{group_string} {spell(times)} times"
+                        group_string = f"{opponent} {spell(times)} times"
                     else:
                         group_string = opponent
                 elif isinstance(group_value, str) and group_value[-1:] == '!':
