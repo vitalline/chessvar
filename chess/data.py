@@ -257,7 +257,7 @@ def get_piece_types(side: Side = Side.WHITE) -> dict[type[Piece], str]:
 
 def get_set_data(side: Side, set_id: int) -> list[type[Piece]]:
     piece_group = piece_groups[set_id]
-    return piece_group.get(f"set_{side.key()[0]}", piece_group.get('set', [NoPiece] * default_board_width))
+    return piece_group.get(f"set_{side.key()[0:1]}", piece_group.get('set', [NoPiece] * default_board_width))
 
 
 def get_set_name(piece_set: list[type[Piece]], include_royals: bool = False) -> str:

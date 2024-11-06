@@ -3,31 +3,38 @@ from chess.pieces.side import Side
 from chess.pieces.types import Empty, Immune
 
 
-class DefaultSidePiece(Piece):
-    name = '(Default-Side Piece)'
+class UtilityPiece(Piece):
+    name = '(Utility Piece)'
     default_side = Side.NONE
 
     def __init__(self, board, **kwargs):
         if kwargs.get('side') is None:
             kwargs['side'] = self.default_side
         super().__init__(board, **kwargs)
+        self.should_hide = False
+        self.is_hidden = False
+
+    def reload(self, *args, **kwargs):
+        self.should_hide = False
+        self.is_hidden = False
+
+    @classmethod
+    def type(cls) -> str:
+        return cls.__name__
 
     def __str__(self):
         return self.name.strip() if self.side is self.default_side else super().__str__()
 
 
-class BackgroundPiece(DefaultSidePiece):
+class BackgroundPiece(UtilityPiece):
     name = '(Background Piece)'
 
     def __init__(self, board, **kwargs):
         super().__init__(board, **kwargs)
-        self.should_hide = False
-        self.is_hidden = False
         self.set_color()
 
     def reload(self, *args, **kwargs):
-        self.should_hide = False
-        self.is_hidden = False
+        super().reload(*args, **kwargs)
         self.set_color()
 
     def set_color(self, *args, **kwargs):
@@ -48,7 +55,7 @@ class Void(BackgroundPiece, Empty, Immune):
     default_side = Side.NEUTRAL
 
 
-class NoSidePiece(DefaultSidePiece, Empty):
+class NoSidePiece(UtilityPiece, Empty):
     name = '(No-Side Piece)'
 
     def __init__(self, board, **kwargs):

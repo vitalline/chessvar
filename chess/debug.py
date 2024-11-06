@@ -14,7 +14,7 @@ from chess.movement.util import to_algebraic_map as tom, from_algebraic_map as f
 from chess.pieces.groups.classic import Pawn
 from chess.pieces.piece import Piece
 from chess.pieces.side import Side
-from chess.pieces.util import DefaultSidePiece
+from chess.pieces.util import UtilityPiece, Block, Border, Shield, Void, Wall
 from chess.save import save_piece_type, save_custom_type
 from chess.util import get_filename, sign, pluralize, spell, spell_ordinal, unpack, repack
 
@@ -25,19 +25,26 @@ if TYPE_CHECKING:
 def get_piece_mapping(board: Board, side: Side = Side.WHITE) -> dict[str, list[str]]:
     mapping = {}
     set_mapping = {}
-    def add_piece(piece: type[Piece]):
+    def add_piece(piece: type[Piece], default: bool = False):
         piece_type = save_piece_type(piece)
         if piece_type not in set_mapping.setdefault(piece.name, set()):
             set_mapping[piece.name].add(piece_type)
             mapping.setdefault(piece.name, []).append(piece_type)
-    for _, piece_set in board.piece_sets.items():
-        for new_piece in piece_set:
-            add_piece(new_piece)
+            if not default and len(set_mapping[piece.name]) > 1:
+                mapping[piece.name] = [None] + mapping[piece.name]
+    for side in (side, side.opponent()):
+        for new_piece in board.piece_sets.get(side, []):
+            add_piece(new_piece, save_piece_type(new_piece) not in board.custom_pieces)
+        pawns = board.custom_pawns if board.custom_pawns is not None else [Pawn]
+        for new_piece in (pawns.get(side, []) if isinstance(pawns, dict) else pawns):
+            add_piece(new_piece, save_piece_type(new_piece) not in board.custom_pieces)
     for _, new_piece in board.custom_pieces.items():
         add_piece(new_piece)
     for piece_set_id in range(len(piece_groups)):
         for new_piece in get_set_data(side, piece_set_id):
             add_piece(new_piece)
+    for new_piece in [Block, Border, Shield, Void, Wall]:
+        add_piece(new_piece)
     for _, new_piece in board.past_custom_pieces.items():
         add_piece(new_piece)
     return mapping
@@ -115,8 +122,10 @@ def save_piece_types(file_path: str = None, side: Side = Side.WHITE) -> None:
 
 def debug_info(board: Board) -> list[str]:
     pad = ''
-    piece_mapping = get_piece_mapping(board)
-    name = lambda piece: get_piece_name(piece, piece_mapping)
+    piece_mapping = {side: get_piece_mapping(board, side) for side in (Side.WHITE, Side.BLACK, Side.NONE)}
+    piece_side = lambda piece: piece.side if isinstance(piece, Piece) else Side.NONE
+    def name(piece, side=Side.NONE):
+        return get_piece_name(piece, piece_mapping.get(piece_side(piece) or side, piece_mapping[side]))
     debug_log = []  # noqa
     debug_log.append(f"Board size: {board.board_width}x{board.board_height}")
     debug_log.append("Borders:")
@@ -165,7 +174,7 @@ def debug_info(board: Board) -> list[str]:
         f"(ID {side_id_strings[Side.BLACK]}) {board.piece_set_names[Side.BLACK]}"
     )
     for side in board.piece_set_ids:
-        debug_log.append(f"{side} setup: {', '.join(name(piece) for piece in board.piece_sets[side])}")
+        debug_log.append(f"{side} setup: {', '.join(name(piece, side) for piece in board.piece_sets[side])}")
     debug_log.append(f"Piece groups ({len(board.piece_groups)}):")
     for group in board.piece_groups:
         group_string = ', '.join(name(piece) for piece in board.piece_groups[group])
@@ -175,13 +184,20 @@ def debug_info(board: Board) -> list[str]:
     for side in board.piece_set_ids:
         debug_log.append(f"{side} pieces ({len(board.movable_pieces[side])}):")
         for piece in board.movable_pieces[side]:
-            debug_log.append(f"{pad:2}{toa(piece.board_pos)} {piece.board_pos}: {name(piece)}")
+            debug_log.append(f"{pad:2}{toa(piece.board_pos)} {piece.board_pos}: {name(piece, side)}")
         if not board.movable_pieces[side]:
             debug_log[-1] += " None"
-    if board.custom_pawn != Pawn:
-        debug_log.append(f"Pawn: {name(board.custom_pawn)}")
+    if isinstance(board.custom_pawns, dict):
+        custom_pawn_data = [(side, board.custom_pawns.get(side, [])) for side in board.piece_set_ids]
     else:
-        debug_log.append("Pawn: Default")
+        custom_pawn_data = [(Side.NONE, board.custom_pawns)]
+    for side, data in custom_pawn_data:
+        side_string = f"{side} pawn" if side else "Pawn"
+        if data is not None:
+            pawn_string = ', '.join(name(piece, side) for piece in data)
+            debug_log.append(f"{pluralize(max(1, len(data)), side_string)} ({len(data)}): {pawn_string or 'None'}")
+        else:
+            debug_log.append(f"{side_string} (0): Default")
     for side in board.piece_set_ids:
         poss = board.areas.get(side, {}).get(Pawn.name) or []
         if poss:
@@ -201,7 +217,7 @@ def debug_info(board: Board) -> list[str]:
         for key, group in board.royal_groups[side].items():
             debug_log.append(f"{pad:2}{key} ({len(group)}):")
             for piece in group:
-                debug_log.append(f"{pad:4}{toa(piece.board_pos)} {piece.board_pos}: {name(piece)}")
+                debug_log.append(f"{pad:4}{toa(piece.board_pos)} {piece.board_pos}: {name(piece, side)}")
             if not group:
                 debug_log[-1] += " None"
         if not board.royal_groups[side]:
@@ -216,7 +232,7 @@ def debug_info(board: Board) -> list[str]:
             side_section_data = section_data.get(side) or {}
             debug_log.append(f"{side} {section_type} pieces ({len(side_section_data)}):")
             for piece in side_section_data:
-                debug_log.append(f"{pad:2}{toa(piece.board_pos)} {piece.board_pos}: {name(piece)}")
+                debug_log.append(f"{pad:2}{toa(piece.board_pos)} {piece.board_pos}: {name(piece, side)}")
             if not side_section_data:
                 debug_log[-1] += " None"
     for section_type, section_data in (
@@ -243,7 +259,7 @@ def debug_info(board: Board) -> list[str]:
             section_rules = section_data.get(side) or {}
             debug_log.append(f"{side} {section} rules ({len(section_rules)}):")
             for piece in section_rules:
-                debug_log.append(f"{pad:2}{name(piece)} ({len(section_rules[piece])}):")
+                debug_log.append(f"{pad:2}{name(piece, side)} ({len(section_rules[piece])}):")
                 rows = set()
                 for pos in section_rules[piece]:
                     row = pos[0]
@@ -264,11 +280,11 @@ def debug_info(board: Board) -> list[str]:
                             if to_piece.movement and to_piece.movement.total_moves:
                                 suffixes.append(f"Moves: {to_piece.movement.total_moves}")
                             if to_piece.promoted_from:
-                                suffixes.append(f"Promoted from: {name(to_piece.promoted_from)}")
+                                suffixes.append(f"Promoted from: {name(to_piece.promoted_from, side)}")
                             if to_piece.should_hide is not None:
                                 suffixes.append("Always hide" if to_piece.should_hide else "Never hide")
                         suffix = f" ({', '.join(suffixes)})" if suffixes else ''
-                        piece_list.append(f"{name(to_piece)}{suffix}")
+                        piece_list.append(f"{name(to_piece, side)}{suffix}")
                     piece_list = ', '.join(string for string in piece_list)
                     debug_log.append(f"{pad:4}{toa((row, -1))} {(row, -1)}: {piece_list if piece_list else 'None'}")
                 if not section_rules[piece]:
@@ -283,7 +299,7 @@ def debug_info(board: Board) -> list[str]:
                 f"{piece.side}" if isinstance(piece, Piece)
                 and not (isinstance(piece, DefaultSidePiece)
                 and piece.side is piece.default_side) else ""
-            ) + name(piece)) if piece else 'None' for piece in side_data
+            ) + name(piece, side)) if piece else 'None' for piece in side_data
         )
         debug_log.append(f"{side} replacements ({len(side_data)}): {piece_list or 'None'}")
     debug_log.append(f"Obstacles ({len(board.obstacles)}):")
@@ -322,7 +338,7 @@ def debug_info(board: Board) -> list[str]:
         if piece.movement and piece.movement.total_moves:
             suffixes.append(f"Moves: {piece.movement.total_moves}")
         if piece.promoted_from:
-            suffixes.append(f"Promoted from: {name(piece.promoted_from)}")
+            suffixes.append(f"Promoted from: {name(piece.promoted_from, piece.side)}")
         if piece.should_hide is not None:
             suffixes.append("Always hide" if piece.should_hide else "Never hide")
         suffix = f" ({', '.join(suffixes)})" if suffixes else ''
@@ -335,7 +351,7 @@ def debug_info(board: Board) -> list[str]:
             section_rules = section_data.get(side) or {}
             debug_log.append(f"{side} custom {section} rules ({len(section_rules)}):")
             for piece in section_rules:
-                debug_log.append(f"{pad:2}{name(piece)} ({len(section_rules[piece])}):")
+                debug_log.append(f"{pad:2}{name(piece, side)} ({len(section_rules[piece])}):")
                 compressed = data.get(str(side.value), {}).get(save_piece_type(piece), {})
                 from_mapping = frm(list(compressed), board.board_width, board.board_height, board.areas.get(side) or {})
                 mapping = {}
@@ -352,11 +368,11 @@ def debug_info(board: Board) -> list[str]:
                             if to_piece.movement and to_piece.movement.total_moves:
                                 suffixes.append(f"Moves: {to_piece.movement.total_moves}")
                             if to_piece.promoted_from:
-                                suffixes.append(f"Promoted from: {name(to_piece.promoted_from)}")
+                                suffixes.append(f"Promoted from: {name(to_piece.promoted_from, side)}")
                             if to_piece.should_hide is not None:
                                 suffixes.append("Always hide" if to_piece.should_hide else "Never hide")
                         suffix = f" ({', '.join(suffixes)})" if suffixes else ''
-                        piece_list.append(f"{name(to_piece)}{suffix}")
+                        piece_list.append(f"{name(to_piece, side)}{suffix}")
                     piece_list = ', '.join(string for string in piece_list)
                     if value not in board.areas.get(side, {}):
                         value = f"{value} {fra(value)}"
@@ -371,7 +387,7 @@ def debug_info(board: Board) -> list[str]:
     ):
         for side in board.piece_set_ids:
             side_section_data = section_data.get(side) or []
-            side_section_string = ', '.join(name(piece) for piece in side_section_data)
+            side_section_string = ', '.join(name(piece, side) for piece in side_section_data)
             debug_log.append(f"{side} {section_type} ({len(side_section_data)}): {side_section_string or 'None'}")
     piece_mode = {0: "Shown", 1: "Hidden", 2: "Penultima"}.get(board.hide_pieces, "Unknown")
     debug_log.append(f"Hide pieces: {board.hide_pieces} - {piece_mode}")
@@ -600,7 +616,7 @@ def debug_info(board: Board) -> list[str]:
                     end_group = end_data.get(group) or []
                     end_value = len(end_group)
                     if end_value:
-                        pieces = [f'{name(p)} on {toa(p.board_pos)} {p.board_pos}'.strip() for p in end_group]
+                        pieces = [f'{name(p, side)} on {toa(p.board_pos)} {p.board_pos}'.strip() for p in end_group]
                         # that str.strip() call is there just in case Piece.board_pos is None for some reason
                         group_data = f" - {', '.join(pieces)}"
                 ratio = f"{end_value}/{abs(group_value) or 1}"
@@ -648,9 +664,10 @@ def debug_info(board: Board) -> list[str]:
     for i, pieces in enumerate(board.probabilistic_piece_history):
         if pieces:
             empty = False
+            turn_side = board.get_turn_side(i, 0)
             debug_log.append(f"{pad:2}Ply {i + 1}:")
             for pos, piece in sorted(pieces.items(), key=lambda x: x[0]):
-                debug_log.append(f"{pad:4}{toa(pos)} {pos}: {name(piece)}")
+                debug_log.append(f"{pad:4}{toa(pos)} {pos}: {name(piece, turn_side)}")
     if empty:
         debug_log[-1] += " None"
     debug_log.append(f"Roll seed: {board.roll_seed} (update: {board.board_config['update_roll_seed']})")

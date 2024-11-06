@@ -177,7 +177,7 @@ class Board(Window):
         self.obstacles = []  # list of obstacles (neutral pieces that block movement and cannot move)
         self.penultima_pieces = {Side.WHITE: {}, Side.BLACK: {}}  # piece textures that are used for penultima mode
         self.past_custom_pieces = {}  # custom piece types that have been used before a reset of custom data
-        self.custom_pawn = Pawn  # custom pawn type
+        self.custom_pawns = None  # custom pawn types
         self.custom_pieces = {}  # custom piece types
         self.custom_layout = {}  # custom starting layout of the board
         self.custom_areas = {}  # custom areas on the board
@@ -533,14 +533,15 @@ class Board(Window):
 
         self.pieces = []
 
-        pawn_row = [self.custom_pawn] * self.board_width
         empty_row = [NoPiece] * self.board_width
+        piece_row = ['piece'] * self.board_width
+        pawn_row = ['pawn'] * self.board_width
 
         white_row = [Side.WHITE] * self.board_width
         black_row = [Side.BLACK] * self.board_width
         neutral_row = [Side.NONE] * self.board_width
 
-        types = [white_row, pawn_row] + [empty_row] * (self.board_height - 4) + [pawn_row, black_row]
+        types = [piece_row, pawn_row] + [empty_row] * (self.board_height - 4) + [pawn_row, piece_row]
         sides = [white_row, white_row] + [neutral_row] * (self.board_height - 4) + [black_row, black_row]
 
         for row in range(self.board_height):
@@ -556,11 +557,25 @@ class Board(Window):
             else:
                 piece_type = types[row][col]
                 piece_side = sides[row][col]
-                if isinstance(piece_type, Side):
+                if piece_type == 'piece':
                     if col < len(self.piece_sets[piece_side]):
                         piece_type = self.piece_sets[piece_side][col] or NoPiece
                     else:
                         piece_type = NoPiece
+                elif piece_type == 'pawn':
+                    custom_pawns = (
+                        self.custom_pawns.get(piece_side)
+                        if isinstance(self.custom_pawns, dict)
+                        else self.custom_pawns
+                    )
+                    if custom_pawns is None:
+                        piece_type = Pawn
+                    elif len(custom_pawns) == 1:
+                        piece_type = custom_pawns[0]
+                    else:
+                        piece_type = NoPiece
+                elif isinstance(piece_type, str):
+                    piece_type = NoPiece  # just in case.
                 self.pieces[row].append(
                     piece_type(board=self, pos=(row, col), side=piece_side)
                 )
@@ -620,7 +635,10 @@ class Board(Window):
                 k.value if isinstance(k, Side) else k: {g: v for g, v in d.items()} if isinstance(k, Side) else d
                 for k, d in self.piece_limits.items()
             },
-            'pawn': save_piece_type(self.custom_pawn) if self.custom_pawn != Pawn else None,
+            'pawn': {
+                k.value: unpack([save_piece_type(t) for t in v]) for k, v in self.custom_pawns.items()
+            } if isinstance(self.custom_pawns, dict) else
+            unpack([save_piece_type(t) for t in self.custom_pawns]) if self.custom_pawns is not None else None,
             'pieces': cnd_alg({
                 p.board_pos: save_piece(p.on(None))
                 for pieces in [*self.movable_pieces.values(), self.obstacles] for p in pieces
@@ -863,7 +881,11 @@ class Board(Window):
             Side(int(k)) if k.isdigit() else k: {g: v for g, v in d.items()} if k.isdigit() else d
             for k, d in data.get('limits', {}).items()
         }
-        self.custom_pawn = load_piece_type(data.get('pawn'), c) or Pawn
+        custom_pawns = data.get('pawn')
+        self.custom_pawns = ({
+            Side(int(v)): [load_piece_type(t, c) for t in repack(l)] for v, l in custom_pawns.items()
+        } if isinstance(custom_pawns, dict) else
+        [load_piece_type(t, c) for t in repack(custom_pawns)] if custom_pawns is not None else None)
         self.custom_promotions = {
             Side(int(v)): {
                 load_piece_type(f, c): {
@@ -1198,7 +1220,7 @@ class Board(Window):
         self.alias_dict = {}
         self.custom_areas = {}
         self.custom_drops = {}
-        self.custom_pawn = Pawn
+        self.custom_pawns = None
         self.custom_pieces = {}
         self.custom_layout = {}
         self.custom_promotions = {}
@@ -1235,8 +1257,16 @@ class Board(Window):
         self.drops = {}
         drop_squares = [(i, j) for i in range(self.board_height) for j in range(self.board_width)]
         pawn_drop_squares = [(i, j) for i in range(1, self.board_height - 1) for j in range(self.board_width)]
+        custom_pawns = {
+            side: self.custom_pawns.get(side)
+            if isinstance(self.custom_pawns, dict)
+            else self.custom_pawns for side in piece_sets
+        }
         for drop_side in piece_sets:
-            drops = {self.custom_pawn: {pos: [self.custom_pawn] for pos in pawn_drop_squares}}
+            drops = {}
+            pawns = custom_pawns[drop_side]
+            for pawn in (pawns if pawns is not None else [Pawn]):
+                drops[pawn] = {pos: [pawn] for pos in pawn_drop_squares}
             for side in (drop_side, drop_side.opponent()):
                 if not piece_sets[side]:
                     continue
@@ -1279,6 +1309,11 @@ class Board(Window):
             Side.BLACK: [(0, i) for i in range(self.board_width)],
         }
         split = {side: len(piece_sets[side]) // 2 for side in self.piece_sets}
+        custom_pawns = {
+            side: self.custom_pawns.get(side)
+            if isinstance(self.custom_pawns, dict)
+            else self.custom_pawns for side in piece_sets
+        }
         for side in promotion_squares:
             promotions = []
             used_piece_set = set()
@@ -1299,7 +1334,10 @@ class Board(Window):
                         used_piece_set.add(piece_type)
                         promotion_types.append(piece_type)
                 promotions.extend(promotion_types[::-1])
-            self.promotions[side] = {self.custom_pawn: {pos: promotions.copy() for pos in promotion_squares[side]}}
+            self.promotions[side] = {}
+            pawns = custom_pawns[side]
+            for pawn in (pawns if pawns is not None else [Pawn]):
+                self.promotions[side][pawn] = {pos: promotions.copy() for pos in promotion_squares[side]}
 
     def reset_edit_promotions(self, piece_sets: dict[Side, list[type[Piece]]] | None = None) -> None:
         if is_prefix_of('custom', self.edit_piece_set_id):
@@ -1327,12 +1365,24 @@ class Board(Window):
         split = {side: len(piece_sets[side]) // 2 for side in self.piece_sets}
         for side in self.edit_promotions:
             used_piece_set = set()
+            side_pawns = (
+                self.custom_pawns.get(side)
+                if isinstance(self.custom_pawns, dict)
+                else self.custom_pawns
+            )
+            opponent_pawns = (
+                self.custom_pawns.get(side.opponent())
+                if isinstance(self.custom_pawns, dict)
+                else self.custom_pawns
+            )
             for pieces in (
                 piece_sets[side][split[side] - 1::-1], piece_sets[side.opponent()][split[side.opponent()] - 1::-1],
                 piece_sets[side][split[side] + 1:], piece_sets[side.opponent()][split[side.opponent()] + 1:],
                 [
                     *piece_sets[side.opponent()][split[side.opponent()]:split[side.opponent()] + 1],
-                    self.custom_pawn, *piece_sets[side][split[side]:split[side] + 1],
+                    *(opponent_pawns if opponent_pawns is not None else [Pawn]),
+                    *(side_pawns if side_pawns is not None else [Pawn]),
+                    *piece_sets[side][split[side]:split[side] + 1],
                 ],
             ):
                 promotion_types = []
