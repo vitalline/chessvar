@@ -196,6 +196,7 @@ class Board(Window):
         self.theoretical_moves_queried = {Side.WHITE: False, Side.BLACK: False}  # same for theoretical moves
         self.display_moves = {Side.WHITE: False, Side.BLACK: False}  # whether to display moves for each side
         self.display_theoretical_moves = {Side.WHITE: False, Side.BLACK: False}  # same for theoretical moves
+        self.move_type_markers = False  # whether to display type-based move markers
         self.anchor = 0, 0  # used to have the board scale from the origin instead of the center
         self.highlight = Sprite("assets/util/selection.png")  # sprite for the highlight marker
         self.highlight.color = self.color_scheme['highlight_color']  # color it according to the color scheme
@@ -209,6 +210,7 @@ class Board(Window):
         self.label_list = []  # labels for the rows and columns
         self.board_sprite_list = SpriteList()  # sprites for the board squares
         self.move_sprite_list = SpriteList()  # sprites for the move markers
+        self.type_sprite_list = SpriteList()  # sprites for the type-based move markers
         self.piece_sprite_list = SpriteList()  # sprites for the pieces
         self.promotion_area_sprite_list = SpriteList()  # sprites for the promotion area background tiles
         self.promotion_piece_sprite_list = SpriteList()  # sprites for the possible promotion pieces
@@ -2638,6 +2640,7 @@ class Board(Window):
         self.hide_moves()
         self.update_caption()
         move_sprites = dict()
+        with_move = True
         if self.hide_move_markers:
             with_markers = False
         pos = self.selected_square or self.hovered_square
@@ -2646,26 +2649,82 @@ class Board(Window):
         if self.on_board(pos) and with_markers:
             piece = self.get_piece(pos)
             if self.hide_move_markers is False or not piece.is_hidden and not isinstance(piece, NoPiece):
+                move_dict = {}
+                use_type_markers = self.move_type_markers
                 if self.display_theoretical_moves.get(piece.side, False):
                     move_dict = self.theoretical_moves.get(piece.side, {})
                 elif self.display_moves.get(piece.side, False):
                     move_dict = self.moves.get(piece.side, {})
-                else:
-                    move_dict = {}
-                pos_dict = move_dict.get(pos, {})
-                pos_list = list(pos_dict.keys())
-                if self.can_pass() and pos not in pos_dict:
-                    pos_list.append(pos)
-                for pos_to in pos_list:
-                    if pos_to in move_sprites:
-                        continue
-                    sprite = Sprite(f"assets/util/{'move' if self.not_a_piece(pos_to) else 'capture'}.png")
-                    sprite.color = self.color_scheme['selection_color' if self.selected_square else 'highlight_color']
-                    sprite.position = self.get_screen_position(pos_to)
-                    sprite.scale = self.square_size / sprite.texture.width
-                    self.move_sprite_list.append(sprite)
-                    move_sprites[pos_to] = sprite
-        if not self.selected_square and self.move_history and not self.edit_mode:
+                    use_type_markers = False
+                pos_dict = {k: v for k, v in move_dict.get(pos, {}).items()}
+                if  not use_type_markers and self.can_pass() and pos not in pos_dict:
+                    pos_dict[pos] = [False]
+                for pos_to, moves in pos_dict.items():
+                    move_marker_list = []
+                    move_marker_set = set()
+                    move_marker_seven = ''
+                    for move in moves:
+                        if move is False:
+                            move_marker_list.append(False)
+                            move_marker_set.add(False)
+                        elif not use_type_markers:
+                            if 'a' in move.marks:
+                                continue
+                            if move_marker_set or move_marker_list:
+                                break
+                            move_marker_list.append(self.not_a_piece(pos_to))
+                            move_marker_set.add(move_marker_list[-1])
+                        else:
+                            for mark in move.marks:
+                                if mark in {'7', '/'}:
+                                    move_marker_seven += mark
+                                elif move_marker_seven:
+                                    move_marker_list.append(move_marker_seven)
+                                    move_marker_set.add(move_marker_seven)
+                                    move_marker_seven = ''
+                                if not move_marker_seven and mark not in move_marker_set:
+                                    move_marker_list.append(mark)
+                                    move_marker_set.add(mark)
+                            if move_marker_seven:
+                                move_marker_list.append(move_marker_seven)
+                                move_marker_set.add(move_marker_seven)
+                                move_marker_seven = ''
+                    if not use_type_markers:
+                        mark = Sprite(f"assets/util/{'move' if move_marker_list[0] else 'capture'}.png")
+                        mark.color = self.color_scheme[f"{'selection' if self.selected_square else 'highlight'}_color"]
+                        mark.position = self.get_screen_position(pos_to)
+                        mark.scale = self.square_size / mark.texture.width
+                        self.move_sprite_list.append(mark)
+                        move_sprites[pos_to] = mark
+                    else:
+                        move_sprites[pos_to] = []
+                        area = len(move_marker_list)
+                        width = 1 + isqrt(area - 1)
+                        height = ceil(area / width)
+                        diff = width * height - area
+                        for i, mark_type in enumerate(move_marker_list):
+                            xi, yi = i % width, i // width
+                            diff_width = width - (diff if yi == height - 1 else 0)
+                            square = self.get_screen_position(pos_to)
+                            if mark_type[0] == '7':
+                                mark_types = mark_type.split('/')
+                                index, count = len(mark_types[0]) - 1, len(mark_types[1])
+                                angle = index / count * 360
+                                mark_type = '7'
+                            else:
+                                angle = 0
+                            mark = Sprite(f"assets/move/{mark_type}.png")
+                            mark.color = self.color_scheme["background_color"]
+                            mark.position = (
+                                square[0] + self.square_size * ((xi + 0.5) / diff_width - 0.5),
+                                square[1] + self.square_size * (0.5 - (yi + 0.5) / height),
+                            )
+                            mark.scale = (self.square_size / width) / mark.texture.width * (2 if area > 1 else 1)
+                            mark.angle = angle
+                            self.type_sprite_list.append(mark)
+                            move_sprites[pos_to].append(mark)
+                with_move = False
+        if with_move and self.move_history and not self.edit_mode:
             move = self.move_history[-1]
             if move is not None and not move.is_edit:
                 pos_from, pos_to = move.pos_from, move.pos_to
@@ -2714,6 +2773,7 @@ class Board(Window):
 
     def hide_moves(self) -> None:
         self.move_sprite_list.clear()
+        self.type_sprite_list.clear()
 
     def can_pass(self, side: Side = None) -> bool:
         return not self.game_over and self.moves.get(side or self.turn_side, {}).get('pass')
@@ -4692,6 +4752,7 @@ class Board(Window):
             self.selection.draw()
         self.move_sprite_list.draw()
         self.piece_sprite_list.draw()
+        self.type_sprite_list.draw()
         if self.active_piece:
             self.active_piece.draw()
         self.promotion_area_sprite_list.draw()
@@ -5622,7 +5683,10 @@ class Board(Window):
                     self.show_moves()
         if symbol == key.K and not self.hide_move_markers:  # Move marker mode
             selected_square = self.selected_square
-            if modifiers & key.MOD_ACCEL and modifiers & key.MOD_SHIFT:  # Default
+            if modifiers & key.MOD_ALT:  # Move type markers
+                self.move_type_markers = not self.move_type_markers
+                self.log(f"Info: Using {'typed' if self.move_type_markers else 'regular'} move markers", False)
+            elif modifiers & key.MOD_ACCEL and modifiers & key.MOD_SHIFT:  # Default
                 self.log("Info: Showing legal moves for moving player", False)
                 self.load_moves(False)
             elif modifiers & key.MOD_ACCEL:  # Valid moves

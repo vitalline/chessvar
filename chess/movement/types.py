@@ -16,6 +16,8 @@ if TYPE_CHECKING:
 
 
 class RiderMovement(BaseMovement):
+    default_mark = 'n'
+
     def __init__(
         self, board: Board,
         directions: UnpackedList[AnyDirection] | None = None,
@@ -61,7 +63,9 @@ class RiderMovement(BaseMovement):
         while direction_id < len(self.directions):
             direction = piece.side.direction(self.directions[direction_id])
             if direction[:2] == (0, 0):
-                yield Move(pos_from=pos_from, pos_to=self.transform(pos_from), movement_type=type(self))
+                yield Move(
+                    pos_from=pos_from, pos_to=self.transform(pos_from), movement_type=type(self)
+                ).mark(self.default_mark)
                 direction_id += 1
                 continue
             self.steps = 0  # note that calls to moves() will restart the step count from 0 once for each direction
@@ -72,13 +76,17 @@ class RiderMovement(BaseMovement):
             self.initialize_direction(direction, pos_from, piece)
             data = self.data.copy()
             current_pos = pos_from
-            move = Move(pos_from=pos_from, pos_to=self.transform(current_pos), movement_type=type(self))
+            move = Move(
+                pos_from=pos_from, pos_to=self.transform(current_pos), movement_type=type(self)
+            ).mark(self.default_mark)
             while self.in_bounds(self.transform(current_pos)):
                 if self.stop_condition(move, direction, piece, theoretical):
                     direction_id += 1
                     break
                 current_pos = add(current_pos, direction[:2])
-                move = Move(pos_from=pos_from, pos_to=self.transform(current_pos), movement_type=type(self))
+                move = Move(
+                    pos_from=pos_from, pos_to=self.transform(current_pos), movement_type=type(self)
+                ).mark(self.default_mark)
                 steps += 1
                 self.data = data
                 self.steps = steps
@@ -146,6 +154,8 @@ class RiderMovement(BaseMovement):
 
 
 class HalflingRiderMovement(RiderMovement):
+    default_mark = 'h'
+
     def __init__(
         self, board: Board,
         directions: UnpackedList[AnyDirection] | None = None,
@@ -172,6 +182,8 @@ class HalflingRiderMovement(RiderMovement):
 
 
 class CannonRiderMovement(RiderMovement):
+    default_mark = 'p'
+
     def __init__(
         self, board: Board,
         directions: UnpackedList[AnyDirection] | None = None,
@@ -211,6 +223,8 @@ class CannonRiderMovement(RiderMovement):
 
 
 class HopperRiderMovement(CannonRiderMovement):
+    default_mark = 'l'
+
     def initialize_direction(self, direction: AnyDirection, pos_from: Position, piece: Piece) -> None:
         super().initialize_direction(direction, pos_from, piece)
         self.data['capture'] = None
@@ -237,11 +251,15 @@ class HopperRiderMovement(CannonRiderMovement):
 
 
 class SpaciousRiderMovement(RiderMovement):
+    default_mark = 's'
+
     def spacious_transform(self, pos: Position) -> Position:
         return pos  # as much as i like the idea of a toroidal movement condition, it's just not practical for this game
         # but if you want to use the "canon" rules for spacious movement, you can use TrueSpaciousRiderMovement instead.
 
     def skip_condition(self, move: Move, direction: AnyDirection, piece: Piece, theoretical: bool = False) -> bool:
+        if theoretical:
+            return super().skip_condition(move, direction, piece, theoretical)
         next_pos_to = self.transform(add(move.pos_from, mul(direction[:2], self.steps + 1)))
         check_space = self.spacious_transform(next_pos_to)
         check_state = check_space == self.spacious_transform(move.pos_from) or self.board.not_a_piece(check_space)
@@ -256,7 +274,11 @@ class TrueSpaciousRiderMovement(SpaciousRiderMovement):
         return tuple(new_pos)  # type: ignore
 
 
-class ToroidalRiderMovement(RiderMovement):
+class BaseLoopMovement(BaseMovement):
+    default_mark = 'o'
+
+
+class ToroidalRiderMovement(BaseLoopMovement, RiderMovement):
     # Looping movement along both axes
     def transform(self, pos: Position) -> Position:
         new_pos = (
@@ -265,13 +287,13 @@ class ToroidalRiderMovement(RiderMovement):
         return tuple(new_pos)  # type: ignore
 
 
-class FileCylindricalRiderMovement(RiderMovement):
+class FileCylindricalRiderMovement(BaseLoopMovement, RiderMovement):
     # Looping movement along the file (vertical) axis
     def transform(self, pos: Position) -> Position:
         return (pos[0] - self.bounds[0][0]) % (self.bounds[0][1] - self.bounds[0][0]) + self.bounds[0][0], pos[1]
 
 
-class RankCylindricalRiderMovement(RiderMovement):
+class RankCylindricalRiderMovement(BaseLoopMovement, RiderMovement):
     # Looping movement along the rank (horizontal) axis
     def transform(self, pos: Position) -> Position:
         return pos[0], (pos[1] - self.bounds[1][0]) % (self.bounds[1][1] - self.bounds[1][0]) + self.bounds[1][0]
@@ -282,6 +304,7 @@ class CylindricalRiderMovement(RankCylindricalRiderMovement):
 
 
 class ReflectiveRiderMovement(RiderMovement):
+    default_mark = 'k'
     # Reflective movement along both axes
     def transform(self, pos: Position) -> Position:
         size = [self.bounds[i][1] - self.bounds[i][0] - 1 for i in range(2)]
@@ -304,6 +327,8 @@ class RankReflectiveRiderMovement(ReflectiveRiderMovement):
 
 
 class RangedMovement(BaseMovement):
+    default_mark = 'g'
+
     def moves(self, pos_from: Position, piece: Piece, theoretical: bool = False):
         for move in super().moves(pos_from, piece, theoretical):
             move = copy(move)
@@ -343,6 +368,8 @@ class RangedCaptureRiderMovement(RangedMovement, RiderMovement):
 
 
 class AutoCaptureMovement(BaseMovement):
+    default_mark = 't'
+
     # Note: The auto-capture implementation assumes that none of the pieces that utilize it can be blocked mid-movement.
     # This is true for the only army that utilizes this movement type, but it may not work correctly in other scenarios.
     def generate_captures(self, move: Move, piece: Piece) -> Move:
@@ -441,11 +468,11 @@ class CastlingMovement(BaseMovement):
                 pos = add(pos_from, gap_offset)
                 if not self.board.not_a_piece(pos):
                     return ()
-        self_move = Move(pos_from=pos_from, pos_to=pos_to, movement_type=type(self))
+        self_move = Move(pos_from=pos_from, pos_to=pos_to, movement_type=type(self)).mark('0')
         other_move = Move(
             pos_from=other_piece_pos, pos_to=other_piece_pos_to,
             movement_type=CastlingPartnerMovement, piece=other_piece
-        )
+        ).mark('c0')  # marking the chained move too, just in case
         return self_move.set(chained_move=other_move),
 
     def update(self, move: Move, piece: Piece):
@@ -580,6 +607,7 @@ class IndexMovement(BaseMultiMovement):
         super().__init__(board, sum(self.movement_index, []))
 
     def moves(self, pos_from: Position, piece: Piece, theoretical: bool = False, index: int | None = None):
+        mark = '#'
         if index is None:
             index = self.total_moves
         index = max(0, index - self.iteration_sub) // (self.iteration_div or 1)
@@ -592,13 +620,17 @@ class IndexMovement(BaseMultiMovement):
                     index = 2 * (len(self.movement_index) - 1) - index
             else:
                 index = len(self.movement_index) - 1
+                mark = ''
         movements = self.movements[slice(
             0 if self.iteration_type < 0 else index,
             0 if self.iteration_type > 0 else index + 1,
         )]
         for movement in movements:
             for move in movement.moves(pos_from, piece, theoretical):
-                yield copy(move)
+                if mark:
+                    yield copy(move).unmark('n').mark(mark)
+                else:
+                    yield copy(move)
 
     def __copy_args__(self):
         return (
@@ -619,7 +651,7 @@ class PlyMovement(IndexMovement):
                 if count == start_count:
                     return ()
             index -= 1
-        return super().moves(pos_from, piece, theoretical, index)
+        yield from super().moves(pos_from, piece, theoretical, index)
 
 
 class RepeatBentMovement(BaseMultiMovement):
@@ -680,8 +712,11 @@ class RepeatBentMovement(BaseMultiMovement):
                         if pos_to == pos_from:
                             stop = True
                     move.movement_type = type(self)
-                    if self.start_index <= index and self.skip_count <= true_index and (not stop or self.loop):
-                        yield copy(move)
+                    if not stop or self.loop:
+                        if self.start_index <= index and self.skip_count <= true_index:
+                            yield copy(move)
+                        else:
+                            yield copy(move).unmark('n').mark('a')
                     if stop:
                         break
                 if (
@@ -800,7 +835,7 @@ class ChainMovement(BaseMultiMovement):
                 if last_chain_move.movement_type == RoyalEnPassantMovement:
                     continue
                 for chained_move in self.moves(last_chain_move.pos_to, piece, theoretical, index + 1):
-                    yield copy(chained_move).set(pos_from=move.pos_from)
+                    yield copy(chained_move).set(pos_from=move.pos_from).unmark('n').mark('+')
         else:
             for move in self.movements[index].moves(pos_from, piece, theoretical):
                 move_chain = [move]
@@ -844,9 +879,15 @@ class MultiMovement(BaseMultiMovement):
 
     def moves(self, pos_from: Position, piece: Piece, theoretical: bool = False):
         if theoretical:
-            for movement in self.movements:
+            for movement in self.both:
                 for move in movement.moves(pos_from, piece, theoretical):
                     yield copy(move)
+            for movement in self.move:
+                for move in movement.moves(pos_from, piece, theoretical):
+                    yield copy(move).unmark('n').mark('m')
+            for movement in self.capture:
+                for move in movement.moves(pos_from, piece, theoretical):
+                    yield copy(move).unmark('n').mark('c')
         else:
             for movement in self.both + self.move:
                 for move in movement.moves(pos_from, piece, theoretical):
@@ -938,7 +979,7 @@ class CloneMovement(BaseMultiMovement):
                         pos_from=None, pos_to=spawn_point,
                         promotion=copy(spawn_piece),
                         movement_type=type(self),
-                    )).chained_move
+                    )).unmark('n').mark('8').chained_move
                 yield move
 
     def __copy_args__(self):
@@ -957,16 +998,16 @@ class ColorMovement(BaseMultiMovement):
         super().__init__(board, self.light + self.dark)
 
     def moves(self, pos_from: Position, piece: Piece, theoretical: bool = False):
-        if self.board.is_light_square(pos_from):
+        if theoretical or self.board.is_light_square(pos_from):
             for movement in self.light:
                 for move in movement.moves(pos_from, piece, theoretical):
                     move.movement_type = type(self)
-                    yield copy(move)
-        if self.board.is_dark_square(pos_from):
+                    yield copy(move).unmark('n').mark('w')
+        if theoretical or self.board.is_dark_square(pos_from):
             for movement in self.dark:
                 for move in movement.moves(pos_from, piece, theoretical):
                     move.movement_type = type(self)
-                    yield copy(move)
+                    yield copy(move).unmark('n').mark('b')
 
     def __copy_args__(self):
         return self.board, unpack(self.light), unpack(self.dark)
@@ -988,26 +1029,27 @@ class SideMovement(BaseMultiMovement):
         super().__init__(board, self.left + self.right)
 
     def moves(self, pos_from: Position, piece: Piece, theoretical: bool = False):
-        if pos_from[1] < ceil(self.board.board_width / 2):
+        if theoretical or pos_from[1] < ceil(self.board.board_width / 2):
             for movement in self.left:
                 for move in movement.moves(pos_from, piece, theoretical):
                     move.movement_type = type(self)
-                    yield copy(move)
-        if pos_from[1] >= floor(self.board.board_width / 2):
+                    yield copy(move).unmark('n').mark('[')
+        if theoretical or pos_from[1] >= floor(self.board.board_width / 2):
             for movement in self.right:
                 for move in movement.moves(pos_from, piece, theoretical):
                     move.movement_type = type(self)
-                    yield copy(move)
-        if pos_from[0] * piece.side.direction() < ceil(self.board.board_height / 2) * piece.side.direction():
+                    yield copy(move).unmark('n').mark(']')
+        position = pos_from[0] * piece.side.direction()
+        if theoretical or position < ceil(self.board.board_height / 2) * piece.side.direction():
             for movement in self.bottom:
                 for move in movement.moves(pos_from, piece, theoretical):
                     move.movement_type = type(self)
-                    yield copy(move)
-        if pos_from[0] * piece.side.direction() >= floor(self.board.board_height / 2) * piece.side.direction():
+                    yield copy(move).unmark('n').mark('(')
+        if theoretical or position >= floor(self.board.board_height / 2) * piece.side.direction():
             for movement in self.top:
                 for move in movement.moves(pos_from, piece, theoretical):
                     move.movement_type = type(self)
-                    yield copy(move)
+                    yield copy(move).unmark('n').mark(')')
 
     def __copy_args__(self):
         return self.board, unpack(self.left), unpack(self.right), unpack(self.bottom), unpack(self.top)
@@ -1021,14 +1063,16 @@ class ProbabilisticMovement(BaseMultiMovement):
             try:
                 current_ply = self.board.ply_count + self.board.ply_simulation - 1
                 current_roll = self.board.roll_history[current_ply][pos_from]
-                movements = [self.movements[current_roll]]
+                movements = [None if i != current_roll else self.movements[i] for i in range(len(self.movements))]
             except IndexError:
                 movements = self.movements
             except KeyError:
                 movements = self.movements
-        for movement in movements:
+        for i, movement in enumerate(movements):
+            if movement is None:
+                continue
             for move in movement.moves(pos_from, piece, theoretical):
-                yield copy(move)
+                yield copy(move).unmark('n').mark('7' * (i + 1) + '/' + '7' * len(movements))
 
     def roll(self):
         return self.board.roll_rng.randrange(len(self.movements))
@@ -1052,9 +1096,11 @@ class BaseChoiceMovement(BaseMultiMovement):
 class ChoiceMovement(BaseChoiceMovement):
     def moves(self, pos_from: Position, piece: Piece, theoretical: bool = False):
         if theoretical:
-            for movement in self.movements:
-                for move in movement.moves(pos_from, piece, theoretical):
-                    yield copy(move)
+            for key in self.movement_dict:
+                mark = 'i!' if key.startswith('!') else 'i'
+                for movement in self.movement_dict[key]:
+                    for move in movement.moves(pos_from, piece, theoretical):
+                        yield copy(move).unmark('n').mark(mark)
         else:
             for key in self.movement_dict:
                 value, invert = (key[1:], True) if key.startswith('!') else (key, False)
@@ -1095,6 +1141,7 @@ class RelayMovement(BaseChoiceMovement):
         relay_tester = piece.of(piece.side.opponent())
         for key in self.movement_dict:
             value, invert = (key[1:], True) if key.startswith('!') else (key, False)
+            mark = 'r!' if invert else 'r'
             relays, movements = self.movement_dict[key]
             is_relayed = False
             if not key:
@@ -1115,11 +1162,11 @@ class RelayMovement(BaseChoiceMovement):
                             is_relayed = True
                         if is_relayed:
                             break
-            if is_relayed == invert:
+            if not theoretical and is_relayed == invert:
                 continue
             for movement in movements:
                 for move in movement.moves(pos_from, piece, theoretical):
-                    yield copy(move)
+                    yield copy(move).unmark('n').mark(mark)
 
     def __copy_args__(self):
         return self.board, {key: (unpack(value[0]), unpack(value[1])) for key, value in self.movement_dict.items()}
@@ -1129,20 +1176,22 @@ class AreaMovement(BaseChoiceMovement):
     def moves(self, pos_from: Position, piece: Piece, theoretical: bool = False):
         for key in self.movement_dict:
             value, invert = (key[1:], True) if key.startswith('!') else (key, False)
-            if self.board.in_area(value, pos_from, piece.side) != invert:
+            mark = 'e!' if invert else 'e'
+            if theoretical or self.board.in_area(value, pos_from, piece.side) != invert:
                 for movement in self.movement_dict[key]:
                     for move in movement.moves(pos_from, piece, theoretical):
-                        yield copy(move)
+                        yield copy(move).unmark('n').mark(mark)
 
 
 class BoundMovement(BaseChoiceMovement):
     def moves(self, pos_from: Position, piece: Piece, theoretical: bool = False):
         for key in self.movement_dict:
             value, invert = (key[1:], True) if key.startswith('!') else (key, False)
+            mark = 'd!' if invert else 'd'
             for movement in self.movement_dict[key]:
                 for move in movement.moves(pos_from, piece, theoretical):
-                    if self.board.in_area(value, move.pos_to, piece.side) != invert:
-                        yield copy(move)
+                    if theoretical or self.board.in_area(value, move.pos_to, piece.side) != invert:
+                        yield copy(move).unmark('n').mark(mark)
 
 
 class TagMovement(BaseChoiceMovement):
