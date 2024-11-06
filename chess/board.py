@@ -4695,9 +4695,9 @@ class Board(Window):
         if self.active_piece:
             self.active_piece.draw()
         self.promotion_area_sprite_list.draw()
-        self.promotion_piece_sprite_list.draw()
         if self.promotion_area:
             self.highlight.draw()
+        self.promotion_piece_sprite_list.draw()
 
     def on_update(self, delta_time: float) -> None:
         if self.is_trickster_mode():
