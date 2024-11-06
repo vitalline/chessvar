@@ -149,7 +149,7 @@ def substitute(data: AnyJson, subs: NumericMap | dict[int, NumericMap], side: Si
                         result = subs[side.value()][key[0]]
                     elif isinstance(subs, dict) and len(key) == 2:
                         result = subs[key[0]][key[1]]
-                    result = substitute(result, subs, side)
+                    result = data[:start] + result + substitute(data[end + 1:], subs, side)
                 except (ValueError, IndexError, KeyError):
                     pass
     return result

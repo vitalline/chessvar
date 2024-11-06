@@ -25,13 +25,17 @@ if TYPE_CHECKING:
 def get_piece_mapping(board: Board, side: Side = Side.WHITE) -> dict[str, list[str]]:
     mapping = {}
     set_mapping = {}
+    defaults = {}
     def add_piece(piece: type[Piece], default: bool = False):
         piece_type = save_piece_type(piece)
         if piece_type not in set_mapping.setdefault(piece.name, set()):
             set_mapping[piece.name].add(piece_type)
             mapping.setdefault(piece.name, []).append(piece_type)
-            if not default and len(set_mapping[piece.name]) > 1:
-                mapping[piece.name] = [None] + mapping[piece.name]
+            if piece.name not in defaults:
+                if default and len(set_mapping[piece.name]) == 1:
+                    defaults[piece.name] = piece_type
+                if not default and len(set_mapping[piece.name]) > 1:
+                    mapping[piece.name] = [None] + mapping[piece.name]
     for side in (side, side.opponent()):
         for new_piece in board.piece_sets.get(side, []):
             add_piece(new_piece, save_piece_type(new_piece) not in board.custom_pieces)

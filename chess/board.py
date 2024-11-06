@@ -759,6 +759,15 @@ class Board(Window):
             self.log(f"Error: Invalid save format (expected dict, but got {type(data)})")
             return False
 
+        if self.chain_start or self.promotion_piece:
+            self.undo_last_finished_move()
+            self.update_caption()
+
+        old_pieces = {
+            p.board_pos: save_piece(p.on(None))
+            for pieces in [*self.movable_pieces.values(), self.obstacles] for p in pieces
+        }
+
         self.save_interval = 0
         self.save_loaded = False
         success = True
@@ -773,12 +782,6 @@ class Board(Window):
         self.win_side = Side.NONE
         self.game_over = False
         self.action_count = 0
-
-        for sprite_list in self.piece_sprite_list, self.promotion_piece_sprite_list, self.promotion_area_sprite_list:
-            sprite_list.clear()
-            for sprite in sprite_list:
-                sprite_list.remove(sprite)
-        self.pieces = []
 
         self.alias_dict = data.get('alias', {})
         if 'alias' in data:
@@ -1060,7 +1063,17 @@ class Board(Window):
         if self.roll_rng is None:
             self.roll_rng = Random(self.roll_seed)
 
-        pieces = exp_alg(data.get('pieces', {}), *whc)
+        pieces = exp_alg(data.get('pieces', {}), *whc) or old_pieces
+
+        for sprite_list in (
+            self.piece_sprite_list,
+            self.promotion_piece_sprite_list,
+            self.promotion_area_sprite_list
+        ):
+            sprite_list.clear()
+            for sprite in sprite_list:
+                sprite_list.remove(sprite)
+
         self.pieces = []
 
         for row in range(self.board_height):
@@ -5795,8 +5808,10 @@ class Board(Window):
                 self.redo_last_finished_move()
             else:
                 self.undo_last_finished_move()
+            self.update_caption()
         if symbol == key.Y and modifiers & key.MOD_ACCEL:  # Redo
             self.redo_last_finished_move()
+            self.update_caption()
         if symbol == key.L:
             if modifiers & key.MOD_ALT:  # Load save data
                 self.deactivate()
