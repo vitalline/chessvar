@@ -2331,8 +2331,7 @@ class Board(Window):
                                 if limit_hits[drop_type]:
                                     continue
                             if self.not_a_piece(pos):
-                                self.moves[turn_side].setdefault('drop', set()).add(piece_type)
-                                break
+                                self.moves[turn_side].setdefault('drop', {}).setdefault(pos, set()).add(piece_type)
                 for piece in movable_pieces[turn_side] if chain_moves is None else [last_chain_move.piece]:
                     piece_type = type(piece)
                     if chain_moves is not None:
@@ -4133,6 +4132,9 @@ class Board(Window):
                 return
             if not self.use_drops and not self.edit_mode:
                 return
+            valid_drops = self.moves[self.turn_side].get('drop', {}).get(move.piece.board_pos, set())
+            if not valid_drops:
+                return
             side_drops = self.drops[self.turn_side]
             drop_list = []
             drop_type_list = []
@@ -4143,7 +4145,7 @@ class Board(Window):
             for piece_type in sorted(self.captured_pieces[self.turn_side], key=lambda x: drop_indexes.get(x, 0)):
                 if piece_type not in side_drops:
                     continue
-                if piece_type not in self.moves[self.turn_side].get('drop', set()):
+                if piece_type not in valid_drops:
                     continue
                 drop_squares = side_drops[piece_type]
                 if move.piece.board_pos not in drop_squares:
