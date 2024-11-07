@@ -151,6 +151,24 @@ class Piece(Sprite):
             )
         )
 
+    def friendly_of(self, what: Piece):
+        if not what:
+            return False
+        if what == self:
+            return True
+        if what.side is Side.NONE:
+            return False
+        if what.side is Side.ANY:
+            return True
+        if what.side is self.side:
+            return not isinstance(self, Enemy)
+        if what.side is self.side.opponent():
+            return isinstance(self, (Double, Enemy))
+        return True
+
+    def friendly_to(self, what: Piece):
+        return what and what.friendly_of(self)
+
     def blocked_by(self, what: Piece):
         if not what:
             return False
@@ -168,6 +186,9 @@ class Piece(Sprite):
             return isinstance(self, Enemy)
         return False
 
+    def blocks(self, what: Piece):
+        return what and what.blocked_by(self)
+
     def captures(self, what: Piece):
         if not what:
             return False
@@ -183,6 +204,9 @@ class Piece(Sprite):
             return not isinstance(self, Enemy)
         return True
 
+    def captured_by(self, what: Piece):
+        return what and what.captures(self)
+
     def skips(self, what: Piece):
         if not what:
             return False
@@ -195,8 +219,11 @@ class Piece(Sprite):
         if what.side is self.side:
             return not isinstance(self, Enemy)
         if what.side is self.side.opponent():
-            return isinstance(self, Enemy)
+            return isinstance(self, (Double, Enemy))
         return True
+
+    def skipped_by(self, what: Piece):
+        return what and what.skips(self)
 
     @classmethod
     def is_colorbound(cls):

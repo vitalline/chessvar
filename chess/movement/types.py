@@ -1141,7 +1141,6 @@ class RelayMovement(BaseChoiceMovement):
         relay_tester = copy(piece)
         relay_tester.blocked_by = lambda p: False
         relay_tester.captures = lambda p: p.side
-        friend_tester = piece.of(piece.side.opponent())
         for key in self.movement_dict:
             value, invert = (key[1:], True) if key.startswith('!') else (key, False)
             relays, movements = self.movement_dict[key]
@@ -1162,7 +1161,7 @@ class RelayMovement(BaseChoiceMovement):
                         relay_piece = self.board.get_piece(pos)
                         if value.isdigit() and (int(value) == relay_piece.side.value):
                             is_relayed = True
-                        elif friend_tester.captures(relay_piece) and self.board.fits(value, relay_piece):
+                        elif piece.friendly_to(relay_piece) and self.board.fits(value, relay_piece):
                             is_relayed = True
                         if is_relayed:
                             break
