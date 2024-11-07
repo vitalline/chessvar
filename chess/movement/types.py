@@ -633,7 +633,7 @@ class IndexMovement(BaseMultiMovement):
                         yield copy(move).unmark('n').mark(mark)
                     else:
                         yield copy(move)
-                else:
+                elif theoretical:
                     yield copy(move).set(is_legal=False).unmark('n').mark(mark + '!')
 
     def __copy_args__(self):

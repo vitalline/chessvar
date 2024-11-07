@@ -77,7 +77,6 @@ class Board(Window):
 
         if self.board_config['color_id'] < 0 or self.board_config['color_id'] >= len(colors):
             self.board_config['color_id'] %= len(colors)
-            self.board_config.save(config_path)
 
         self.color_index = self.board_config['color_id'] or 0  # index of the current color scheme
         self.color_scheme = colors[self.color_index]  # current color scheme
@@ -3626,7 +3625,6 @@ class Board(Window):
         self.deselect_piece()
         if not self.move_history:
             return
-        offset = False
         in_promotion = self.promotion_piece is not None
         partial_move = self.chain_start is not None or in_promotion
         if in_promotion:
