@@ -2839,7 +2839,14 @@ class Board(Window):
                             move_sprites[pos_to].append(mark)
                         with_move = False
         if with_move and self.move_history and not self.edit_mode:
-            move = self.move_history[-1]
+            index = -1
+            while (
+                index >= -len(self.move_history)
+                and self.get_turn_side(index) == self.get_turn_side(-1) and (self.move_history[index] is None
+                or issubclass(self.move_history[index].movement_type, DropMovement))
+            ):
+                index -= 1
+            move = self.move_history[index]
             if move is not None and not move.is_edit:
                 pos_from, pos_to = move.pos_from, move.pos_to
                 last_move = move
@@ -2855,11 +2862,12 @@ class Board(Window):
                 pos_to = pos_to
                 if last_move.captured_piece:
                     captures.append(last_move.captured_piece.board_pos)
+                pos = move.piece.board_pos
                 if pos_from is not None and pos_from != pos_to:
                     if pos_from in move_sprites and not self.not_a_piece(pos_from):
                         move_sprites[pos_from].color = self.color_scheme['selection_color']
                     else:
-                        sprite = Sprite(f"assets/util/{'capture' if self.not_a_piece(pos_from) else 'selection'}.png")
+                        sprite = Sprite(f"assets/util/{'capture' if pos_from != pos else 'selection'}.png")
                         sprite.color = self.color_scheme['selection_color']
                         sprite.position = self.get_screen_position(pos_from)
                         sprite.scale = self.square_size / sprite.texture.width
@@ -2868,7 +2876,7 @@ class Board(Window):
                     if pos_to in move_sprites:
                         move_sprites[pos_to].color = self.color_scheme['selection_color']
                     else:
-                        sprite = Sprite(f"assets/util/{'capture' if self.not_a_piece(pos_to) else 'selection'}.png")
+                        sprite = Sprite(f"assets/util/{'capture' if pos_to != pos else 'selection'}.png")
                         sprite.color = self.color_scheme['selection_color']
                         sprite.position = self.get_screen_position(pos_to)
                         sprite.scale = self.square_size / sprite.texture.width
@@ -2879,7 +2887,7 @@ class Board(Window):
                     if capture in move_sprites:
                         move_sprites[capture].color = self.color_scheme['selection_color']
                     else:
-                        sprite = Sprite(f"assets/util/{'capture' if self.not_a_piece(capture) else 'selection'}.png")
+                        sprite = Sprite(f"assets/util/{'capture' if capture != pos else 'selection'}.png")
                         sprite.color = self.color_scheme['highlight_color']
                         sprite.position = self.get_screen_position(capture)
                         sprite.scale = self.square_size / sprite.texture.width
@@ -3944,14 +3952,14 @@ class Board(Window):
             self.update_caption()  # updating the caption to reflect the edit that was just made
             return  # let's not advance the turn while editing the board to hopefully make things easier for everyone
         self.update_status()
+        if self.board_config['fast_turn_pass'] and not self.game_over:
+            if 'pass' in self.moves[self.turn_side] and len(self.moves[self.turn_side]) == 1:
+                if self.auto_moves:
+                    self.pass_turn()
+                return
         self.draw(0)
         if self.auto_moves and self.board_config['fast_moves'] and not self.game_over:
-            if self.try_auto():
-                return
-        if self.auto_moves and self.board_config['fast_turn_pass'] and not self.game_over:
-            if 'pass' in self.moves[self.turn_side] and len(self.moves[self.turn_side]) == 1:
-                self.pass_turn()
-                return
+            self.try_auto()
 
     def get_status_string(self) -> str | None:
         if self.game_over:
