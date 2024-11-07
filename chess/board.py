@@ -186,6 +186,7 @@ class Board(Window):
         self.custom_extra_drops = {}  # custom extra drops, as {side: [was]}
         self.custom_turn_order = []  # custom turn order options
         self.custom_end_rules = {}  # custom game end conditions
+        self.custom_variant = ''  # custom variant name
         self.captured_pieces = {Side.WHITE: [], Side.BLACK: []}  # pieces captured by each side
         self.alias_dict = {}  # dictionary of aliases for save data
         self.moves = {Side.WHITE: {}, Side.BLACK: {}}  # dictionary of valid moves from any square
@@ -605,7 +606,7 @@ class Board(Window):
         whc = *wh, {k: v for k, v in self.custom_areas.items() if isinstance(v, set)}
         wha = defaultdict(lambda: whn, {side: (*wh, self.areas.get(side) or {}) for side in (Side.WHITE, Side.BLACK)})
         data = {
-            'variant': self.variant,
+            'variant': self.custom_variant,
             'board_size': [*wh],
             'borders': [toa((-1, col)) for col in self.border_cols] + [toa((row, -1)) for row in self.border_rows],
             'areas': {
@@ -820,7 +821,7 @@ class Board(Window):
                 subs_dict.setdefault(Side.NONE.value, {})[i] = value
         data = substitute(data, subs_dict)
 
-        self.variant = data.get('variant', '')
+        self.custom_variant = data.get('variant', '')
 
         # might have to add more error checking to saving/loading, even if at the cost of slight redundancy.
         # who knows when someone decides to introduce a breaking change and absolutely destroy all the saves
@@ -1098,7 +1099,7 @@ class Board(Window):
                 self.load_auto_capture_markers(side)
 
         starting = 'Starting new' if with_history else 'Resuming saved'
-        if self.variant:
+        if self.custom_variant:
             self.log(f"Info: {starting} game (with custom variant)")
         elif self.custom_layout:
             self.log(f"Info: {starting} game (with custom starting layout)")
@@ -1262,7 +1263,7 @@ class Board(Window):
         else:
             self.past_custom_pieces = {**self.past_custom_pieces, **self.custom_pieces}
         self.save_info = [None]
-        self.variant = ''
+        self.custom_variant = ''
         self.alias_dict = {}
         self.custom_areas = {}
         self.custom_drops = {}
@@ -3970,6 +3971,7 @@ class Board(Window):
         if self.skip_caption_update:
             return
         if self.board_config['status_string'] is None:
+            self.set_caption(self.custom_variant or ("???" if self.hide_pieces else self.variant))
             return
         prefix = ''
         if self.board_config['status_prefix'] == 0:
@@ -3990,7 +3992,7 @@ class Board(Window):
                 else:
                     self.set_caption(prefix)
             else:
-                self.set_caption('Chess')
+                self.set_caption(self.custom_variant or ("???" if self.hide_pieces else self.variant))
             return
         if prefix:
             prefix = f"[{prefix}]"
@@ -6015,17 +6017,14 @@ class Board(Window):
                 self.log(f"Note: {line}", False)
 
     def log_armies(self):
-        if self.variant or self.custom_layout:
-            self.log(f"Game: {self.variant or 'Custom'}")
+        if self.custom_variant or self.custom_layout:
+            self.log(f"Game: {self.custom_variant or 'Custom'}")
             return
-        if self.piece_set_ids[Side.WHITE] == self.piece_set_ids[Side.BLACK] == 0 and not self.hide_pieces:
-            self.log("Game: Chess")
-            return
-        self.log(
-            "Game: "
-            f"{self.piece_set_names[Side.WHITE] if not self.hide_pieces else '???'} vs. "
-            f"{self.piece_set_names[Side.BLACK] if not self.hide_pieces else '???'}"
-        )
+        if self.piece_set_ids[Side.WHITE] == self.piece_set_ids[Side.BLACK] == 0:
+            self.variant = 'Chess'
+        else:
+            self.variant = f"{self.piece_set_names[Side.WHITE]} vs. {self.piece_set_names[Side.BLACK]}"
+        self.log(f"Game: {'???' if self.hide_pieces else self.variant}")
 
     def log_special_modes(self):
         if self.hide_pieces == 1:
