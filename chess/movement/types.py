@@ -1136,9 +1136,12 @@ class RelayMovement(BaseChoiceMovement):
         self.movement_dict = movement_dict
 
     def moves(self, pos_from: Position, piece: Piece, theoretical: bool = False):
-        relay_piece_dict = self.board.relay_pieces.get(piece.side, {})
-        relay_marker_dict = self.board.relay_markers.get(piece.side, {})
-        relay_tester = piece.of(piece.side.opponent())
+        relay_target_dict = self.board.relay_targets.get(piece.side, {})
+        relay_source_dict = self.board.relay_sources.get(piece.side, {})
+        relay_tester = copy(piece)
+        relay_tester.blocked_by = lambda p: False
+        relay_tester.captures = lambda p: p.side
+        friend_tester = piece.of(piece.side.opponent())
         for key in self.movement_dict:
             value, invert = (key[1:], True) if key.startswith('!') else (key, False)
             relays, movements = self.movement_dict[key]
@@ -1148,18 +1151,18 @@ class RelayMovement(BaseChoiceMovement):
                 is_relayed = True
             else:
                 mark = 'r!' if invert else 'r'
-                if key not in relay_piece_dict or pos_from not in relay_piece_dict[key]:
-                    relay_piece_dict.setdefault(key, {})[pos_from] = set()
+                if key not in relay_target_dict or pos_from not in relay_target_dict[key]:
+                    relay_target_dict.setdefault(key, {})[pos_from] = set()
                     for relay in relays:
                         for move in relay.moves(pos_from, relay_tester, theoretical):
-                            relay_piece_dict[key][pos_from].add(move.pos_to)
-                            relay_marker_dict.setdefault(move.pos_to, set()).add((key, pos_from))
-                if key in relay_piece_dict and pos_from in relay_piece_dict[key]:
-                    for pos in relay_piece_dict[key][pos_from]:
+                            relay_target_dict[key][pos_from].add(move.pos_to)
+                            relay_source_dict.setdefault(move.pos_to, set()).add((key, pos_from))
+                if key in relay_target_dict and pos_from in relay_target_dict[key]:
+                    for pos in relay_target_dict[key][pos_from]:
                         relay_piece = self.board.get_piece(pos)
                         if value.isdigit() and (int(value) == relay_piece.side.value):
                             is_relayed = True
-                        elif relay_piece.side == piece.side and self.board.fits(value, relay_piece):
+                        elif friend_tester.captures(relay_piece) and self.board.fits(value, relay_piece):
                             is_relayed = True
                         if is_relayed:
                             break

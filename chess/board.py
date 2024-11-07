@@ -168,10 +168,10 @@ class Board(Window):
         self.en_passant_markers = {Side.WHITE: {}, Side.BLACK: {}}  # where the side's pieces can be captured e.p.
         self.royal_ep_targets = {Side.WHITE: {}, Side.BLACK: {}}  # royal pieces that can be captured en passant
         self.royal_ep_markers = {Side.WHITE: {}, Side.BLACK: {}}  # where the side's royals can be captured e.p.
+        self.relay_targets = {Side.WHITE: {}, Side.BLACK: {}}  # pieces that can get powers relayed from friendly pieces
+        self.relay_sources = {Side.WHITE: {}, Side.BLACK: {}}  # pieces that relay powers to the side's pieces
         self.auto_ranged_pieces = {Side.WHITE: [], Side.BLACK: []}  # pieces that auto-capture anywhere they can move to
         self.auto_capture_markers = {Side.WHITE: {}, Side.BLACK: {}}  # squares where the side's pieces can auto-capture
-        self.relay_pieces = {Side.WHITE: {}, Side.BLACK: {}}  # pieces that are relaying powers onto certain squares
-        self.relay_markers = {Side.WHITE: {}, Side.BLACK: {}}  # squares the side's pieces are relaying their powers to
         self.probabilistic_pieces = {Side.WHITE: [], Side.BLACK: []}  # pieces that can move probabilistically
         self.probabilistic_piece_history = []  # list of probabilistic piece positions for every ply
         self.obstacles = []  # list of obstacles (neutral pieces that block movement and cannot move)
@@ -3148,24 +3148,30 @@ class Board(Window):
 
     def update_relay_markers(self, move: Move | None = None):
         while move:
-            if move.piece and move.pos_from != move.pos_to or move.promotion:
-                markers = self.relay_markers.get(move.piece.side, {}).pop(move.pos_from, set())
-                pieces = self.relay_pieces.get(move.piece.side, {})
-                for group, pos in markers:
-                    if group in pieces and pos in pieces[group]:
-                        pieces[group].pop(pos, None)
+            if move.piece and move.pos_from != move.pos_to:
+                sources = self.relay_sources.get(move.piece.side, {}).pop(move.pos_from or move.pos_to, set())
+                targets = self.relay_targets.get(move.piece.side, {})
+                for group, pos in sources:
+                    if group in targets and pos in targets[group]:
+                        targets[group].pop(pos, None)
+            if move.promotion:
+                sources = self.relay_sources.get(move.promotion.side, {}).pop(move.pos_to, set())
+                targets = self.relay_targets.get(move.promotion.side, {})
+                for group, pos in sources:
+                    if group in targets and pos in targets[group]:
+                        targets[group].pop(pos, None)
             if move.captured_piece:
-                markers = self.relay_markers.get(move.captured_piece.side, {}).pop(move.captured_piece.board_pos, set())
-                pieces = self.relay_pieces.get(move.captured_piece.side, {})
-                for group, pos in markers:
-                    if group in pieces and pos in pieces[group]:
-                        pieces[group].pop(pos, None)
+                sources = self.relay_sources.get(move.captured_piece.side, {}).pop(move.captured_piece.board_pos, set())
+                targets = self.relay_targets.get(move.captured_piece.side, {})
+                for group, pos in sources:
+                    if group in targets and pos in targets[group]:
+                        targets[group].pop(pos, None)
             if move.swapped_piece:
-                markers = self.relay_markers.get(move.swapped_piece.side, {}).pop(move.pos_to, set())
-                pieces = self.relay_pieces.get(move.swapped_piece.side, {})
-                for group, pos in markers:
-                    if group in pieces and pos in pieces[group]:
-                        pieces[group].pop(pos, None)
+                sources = self.relay_sources.get(move.swapped_piece.side, {}).pop(move.pos_to, set())
+                targets = self.relay_targets.get(move.swapped_piece.side, {})
+                for group, pos in sources:
+                    if group in targets and pos in targets[group]:
+                        targets[group].pop(pos, None)
             move = move.chained_move
 
     def revert_relay_markers(self, move: Move | None = None):
@@ -3174,24 +3180,36 @@ class Board(Window):
             move_chain.append(move)
             move = move.chained_move
         for move in move_chain[::-1]:
-            if move.piece and move.pos_from != move.pos_to or move.promotion:
+            if move.piece and move.pos_from != move.pos_to:
                 piece = move.promotion or move.piece
-                markers = self.relay_markers.get(piece.side, {}).pop(move.pos_to, set())
-                pieces = self.relay_pieces.get(piece.side, {})
-                for group, pos in markers:
-                    if group in pieces and pos in pieces[group]:
-                        pieces[group].pop(pos, None)
+                sources = self.relay_sources.get(piece.side, {}).pop(move.pos_to or move.pos_from, set())
+                targets = self.relay_targets.get(piece.side, {})
+                for group, pos in sources:
+                    if group in targets and pos in targets[group]:
+                        targets[group].pop(pos, None)
+            if move.promotion:
+                sources = self.relay_sources.get(move.promotion.side, {}).pop(move.pos_to, set())
+                targets = self.relay_targets.get(move.promotion.side, {})
+                for group, pos in sources:
+                    if group in targets and pos in targets[group]:
+                        targets[group].pop(pos, None)
+            if move.captured_piece:
+                sources = self.relay_sources.get(move.captured_piece.side, {}).pop(move.captured_piece.board_pos, set())
+                targets = self.relay_targets.get(move.captured_piece.side, {})
+                for group, pos in sources:
+                    if group in targets and pos in targets[group]:
+                        targets[group].pop(pos, None)
             if move.swapped_piece:
-                markers = self.relay_markers.get(move.swapped_piece.side, {}).pop(move.pos_from, set())
-                pieces = self.relay_pieces.get(move.swapped_piece.side, {})
-                for group, pos in markers:
-                    if group in pieces and pos in pieces[group]:
-                        pieces[group].pop(pos, None)
+                sources = self.relay_sources.get(move.swapped_piece.side, {}).pop(move.pos_from, set())
+                targets = self.relay_targets.get(move.swapped_piece.side, {})
+                for group, pos in sources:
+                    if group in targets and pos in targets[group]:
+                        targets[group].pop(pos, None)
 
     def clear_relay_markers(self) -> None:
-        for target_dict in (self.relay_pieces, self.relay_markers):
-            for side in target_dict:
-                target_dict[side].clear()
+        for relay_dict in (self.relay_targets, self.relay_sources):
+            for side in relay_dict:
+                relay_dict[side].clear()
 
     def update_end_data(self, move: Move | None = None) -> None:
         if self.edit_mode or (move and move.is_edit):
@@ -3610,6 +3628,7 @@ class Board(Window):
             return
         offset = False
         in_promotion = self.promotion_piece is not None
+        partial_move = self.chain_start is not None or in_promotion
         if in_promotion:
             if self.move_history and self.future_move_history:
                 past, future = self.move_history[-1], self.future_move_history[-1]
@@ -3683,17 +3702,29 @@ class Board(Window):
         self.reload_end_data()
         self.advance_turn()
         self.future_move_history = future_move_history
-        if self.future_move_history:
-            copies = [
-                copy(move).set(chained_move=Default) if move is not None else None
-                for move in (self.future_move_history[-1], last_move)
-            ]
-            if (
-                (copies[0] is None) or (copies[1] is None) or
-                (copies[0] is not None and not copies[0].matches(copies[1]))
-            ):
-                if not offset:
-                    self.clear_future_history(self.ply_count)
+        if partial_move and self.future_move_history:
+            last_history_move = self.future_move_history[-1]
+            last_chain_move = last_move
+            matches = True
+            while last_chain_move:
+                if last_history_move:
+                    copies = [
+                        copy(move).set(chained_move=Default) if move is not None else None
+                        for move in (last_history_move, last_chain_move)
+                    ]
+                    if (
+                        (copies[0] is None) != (copies[1] is None) or
+                        (copies[0] is not None and not copies[0].matches(copies[1]))
+                    ):
+                        matches = False
+                        break
+                    last_history_move = last_history_move.chained_move
+                    last_chain_move = last_chain_move.chained_move
+                else:
+                    matches = False
+                    break
+            if not matches:
+                self.clear_future_history(self.ply_count)
                 self.future_move_history.append(last_move)
         else:
             self.future_move_history.append(last_move)
@@ -3827,8 +3858,11 @@ class Board(Window):
                     self.shift_ply(+1)
                     self.load_check()
                     self.update_end_data(last_move)
-                    self.load_moves()
-                    self.reload_end_data()
+                else:
+                    self.load_check()
+                    self.update_end_data()
+                self.load_moves()
+                self.reload_end_data()
                 self.compare_history()
             self.advance_turn()
         elif last_chain_move.chained_move is Unset:
@@ -4207,12 +4241,15 @@ class Board(Window):
             self.move_history.append(deepcopy(move))
             self.unload_end_data()
             self.load_pieces()
-            self.load_check()
             if not move.is_edit:
                 self.shift_ply(+1)
+                self.load_check()
                 self.update_end_data(self.move_history[-1])
-                self.load_moves()
-                self.reload_end_data()
+            else:
+                self.load_check()
+                self.update_end_data()
+            self.load_moves()
+            self.reload_end_data()
             self.compare_history()
             self.advance_turn()
 
@@ -4980,15 +5017,17 @@ class Board(Window):
                             self.move(chained_move)
                             self.update_auto_capture_markers(chained_move)
                             chained_move.set(piece=copy(chained_move.piece))
+                    self.unload_end_data()
                     self.load_pieces()
                     if not current_move.is_edit:
                         self.shift_ply(+1)
-                        self.unload_end_data()
-                        self.load_pieces()
                         self.load_check()
                         self.update_end_data(self.move_history[-1])
-                        self.load_moves()
-                        self.reload_end_data()
+                    else:
+                        self.load_check()
+                        self.update_end_data()
+                    self.load_moves()
+                    self.reload_end_data()
                     self.compare_history()
                     self.advance_turn()
                 return

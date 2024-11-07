@@ -169,7 +169,9 @@ def debug_info(board: Board) -> list[str]:
     ):
         strings = ', '.join(f"{i:0{digits}d}" for i in section_data)
         debug_log.append(f"{section_type} blocklist ({len(section_data)}): {strings or 'None'}")
-    debug_log.append(f"Variant: {board.variant or 'None'}")
+    debug_log.append(f"Variant: {board.custom_variant or board.variant or 'None'}")
+    if board.custom_variant:
+        debug_log[-1] += " (Custom)"
     side_id_strings = {
         side: '-' if set_id is None else f"{set_id:0{digits}d}"
         for side, set_id in board.piece_set_ids.items()
@@ -190,6 +192,8 @@ def debug_info(board: Board) -> list[str]:
     debug_log.append(f"Obstacles ({len(board.obstacles)}):")
     for piece in board.obstacles:
         debug_log.append(f"{pad:2}{toa(piece.board_pos)} {piece.board_pos}: {name(piece)}")
+    if not board.obstacles:
+        debug_log[-1] += " None"
     for side in board.piece_set_ids:
         debug_log.append(f"{side} pieces ({len(board.movable_pieces[side])}):")
         for piece in board.movable_pieces[side]:
@@ -325,8 +329,6 @@ def debug_info(board: Board) -> list[str]:
             side_section_data = section_data.get(side) or []
             side_section_string = ', '.join(name(piece, side) for piece in side_section_data)
             debug_log.append(f"{side} {section_type} ({len(side_section_data)}): {side_section_string or 'None'}")
-    if not board.obstacles:
-        debug_log[-1] += " None"
     debug_log.append(f"Edit piece set: {board.edit_piece_set_id}")
     for side in board.piece_set_ids:
         side_data = board.edit_promotions.get(side, [])
