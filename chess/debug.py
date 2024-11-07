@@ -14,7 +14,7 @@ from chess.movement.util import to_algebraic_map as tom, from_algebraic_map as f
 from chess.pieces.groups.classic import Pawn
 from chess.pieces.piece import Piece
 from chess.pieces.side import Side
-from chess.pieces.util import UtilityPiece, Block, Border, Shield, Void, Wall
+from chess.pieces.util import UtilityPiece, NoPiece, Block, Border, Shield, Void, Wall
 from chess.save import save_piece_type, save_custom_type
 from chess.util import get_filename, sign, pluralize, spell, spell_ordinal, unpack, repack
 
@@ -129,6 +129,8 @@ def debug_info(board: Board) -> list[str]:
     piece_mapping = {side: get_piece_mapping(board, side) for side in (Side.WHITE, Side.BLACK, Side.NONE)}
     piece_side = lambda piece: piece.side if isinstance(piece, Piece) else Side.NONE
     def name(piece, side=Side.NONE):
+        if not piece or isinstance(piece, NoPiece):
+            return 'None'
         return get_piece_name(piece, piece_mapping.get(piece_side(piece) or side, piece_mapping[side]))
     debug_log = []  # noqa
     debug_log.append(f"Board size: {board.board_width}x{board.board_height}")
@@ -261,6 +263,7 @@ def debug_info(board: Board) -> list[str]:
         ('drop', board.drops, board.custom_drops),
     ):
         for side in board.piece_set_ids:
+            side_areas = board.areas.get(side) or {}
             section_rules = section_data.get(side) or {}
             debug_log.append(f"{side} {section} rules ({len(section_rules)}):")
             for piece in section_rules:
@@ -269,7 +272,7 @@ def debug_info(board: Board) -> list[str]:
                     base_data = (board.load_dict or {}).get(f"{section}s") or {}
                     from_mapping = frm(
                         list(base_data.get(str(side.value), {}).get(save_piece_type(piece), {})),
-                        board.board_width, board.board_height, board.areas.get(side) or {}
+                        board.board_width, board.board_height, side_areas
                     )
                     mapping = {}
                     for pos, value in from_mapping.items():
@@ -301,8 +304,14 @@ def debug_info(board: Board) -> list[str]:
                         suffix = f" ({', '.join(suffixes)})" if suffixes else ''
                         piece_list.append(f"{name(to_piece, side)}{suffix}")
                     piece_list = ', '.join(string for string in piece_list)
-                    if string not in board.areas.get(side, {}):
-                        string = f"{string} {fra(string)}"
+                    if string not in side_areas:
+                        poss = frm([string], board.board_width, board.board_height, side_areas)
+                        if len(poss) > 1:
+                            string = f"{string} ({len(poss)})"
+                        else:
+                            string = f"{string} {fra(string)}"
+                    else:
+                        string = f"{string} ({len(side_areas[string])})"
                     debug_log.append(f"{pad:4}{string}: {piece_list if piece_list else 'None'}")
                 if not section_rules[piece]:
                     debug_log[-1] += " None"
@@ -352,7 +361,17 @@ def debug_info(board: Board) -> list[str]:
     if not board.custom_areas:
         debug_log[-1] += " None"
     debug_log.append(f"Custom layout ({len(board.custom_layout)}):")
-    for pos, piece in board.custom_layout.items():
+    base_data = (board.load_dict or {}).get(f"layout") or {}
+    neutral_areas = {k: v for k, v in board.custom_areas.items() if isinstance(v, set)}
+    from_mapping = frm(base_data, board.board_width, board.board_height, neutral_areas)
+    mapping = {}
+    for pos, value in from_mapping.items():
+        if value not in mapping:
+            mapping[value] = pos
+    for string, pos in mapping.items():
+        piece = board.custom_layout.get(pos)
+        if not piece or isinstance(piece, NoPiece):
+            continue
         piece_name = name(piece)
         if piece.side is not (piece.default_side if isinstance(piece, UtilityPiece) else Side.NONE):
             piece_name = f"{piece.side} {piece_name}"
@@ -364,7 +383,15 @@ def debug_info(board: Board) -> list[str]:
         if piece.should_hide is not None:
             suffixes.append("Always hide" if piece.should_hide else "Never hide")
         suffix = f" ({', '.join(suffixes)})" if suffixes else ''
-        debug_log.append(f"{pad:2}{toa(pos)} {pos}: {piece_name}{suffix}")
+        if string not in neutral_areas:
+            poss = frm([string], board.board_width, board.board_height, neutral_areas)
+            if len(poss) > 1:
+                string = f"{string} ({len(poss)})"
+            else:
+                string = f"{string} {fra(string)}"
+        else:
+            string = f"{string} ({len(neutral_areas[string])})"
+        debug_log.append(f"{pad:2}{string}: {piece_name}{suffix}")
     if not board.custom_layout:
         debug_log[-1] += " None"
     piece_mode = {0: "Shown", 1: "Hidden", 2: "Penultima"}.get(board.hide_pieces, "Unknown")
@@ -445,6 +472,7 @@ def debug_info(board: Board) -> list[str]:
                                         f"from {string[:-1]}" if string[-1] == '>' else
                                         string for string in (allow_type, block_type)
                                     )
+                                    allow_type_string = allow_type_string.capitalize()
                                     type_string = (
                                         "Any move" if allow_type == '*' and block_type is None else
                                         "Tag used" if allow_type == '' and block_type is None else
@@ -460,15 +488,18 @@ def debug_info(board: Board) -> list[str]:
                                     debug_log.append(f"{pad:10}{type_string}:")
                                     for allow_action in block_type_rules:
                                         allow_action_rules = block_type_rules[allow_action]
-                                        allow_string = 'turn pass' if allow_action == 'pass' else allow_action
                                         for block_action in sorted(allow_action_rules):
                                             check_rule = allow_action_rules[block_action]
-                                            block_string = 'turn pass' if block_action == 'pass' else block_action
+                                            allow_string, block_string = (
+                                                'turn pass' if action == 'pass' else action
+                                                for action in (allow_action, block_action)
+                                            )
+                                            allow_string = allow_string.capitalize()
                                             action_string = (
                                                 "Any action" if allow_action == '*' and block_action is None else
-                                                f"{allow_string.capitalize()}" if block_action is None else
+                                                f"{allow_string}" if block_action is None else
                                                 f"NOT {block_string}" if allow_action == '*' else
-                                                f"{allow_string.capitalize()}, NOT {block_string}"
+                                                f"{allow_string}, NOT {block_string}"
                                             )
                                             check_string = {
                                                 0: action_string,
