@@ -3303,6 +3303,7 @@ class Board(Window):
             return True
         future_move_history = self.future_move_history
         self.future_move_history = []
+        self.auto_moves = False
         finished = False
         next_move = future_move_history.pop()
         while True:
@@ -3330,13 +3331,13 @@ class Board(Window):
             elif next_move.movement_type == DropMovement:
                 pos = next_move.pos_to
                 if not self.not_on_board(pos) and self.not_a_piece(pos):
-                    if next_move.promotion is Unset:
-                        self.try_drop(next_move)
+                    self.try_drop(next_move)
                     if next_move.promotion is Unset:
                         self.move_history.append(next_move)
                         finished = True
                         break
-                    continue
+                    else:
+                        self.shift_ply(+1)
                 else:
                     finished = False
                     break
@@ -3419,6 +3420,7 @@ class Board(Window):
         if finished:
             self.select_piece(selection)
             self.edit_mode = edit_mode
+        self.auto_moves = True
         return finished
 
     def move(self, move: Move) -> None:
@@ -3663,7 +3665,7 @@ class Board(Window):
                 self.revert_auto_capture_markers(chained_move)
                 if chained_move.promotion is not None:
                     if chained_move.placed_piece is not None:
-                        turn_side = self.get_turn_side(+1)
+                        turn_side = self.get_turn_side()
                         if chained_move.placed_piece in self.drops[turn_side]:
                             self.captured_pieces[turn_side].append(chained_move.placed_piece)
                     if not isinstance(chained_move.piece, NoPiece):
@@ -4221,35 +4223,6 @@ class Board(Window):
             else:
                 self.start_promotion(self.get_piece(move.piece.board_pos), drop_list, drop_type_list)
                 return
-        if move.promotion:
-            chained_move = move
-            while chained_move:
-                move_type = (
-                    'Edit' if chained_move.is_edit
-                    else 'Drop' if chained_move.movement_type == DropMovement
-                    else 'Move'
-                )
-                self.log(f"{move_type}: {chained_move}")
-                chained_move = chained_move.chained_move
-                if chained_move:
-                    self.move(chained_move)
-                    self.update_auto_capture_markers(chained_move)
-                    chained_move.set(piece=copy(chained_move.piece))
-            self.update_en_passant_markers(move)
-            self.move_history.append(deepcopy(move))
-            self.unload_end_data()
-            self.load_pieces()
-            if not move.is_edit:
-                self.shift_ply(+1)
-                self.load_check()
-                self.update_end_data(self.move_history[-1])
-            else:
-                self.load_check()
-                self.update_end_data()
-            self.load_moves()
-            self.reload_end_data()
-            self.compare_history()
-            self.advance_turn()
 
     def try_promotion(self, move: Move) -> None:
         promotion_piece = self.promotion_piece
