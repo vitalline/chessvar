@@ -185,6 +185,9 @@ def debug_info(board: Board) -> list[str]:
         debug_log.append(f"{pad:2}{group} ({len(board.piece_groups[group])}): {group_string or 'None'}")
     if not board.piece_groups:
         debug_log[-1] += " None"
+    debug_log.append(f"Obstacles ({len(board.obstacles)}):")
+    for piece in board.obstacles:
+        debug_log.append(f"{pad:2}{toa(piece.board_pos)} {piece.board_pos}: {name(piece)}")
     for side in board.piece_set_ids:
         debug_log.append(f"{side} pieces ({len(board.movable_pieces[side])}):")
         for piece in board.movable_pieces[side]:
@@ -253,33 +256,41 @@ def debug_info(board: Board) -> list[str]:
                 debug_log.append(f"{pad:2}{toa(pos)} {pos}: (From {len(piece_poss)}) {poss_string or 'None'}")
             if not side_section_data:
                 debug_log[-1] += " None"
-    for section, section_data, custom_section in (
+    for section, section_data, custom_data in (
         ('promotion', board.promotions, board.custom_promotions),
         ('drop', board.drops, board.custom_drops),
     ):
-        if custom_section:
-            continue
         for side in board.piece_set_ids:
             section_rules = section_data.get(side) or {}
             debug_log.append(f"{side} {section} rules ({len(section_rules)}):")
             for piece in section_rules:
                 debug_log.append(f"{pad:2}{name(piece, side)} ({len(section_rules[piece])}):")
-                rows = set()
-                for pos in section_rules[piece]:
-                    row = pos[0]
-                    if row in rows:
-                        continue
-                    rows.add(row)
-                if rows == set(range(board.board_height)):
-                    rows = {-1}
-                for row in sorted(rows):
+                if custom_data:
+                    base_data = (board.load_dict or {}).get(f"{section}s") or {}
+                    from_mapping = frm(
+                        list(base_data.get(str(side.value), {}).get(save_piece_type(piece), {})),
+                        board.board_width, board.board_height, board.areas.get(side) or {}
+                    )
+                    mapping = {}
+                    for pos, value in from_mapping.items():
+                        if value not in mapping:
+                            mapping[value] = pos
+                else:
+                    rows = set()
+                    for pos in section_rules[piece]:
+                        row = pos[0]
+                        if row in rows:
+                            continue
+                        rows.add(row)
+                    if rows == set(range(board.board_height)):
+                        rows = {-1}
+                    mapping = {toa((row, -1)): (max(row, 0), 0) for row in rows}
+                for string, pos in mapping.items():
                     piece_list = []
-                    for to_piece in section_rules[piece][(max(row, 0), 0)]:
+                    for to_piece in section_rules[piece][pos]:
                         suffixes = []
                         if isinstance(to_piece, Piece):
-                            if to_piece.side not in (
-                                {piece.default_side} if isinstance(piece, UtilityPiece) else {Side.NONE, side}
-                            ):
+                            if to_piece.side not in {side, Side.NONE}:
                                 suffixes.append(f"Side: {to_piece.side}")
                             if to_piece.movement and to_piece.movement.total_moves:
                                 suffixes.append(f"Moves: {to_piece.movement.total_moves}")
@@ -290,11 +301,23 @@ def debug_info(board: Board) -> list[str]:
                         suffix = f" ({', '.join(suffixes)})" if suffixes else ''
                         piece_list.append(f"{name(to_piece, side)}{suffix}")
                     piece_list = ', '.join(string for string in piece_list)
-                    debug_log.append(f"{pad:4}{toa((row, -1))} {(row, -1)}: {piece_list if piece_list else 'None'}")
+                    if string not in board.areas.get(side, {}):
+                        string = f"{string} {fra(string)}"
+                    debug_log.append(f"{pad:4}{string}: {piece_list if piece_list else 'None'}")
                 if not section_rules[piece]:
                     debug_log[-1] += " None"
             if not section_rules:
                 debug_log[-1] += " None"
+    for section_type, section_data in (
+        ('starting drops', board.custom_extra_drops),
+        ('drops', board.captured_pieces),
+    ):
+        for side in board.piece_set_ids:
+            side_section_data = section_data.get(side) or []
+            side_section_string = ', '.join(name(piece, side) for piece in side_section_data)
+            debug_log.append(f"{side} {section_type} ({len(side_section_data)}): {side_section_string or 'None'}")
+    if not board.obstacles:
+        debug_log[-1] += " None"
     debug_log.append(f"Edit piece set: {board.edit_piece_set_id}")
     for side in board.piece_set_ids:
         side_data = board.edit_promotions.get(side, [])
@@ -306,11 +329,6 @@ def debug_info(board: Board) -> list[str]:
             ) + name(piece, side)) if piece else 'None' for piece in side_data
         )
         debug_log.append(f"{side} replacements ({len(side_data)}): {piece_list or 'None'}")
-    debug_log.append(f"Obstacles ({len(board.obstacles)}):")
-    for piece in board.obstacles:
-        debug_log.append(f"{pad:2}{toa(piece.board_pos)} {piece.board_pos}: {name(piece)}")
-    if not board.obstacles:
-        debug_log[-1] += " None"
     for section, section_data in (("Custom", board.custom_pieces), ("Past custom", board.past_custom_pieces)):
         debug_log.append(f"{section} pieces ({len(section_data)}):")
         for piece, data in section_data.items():
@@ -349,50 +367,6 @@ def debug_info(board: Board) -> list[str]:
         debug_log.append(f"{pad:2}{toa(pos)} {pos}: {piece_name}{suffix}")
     if not board.custom_layout:
         debug_log[-1] += " None"
-    for section, section_data in (('promotion', board.custom_promotions), ('drop', board.custom_drops)):
-        data = (board.load_dict or {}).get(f"{section}s") or {}
-        for side in board.piece_set_ids:
-            section_rules = section_data.get(side) or {}
-            debug_log.append(f"{side} custom {section} rules ({len(section_rules)}):")
-            for piece in section_rules:
-                debug_log.append(f"{pad:2}{name(piece, side)} ({len(section_rules[piece])}):")
-                compressed = data.get(str(side.value), {}).get(save_piece_type(piece), {})
-                from_mapping = frm(list(compressed), board.board_width, board.board_height, board.areas.get(side) or {})
-                mapping = {}
-                for pos, value in from_mapping.items():
-                    if value not in mapping:
-                        mapping[value] = pos
-                for value, pos in mapping.items():
-                    piece_list = []
-                    for to_piece in section_rules[piece][pos]:
-                        suffixes = []
-                        if isinstance(to_piece, Piece):
-                            if to_piece.side not in {side, Side.NONE}:
-                                suffixes.append(f"Side: {to_piece.side}")
-                            if to_piece.movement and to_piece.movement.total_moves:
-                                suffixes.append(f"Moves: {to_piece.movement.total_moves}")
-                            if to_piece.promoted_from:
-                                suffixes.append(f"Promoted from: {name(to_piece.promoted_from, side)}")
-                            if to_piece.should_hide is not None:
-                                suffixes.append("Always hide" if to_piece.should_hide else "Never hide")
-                        suffix = f" ({', '.join(suffixes)})" if suffixes else ''
-                        piece_list.append(f"{name(to_piece, side)}{suffix}")
-                    piece_list = ', '.join(string for string in piece_list)
-                    if value not in board.areas.get(side, {}):
-                        value = f"{value} {fra(value)}"
-                    debug_log.append(f"{pad:4}{value}: {piece_list if piece_list else 'None'}")
-                if not section_rules[piece]:
-                    debug_log[-1] += " None"
-            if not section_rules:
-                debug_log[-1] += " None"
-    for section_type, section_data in (
-        ('starting drops', board.custom_extra_drops),
-        ('drops', board.captured_pieces),
-    ):
-        for side in board.piece_set_ids:
-            side_section_data = section_data.get(side) or []
-            side_section_string = ', '.join(name(piece, side) for piece in side_section_data)
-            debug_log.append(f"{side} {section_type} ({len(side_section_data)}): {side_section_string or 'None'}")
     piece_mode = {0: "Shown", 1: "Hidden", 2: "Penultima"}.get(board.hide_pieces, "Unknown")
     debug_log.append(f"Hide pieces: {board.hide_pieces} - {piece_mode}")
     move_mode = {None: "Default", False: "Shown", True: "Hidden"}.get(board.hide_move_markers, "Unknown")
