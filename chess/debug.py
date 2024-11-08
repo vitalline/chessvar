@@ -16,7 +16,7 @@ from chess.pieces.piece import Piece
 from chess.pieces.side import Side
 from chess.pieces.util import UtilityPiece, NoPiece, Block, Border, Shield, Void, Wall
 from chess.save import save_piece_type, save_custom_type
-from chess.util import get_filename, sign, pluralize, spell, spell_ordinal, unpack, repack
+from chess.util import get_file_name, pluralize, spell, spell_ordinal, sign, unpack, repack
 
 if TYPE_CHECKING:
     from chess.board import Board
@@ -96,8 +96,7 @@ def print_piece_types(fp: TextIO = sys.stdout, side: Side = Side.WHITE) -> None:
 
 def save_piece_data(board: Board, file_path: str = None) -> None:
     with open(
-        file_path or
-        get_filename('debug_piece_data', 'json', ts_format=''),
+        file_path or get_file_name('debug_piece_data', 'json', ts_format=''),
         mode='w',
         encoding='utf-8',
     ) as fp:
@@ -106,8 +105,7 @@ def save_piece_data(board: Board, file_path: str = None) -> None:
 
 def save_piece_sets(file_path: str = None) -> None:
     with open(
-        file_path or
-        get_filename('debug_piece_sets', 'txt', ts_format=''),
+        file_path or get_file_name('debug_piece_sets', 'txt', ts_format=''),
         mode='w',
         encoding='utf-8',
     ) as fp:
@@ -116,8 +114,7 @@ def save_piece_sets(file_path: str = None) -> None:
 
 def save_piece_types(file_path: str = None, side: Side = Side.WHITE) -> None:
     with open(
-        file_path or
-        get_filename('debug_piece_types', 'txt', ts_format=''),
+        file_path or get_file_name('debug_piece_types', 'txt', ts_format=''),
         mode='w',
         encoding='utf-8',
     ) as fp:

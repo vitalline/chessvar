@@ -2,6 +2,7 @@ import os
 import sys
 
 from collections import defaultdict
+from collections.abc import Collection, Callable
 from datetime import datetime
 from tkinter import filedialog
 from typing import Any, TypeVar
@@ -115,7 +116,9 @@ def pluralize(number: int | str, singular: str | None = None, plural: str | None
 
 
 T = TypeVar('T')
-UnpackedList = list[T] | T
+Unpacked = Collection[T] | T
+Condition = Callable[[T], bool]
+Comparator = Callable[[T, T], bool]
 
 
 # Function to remove duplicate entries from a list while preserving order.
@@ -124,12 +127,12 @@ def deduplicate(l: list[T]) -> list[T]:
 
 
 # Function to turn any list into its single element if it has exactly one element. If not, it returns the original list.
-def unpack(l: list[T]) -> UnpackedList[T]:
+def unpack(l: list[T]) -> Unpacked[T]:
     return l[0] if isinstance(l, list) and len(l) == 1 else l
 
 
 # Function to turn any object into a list containing it, unless it already is a list, in which case it's returned as is.
-def repack(l: UnpackedList[T]) -> list[T]:
+def repack(l: Unpacked[T]) -> list[T]:
     return l if isinstance(l, list) else [l]
 
 
@@ -165,10 +168,11 @@ def fits(template: str, data: Any) -> bool:
         return data.endswith(template)
     if template_end:
         return data.startswith(template)
+    return False
 
 
 # Function to generate a file name based on a name, extension and timestamp (if not provided, the current time is used).
-def get_filename(
+def get_file_name(
     name: str, ext: str, in_dir: str = base_dir, ts: datetime | None = None, ts_format: str = "%Y-%m-%d_%H-%M-%S"
 ) -> str:
     name_args = [name, (ts or datetime.now()).strftime(ts_format)]
@@ -203,7 +207,7 @@ def select_save_data() -> str:
 def select_save_name() -> str:
     return filedialog.asksaveasfilename(
         initialdir=base_dir,
-        initialfile=get_filename('save', 'json', in_dir=''),
+        initialfile=get_file_name('save', 'json', in_dir=''),
         filetypes=[("JSON save file", "*.json")],
         defaultextension='.json',
     )

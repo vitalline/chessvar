@@ -123,15 +123,22 @@ def from_alpha(s: str) -> int:
     return 0 if not s else from_alpha(s[:-1]) * 26 + COORDINATE_ALPHABET.index(s[-1]) + 1
 
 
+generics_alg = {
+    -1: '*',  # '*' means all positions in the nth rank/file
+    -2: '_',  # '_' means all positions in the last rank/file
+}
+generics_num = {v: k for k, v in generics_alg.items()}
+
+
 def to_algebraic(pos: Position | None) -> str:
     if pos is None:
         return UNKNOWN_COORDINATE_STRING
-    if pos[0] == -1 and pos[1] == -1:
-        return '*'  # '*' means all possible positions
-    if pos[0] == -1:
-        return f'{to_alpha(pos[1] + 1)}*'  # 'l*' means all positions in the l file
-    if pos[1] == -1:
-        return f'*{pos[0] + 1}'  # '*n' means all positions in the nth rank
+    if pos[0] in generics_alg and pos[1] in generics_alg:
+        return generics_alg[pos[0]] + (generics_alg[pos[1]] if pos[0] != pos[1] else '')
+    if pos[0] in generics_alg:
+        return f'{to_alpha(pos[1] + 1)}{generics_alg[pos[0]]}'
+    if pos[1] in generics_alg:
+        return f'{generics_alg[pos[1]]}{pos[0] + 1}'
     return f'{to_alpha(pos[1] + 1)}{pos[0] + 1}'  # return as (file, rank), or (x, y)
 
 
@@ -141,12 +148,12 @@ def from_algebraic(pos: str) -> Position | None:
     if pos == UNKNOWN_COORDINATE_STRING:
         return None
     pos = pos.lower()
-    if pos[0] == '*' and pos[-1] == '*':  # '*' (or '**') means all positions
-        return -1, -1
-    if pos[0] == '*':  # '*n' means all positions in the nth rank
-        return int(pos[1:]) - 1, -1
-    if pos[-1] == '*':  # 'l*' means all positions in the l file
-        return -1, from_alpha(pos[:-1]) - 1
+    if pos[0] in generics_num and pos[-1] in generics_num:
+        return generics_num[pos[0]], generics_num[pos[-1]]
+    if pos[0] in generics_num:
+        return int(pos[1:]) - 1, generics_num[pos[0]]
+    if pos[-1] in generics_num:
+        return generics_num[pos[-1]], from_alpha(pos[:-1]) - 1
     split_index = next((i for i, c in enumerate(pos) if c.isdigit()), len(pos))
     return int(pos[split_index:]) - 1, from_alpha(pos[:split_index]) - 1  # return as (rank, file), or (y, x)
     # this is the opposite of the usual (x, y) coordinate system OR the usual (file, rank) algebraic notation
@@ -242,3 +249,16 @@ def from_algebraic_map(
         else:  # a single position
             result[pos] = value
     return {k: result[k] for k in sorted(result)}
+
+
+def resolve(pos: Position, lasts: list[Position] = ()) -> Position:
+    if -2 not in pos:
+        return pos
+    for last in lasts[::-1]:
+        if pos[0] == -2 and last[0] != -2:
+            pos = (last[0], pos[1])
+        if pos[1] == -2 and last[1] != -2:
+            pos = (pos[0], last[1])
+        if -2 not in pos:
+            return pos
+    return pos

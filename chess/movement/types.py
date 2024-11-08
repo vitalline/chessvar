@@ -8,7 +8,7 @@ from chess.movement.base import BaseMovement
 from chess.movement.move import Move
 from chess.movement.util import AnyDirection, Direction, Position, add, sub, mul, ddiv
 from chess.pieces.types import Immune, Slow, Delayed, Delayed1
-from chess.util import UnpackedList, Unset, sign, repack, unpack
+from chess.util import Unpacked, Unset, sign, repack, unpack
 
 if TYPE_CHECKING:
     from chess.board import Board
@@ -20,7 +20,7 @@ class RiderMovement(BaseMovement):
 
     def __init__(
         self, board: Board,
-        directions: UnpackedList[AnyDirection] | None = None,
+        directions: Unpacked[AnyDirection] | None = None,
         boundless: int = 0, loop: int = 0
     ):
         super().__init__(board)
@@ -158,7 +158,7 @@ class HalflingRiderMovement(RiderMovement):
 
     def __init__(
         self, board: Board,
-        directions: UnpackedList[AnyDirection] | None = None,
+        directions: Unpacked[AnyDirection] | None = None,
         shift: int = 0, boundless: int = 0, loop: int = 0
     ):
         super().__init__(board, directions, boundless, loop)
@@ -186,7 +186,7 @@ class CannonRiderMovement(RiderMovement):
 
     def __init__(
         self, board: Board,
-        directions: UnpackedList[AnyDirection] | None = None,
+        directions: Unpacked[AnyDirection] | None = None,
         distance: int = 0, boundless: int = 0, loop: int = 0
     ):
         super().__init__(board, directions, boundless, loop)
@@ -436,8 +436,8 @@ class CastlingMovement(BaseMovement):
         direction: Direction,
         other_piece: Direction,
         other_direction: Direction,
-        movement_gap: UnpackedList[Direction] | None = None,
-        en_passant_gap: UnpackedList[Direction] | None = None,
+        movement_gap: Unpacked[Direction] | None = None,
+        en_passant_gap: Unpacked[Direction] | None = None,
     ):
         super().__init__(board)
         self.direction = direction
@@ -559,7 +559,7 @@ class EnPassantRiderMovement(RiderMovement):
 
 
 class BaseMultiMovement(BaseMovement):
-    def __init__(self, board: Board, movements: UnpackedList[BaseMovement] | None = None):
+    def __init__(self, board: Board, movements: Unpacked[BaseMovement] | None = None):
         super().__init__(board)
         self.movements = repack(movements or [])
         for movement in self.movements:
@@ -594,7 +594,7 @@ class IndexMovement(BaseMultiMovement):
     def __init__(
         self,
         board: Board,
-        movement_index: tuple[UnpackedList[BaseMovement]] | None = None,
+        movement_index: tuple[Unpacked[BaseMovement]] | None = None,
         iteration_type: int = 0,
         iteration_div: int = 0,
         iteration_sub: int = 0,
@@ -647,11 +647,11 @@ class PlyMovement(IndexMovement):
     def moves(self, pos_from: Position, piece: Piece, theoretical: bool = False, index: int | None = None):
         if index is None:
             index = self.board.ply_count
-            count = self.board.get_turn()
+            count = self.board.get_turn_index()
             start_count = count
             while self.board.turn_order[count][0] != piece.side:
                 index += 1
-                count = self.board.get_turn(index, 0)
+                count = self.board.get_turn_index(index, 0)
                 if count == start_count:
                     return ()
             index -= 1
@@ -662,7 +662,7 @@ class RepeatBentMovement(BaseMultiMovement):
     def __init__(
         self,
         board: Board,
-        movements: UnpackedList[RiderMovement] | None = None,
+        movements: Unpacked[RiderMovement] | None = None,
         start_index: int = 0,
         step_count: int = 0,
         skip_count: int = 0,
@@ -745,7 +745,7 @@ class RepeatMovement(RepeatBentMovement):
     def __init__(
         self,
         board: Board,
-        movements: UnpackedList[RiderMovement] | None = None,
+        movements: Unpacked[RiderMovement] | None = None,
         start_index: int = 0,
         step_count: int = 0,
         skip_count: int = 0,
@@ -769,7 +769,7 @@ class BentMovement(RepeatBentMovement):
     def __init__(
         self,
         board: Board,
-        movements: UnpackedList[RiderMovement] | None = None,
+        movements: Unpacked[RiderMovement] | None = None,
         start_index: int = 0,
         loop: int = 0,
     ):
@@ -788,7 +788,7 @@ class SpinMovement(RepeatBentMovement):
     def __init__(
         self,
         board: Board,
-        movements: UnpackedList[RiderMovement] | None = None,
+        movements: Unpacked[RiderMovement] | None = None,
         reverse: int = 0,
         start_index: int = 0,
         step_count: int = 0,
@@ -872,9 +872,9 @@ class MultiMovement(BaseMultiMovement):
     def __init__(
         self,
         board: Board,
-        both: UnpackedList[BaseMovement] | None = None,
-        move: UnpackedList[BaseMovement] | None = None,
-        capture: UnpackedList[BaseMovement] | None = None
+        both: Unpacked[BaseMovement] | None = None,
+        move: Unpacked[BaseMovement] | None = None,
+        capture: Unpacked[BaseMovement] | None = None
     ):
         self.both = repack(both or [])
         self.move = repack(move or [])
@@ -937,7 +937,7 @@ class CloneMovement(BaseMultiMovement):
     def __init__(
         self,
         board: Board,
-        movements: UnpackedList[BaseMovement] | None = None,
+        movements: Unpacked[BaseMovement] | None = None,
         move: int = 0,
         capture: int = 0
     ):
@@ -994,8 +994,8 @@ class ColorMovement(BaseMultiMovement):
     def __init__(
         self,
         board: Board,
-        light: UnpackedList[BaseMovement] | None = None,
-        dark: UnpackedList[BaseMovement] | None = None
+        light: Unpacked[BaseMovement] | None = None,
+        dark: Unpacked[BaseMovement] | None = None
     ):
         self.light = repack(light or [])
         self.dark = repack(dark or [])
@@ -1021,10 +1021,10 @@ class SideMovement(BaseMultiMovement):
     def __init__(
         self,
         board: Board,
-        left: UnpackedList[BaseMovement] | None = None,
-        right: UnpackedList[BaseMovement] | None = None,
-        bottom: UnpackedList[BaseMovement] | None = None,
-        top: UnpackedList[BaseMovement] | None = None
+        left: Unpacked[BaseMovement] | None = None,
+        right: Unpacked[BaseMovement] | None = None,
+        bottom: Unpacked[BaseMovement] | None = None,
+        top: Unpacked[BaseMovement] | None = None
     ):
         self.left = repack(left or [])
         self.right = repack(right or [])
@@ -1087,7 +1087,7 @@ class RandomMovement(ProbabilisticMovement):
 
 
 class BaseChoiceMovement(BaseMultiMovement):
-    def __init__(self, board: Board, movements: dict[str, UnpackedList[BaseMovement]] | None = None):
+    def __init__(self, board: Board, movements: dict[str, Unpacked[BaseMovement]] | None = None):
         if movements is None:
             movements = {}
         self.movement_dict = {key: repack(value) for key, value in movements.items()}
@@ -1112,8 +1112,6 @@ class ChoiceMovement(BaseChoiceMovement):
                         if not value:
                             if (piece == to_piece or not to_piece.side) != invert:
                                 legal = True
-                        elif value.isdigit() and (int(value) == to_piece.side.value) != invert:
-                            legal = True
                         elif self.board.fits(value, to_piece) != invert:
                             legal = True
                         yield copy(move).set(is_legal=legal).unmark('n').mark(mark)
@@ -1122,7 +1120,7 @@ class ChoiceMovement(BaseChoiceMovement):
 class RelayMovement(BaseChoiceMovement):
     def __init__(
         self, board: Board,
-        movements: dict[str, tuple[UnpackedList[BaseMovement], UnpackedList[BaseMovement]]] | None = None
+        movements: dict[str, tuple[Unpacked[BaseMovement], Unpacked[BaseMovement]]] | None = None
     ):
         if movements is None:
             movements = {}
