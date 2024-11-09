@@ -1,6 +1,6 @@
+from collections.abc import Sequence, Collection
 from enum import Enum
 from itertools import zip_longest
-
 
 Direction = tuple[int, int]
 RepeatDirection = tuple[int, int, int]
@@ -168,11 +168,11 @@ def is_algebraic(pos: str) -> bool:
 
 
 def to_algebraic_map(
-    poss: list[Position],
+    poss: Sequence[Position],
     width: int,
     height: int,
-    areas: dict[str, set[Position]],
-) -> dict[str, list[Position]]:
+    areas: dict[str, Collection[Position]],
+) -> dict[str, Sequence[Position]]:
     rows, cols = set(range(height)), set(range(width))
     remain = set(poss)
     all_squares = {(row, col) for row in rows for col in cols}
@@ -227,10 +227,10 @@ def to_algebraic_map(
     }
 
 def from_algebraic_map(
-    poss: list[str],
+    poss: Sequence[str],
     width: int,
     height: int,
-    areas: dict[str, set[Position]],
+    areas: dict[str, Collection[Position]],
 ) -> dict[Position, str]:
     result = {}
     for value in poss:

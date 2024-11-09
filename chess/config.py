@@ -27,6 +27,7 @@ DEFAULT_CONFIG = {
         'block_ids_chaos': '',
         'recursive_aliases': True,
         'save_indent': '',
+        'save_compression': 0,
         'save_update_mode': 0,
         'partial_save': False,
         'partial_autosave': False,

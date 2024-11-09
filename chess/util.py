@@ -2,11 +2,13 @@ import os
 import sys
 
 from collections import defaultdict
-from collections.abc import Collection, Callable
+from collections.abc import Collection, Mapping, Sequence
+from copy import copy
 from datetime import datetime
+from itertools import chain
+from json import dumps as json_dumps
 from tkinter import filedialog
-from typing import Any, TypeVar
-
+from typing import Any, TypeAlias, TypeVar
 
 # Lambda function to return the sign of a number. Returns +1 for positive numbers, -1 for negative numbers, and 0 for 0.
 sign = lambda x: (x > 0) - (x < 0)
@@ -116,9 +118,13 @@ def pluralize(number: int | str, singular: str | None = None, plural: str | None
 
 
 T = TypeVar('T')
-Unpacked = Collection[T] | T
-Condition = Callable[[T], bool]
-Comparator = Callable[[T, T], bool]
+Unpacked: TypeAlias = Sequence[T] | T
+StringIndex: TypeAlias = Mapping[str, T]
+IntIndex: TypeAlias = Sequence[T] | Mapping[int, T]
+Index: TypeAlias = IntIndex[T] | StringIndex[T]
+Key: TypeAlias = str | int
+AnyJsonType = str | int | float | bool | None
+AnyJson = dict | list | AnyJsonType
 
 
 # Function to remove duplicate entries from a list while preserving order.
@@ -126,26 +132,41 @@ def deduplicate(l: list[T]) -> list[T]:
     return list(dict.fromkeys(l))
 
 
-# Function to turn any list into its single element if it has exactly one element. If not, it returns the original list.
-def unpack(l: list[T]) -> Unpacked[T]:
-    return l[0] if isinstance(l, list) and len(l) == 1 else l
+# Function to turn a sequence into its single element if it has exactly one element. If not, returns the Sequence as is.
+def unpack(l: Sequence[T]) -> Unpacked[T]:
+    return l[0] if isinstance(l, Sequence) and not isinstance(l, str) and len(l) == 1 else l
 
 
-# Function to turn any object into a list containing it, unless it already is a list, in which case it's returned as is.
-def repack(l: Unpacked[T]) -> list[T]:
-    return l if isinstance(l, list) else [l]
+# Function to turn any non-sequence object into a one-element sequence containing the object or return a Sequence as is.
+def repack(l: Unpacked[T]) -> Sequence[T]:
+    return l if isinstance(l, Sequence) and not isinstance(l, str) else [l]
 
 
-# Simple template matching function. Matches a string (or a group thereof) with a template containing '*' as a wildcard.
+# Function to traverse any data object using a sequence of keys or indices. Returns the value at the specified location.
+def find(data: Index[T], *fields: Key) -> T | None:
+    try:
+        return find(data[fields[0]], *fields[1:]) if fields else data
+    except (IndexError, KeyError, TypeError):
+        return None
+
+
+# Same as find(), but returns a list of values for each group of keys or indices. Skips groups that do not have a value.
+def find_all(data: Index[T], *field_groups: Sequence[Key]) -> T:
+    return [value for fields in field_groups if (value := find(data, *fields)) is not None]
+
+
+# Simple template matching function. Matches an object or a group thereof with a template, and treats '*' as a wildcard.
 def fits(template: str, data: Any) -> bool:
     if not template:
         return False
     if data is None:
         return False
-    if not isinstance(data, str):
-        return any(fits(template, s) for s in data)
     if template == '*':
         return True
+    if not isinstance(data, str):
+        if isinstance(data, Collection):
+            return any(fits(template, s) for s in data)
+        data = str(data)
     if template == data:
         return True
     if '*' not in template:
@@ -180,19 +201,13 @@ def get_file_name(
     return os.path.join(in_dir, f"{full_name}.{ext}")
 
 
-# Function to check if a string is a prefix of another string, ignoring case.
-def is_prefix_of(string: Any, prefix: Any) -> bool:
-    return isinstance(string, str) and isinstance(prefix, str) and string.lower().startswith(prefix.lower())
-
-
-# Function to check if a string is a prefix of any string in a list, ignoring case.
-def is_prefix_in(strings: list[Any], prefix: Any) -> bool:
-    return any(is_prefix_of(string, prefix) for string in strings)
-
-
-# Function to check if a string has a prefix from a list of prefixes, ignoring case.
-def has_prefix_in(string: Any, prefixes: list[Any]) -> bool:
-    return any(is_prefix_of(string, prefix) for prefix in prefixes)
+# Function to check if a string contains another string as a prefix, a suffix, or a substring, optionally ignoring case.
+def find_string(string: Any, part: Any, side: int = 0, case: bool = False) -> bool:
+    if not isinstance(string, str) or not isinstance(part, str):
+        return False
+    if not case:
+        string, part = string.lower(), part.lower()
+    return part in string if not side else (string.startswith(part) if side < 0 else string.endswith(part))
 
 
 # Function to select a file to open. Returns the path of the selected file.
@@ -226,6 +241,94 @@ def get_texture_path(path: str) -> str:
         if os.path.isfile(curr_path):
             return curr_path
     return default_texture
+
+
+# Function to check if a given object is a layered collection with a specified level of depth. Used for JSON formatting.
+def is_layered(obj: AnyJson, depth: int = 0) -> bool:
+    if not isinstance(obj, (dict, list)):
+        return False
+    if not depth:
+        return True
+    for i in range(depth):
+        fi = chain.from_iterable
+        obj = fi(sub for sub in (obj.values() if isinstance(obj, dict) else obj if isinstance(obj, list) else ()))
+    for _ in obj:
+        return True
+    return False
+
+
+# Alternative JSON dump function that allows for more control over the output format.
+def dumps(data: AnyJson, **kwargs: Any) -> str:
+    compression = kwargs.pop('compression', 0)
+    result = ''
+    stack = [copy(data)]
+    info_stack = [{'depth': 0, 'pad': 0, 'compress': not is_layered(stack[-1], compression)}]
+    indent = kwargs.pop('indent', None)
+    nl = '' if indent is None else '\n'
+    indent = indent or 0
+    item_sep, key_sep = kwargs.pop('separators', ('', ''))
+    item_sep, key_sep = item_sep or ', ', key_sep or ': '
+    sep = 0
+    while True:
+        if not stack:
+            return result
+        item = stack[-1]
+        info = info_stack[-1]
+        if sep == 2:
+            result += key_sep
+        start = ''
+        if info['depth'] < len(stack):
+            if isinstance(item, dict):
+                start = '{'
+            elif isinstance(item, list):
+                start = '['
+            if not info['compress'] and sep != 2:
+                result += f"{nl}{'':{info['pad'] * indent}}"
+            if start:
+                compress = not is_layered(item, compression)
+                info_stack.append(
+                    {'depth': info['depth'] + 1, 'pad': info['pad'] + (not info['compress']), 'compress': compress}
+                )
+            if start:
+                result += f"{start}"
+        if sep == 2:
+            sep = 0
+        end = ''
+        info = info_stack[-1]
+        if isinstance(item, dict):
+            if not item:
+                sep = 1
+                end = "}"
+            else:
+                if sep == 1:
+                    result += item_sep
+                k = next(iter(item))
+                v = stack[-1].pop(k)
+                if not info['compress']:
+                    result += f"{nl}{'':{info['pad'] * indent}}"
+                result += json_dumps(k, **kwargs)
+                sep = 2
+                stack.append(copy(v))
+        elif isinstance(item, list):
+            if not item:
+                sep = 1
+                end = "]"
+            else:
+                if sep == 1:
+                    result += item_sep
+                    sep = 0
+                stack.append(copy(stack[-1].pop(0)))
+        else:
+            stack.pop()
+            result += json_dumps(item, **kwargs)
+            sep = 1
+        if end:
+            stack.pop()
+            compress = info_stack.pop()['compress']
+            info = info_stack[-1]
+            if not start and not compress:
+                result += f"{nl}{'':{info['depth'] * indent}}"
+            result += end
 
 
 # Function to find the first method with a given name in the MRO of a given object. Used for dynamic super()-like calls.

@@ -18,7 +18,7 @@ from chess.movement.util import to_algebraic_map as tom, from_algebraic_map as f
 from chess.pieces import types as piece_types
 from chess.pieces.piece import Piece
 from chess.pieces.util import UtilityPiece, NoPiece
-from chess.util import CUSTOM_PREFIX, UNSET_STRING, Unset
+from chess.util import CUSTOM_PREFIX, UNSET_STRING, Unset, AnyJson, AnyJsonType, IntIndex
 
 if TYPE_CHECKING:
     from chess.board import Board
@@ -31,12 +31,6 @@ TYPE_CONFLICTS = {
         (piece_types.Double, piece_types.Enemy),
     ))) for x in s
 }
-
-NumericMap = list[str] | dict[int, str]
-StringMap = dict[str, str]
-
-AnyJsonType = str | int | float | bool | None
-AnyJson = dict | list | AnyJsonType
 
 
 def make_tuple(thing: AnyJson) -> tuple | AnyJsonType:
@@ -124,7 +118,7 @@ def expand_algebraic(
     return result
 
 
-def substitute(data: AnyJson, subs: NumericMap | dict[int, NumericMap], side: Side = Side.NONE) -> AnyJson:
+def substitute(data: AnyJson, subs: IntIndex | dict[int, IntIndex], side: Side = Side.NONE) -> AnyJson:
     result = data
     if isinstance(data, dict):
         result = {}

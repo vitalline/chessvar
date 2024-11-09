@@ -1,9 +1,10 @@
 from __future__ import annotations
 
 from collections import defaultdict
+from collections.abc import Collection, Sequence
 from copy import copy, deepcopy
 from itertools import chain, product, zip_longest
-from json import dumps, loads, JSONDecodeError
+from json import loads, JSONDecodeError
 from math import ceil, floor, isqrt
 from os import makedirs, name as os_name, system
 from os.path import dirname, isfile, join
@@ -42,9 +43,9 @@ from chess.pieces.util import NoPiece, Obstacle, Block, Border, Shield, Void, Wa
 from chess.save import condense, expand, condense_algebraic as cnd_alg, expand_algebraic as exp_alg, substitute
 from chess.save import load_move, load_piece, load_rng, load_piece_type, load_custom_type, load_movement_type
 from chess.save import save_move, save_piece, save_rng, save_piece_type, save_custom_type
-from chess.util import base_dir, config_path, get_file_name, select_save_data, select_save_name
+from chess.util import base_dir, config_path, get_file_name, select_save_data, select_save_name, Key, Index, Unpacked
 from chess.util import Default, Unset, unpack, repack, sign, spell
-from chess.util import deduplicate, is_prefix_of, fits
+from chess.util import deduplicate, dumps, find, find_string, fits
 
 
 class Board(Window):
@@ -396,58 +397,56 @@ class Board(Window):
         self.turn_side, self.turn_rules = self.get_turn_entry()
 
     def fits(self, template: str, data: Any, last: Any = ()) -> bool:
+        if template == '*':
+            return True
         if template == '_':
-            self.fits(template, last)
+            return self.fits(template, last)
         if isinstance(data, list):
             return any(self.fits(template, item, last) for item in data)
-        elif isinstance(data, tuple):
+        if isinstance(data, tuple):
+            if not data:
+                return False
             if isinstance(data[0], int):
                 return self.in_area(template, data, last=last)  # type: ignore
-            else:
-                return self.in_area(template, *data, last=last)  # type: ignore
-        elif isinstance(data, Move):
+            return self.in_area(template, *data, last=last)  # type: ignore
+        if isinstance(data, Move):
             return fits(template, data.type())
-        elif isinstance(data, Piece):
+        if isinstance(data, Piece):
             return fits(template, data.side.name.lower()) or self.fits(template, type(data))
-        elif isinstance(data, type):
+        if isinstance(data, type):
             if issubclass(data, Piece):
                 return fits(template, (data.group(), data.name, data.type()))
-            elif issubclass(data, BaseMovement):
+            if issubclass(data, BaseMovement):
                 return fits(template, data.__name__)
         return fits(template, data)
 
-    def fits_one(self, template_data: Any, path: Any, data: Any = (), last: Any = (), fit: bool = True):
-        if isinstance(path, (str, int)):
-            path = [path]
-        if isinstance(last, (str, int)):
-            last = [last]
-        def crawl(templates, fields):
-            try:
-                return crawl(templates[fields[0]], fields[1:])
-            except (IndexError, KeyError):
-                return templates
-        def split_templates(templates, fields):
-            blocks, allows = set(), set()
-            for s in repack(crawl(templates, fields)):
-                if isinstance(s, str) and s[0:1] == '!':
-                    blocks.add(s[1:])
-                else:
-                    allows.add(s)
-            return {False: blocks, True: allows}
-        def match_templates(s):
-            return any(self.fits(t, data, crawl(template_data, last)) for t in s) if fit else any(d in s for d in data)
+    def fits_one(self, template_data: Index, path: Unpacked[Key], data: Any = (), last: Any = (), fit: bool = True):
+        path, last = (repack(x) for x in (path, last))
+        def split_templates(templates: Index, fields: Sequence[Key]) -> dict[bool, Collection]:
+            results = {False: set(), True: set()}
+            for s in repack(find(templates, *fields)):
+                (results[False].add(s[1:]) if isinstance(s, str) and s[0:1] == '!' else results[True].add(s))
+            return results
+        def match_templates(s: Collection):
+            return any(self.fits(t, data, find(template_data, *last)) for t in s) if fit else any(d in s for d in data)
         for k, part in split_templates(template_data, path).items():
             if part and k != match_templates(part):
                 return False
         return True
 
-    def fits_any(self, templates: Any, path: Any, data: Any = (), last: Any = (), fit: bool = True) -> bool:
+    def fits_any(
+        self, templates: Collection[Index], path: Unpacked[Key], data: Any = (), last: Any = (), fit: bool = True
+    ) -> bool:
         return any(self.fits_one(template, path, data, last, fit) for template in templates)
 
-    def filter(self, templates: Any, path: Any, data: Any = (), last: Any = (), fit: bool = True) -> list:
+    def filter(
+        self, templates: Collection[Index], path: Unpacked[Key], data: Any = (), last: Any = (), fit: bool = True
+    ) -> list:
         return [template for template in templates if self.fits_one(template, path, data, last, fit)]
 
-    def split(self, templates: Any, path: Any, data: Any = (), last: Any = (), fit: bool = True) -> tuple[list, list]:
+    def split(
+        self, templates: Collection[Index], path: Unpacked[Key], data: Any = (), last: Any = (), fit: bool = True
+    ) -> tuple[list, list]:
         results = {False: [], True: []}
         _ = [results[self.fits_one(template, path, data, last, fit)].append(template) for template in templates]
         return results[True], results[False]
@@ -692,7 +691,10 @@ class Board(Window):
                 p.board_pos: save_piece(p.on(None))
                 for pieces in [*self.movable_pieces.values(), self.obstacles] for p in pieces
             }, *whc),
-            'custom': {k: save_custom_type(v) for k, v in self.custom_pieces.items()},
+            'custom': {
+                k: save_custom_type(v(self))  # instantiating a custom piece type loads the type's default movement data
+                for k, v in self.custom_pieces.items()  # so the movement will actually get compressed when exporting it
+            },
             'layout': cnd_alg({pos: save_piece(p.on(None)) for pos, p in self.custom_layout.items()}, *whc),
             'promotions': {
                 side.value: {
@@ -802,10 +804,11 @@ class Board(Window):
         if self.alias_dict:
             data = {'alias': self.alias_dict, **condense(data, self.alias_dict, self.board_config['recursive_aliases'])}
         indent = self.board_config['save_indent']
+        compression = self.board_config['save_compression']
         if indent is None:
             return dumps(data, separators=(',', ':'), ensure_ascii=False)
         else:
-            return dumps(data, indent=indent, ensure_ascii=False)
+            return dumps(data, indent=indent, compression=compression, ensure_ascii=False)
 
     def load_board(self, dump: str, with_history: bool = False) -> bool:
         try:
@@ -1456,14 +1459,14 @@ class Board(Window):
                 self.promotions[side][pawn] = {pos: promotions.copy() for pos in promotion_squares[side]}
 
     def reset_edit_promotions(self, piece_sets: dict[Side, list[type[Piece]]] | None = None) -> None:
-        if is_prefix_of('custom', self.edit_piece_set_id):
+        if find_string('custom', self.edit_piece_set_id, -1):
             self.edit_promotions = {
                 side: [piece_type for _, piece_type in self.custom_pieces.items()]
                 + [piece_type for k, piece_type in self.past_custom_pieces.items() if k not in self.custom_pieces]
                 for side in self.edit_promotions
             }
             return
-        if is_prefix_of('wall', self.edit_piece_set_id):
+        if find_string('wall', self.edit_piece_set_id, -1):
             blanks = [None] * (
                 max(0, self.board_height // 2 - 3 if (self.board_height // 3 or self.board_height < 9) else 0)
             )
@@ -1572,6 +1575,7 @@ class Board(Window):
             'type': ["!pass"],
             'from': ["*"],
             'to': ["*"],
+            'take': ["*"],
             'new': ["*"],
             'check': 0,
         }
@@ -1582,6 +1586,7 @@ class Board(Window):
             'type': ["*"],
             'from': ["*"],
             'to': ["*"],
+            'take': ["*"],
             'new': ["*"],
         }
         to_pure_type = lambda s: action_types.get(s, s)
@@ -1597,7 +1602,6 @@ class Board(Window):
                 for field in default_rules:
                     if field not in rule:
                         rule[field] = default_rules[field]
-                rule['check'] = str(int(rule['check']))
                 rule['move'] = [to_move(s) for s in rule['move']]
                 rule['type'] = [to_type(s) for s in rule['type']]
                 for last in rule['last']:
@@ -2338,6 +2342,12 @@ class Board(Window):
                             history_rules = self.filter(
                                 history_rules, ('last', 'to'), [(side, pos_to)], ('match', 'poss')
                             )
+                            if capture := last_history_move.captured_piece:
+                                history_rules = self.filter(
+                                    history_rules, ('last', 'take'), [type(capture)], ('match', 'take')
+                                )
+                                for rule in history_rules:
+                                    rule['match'].setdefault('take', set()).add(type(capture))
                             if promotion:
                                 history_rules = self.filter(
                                     history_rules, ('last', 'new'), [type(promotion)], ('match', 'new')
@@ -2348,7 +2358,6 @@ class Board(Window):
                             last_history_move = last_history_move.chained_move
                         i -= 1
                 if not self.chain_start and last_history_rules:
-                    self.load_pieces()
                     pass_rules = self.filter(
                         last_history_rules, 'type', ['pass'], ('match', 'type'), False
                     )
@@ -2357,20 +2366,22 @@ class Board(Window):
                     pass_rules = self.filter(pass_rules, 'type', last=('match', 'type'))
                     pass_rules = self.filter(pass_rules, 'from', last=('match', 'poss'))
                     pass_rules = self.filter(pass_rules, 'to', last=('match', 'poss'))
+                    pass_rules = self.filter(pass_rules, 'take', last=('match', 'take'))
                     pass_rules = self.filter(pass_rules, 'new', last=('match', 'new'))
-                    if self.fits_any(pass_rules, 'check', [0]) and self.check_side != turn_side:
-                        self.moves[turn_side]['pass'] = True
-                    elif self.fits_any(pass_rules, 'check', ['1', '-1']):
-                        old_check_side = self.check_side
-                        if opponent not in check_sides:
-                            self.load_check(opponent)
-                            if self.check_side == opponent:
-                                check_sides[opponent] = True
-                        self.check_side = old_check_side
-                        if self.check_side != turn_side:
-                            if self.fits_any(pass_rules, 'check', ['1' if check_sides.get(opponent, False) else '-1']):
+                    if pass_rules and self.check_side != turn_side:
+                        if self.fits_any(pass_rules, 'check', [0], fit=False):
+                            self.moves[turn_side]['pass'] = True
+                        else:
+                            old_check_side = self.check_side
+                            if opponent not in check_sides:
+                                self.load_pieces()
+                                self.load_check(opponent)
+                                if self.check_side == opponent:
+                                    check_sides[opponent] = True
+                            check_requirements = [1 if check_sides.get(opponent, False) else -1]
+                            if self.fits_any(pass_rules, 'check', check_requirements, fit=False):
                                 self.moves[turn_side]['pass'] = True
-                        self.check_side = check_side
+                            self.check_side = old_check_side
                 piece_rule_dict = {}
                 if not self.chain_start and self.use_drops and turn_side in self.drops:
                     side_drops = self.drops[turn_side]
@@ -2394,10 +2405,13 @@ class Board(Window):
                             pos_rules = self.filter(pos_rules, 'to', [(turn_side, pos)], ('match', 'poss'))
                             if not pos_rules:
                                 continue
+                            take_rules = self.filter(pos_rules, 'take', last=('match', 'take'))
+                            if not take_rules:
+                                continue
                             drop_types = set()
                             for drop in side_drops[piece_type][pos]:
                                 drop_type = type(drop) if isinstance(drop, Piece) else drop
-                                new_rules = self.filter(pos_rules, 'new', [drop_type], ('match', 'new'))
+                                new_rules = self.filter(take_rules, 'new', [drop_type], ('match', 'new'))
                                 if not new_rules:
                                     continue
                                 if drop_type not in limit_hits:
@@ -2459,6 +2473,8 @@ class Board(Window):
                                 rule['match'].setdefault('to', []).append(poss[-1])
                             move_rules = self.filter(move_rules, 'from', [(turn_side, pos_from)], ('match', 'poss'))
                             move_rules = self.filter(move_rules, 'to', [(turn_side, pos_to)], ('match', 'poss'))
+                            if capture := chained_move.captured_piece:
+                                move_rules = self.filter(move_rules, 'take', [type(capture)], ('match', 'take'))
                             if not move_rules:
                                 break
                             chained_move = chained_move.chained_move
@@ -2497,23 +2513,23 @@ class Board(Window):
                                         break
                             if limit_hits[promotion_type]:
                                 continue
-                        type_rules = self.filter(move_rules, 'type', move_types, ('match', 'type'), False)
-                        pass_rules = self.filter(move_rules, 'type', ['pass'], ('match', 'type'), False)
-                        if pass_rules:
-                            old_check_side = self.check_side
-                            if opponent not in check_sides:
-                                if self.fits_any(pass_rules, 'check', ['1', '-1']):
-                                    self.load_pieces()
-                                    self.load_check(opponent)
-                                    if self.check_side == opponent:
-                                        check_sides[opponent] = True
-                            self.check_side = old_check_side
-                            if self.check_side != turn_side:
-                                if self.fits_any(
-                                    pass_rules, 'check', ['0'] + ['1' if check_sides.get(opponent, False) else '-1']
-                                ):
+                        if not self.moves[turn_side].get('pass'):
+                            pass_rules = self.filter(move_rules, 'type', ['pass'], ('match', 'type'), False)
+                            if pass_rules and self.check_side != turn_side:
+                                if self.fits_any(pass_rules, 'check', [0], fit=False):
                                     self.moves[turn_side]['pass'] = True
-                            self.check_side = check_side
+                                else:
+                                    old_check_side = self.check_side
+                                    if opponent not in check_sides:
+                                        self.load_pieces()
+                                        self.load_check(opponent)
+                                        if self.check_side == opponent:
+                                            check_sides[opponent] = True
+                                    check_requirements = [1 if check_sides.get(opponent, False) else -1]
+                                    if self.fits_any(pass_rules, 'check', check_requirements, fit=False):
+                                        self.moves[turn_side]['pass'] = True
+                                    self.check_side = old_check_side
+                        type_rules = self.filter(move_rules, 'type', move_types, ('match', 'type'), False)
                         if type_rules:
                             self.update_auto_capture_markers(move, True)
                             self.update_auto_captures(move, turn_side.opponent())
@@ -2527,15 +2543,15 @@ class Board(Window):
                             chained_move = move.chained_move
                             skipped = False
                             legal = True
-                            self.load_pieces()
                             if (
                                 {'check', 'checkmate'}.intersection(self.end_rules[turn_side.opponent()])
                                 and chained_move and issubclass(type(move.piece), Slow)
-                                and move.piece.board_pos in self.royal_markers[turn_side]
                             ):
-                                self.load_check(turn_side)
-                                if self.check_side == turn_side:
-                                    legal = False
+                                self.load_pieces()
+                                if move.piece.board_pos in self.royal_markers[turn_side]:
+                                    self.load_check(turn_side)
+                                    if self.check_side == turn_side:
+                                        legal = False
                             while legal and chained_move:
                                 self.update_move(chained_move)
                                 if (
@@ -2555,15 +2571,15 @@ class Board(Window):
                                 else:
                                     self.update_auto_capture_markers(chained_move)
                                 move_chain.append(chained_move)
-                                self.load_pieces()
                                 if (
                                     {'check', 'checkmate'}.intersection(self.end_rules[turn_side.opponent()])
-                                    and chained_move.chained_move and issubclass(type(chained_move.piece), Slow)
-                                    and chained_move.piece.board_pos in self.royal_markers[turn_side]
+                                    and chained_move and issubclass(type(move.piece), Slow)
                                 ):
-                                    self.load_check(turn_side)
-                                    if self.check_side == turn_side:
-                                        legal = False
+                                    self.load_pieces()
+                                    if move.piece.board_pos in self.royal_markers[turn_side]:
+                                        self.load_check(turn_side)
+                                        if self.check_side == turn_side:
+                                            legal = False
                                 if legal:
                                     chained_move = chained_move.chained_move
                             if legal:
@@ -2636,16 +2652,16 @@ class Board(Window):
                                                     self.moves_queried[opponent] = True
                                                     end_data[self.turn_side]['checkmate'][''] = 1
                             if legal:
-                                old_check_side = self.check_side
-                                new_check_side = Side.NONE
-                                if self.fits_any(type_rules, 'check', ['1', '-1']):
+                                move_fits = self.fits_any(type_rules, 'check', [0], fit=False)
+                                if type_rules and not move_fits:
+                                    old_check_side = self.check_side
                                     self.load_pieces()
                                     self.load_check(opponent)
-                                    new_check_side = self.check_side
-                                self.check_side = old_check_side
-                                if self.fits_any(
-                                    type_rules, 'check', ['0'] + ['1' if new_check_side == opponent else '-1']
-                                ):
+                                    check_requirements = [1 if self.check_side == opponent else -1]
+                                    if self.fits_any(type_rules, 'check', check_requirements, fit=False):
+                                        move_fits = True
+                                    self.check_side = old_check_side
+                                if move_fits:
                                     pos_from, pos_to = move.pos_from, move.pos_to or move.pos_from
                                     if pos_from == pos_to and move.captured_piece is not None:
                                         pos_to = move.captured_piece.board_pos
@@ -4087,9 +4103,9 @@ class Board(Window):
                 else:
                     message = f""
                     if self.edit_mode and self.edit_piece_set_id is not None:
-                        if is_prefix_of('custom', self.edit_piece_set_id):
+                        if find_string('custom', self.edit_piece_set_id, -1):
                             message += "Custom piece"
-                        elif is_prefix_of('wall', self.edit_piece_set_id):
+                        elif find_string('wall', self.edit_piece_set_id, -1):
                             message += "Obstacle"
                         else:
                             message += f"Piece from {piece_groups[self.edit_piece_set_id]['name']}"
@@ -4115,9 +4131,9 @@ class Board(Window):
                 else:
                     message += f" to {promotion.name}"
             elif self.edit_mode and self.edit_piece_set_id is not None:
-                if is_prefix_of('custom', self.edit_piece_set_id):
+                if find_string('custom', self.edit_piece_set_id, -1):
                     message += " to a custom piece"
-                elif is_prefix_of('wall', self.edit_piece_set_id):
+                elif find_string('wall', self.edit_piece_set_id, -1):
                     message += " to an obstacle"
                 else:
                     message += f" to {piece_groups[self.edit_piece_set_id]['name']}"

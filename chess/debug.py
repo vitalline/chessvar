@@ -2,8 +2,7 @@ from __future__ import annotations
 
 import sys
 
-from copy import deepcopy, copy
-from json import dumps
+from copy import deepcopy
 from typing import TYPE_CHECKING, TextIO
 
 from chess.data import end_types, get_piece_types, get_set_data, get_set_name, piece_groups
@@ -16,7 +15,7 @@ from chess.pieces.piece import Piece
 from chess.pieces.side import Side
 from chess.pieces.util import UtilityPiece, NoPiece, Block, Border, Shield, Void, Wall
 from chess.save import save_piece_type, save_custom_type
-from chess.util import get_file_name, pluralize, spell, spell_ordinal, sign, unpack, repack
+from chess.util import dumps, get_file_name, pluralize, spell, spell_ordinal, sign, unpack, repack
 
 if TYPE_CHECKING:
     from chess.board import Board
@@ -211,8 +210,11 @@ def debug_info(board: Board) -> list[str]:
     for side in board.piece_set_ids:
         poss = board.areas.get(side, {}).get(Pawn.name) or []
         if poss:
-            strs = list(tom(poss, board.board_width, board.board_height, {}))
-            debug_log.append(f"{side} pawn area ({len(poss)}): {', '.join(f'{pos} {fra(pos)}' for pos in strs)}")
+            strs = (
+                f"{k} ({len(v)})" if len(v) > 1 else f"{k} {v[0]}" for k, v in
+                tom(poss, board.board_width, board.board_height, {}).items()
+            )
+            debug_log.append(f"{side} pawn area ({len(poss)}): {', '.join(strs)}")
         else:
             debug_log.append(f"{side} pawn area (0): None")
     for side in board.piece_set_ids:
@@ -340,7 +342,36 @@ def debug_info(board: Board) -> list[str]:
     for section, section_data in (("Custom", board.custom_pieces), ("Past custom", board.past_custom_pieces)):
         debug_log.append(f"{section} pieces ({len(section_data)}):")
         for piece, data in section_data.items():
-            debug_log.append(f"{pad:2}{piece}: {save_custom_type(data)}")
+            debug_log.append(f"{pad:2}{piece}:")
+            custom_data = save_custom_type(data(board))
+            if not custom_data:
+                debug_log[-1] += " None"
+            else:
+                for key_data in (
+                    ('cls', 'Types'),
+                    'name',
+                    ('path', 'Texture path'),
+                    ('file', 'Texture file'),
+                    ('cb', 'Colorbound', False),
+                    ('movement', None, None, lambda x: dumps(x, indent=2, compression=1, ensure_ascii=False)),
+                ):
+                    key_data = key_data if isinstance(key_data, tuple) else (key_data,)
+                    key_data = key_data + (None,) * (4 - len(key_data))
+                    key, string, default, build = key_data[:4]
+                    if isinstance(key, str):
+                        key = (key,)
+                    if string is None:
+                        string = ', '.join(x.capitalize() for x in key)
+                    if default is None:
+                        default = 'None'
+                    if build is None:
+                        build = lambda x: (', '.join(map(str, x)) if isinstance(x, list) else str(x)) or 'None'
+                    debug_log.append(f"{pad:4}{string}:")
+                    value = build(custom_data.get(key, default)).splitlines()
+                    if len(value) > 1:
+                        debug_log.extend(f"{pad:6}{line}" for line in value)
+                    else:
+                        debug_log[-1] += f" {value[0]}"
         if not section_data:
             debug_log[-1] += " None"
     debug_log.append(f"Custom areas ({len(board.custom_areas)}):")
@@ -353,8 +384,11 @@ def debug_info(board: Board) -> list[str]:
         for prefix, poss in entries:
             poss = poss or []
             if poss:
-                strs = list(tom(poss, board.board_width, board.board_height, {}))
-                debug_log.append(f"{prefix} ({len(poss)}): {', '.join(f'{pos} {fra(pos)}' for pos in strs)}")
+                strs = (
+                    f"{k} ({len(v)})" if len(v) > 1 else f"{k} {v[0]}" for k, v in
+                    tom(poss, board.board_width, board.board_height, {}).items()
+                )
+                debug_log.append(f"{prefix} ({len(poss)}): {', '.join(strs)}")
             else:
                 debug_log.append(f"{prefix} (0): None")
     if not board.custom_areas:
@@ -414,98 +448,7 @@ def debug_info(board: Board) -> list[str]:
     debug_log.append(f"Current turn: {board.turn_data[0]}")
     debug_log.append(f"Current side: {board.turn_side if board.turn_side else 'None'}")
     debug_log.append(f"Current move: {board.turn_data[2]}")
-    debug_log.append(f"Movement rules:")
-    for order in board.get_order():
-        order_rules = board.turn_rules.get(order) or {}
-        debug_log.append(f"{pad:2}Priority {order}:")
-        states = [x for x in [0, 1, -1, 2, -2] if x in order_rules]
-        for state in states:
-            state_rules = order_rules[state]
-            state_string = {
-                0: "Any board state",
-                1: "White is NOT in check",
-                2: "Black is NOT in check",
-                -1: "White is in check",
-                -2: "Black is in check"
-            }.get(state, "Unknown")
-            debug_log.append(f"{pad:4}State {state} ({state_string}):")
-            for allow_last in sorted(state_rules):
-                allow_last_rules = state_rules[allow_last]
-                for block_last in sorted(allow_last_rules, key=lambda x: '' if x is None else f' {x}'):
-                    block_last_rules = allow_last_rules[block_last]
-                    allow_last_string, block_last_string = (
-                        string if not string else
-                        f"to {string[1:]}" if string[0] == '>' else
-                        f"from {string[:-1]}" if string[-1] == '>' else
-                        string for string in (allow_last, block_last)
-                    )
-                    last_string = (
-                        "Any last move" if allow_last == '*' and block_last is None else
-                        f"Last move was {allow_last_string}" if block_last is None else
-                        f"Last move was NOT {block_last_string}" if allow_last == '*' else
-                        f"Last move was {allow_last_string}, NOT {block_last_string}"
-                    )
-                    debug_log.append(f"{pad:6}{last_string}:")
-                    for allow_piece in sorted(block_last_rules, key=lambda x: '' if x is None else f' {x}'):
-                        allow_piece_rules = block_last_rules[allow_piece]
-                        for block_piece in sorted(allow_piece_rules, key=lambda x: '' if x is None else f' {x}'):
-                            block_piece_rules = allow_piece_rules[block_piece]
-                            piece_string = (
-                                "Any piece" if allow_piece == '*' and block_piece is None else
-                                "Piece moved" if allow_piece == '' and block_piece is None else
-                                "Piece NOT moved" if allow_piece == '*' and block_piece == '' else
-                                f"{allow_piece}, NOT moved" if allow_piece != '*' and block_piece == '' else
-                                f"NOT {block_piece}, moved" if allow_piece == '' and block_piece is not None else
-                                f"{allow_piece}" if block_piece is None else
-                                f"NOT {block_piece}" if allow_piece == '*' else
-                                f"{allow_piece}, NOT {block_piece}"
-                            )
-                            debug_log.append(f"{pad:8}{piece_string}:")
-                            for allow_type in sorted(block_piece_rules, key=lambda x: '' if x is None else f' {x}'):
-                                allow_type_rules = block_piece_rules[allow_type]
-                                for block_type in sorted(allow_type_rules, key=lambda x: '' if x is None else f' {x}'):
-                                    block_type_rules = allow_type_rules[block_type]
-                                    allow_type_string, block_type_string = (
-                                        string if not string else
-                                        f"to {string[1:]}" if string[0] == '>' else
-                                        f"from {string[:-1]}" if string[-1] == '>' else
-                                        string for string in (allow_type, block_type)
-                                    )
-                                    allow_type_string = allow_type_string.capitalize()
-                                    type_string = (
-                                        "Any move" if allow_type == '*' and block_type is None else
-                                        "Tag used" if allow_type == '' and block_type is None else
-                                        "Tag NOT used" if allow_type == '*' and block_type == '' else
-                                        f"{allow_type_string}, NOT used"
-                                        if allow_type != '*' and block_type == '' else
-                                        f"NOT {block_type_string}, used"
-                                        if allow_type == '' and block_type is not None else
-                                        f"{allow_type_string}" if block_type is None else
-                                        f"NOT {block_type_string}" if allow_type == '*' else
-                                        f"{allow_type_string}, NOT {block_type_string}"
-                                    )
-                                    debug_log.append(f"{pad:10}{type_string}:")
-                                    for allow_action in block_type_rules:
-                                        allow_action_rules = block_type_rules[allow_action]
-                                        for block_action in sorted(allow_action_rules):
-                                            check_rule = allow_action_rules[block_action]
-                                            allow_string, block_string = (
-                                                'turn pass' if action == 'pass' else action
-                                                for action in (allow_action, block_action)
-                                            )
-                                            allow_string = allow_string.capitalize()
-                                            action_string = (
-                                                "Any action" if allow_action == '*' and block_action is None else
-                                                f"{allow_string}" if block_action is None else
-                                                f"NOT {block_string}" if allow_action == '*' else
-                                                f"{allow_string}, NOT {block_string}"
-                                            )
-                                            check_string = {
-                                                0: action_string,
-                                                1: f"{action_string}: Only as check",
-                                                -1: f"{action_string}: Never as check",
-                                            }.get(check_rule, f"{action_string}: Unknown")
-                                            debug_log.append(f"{pad:12}{check_string} ({check_rule})")
+    debug_log.append(f"Current turn index: {board.get_turn_index()}")
     start, loop = [], []
     start_ended = False
     for data in board.custom_turn_order:
@@ -527,15 +470,77 @@ def debug_info(board: Board) -> list[str]:
             pad_count = 2 if start_index and not start_count else 4
             for i, data in enumerate(section, start_count):
                 turn_side, turn_rules = data
-                turn_rules = list(repack(turn_rules))
-                for j, rule in enumerate(turn_rules):
-                    for string in ('action', 'last', 'piece', 'type'):
-                        if rule and string in rule:
-                            turn_rules[j] = copy(rule)
-                            turn_rules[j][string] = unpack([t for t in repack(rule[string])])
-                turn_rules = unpack(turn_rules)
-                turn_suffix = '' if turn_rules is None else f", {turn_rules}"
-                debug_log.append(f"{pad:{pad_count}}{i + 1}: {turn_side}{turn_suffix}")
+                if not turn_rules:
+                    debug_log.append(f"{pad:{pad_count}}{i + 1}: {turn_side}")
+                else:
+                    debug_log.append(f"{pad:{pad_count}}{i + 1}: {turn_side} ({len(turn_rules)}):")
+                    for rule in turn_rules:
+                        last_data = []
+                        for last in rule.get('last', []):
+                            for key_data in (
+                                ('ago', 'Moves ago'),
+                                'piece',
+                                ('move', 'Move type'),
+                                ('type', 'Action type'),
+                                'from',
+                                'to',
+                                ('take', 'Captured'),
+                                'new',
+                            ):
+                                key_data = key_data if isinstance(key_data, tuple) else (key_data,)
+                                key_data = key_data + (None,) * (3 - len(key_data))
+                                key, string, b = key_data[:3]
+                                if string is None:
+                                    string = key.capitalize()
+                                if b is None:
+                                    c = lambda x: x.capitalize() if not isinstance(x, str) or x[0:1] != '!' else x
+                                    a = lambda x: f"NOT {x[1:]}" if isinstance(x, str) and x[0:1] == '!' else c(x)
+                                    b = lambda x: (', '.join(map(a, x)) if isinstance(x, list) else a(x)) or 'None'
+                                last_data.append(f"{string}:")
+                                value = b(last[key]).splitlines()
+                                if len(value) > 1:
+                                    last_data.extend(f"{pad:2}{line}" for line in value)
+                                else:
+                                    last_data[-1] += f" {value[0]}"
+                        for key_data in (
+                            'order',
+                            (
+                                'state', 'Board state', lambda x: {
+                                    0: 'Any',
+                                    1: 'White is NOT in check', -1: 'White is in check',
+                                    2: 'Black is NOT in check', -2: 'Black is in check',
+                                }.get(x, 'Unknown')
+                            ),
+                            ('last', 'Last moves', lambda _: '\n'.join(last_data)),
+                            'piece',
+                            ('move', 'Move type'),
+                            ('type', 'Action type'),
+                            'from',
+                            'to',
+                            ('take', 'Captured'),
+                            'new',
+                            ('check', 'Check', lambda x: {0: 'Any', 1: 'Yes', -1: 'No'}.get(x, 'Unknown')),
+                        ):
+                            key_data = key_data if isinstance(key_data, tuple) else (key_data,)
+                            key_data = key_data + (None,) * (4 - len(key_data))
+                            key, string, default, build = key_data[:4]
+                            if isinstance(key, str):
+                                key = (key,)
+                            if string is None:
+                                string = ', '.join(x.capitalize() for x in key)
+                            if default is None:
+                                default = 'None'
+                            if build is None:
+                                c = lambda x: x.capitalize() if not isinstance(x, str) or x[0:1] != '!' else x
+                                a = lambda x: f"NOT {x[1:]}" if isinstance(x, str) and x[0:1] == '!' else c(x)
+                                b = lambda x: (', '.join(map(a, x)) if isinstance(x, list) else a(x)) or 'None'
+                                build = b
+                            debug_log.append(f"{pad:{pad_count + 2}}{string}:")
+                            value = build(rule.get(key, default)).splitlines()
+                            if len(value) > 1:
+                                debug_log.extend(f"{pad:{pad_count + 4}}{line}" for line in value)
+                            else:
+                                debug_log[-1] += f" {value[0]}"
         start_count += len(section)
         start_index += 1
     if not start and not loop:
