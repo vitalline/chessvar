@@ -138,10 +138,10 @@ def to_algebraic(pos: GenericPosition | None) -> str:
     if pos[0] in generics and pos[1] in generics:
         return pos[0] + (pos[1] if pos[0] != pos[1] else '')
     if pos[0] in generics:
-        return f'{to_alpha(pos[1] + 1)}{pos[0]}'
+        return f'{to_alpha(pos[1] + (0 if pos[1] < 0 else 1))}{pos[0]}'
     if pos[1] in generics:
         return f'{pos[1]}{pos[0] + 1}'
-    return f'{to_alpha(pos[1] + 1)}{pos[0] + 1}'  # return as (file, rank), or (x, y)
+    return f'{to_alpha(pos[1] + (0 if pos[1] < 0 else 1))}{pos[0] + 1}'  # return as (file, rank), or (x, y)
 
 
 def from_algebraic(pos: str) -> GenericPosition | None:
@@ -150,14 +150,15 @@ def from_algebraic(pos: str) -> GenericPosition | None:
     if pos == UNKNOWN:
         return None
     pos = pos.lower()
+    sign_alpha = lambda x: (i := from_alpha(x)) + (1 if i < 0 else 0)
     if pos[0] in generics and pos[-1] in generics:
         return pos[0], pos[-1]
     if pos[0] in generics:
         return int(pos[1:]) - 1, pos[0]
     if pos[-1] in generics:
-        return pos[-1], from_alpha(pos[:-1]) - 1
+        return pos[-1], sign_alpha(pos[:-1]) - 1
     split_index = next((i for i, c in enumerate(pos) if not c.isalpha()), len(pos))
-    return int(pos[split_index:]) - 1, from_alpha(pos[:split_index]) - 1  # return as (rank, file), or (y, x)
+    return int(pos[split_index:]) - 1, sign_alpha(pos[:split_index]) - 1  # return as (rank, file), or (y, x)
     # this is the opposite of the usual (x, y) coordinate system OR the usual (file, rank) algebraic notation
     # the board is represented as a list of lists, so the rank is the outer list and goes first when indexing
 
@@ -175,19 +176,21 @@ def sort_key(pos: str | GenericPosition) -> tuple:
     if pos[0] in generics and pos[1] in generics:
         return '1', pos[0], pos[1]
     if pos[0] in generics:
-        return '2', pos[0], to_alpha(pos[1] + 1)
+        return '2', pos[0], to_alpha(pos[1] + (0 if pos[1] < 0 else 1))
     if pos[1] in generics:
-        return '2', to_alpha(pos[0] + 1), pos[1]
-    return '2', to_alpha(pos[0] + 1), to_alpha(pos[1] + 1)
+        return '2', to_alpha(pos[0] + (0 if pos[0] < 0 else 1)), pos[1]
+    return '2', to_alpha(pos[0] + (0 if pos[0] < 0 else 1)), to_alpha(pos[1] + (0 if pos[1] < 0 else 1))
 
 
 def to_algebraic_map(
     poss: Sequence[Position],
     width: int,
     height: int,
+    x_offset: int,
+    y_offset: int,
     areas: dict[str, Collection[Position]],
 ) -> dict[str, Sequence[Position]]:
-    rows, cols = set(range(height)), set(range(width))
+    rows, cols = set(y + y_offset for y in range(height)), set(x + x_offset for x in range(width))
     remain = set(poss)
     all_squares = {(row, col) for row in rows for col in cols}
     if remain == all_squares:  # if all positions are listed
@@ -242,6 +245,8 @@ def from_algebraic_map(
     poss: Sequence[str],
     width: int,
     height: int,
+    x_offset: int,
+    y_offset: int,
     areas: dict[str, Collection[Position]],
 ) -> dict[Position, str]:
     result = {}
@@ -253,11 +258,11 @@ def from_algebraic_map(
             continue
         pos = from_algebraic(value)
         if pos[0] == ANY and pos[1] == ANY:  # all positions
-            result |= {(row, col): value for row in range(height) for col in range(width)}
+            result |= {(row + y_offset, col + x_offset): value for row in range(height) for col in range(width)}
         elif pos[0] == ANY:  # all positions in the l file
-            result |= {(row, pos[1]): value for row in range(height)}
+            result |= {(row + y_offset, pos[1]): value for row in range(height)}
         elif pos[1] == ANY:  # all positions in the nth rank
-            result |= {(pos[0], col): value for col in range(width)}
+            result |= {(pos[0], col + x_offset): value for col in range(width)}
         else:  # a single position
             result[pos] = value
     return {k: result[k] for k in sorted(result)}

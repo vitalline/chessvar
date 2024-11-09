@@ -48,11 +48,13 @@ class RiderMovement(BaseMovement):
         if self.board.not_on_board(pos_from):
             return ()
         board_size = self.board.board_height, self.board.board_width
+        board_offset = self.board.notation_offset[1], self.board.notation_offset[0]
+        board_bounds = [[x + board_offset[i] for x in (0, board_size[i])] for i in range(2)]
         if self.boundless:
-            self.bounds = [[0, board_size[i]] for i in range(2)]
+            self.bounds = [board_bounds[i][:] for i in range(2)]
         else:
             bounds = [self.board.border_rows, self.board.border_cols]
-            bounds = [[0] + bounds[i] + [board_size[i]] for i in range(2)]
+            bounds = [[board_bounds[i][0]] + bounds[i] + [board_bounds[i][-1]] for i in range(2)]
             self.bounds = [
                 [
                     max(x for x in bounds[i] if x <= pos_from[i]),
@@ -1034,23 +1036,29 @@ class SideMovement(BaseMultiMovement):
         super().__init__(board, [*self.left, *self.right, *self.bottom, *self.top])
 
     def moves(self, pos_from: Position, piece: Piece, theoretical: bool = False):
-        if (legal := pos_from[1] < ceil(self.board.board_width / 2)) or theoretical:
+        if (legal := pos_from[1] < ceil(self.board.board_width / 2) - self.board.notation_offset[0]) or theoretical:
             for movement in self.left:
                 for move in movement.moves(pos_from, piece, theoretical):
                     move.movement_type = type(self)
                     yield copy(move).set(is_legal=legal).unmark('n').mark('[')
-        if (legal := pos_from[1] >= floor(self.board.board_width / 2)) or theoretical:
+        if (legal := pos_from[1] >= floor(self.board.board_width / 2) - self.board.notation_offset[0]) or theoretical:
             for movement in self.right:
                 for move in movement.moves(pos_from, piece, theoretical):
                     move.movement_type = type(self)
                     yield copy(move).set(is_legal=legal).unmark('n').mark(']')
         position = pos_from[0] * piece.side.direction()
-        if (legal := position < ceil(self.board.board_height / 2) * piece.side.direction()) or theoretical:
+        if (
+            legal := position <
+            ceil(self.board.board_height / 2) * piece.side.direction() - self.board.notation_offset[1]
+        ) or theoretical:
             for movement in self.bottom:
                 for move in movement.moves(pos_from, piece, theoretical):
                     move.movement_type = type(self)
                     yield copy(move).set(is_legal=legal).unmark('n').mark('(')
-        if (legal := position >= floor(self.board.board_height / 2) * piece.side.direction()) or theoretical:
+        if (
+            legal := position >=
+            floor(self.board.board_height / 2) * piece.side.direction() - self.board.notation_offset[1]
+        ) or theoretical:
             for movement in self.top:
                 for move in movement.moves(pos_from, piece, theoretical):
                     move.movement_type = type(self)

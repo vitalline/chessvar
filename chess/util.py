@@ -248,9 +248,11 @@ def is_layered(obj: AnyJson, depth: int = 0) -> bool:
         return False
     if not depth:
         return True
+    if isinstance(obj, dict):
+        obj = obj.values()
     for i in range(depth):
         fi = chain.from_iterable
-        obj = fi(sub for sub in (obj.values() if isinstance(obj, dict) else obj if isinstance(obj, list) else ()))
+        obj = fi(sub.values() if isinstance(sub, dict) else sub if isinstance(sub, list) else () for sub in obj)
     for _ in obj:
         return True
     return False
@@ -279,14 +281,16 @@ def dumps(data: AnyJson, **kwargs: Any) -> str:
                 start = '{'
             elif isinstance(item, list):
                 start = '['
-            if not info['compress'] and sep:
-                result += f"{nl}{'':{info['pad'] * indent}}"
             if start:
                 compress = not is_layered(item, compression)
                 info_stack.append(
                     {'depth': info['depth'] + 1, 'pad': info['pad'] + (not info['compress']), 'compress': compress}
                 )
+            if not info_stack[-1]['compress'] and sep:
+                result += f"{nl}{'':{info['pad'] * indent}}"
+            info = info_stack[-1]
             if start:
+                sep = ''
                 result += f"{start}"
         end = ''
         info = info_stack[-1]
@@ -296,7 +300,6 @@ def dumps(data: AnyJson, **kwargs: Any) -> str:
                 end = "}"
             else:
                 result += sep
-                sep = ''
                 k = next(iter(item))
                 v = stack[-1].pop(k)
                 if not info['compress']:
@@ -310,8 +313,9 @@ def dumps(data: AnyJson, **kwargs: Any) -> str:
                 sep = item_sep
                 end = "]"
             else:
+                if start and not info['compress']:
+                    result += f"{nl}{'':{info['pad'] * indent}}"
                 result += sep
-                sep = ''
                 stack.append(copy(stack[-1].pop(0)))
         else:
             stack.pop()
@@ -322,7 +326,7 @@ def dumps(data: AnyJson, **kwargs: Any) -> str:
             compress = info_stack.pop()['compress']
             info = info_stack[-1]
             if not start and not compress:
-                result += f"{nl}{'':{info['depth'] * indent}}"
+                result += f"{nl}{'':{info['pad'] * indent}}"
             result += end
 
 

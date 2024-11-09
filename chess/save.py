@@ -67,7 +67,6 @@ def expand(data: AnyJson, alias_dict: dict, recursive: bool = False) -> AnyJson:
         while old_data != data:
             old_data, data = data, expand(data, alias_dict)
         return data
-
     if isinstance(data, dict):
         return {alias_dict.get(k, k): expand(v, alias_dict) for k, v in data.items()}
     if isinstance(data, list):
@@ -81,6 +80,8 @@ def condense_algebraic(
     data: dict[Position, AnyJson],
     width: int,
     height: int,
+    x_offset: int,
+    y_offset: int,
     areas: dict[str, set[Position]],
 ) -> dict[str, AnyJson]:
     data_groups = {}
@@ -88,7 +89,7 @@ def condense_algebraic(
         data_groups.setdefault(make_tuple(value), set()).add(key)
     result = {}
     for group in data_groups.values():
-        mapping = tom(list(group), width, height, areas)
+        mapping = tom(list(group), width, height, x_offset, y_offset, areas)
         for notation, poss in mapping.items():
             if not poss:
                 continue
@@ -107,9 +108,11 @@ def expand_algebraic(
     data: dict[str, AnyJson],
     width: int,
     height: int,
+    x_offset: int,
+    y_offset: int,
     areas: dict[str, set[Position]],
 ) -> dict[Position, AnyJson]:
-    mapping = frm(list(data), width, height, areas)
+    mapping = frm(list(data), width, height, x_offset, y_offset, areas)
     result = {}
     for pos, notation in mapping.items():
         result[pos] = copy(data[notation])

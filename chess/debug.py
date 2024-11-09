@@ -122,6 +122,8 @@ def save_piece_types(file_path: str = None, side: Side = Side.WHITE) -> None:
 
 def debug_info(board: Board) -> list[str]:
     pad = ''
+    s26 = lambda x: b26(x + (0 if x < 0 else 1))
+    offset_x, offset_y = board.notation_offset
     piece_mapping = {side: get_piece_mapping(board, side) for side in (Side.WHITE, Side.BLACK, Side.NONE)}
     piece_side = lambda piece: piece.side if isinstance(piece, Piece) else Side.NONE
     def name(piece, side=Side.NONE):
@@ -132,7 +134,7 @@ def debug_info(board: Board) -> list[str]:
     debug_log.append(f"Board size: {board.board_width}x{board.board_height}")
     debug_log.append("Borders:")
     if board.border_cols or board.border_rows:
-        file_splits = list(f'{b26(x)}/{b26(x + 1)}' for x in board.border_cols)
+        file_splits = list(f'{s26(x)}/{s26(x + 1)}' for x in board.border_cols)
         if file_splits:
             debug_log.append(f"{pad:2}Files ({len(file_splits)}): {', '.join(file_splits)} {tuple(board.border_cols)}")
         else:
@@ -212,7 +214,7 @@ def debug_info(board: Board) -> list[str]:
         if poss:
             strs = (
                 f"{k} ({len(v)})" if len(v) > 1 else f"{k} {v[0]}" for k, v in
-                tom(poss, board.board_width, board.board_height, {}).items()
+                tom(poss, board.board_width, board.board_height, offset_x, offset_y, {}).items()
             )
             debug_log.append(f"{side} pawn area ({len(poss)}): {', '.join(strs)}")
         else:
@@ -275,7 +277,7 @@ def debug_info(board: Board) -> list[str]:
                     base_data = (board.load_dict or {}).get(f"{section}s") or {}
                     from_mapping = frm(
                         list(base_data.get(str(side.value), {}).get(save_piece_type(piece), {})),
-                        board.board_width, board.board_height, side_areas
+                        board.board_width, board.board_height, offset_x, offset_y, side_areas
                     )
                     mapping = {}
                     for pos, value in from_mapping.items():
@@ -308,7 +310,7 @@ def debug_info(board: Board) -> list[str]:
                         piece_list.append(f"{name(to_piece, side)}{suffix}")
                     piece_list = ', '.join(string for string in piece_list)
                     if string not in side_areas:
-                        poss = frm([string], board.board_width, board.board_height, side_areas)
+                        poss = frm([string], board.board_width, board.board_height, offset_x, offset_y, side_areas)
                         if len(poss) > 1:
                             string = f"{string} ({len(poss)})"
                         else:
@@ -348,20 +350,18 @@ def debug_info(board: Board) -> list[str]:
                 debug_log[-1] += " None"
             else:
                 for key_data in (
-                    ('cls', 'Types'),
+                    ('cls', "Type"),
                     'name',
-                    ('path', 'Texture path'),
-                    ('file', 'Texture file'),
-                    ('cb', 'Colorbound', False),
-                    ('movement', None, None, lambda x: dumps(x, indent=2, compression=1, ensure_ascii=False)),
+                    ('path', "Texture path"),
+                    ('file', "Texture file"),
+                    ('cb', "Colorbound", False),
+                    ('movement', None, None, lambda x: dumps(x, indent=2, compression=3, ensure_ascii=False)),
                 ):
                     key_data = key_data if isinstance(key_data, tuple) else (key_data,)
                     key_data = key_data + (None,) * (4 - len(key_data))
                     key, string, default, build = key_data[:4]
-                    if isinstance(key, str):
-                        key = (key,)
                     if string is None:
-                        string = ', '.join(x.capitalize() for x in key)
+                        string = key.capitalize()
                     if default is None:
                         default = 'None'
                     if build is None:
@@ -386,7 +386,7 @@ def debug_info(board: Board) -> list[str]:
             if poss:
                 strs = (
                     f"{k} ({len(v)})" if len(v) > 1 else f"{k} {v[0]}" for k, v in
-                    tom(poss, board.board_width, board.board_height, {}).items()
+                    tom(poss, board.board_width, board.board_height, offset_x, offset_y, {}).items()
                 )
                 debug_log.append(f"{prefix} ({len(poss)}): {', '.join(strs)}")
             else:
@@ -396,7 +396,7 @@ def debug_info(board: Board) -> list[str]:
     debug_log.append(f"Custom layout ({len(board.custom_layout)}):")
     base_data = (board.load_dict or {}).get(f"layout") or {}
     neutral_areas = {k: v for k, v in board.custom_areas.items() if isinstance(v, set)}
-    from_mapping = frm(base_data, board.board_width, board.board_height, neutral_areas)
+    from_mapping = frm(base_data, board.board_width, board.board_height, offset_x, offset_y, neutral_areas)
     mapping = {}
     for pos, value in from_mapping.items():
         if value not in mapping:
@@ -417,7 +417,7 @@ def debug_info(board: Board) -> list[str]:
             suffixes.append("Always hide" if piece.should_hide else "Never hide")
         suffix = f" ({', '.join(suffixes)})" if suffixes else ''
         if string not in neutral_areas:
-            poss = frm([string], board.board_width, board.board_height, neutral_areas)
+            poss = frm([string], board.board_width, board.board_height, offset_x, offset_y, neutral_areas)
             if len(poss) > 1:
                 string = f"{string} ({len(poss)})"
             else:
@@ -474,27 +474,31 @@ def debug_info(board: Board) -> list[str]:
                     debug_log.append(f"{pad:{pad_count}}{i + 1}: {turn_side}")
                 else:
                     debug_log.append(f"{pad:{pad_count}}{i + 1}: {turn_side} ({len(turn_rules)}):")
-                    for rule in turn_rules:
+                    for ri, rule in enumerate(turn_rules):
+                        debug_log.append(f"{pad:{pad_count + 2}}Option {ri + 1}:")
                         last_data = []
-                        for last in rule.get('last', []):
+                        for li, last in enumerate(rule.get('last', [])):
+                            last_data.append(f"Last option {li + 1}:")
                             for key_data in (
-                                ('ago', 'Moves ago'),
+                                ('ago', "Moves ago"),
                                 'piece',
-                                ('move', 'Move type'),
-                                ('type', 'Action type'),
-                                'from',
-                                'to',
-                                ('take', 'Captured'),
+                                ('move', "Move type"),
+                                ('type', "Action type"),
+                                ('from', None, lambda x: ', '.join(map(str, x))),
+                                ('to', None, lambda x: ', '.join(map(str, x))),
+                                ('take', "Captured"),
                                 'new',
-                                ('old', 'Total moves'),
+                                ('old', "Total moves"),
                             ):
                                 key_data = key_data if isinstance(key_data, tuple) else (key_data,)
                                 key_data = key_data + (None,) * (3 - len(key_data))
                                 key, string, b = key_data[:3]
+                                if key not in last:
+                                    continue
                                 if string is None:
                                     string = key.capitalize()
                                 if b is None:
-                                    c = lambda x: x.capitalize() if not isinstance(x, str) or x[0:1] != '!' else x
+                                    c = lambda x: x.capitalize() if isinstance(x, str) and x[0:1] != '!' else str(x)
                                     a = lambda x: f"NOT {x[1:]}" if isinstance(x, str) and x[0:1] == '!' else c(x)
                                     b = lambda x: (', '.join(map(a, x)) if isinstance(x, list) else a(x)) or 'None'
                                 last_data.append(f"{string}:")
@@ -506,41 +510,39 @@ def debug_info(board: Board) -> list[str]:
                         for key_data in (
                             'order',
                             (
-                                'state', 'Board state', lambda x: {
-                                    0: 'Any',
-                                    1: 'White is NOT in check', -1: 'White is in check',
-                                    2: 'Black is NOT in check', -2: 'Black is in check',
+                                'state', "Board state", lambda x: {
+                                    0: "Any",
+                                    1: "White is NOT in check", -1: "White is in check",
+                                    2: "Black is NOT in check", -2: "Black is in check",
                                 }.get(x, 'Unknown')
                             ),
-                            ('last', 'Last moves', lambda _: '\n'.join(last_data)),
+                            ('last', "Last moves", lambda _: '\n'.join(last_data)),
                             'piece',
-                            ('move', 'Move type'),
+                            ('move', "Move type"),
                             ('type', 'Action type'),
-                            'from',
-                            'to',
-                            ('take', 'Captured'),
+                            ('from', None, lambda x: ', '.join(map(str, x))),
+                            ('to', None, lambda x: ', '.join(map(str, x))),
+                            ('take', "Captured"),
                             'new',
-                            ('old', 'Total moves'),
-                            ('check', 'Check', lambda x: {0: 'Any', 1: 'Yes', -1: 'No'}.get(x, 'Unknown')),
+                            ('old', "Total moves"),
+                            ('check', "Check", lambda x: {0: 'Any', 1: 'Yes', -1: 'No'}.get(x, 'Unknown')),
                         ):
                             key_data = key_data if isinstance(key_data, tuple) else (key_data,)
-                            key_data = key_data + (None,) * (4 - len(key_data))
-                            key, string, default, build = key_data[:4]
-                            if isinstance(key, str):
-                                key = (key,)
+                            key_data = key_data + (None,) * (3 - len(key_data))
+                            key, string, build = key_data[:3]
+                            if key not in rule:
+                                continue
                             if string is None:
-                                string = ', '.join(x.capitalize() for x in key)
-                            if default is None:
-                                default = 'None'
+                                string = key.capitalize()
                             if build is None:
-                                c = lambda x: x.capitalize() if not isinstance(x, str) or x[0:1] != '!' else x
+                                c = lambda x: x.capitalize() if isinstance(x, str) and x[0:1] != '!' else str(x)
                                 a = lambda x: f"NOT {x[1:]}" if isinstance(x, str) and x[0:1] == '!' else c(x)
                                 b = lambda x: (', '.join(map(a, x)) if isinstance(x, list) else a(x)) or 'None'
                                 build = b
-                            debug_log.append(f"{pad:{pad_count + 2}}{string}:")
-                            value = build(rule.get(key, default)).splitlines()
+                            debug_log.append(f"{pad:{pad_count + 4}}{string}:")
+                            value = build(rule[key]).splitlines()
                             if len(value) > 1:
-                                debug_log.extend(f"{pad:{pad_count + 4}}{line}" for line in value)
+                                debug_log.extend(f"{pad:{pad_count + 6}}{line}" for line in value)
                             else:
                                 debug_log[-1] += f" {value[0]}"
         start_count += len(section)
@@ -566,7 +568,7 @@ def debug_info(board: Board) -> list[str]:
                         if pos == (ANY, ANY):
                             rule_start = f"Have"
                         elif pos[0] == ANY:
-                            rule_start = f"Reach the {b26(pos[1] + 1)}-file with"
+                            rule_start = f"Reach the {s26(pos[1] + 1)}-file with"
                         elif pos[1] == ANY:
                             rule_start = f"Reach the {spell_ordinal(pos[0] + 1, 0)} rank with"
                         else:
