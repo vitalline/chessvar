@@ -486,6 +486,7 @@ def debug_info(board: Board) -> list[str]:
                                 'to',
                                 ('take', 'Captured'),
                                 'new',
+                                ('old', 'Total moves'),
                             ):
                                 key_data = key_data if isinstance(key_data, tuple) else (key_data,)
                                 key_data = key_data + (None,) * (3 - len(key_data))
@@ -519,6 +520,7 @@ def debug_info(board: Board) -> list[str]:
                             'to',
                             ('take', 'Captured'),
                             'new',
+                            ('old', 'Total moves'),
                             ('check', 'Check', lambda x: {0: 'Any', 1: 'Yes', -1: 'No'}.get(x, 'Unknown')),
                         ):
                             key_data = key_data if isinstance(key_data, tuple) else (key_data,)

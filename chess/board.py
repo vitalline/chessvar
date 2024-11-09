@@ -750,14 +750,18 @@ class Board(Window):
                         'type': unpack([t for t in s.get('type', [])]),
                         'from': unpack([t for t in s.get('from', [])]),
                         'to': unpack([t for t in s.get('to', [])]),
+                        'take': unpack([t for t in s.get('take', [])]),
                         'new': unpack([t for t in s.get('new', [])]),
+                        'old': unpack([t for t in s.get('old', [])]),
                     }.items() if sv} for s in d.get('last', [])]),
                     'piece': unpack([t for t in d.get('piece', [])]),
                     'move': unpack([t for t in d.get('move', [])]),
                     'type': unpack([t for t in d.get('type', [])]),
                     'from': unpack([t for t in d.get('from', [])]),
                     'to': unpack([t for t in d.get('to', [])]),
+                    'take': unpack([t for t in d.get('take', [])]),
                     'new': unpack([t for t in d.get('new', [])]),
+                    'old': unpack([t for t in d.get('old', [])]),
                     'check': d.get('check', 0),
                 }.items() if v} for d in side[1]])]
                 for side in self.custom_turn_order
@@ -1059,14 +1063,18 @@ class Board(Window):
                     'type': [t for t in repack(s.get('type', []))],
                     'from': [t for t in repack(s.get('from', []))],
                     'to': [t for t in repack(s.get('to', []))],
+                    'take': [t for t in repack(s.get('take', []))],
                     'new': [t for t in repack(s.get('new', []))],
+                    'old': [t for t in repack(s.get('old', []))],
                 }.items() if sv} for s in repack(d.get('last', []))],
                 'piece': [t for t in repack(d.get('piece', []))],
                 'move': [t for t in repack(d.get('move', []))],
                 'type': [t for t in repack(d.get('type', []))],
                 'from': [t for t in repack(d.get('from', []))],
                 'to': [t for t in repack(d.get('to', []))],
+                'take': [t for t in repack(d.get('take', []))],
                 'new': [t for t in repack(d.get('new', []))],
+                'old': [t for t in repack(d.get('old', []))],
                 'check': d.get('check', 0),
             }.items() if v} for d in repack(side[1])])
             if isinstance(side, list) and len(side) > 1 else (Side(int(side)), None)
@@ -1577,6 +1585,7 @@ class Board(Window):
             'to': ["*"],
             'take': ["*"],
             'new': ["*"],
+            'old': ["*"],
             'check': 0,
         }
         default_last_rules = {
@@ -1588,6 +1597,7 @@ class Board(Window):
             'to': ["*"],
             'take': ["*"],
             'new': ["*"],
+            'old': ["*"],
         }
         to_pure_type = lambda s: action_types.get(s, s)
         to_pure_move = lambda s: t.__name__ if isinstance((t := load_movement_type(s) or s), type) else t
@@ -2342,6 +2352,9 @@ class Board(Window):
                             history_rules = self.filter(
                                 history_rules, ('last', 'to'), [(side, pos_to)], ('match', 'poss')
                             )
+                            history_rules = self.filter(
+                                history_rules, ('last', 'old'), [piece.movement.total_moves], ('match', 'old')
+                            )
                             if capture := last_history_move.captured_piece:
                                 history_rules = self.filter(
                                     history_rules, ('last', 'take'), [type(capture)], ('match', 'take')
@@ -2368,6 +2381,7 @@ class Board(Window):
                     pass_rules = self.filter(pass_rules, 'to', last=('match', 'poss'))
                     pass_rules = self.filter(pass_rules, 'take', last=('match', 'take'))
                     pass_rules = self.filter(pass_rules, 'new', last=('match', 'new'))
+                    pass_rules = self.filter(pass_rules, 'old', last=('match', 'old'))
                     if pass_rules and self.check_side != turn_side:
                         if self.fits_any(pass_rules, 'check', [0], fit=False):
                             self.moves[turn_side]['pass'] = True
@@ -2408,10 +2422,13 @@ class Board(Window):
                             take_rules = self.filter(pos_rules, 'take', last=('match', 'take'))
                             if not take_rules:
                                 continue
+                            old_rules = self.filter(take_rules, 'old', last=('match', 'old'))
+                            if not old_rules:
+                                continue
                             drop_types = set()
                             for drop in side_drops[piece_type][pos]:
                                 drop_type = type(drop) if isinstance(drop, Piece) else drop
-                                new_rules = self.filter(take_rules, 'new', [drop_type], ('match', 'new'))
+                                new_rules = self.filter(old_rules, 'new', [drop_type], ('match', 'new'))
                                 if not new_rules:
                                     continue
                                 if drop_type not in limit_hits:
@@ -2436,13 +2453,16 @@ class Board(Window):
                         )
                     if not piece_rule_dict[piece_type]:
                         continue
+                    piece_rules = self.filter(
+                        piece_rule_dict[piece_type], 'old', [piece.movement.total_moves], ('match', 'old')
+                    )
+                    if not piece_rules:
+                        continue
                     move_rule_dict = {}
                     for move in piece.moves() if chain_moves is None else chain_moves:
                         move_type = move.type()
                         if move_type not in move_rule_dict:
-                            move_rule_dict[move_type] = self.filter(
-                                piece_rule_dict[piece_type], 'move', [move], ('match', 'move')
-                            )
+                            move_rule_dict[move_type] = self.filter(piece_rules, 'move', [move], ('match', 'move'))
                         move_rules = move_rule_dict[move_type]
                         if not move_rules:
                             continue
