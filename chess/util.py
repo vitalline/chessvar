@@ -267,21 +267,19 @@ def dumps(data: AnyJson, **kwargs: Any) -> str:
     indent = indent or 0
     item_sep, key_sep = kwargs.pop('separators', ('', ''))
     item_sep, key_sep = item_sep or ', ', key_sep or ': '
-    sep = 0
+    sep = ''
     while True:
         if not stack:
             return result
         item = stack[-1]
         info = info_stack[-1]
-        if sep == 2:
-            result += key_sep
         start = ''
         if info['depth'] < len(stack):
             if isinstance(item, dict):
                 start = '{'
             elif isinstance(item, list):
                 start = '['
-            if not info['compress'] and sep != 2:
+            if not info['compress'] and sep:
                 result += f"{nl}{'':{info['pad'] * indent}}"
             if start:
                 compress = not is_layered(item, compression)
@@ -290,37 +288,35 @@ def dumps(data: AnyJson, **kwargs: Any) -> str:
                 )
             if start:
                 result += f"{start}"
-        if sep == 2:
-            sep = 0
         end = ''
         info = info_stack[-1]
         if isinstance(item, dict):
             if not item:
-                sep = 1
+                sep = item_sep
                 end = "}"
             else:
-                if sep == 1:
-                    result += item_sep
+                result += sep
+                sep = ''
                 k = next(iter(item))
                 v = stack[-1].pop(k)
                 if not info['compress']:
                     result += f"{nl}{'':{info['pad'] * indent}}"
-                result += json_dumps(k, **kwargs)
-                sep = 2
+                if not isinstance(k, str):
+                    k = json_dumps(k, **kwargs)
+                result += f'"{k}"{key_sep}'
                 stack.append(copy(v))
         elif isinstance(item, list):
             if not item:
-                sep = 1
+                sep = item_sep
                 end = "]"
             else:
-                if sep == 1:
-                    result += item_sep
-                    sep = 0
+                result += sep
+                sep = ''
                 stack.append(copy(stack[-1].pop(0)))
         else:
             stack.pop()
             result += json_dumps(item, **kwargs)
-            sep = 1
+            sep = item_sep
         if end:
             stack.pop()
             compress = info_stack.pop()['compress']

@@ -291,7 +291,7 @@ def save_movement(movement: BaseMovement | frozenset | None) -> list | str | Non
     if movement is Unset:  # otherwise, we need to return a list consisting of the movement type as a string
         return UNSET_STRING  # and the rest of the arguments saved as a list of arguments (using the helper)
     args = list(movement.__copy_args__()[1:])  # store arguments of the movement (except the board argument)
-    while not args[-1]:  # some movement classes have optional __init__() arguments with falsy defaults that
+    while args and not args[-1]:  # movement classes have optional constructor args with falsy defaults that
         args.pop()  # aren't needed to reconstruct the movement, so we can remove the trailing ones and then
     return [save_movement_type(type(movement))] + [save_arg(arg) for arg in args]  # save the data as a list
 
