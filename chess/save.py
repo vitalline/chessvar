@@ -12,7 +12,7 @@ from chess.movement import types as movement_types
 from chess.movement.base import BaseMovement
 from chess.movement.move import Move
 from chess.pieces.side import Side
-from chess.movement.util import Position
+from chess.movement.util import Position, sort_key
 from chess.movement.util import to_algebraic as toa, from_algebraic as fra
 from chess.movement.util import to_algebraic_map as tom, from_algebraic_map as frm
 from chess.pieces import types as piece_types
@@ -87,22 +87,20 @@ def condense_algebraic(
     for key, value in data.items():
         data_groups.setdefault(make_tuple(value), set()).add(key)
     result = {}
-    order = {}
     for group in data_groups.values():
         mapping = tom(list(group), width, height, areas)
         for notation, poss in mapping.items():
             if not poss:
                 continue
-            order_key = (-2, notation) if notation in areas else fra(notation)
             value = data[poss[0]]
             for pos in poss[1:]:
                 if data[pos] != value:
                     for pos2 in poss:
-                        result[order.setdefault(pos2, toa(pos2))] = data[pos2]
+                        result[toa(pos2)] = data[pos2]
                     break
             else:
-                result[order.setdefault(order_key, notation)] = value
-    return {v: result[v] for _, v in sorted(order.items(), key=lambda x: x[0])}
+                result[notation] = value
+    return {k: result[k] for k in sorted(result, key=lambda s: sort_key(s if s in areas else fra(s)))}
 
 
 def expand_algebraic(
@@ -154,7 +152,7 @@ def save_piece_type(piece_type: type[Piece] | frozenset | None) -> str | None:
         return None
     if piece_type is Unset:
         return UNSET_STRING
-    return piece_type.type()
+    return piece_type.type_str()
 
 
 def load_piece_type(data: str | None, from_dict: dict | None) -> type[Piece] | frozenset | None:

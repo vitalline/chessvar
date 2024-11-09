@@ -20,8 +20,8 @@ class Piece(Sprite):
     name = '(Piece)'
     file_name = 'none'
     asset_folder = 'util'
-    type_str = None
-    group_str = None
+    type_data = None
+    group_data = None
 
     def __init__(
         self,
@@ -230,17 +230,17 @@ class Piece(Sprite):
         return getattr(cls, 'colorbound', False)
 
     @classmethod
-    def type(cls) -> str:
-        if cls.type_str is None:
+    def type_str(cls) -> str:
+        if cls.type_data is None:
             if cls.__name__.startswith(CUSTOM_PREFIX):
-                cls.type_str = cls.__name__.removeprefix(CUSTOM_PREFIX)
+                cls.type_data = cls.__name__.removeprefix(CUSTOM_PREFIX)
             else:
-                cls.type_str = f"{cls.__module__.rsplit('.', 1)[-1]}.{cls.__name__}"
-        return cls.type_str
+                cls.type_data = f"{cls.__module__.rsplit('.', 1)[-1]}.{cls.__name__}"
+        return cls.type_data
 
     @classmethod
-    def group(cls) -> str:
-        return cls.group_str
+    def group_str(cls) -> str:
+        return cls.group_data
 
     def texture_path(self) -> str:
         return f"assets/{self.texture_folder}/{self.texture_side.file_prefix()}{self.texture_name}.png"

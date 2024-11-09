@@ -7,7 +7,7 @@ from typing import TYPE_CHECKING, TextIO
 
 from chess.data import end_types, get_piece_types, get_set_data, get_set_name, piece_groups
 from chess.movement.types import DropMovement
-from chess.movement.util import to_alpha as b26
+from chess.movement.util import ANY, to_alpha as b26
 from chess.movement.util import to_algebraic as toa, from_algebraic as fra
 from chess.movement.util import to_algebraic_map as tom, from_algebraic_map as frm
 from chess.pieces.groups.classic import Pawn
@@ -15,7 +15,7 @@ from chess.pieces.piece import Piece
 from chess.pieces.side import Side
 from chess.pieces.util import UtilityPiece, NoPiece, Block, Border, Shield, Void, Wall
 from chess.save import save_piece_type, save_custom_type
-from chess.util import dumps, get_file_name, pluralize, spell, spell_ordinal, sign, unpack, repack
+from chess.util import dumps, get_file_name, pluralize, spell, spell_ordinal, sign
 
 if TYPE_CHECKING:
     from chess.board import Board
@@ -289,8 +289,8 @@ def debug_info(board: Board) -> list[str]:
                             continue
                         rows.add(row)
                     if rows == set(range(board.board_height)):
-                        rows = {-1}
-                    mapping = {toa((row, -1)): (max(row, 0), 0) for row in rows}
+                        rows = {ANY}
+                    mapping = {toa((row, ANY)): (max(row, 0), 0) for row in rows}
                 for string, pos in mapping.items():
                     piece_list = []
                     for to_piece in section_rules[piece][pos]:
@@ -563,11 +563,11 @@ def debug_info(board: Board) -> list[str]:
                 else:
                     try:
                         pos = fra(rule)
-                        if pos == (-1, -1):
+                        if pos == (ANY, ANY):
                             rule_start = f"Have"
-                        elif pos[0] == -1:
+                        elif pos[0] == ANY:
                             rule_start = f"Reach the {b26(pos[1] + 1)}-file with"
-                        elif pos[1] == -1:
+                        elif pos[1] == ANY:
                             rule_start = f"Reach the {spell_ordinal(pos[0] + 1, 0)} rank with"
                         else:
                             rule_start = f"Reach {toa(pos)} with"

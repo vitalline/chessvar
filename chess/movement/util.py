@@ -1,4 +1,4 @@
-from collections.abc import Sequence, Collection
+from collections.abc import Collection, Sequence
 from enum import Enum
 from itertools import zip_longest
 
@@ -7,6 +7,7 @@ RepeatDirection = tuple[int, int, int]
 RepeatFromDirection = tuple[int, int, int, int]
 AnyDirection = Direction | RepeatDirection | RepeatFromDirection
 Position = Direction
+GenericPosition = tuple[int | str, int | str]
 
 
 class ClashResolution(Enum):
@@ -111,50 +112,51 @@ def merge(a: list[AnyDirection], b: list[AnyDirection], clash_resolution: ClashR
     return list(data.values())
 
 
-UNKNOWN_COORDINATE_STRING = '\u2588' * 2
-COORDINATE_ALPHABET = 'abcdefghijklmnopqrstuvwxyz'
+UNKNOWN = '\u2588' * 2
+ALPHABET = 'abcdefghijklmnopqrstuvwxyz'
+ANY = '*'   # all positions in the nth rank/file
+LAST = '_'  # all positions in the last rank/file
+NONE = ''   # no position
+generics = {ANY, LAST}
 
 
 def to_alpha(n: int) -> str:
-    return '' if n == 0 else to_alpha((n - 1) // 26) + COORDINATE_ALPHABET[(n - 1) % 26]
+    if n < 0:
+        return to_alpha(-n).upper()
+    return '' if n == 0 else to_alpha((n - 1) // 26) + ALPHABET[(n - 1) % 26]
 
 
 def from_alpha(s: str) -> int:
-    return 0 if not s else from_alpha(s[:-1]) * 26 + COORDINATE_ALPHABET.index(s[-1]) + 1
+    if s.isupper():
+        return -from_alpha(s.lower())
+    return 0 if not s else from_alpha(s[:-1]) * 26 + ALPHABET.index(s[-1]) + 1
 
 
-generics_alg = {
-    -1: '*',  # '*' means all positions in the nth rank/file
-    -2: '_',  # '_' means all positions in the last rank/file
-}
-generics_num = {v: k for k, v in generics_alg.items()}
-
-
-def to_algebraic(pos: Position | None) -> str:
+def to_algebraic(pos: GenericPosition | None) -> str:
     if pos is None:
-        return UNKNOWN_COORDINATE_STRING
-    if pos[0] in generics_alg and pos[1] in generics_alg:
-        return generics_alg[pos[0]] + (generics_alg[pos[1]] if pos[0] != pos[1] else '')
-    if pos[0] in generics_alg:
-        return f'{to_alpha(pos[1] + 1)}{generics_alg[pos[0]]}'
-    if pos[1] in generics_alg:
-        return f'{generics_alg[pos[1]]}{pos[0] + 1}'
+        return UNKNOWN
+    if pos[0] in generics and pos[1] in generics:
+        return pos[0] + (pos[1] if pos[0] != pos[1] else '')
+    if pos[0] in generics:
+        return f'{to_alpha(pos[1] + 1)}{pos[0]}'
+    if pos[1] in generics:
+        return f'{pos[1]}{pos[0] + 1}'
     return f'{to_alpha(pos[1] + 1)}{pos[0] + 1}'  # return as (file, rank), or (x, y)
 
 
-def from_algebraic(pos: str) -> Position | None:
+def from_algebraic(pos: str) -> GenericPosition | None:
     if not pos:
         return None
-    if pos == UNKNOWN_COORDINATE_STRING:
+    if pos == UNKNOWN:
         return None
     pos = pos.lower()
-    if pos[0] in generics_num and pos[-1] in generics_num:
-        return generics_num[pos[0]], generics_num[pos[-1]]
-    if pos[0] in generics_num:
-        return int(pos[1:]) - 1, generics_num[pos[0]]
-    if pos[-1] in generics_num:
-        return generics_num[pos[-1]], from_alpha(pos[:-1]) - 1
-    split_index = next((i for i, c in enumerate(pos) if c.isdigit()), len(pos))
+    if pos[0] in generics and pos[-1] in generics:
+        return pos[0], pos[-1]
+    if pos[0] in generics:
+        return int(pos[1:]) - 1, pos[0]
+    if pos[-1] in generics:
+        return pos[-1], from_alpha(pos[:-1]) - 1
+    split_index = next((i for i, c in enumerate(pos) if not c.isalpha()), len(pos))
     return int(pos[split_index:]) - 1, from_alpha(pos[:split_index]) - 1  # return as (rank, file), or (y, x)
     # this is the opposite of the usual (x, y) coordinate system OR the usual (file, rank) algebraic notation
     # the board is represented as a list of lists, so the rank is the outer list and goes first when indexing
@@ -167,6 +169,18 @@ def is_algebraic(pos: str) -> bool:
         return False
 
 
+def sort_key(pos: str | GenericPosition) -> tuple:
+    if isinstance(pos, str):
+        return '0', pos
+    if pos[0] in generics and pos[1] in generics:
+        return '1', pos[0], pos[1]
+    if pos[0] in generics:
+        return '2', pos[0], to_alpha(pos[1] + 1)
+    if pos[1] in generics:
+        return '2', to_alpha(pos[0] + 1), pos[1]
+    return '2', to_alpha(pos[0] + 1), to_alpha(pos[1] + 1)
+
+
 def to_algebraic_map(
     poss: Sequence[Position],
     width: int,
@@ -177,8 +191,8 @@ def to_algebraic_map(
     remain = set(poss)
     all_squares = {(row, col) for row in rows for col in cols}
     if remain == all_squares:  # if all positions are listed
-        # use '*' (-1, -1) to represent all possible positions
-        return {to_algebraic((-1, -1)): sorted(poss)}
+        # use '*' (ANY) to represent all possible positions
+        return {ANY: sorted(poss)}
     result = {}
     by_area = {area: set() for area in areas}
     for pos in poss:  # find all areas listed for each position
@@ -197,34 +211,32 @@ def to_algebraic_map(
         by_row[pos[0]].add(pos[1])
     for row in by_row:
         if by_row[row] == cols:  # if all positions for the nth rank are listed
-            # add '*n' (n, -1) to the result and remove them from the remaining positions
+            # add '*n' (n, ANY) to the result and remove them from the remaining positions
             row_poss = [(row, col) for col in cols]
-            result[(row, -1)] = row_poss
+            result[(row, ANY)] = row_poss
             remain.difference_update(row_poss)
         if not remain:  # if all listed positions were discarded, return the result
             return {
-                k if isinstance(k, str) else to_algebraic(k): sorted(result[k]) for k in
-                sorted(result, key=lambda x: (-2, x) if isinstance(x, str) else x)
+                k if isinstance(k, str) else to_algebraic(k): sorted(result[k]) for k in sorted(result, key=sort_key)
             }
     by_col = {col: set() for _, col in remain}
     for pos in poss:  # find all ranks listed for each file
         by_col[pos[1]].add(pos[0])
     for col in by_col:
         if by_col[col] == rows:  # if all positions for the l file are listed
-            # add 'l*' (-1, l) to the result and remove them from the remaining positions
+            # add 'l*' (ANY, l) to the result and remove them from the remaining positions
             col_poss = [(row, col) for row in rows]
-            result[(-1, col)] = col_poss
+            result[(ANY, col)] = col_poss
             remain.difference_update(col_poss)
         if not remain:  # if all listed positions were discarded, return the result
             return {
-                k if isinstance(k, str) else to_algebraic(k): sorted(result[k]) for k in
-                sorted(result, key=lambda x: (-2, x) if isinstance(x, str) else x)
+                k if isinstance(k, str) else to_algebraic(k): sorted(result[k]) for k in sorted(result, key=sort_key)
             }
     result |= {pos: [pos] for pos in remain}  # add the remaining positions to the result
     return {
-        k if isinstance(k, str) else to_algebraic(k): sorted(result[k]) for k in
-        sorted(result, key=lambda x: (-2, x) if isinstance(x, str) else x)
+        k if isinstance(k, str) else to_algebraic(k): sorted(result[k]) for k in sorted(result, key=sort_key)
     }
+
 
 def from_algebraic_map(
     poss: Sequence[str],
@@ -234,30 +246,30 @@ def from_algebraic_map(
 ) -> dict[Position, str]:
     result = {}
     for value in poss:
-        if value == UNKNOWN_COORDINATE_STRING:
+        if value == UNKNOWN:
             continue
         if value in areas:
             result |= {pos: value for pos in areas[value]}
             continue
         pos = from_algebraic(value)
-        if pos[0] == -1 and pos[1] == -1:  # all positions
+        if pos[0] == ANY and pos[1] == ANY:  # all positions
             result |= {(row, col): value for row in range(height) for col in range(width)}
-        elif pos[0] == -1:  # all positions in the l file
+        elif pos[0] == ANY:  # all positions in the l file
             result |= {(row, pos[1]): value for row in range(height)}
-        elif pos[1] == -1:  # all positions in the nth rank
+        elif pos[1] == ANY:  # all positions in the nth rank
             result |= {(pos[0], col): value for col in range(width)}
         else:  # a single position
             result[pos] = value
     return {k: result[k] for k in sorted(result)}
 
 
-def resolve(pos: Position, last: Position = (-2, -2)) -> Position:
-    if -2 not in pos:
+def resolve(pos: GenericPosition, last: GenericPosition = (LAST, LAST)) -> Position:
+    if LAST not in pos:
         return pos
-    if pos == (-2, -2):
+    if pos == (LAST, LAST):
         return last
-    if pos[0] == -2 and pos[1] == last[1]:
+    if pos[0] == LAST and pos[1] == last[1]:
         pos = (last[0], pos[1])
-    if pos[1] == -2 and pos[0] == last[0]:
+    if pos[1] == LAST and pos[0] == last[0]:
         pos = (pos[0], last[1])
     return pos

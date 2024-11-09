@@ -50,7 +50,7 @@ class Move(object):
         self.marks = self.marks.strip(marks)
         return self
 
-    def type(self) -> str:
+    def type_str(self) -> str:
         return self.tag or (self.movement_type.__name__ if self.movement_type else '')
 
     def set(

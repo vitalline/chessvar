@@ -32,7 +32,8 @@ from chess.movement.move import Move
 from chess.movement.types import AutoCaptureMovement, AutoRangedAutoCaptureRiderMovement
 from chess.movement.types import CastlingMovement, CastlingPartnerMovement
 from chess.movement.types import CloneMovement, DropMovement, ProbabilisticMovement
-from chess.movement.util import Position, add, to_alpha as b26, resolve as res
+from chess.movement.util import Position, GenericPosition, ANY
+from chess.movement.util import add, to_alpha as b26, resolve as res
 from chess.movement.util import to_algebraic as toa, from_algebraic as fra, is_algebraic as isa
 from chess.movement.util import to_algebraic_map as tom, from_algebraic_map as frm
 from chess.pieces.groups.classic import Pawn, King
@@ -272,7 +273,7 @@ class Board(Window):
         border_cols: list[int] | None = None,
         border_rows: list[int] | None = None,
         flip: bool | None = None,
-    ) -> Position:
+    ) -> Position | None:
         x, y = pos
         size = size or self.square_size
         origin = origin or self.origin
@@ -288,20 +289,18 @@ class Board(Window):
             if col > border_col:
                 col -= 1
             elif col == border_col:
-                col = -1
-                break
+                return None
         for border_row in border_rows:
             if row > border_row:
                 row -= 1
             elif row == border_row:
-                row = -1
-                break
+                return None
         col, row = (board_size[0] - 1 - col, board_size[1] - 1 - row) if flip else (col, row)
         return row, col
 
     def get_screen_position(
         self,
-        pos: Position,
+        pos: Position | None,
         size: float | None = None,
         origin: tuple[float, float] | None = None,
         width: int | None = None,
@@ -310,6 +309,8 @@ class Board(Window):
         border_rows: list[int] | None = None,
         flip: bool | None = None,
     ) -> tuple[float, float]:
+        if pos is None:
+            return -1, -1
         row, col = pos
         size = size or self.square_size
         origin = origin or self.origin
@@ -411,12 +412,12 @@ class Board(Window):
                 return self.in_area(template, data, last=last)  # type: ignore
             return self.in_area(template, data[1], data[0], last=last)  # type: ignore
         if isinstance(data, Move):
-            return fits(template, data.type())
+            return fits(template, data.type_str())
         if isinstance(data, Piece):
             return fits(template, data.side.name.lower()) or self.fits(template, type(data))
         if isinstance(data, type):
             if issubclass(data, Piece):
-                return fits(template, (data.group(), data.name, data.type()))
+                return fits(template, (data.group_str(), data.name, data.type_str()))
             if issubclass(data, BaseMovement):
                 return fits(template, data.__name__)
         return fits(template, data)
@@ -657,7 +658,7 @@ class Board(Window):
         data = {
             'variant': self.custom_variant,
             'board_size': [*wh],
-            'borders': [toa((-1, col)) for col in self.border_cols] + [toa((row, -1)) for row in self.border_rows],
+            'borders': [toa((ANY, col)) for col in self.border_cols] + [toa((row, ANY)) for row in self.border_rows],
             'areas': {
                 name: {
                     side.value: unpack(list(tom(area, *whn))) for side, area in data.items()
@@ -875,7 +876,7 @@ class Board(Window):
         # who knows when someone decides to introduce a breaking change and absolutely destroy all the saves
         board_size = tuple(data.get('board_size', (self.board_width, self.board_height)))
         borders = [fra(t) for t in data.get('borders', [])]
-        borders = [t[1] for t in borders if t[0] == -1], [t[0] for t in borders if t[1] == -1]
+        borders = [t[1] for t in borders if t[0] == ANY], [t[0] for t in borders if t[1] == ANY]
         self.resize_board(*board_size, *borders, update=False)
 
         wh = self.board_width, self.board_height
@@ -959,7 +960,7 @@ class Board(Window):
         }
         for group, piece_list in self.piece_groups.items():
             for piece_type in piece_list:
-                piece_type.group_str = group
+                piece_type.group_data = group
         self.piece_limits = {
             Side(int(k)) if k.isdigit() else k: {g: v for g, v in d.items()} if k.isdigit() else d
             for k, d in data.get('limits', {}).items()
@@ -1319,7 +1320,7 @@ class Board(Window):
         self.custom_end_rules = {}
         for group, piece_list in self.piece_groups.items():
             for piece_type in piece_list:
-                piece_type.group_str = None
+                piece_type.group_data = None
         self.piece_groups = {}
         self.piece_limits = {}
         if self.color_index is None:
@@ -1749,21 +1750,21 @@ class Board(Window):
                         return value, group
         return 0, ''
 
-    def in_area(self, area: str, pos: Position, side: Side = Side.NONE, last: list[Position] = ()) -> bool:
-        if area == '*':  # all squares on the board, guaranteed to be True
+    def in_area(self, area: str, pos: GenericPosition, of: Side = Side.NONE, last: list[GenericPosition] = ()) -> bool:
+        if area == ANY:  # all squares on the board, guaranteed to be True
             return True
-        if side in self.areas:  # try side-specific areas first
+        if of in self.areas:  # try side-specific areas first
             if area == '':  # any side-specific area on the board
-                return any(pos in a for _, a in self.areas[side].items())
-            if area in self.areas[side]:  # a side-specific area on the board
-                return pos in self.areas[side][area]
+                return any(pos in a for _, a in self.areas[of].items())
+            if area in self.areas[of]:  # a side-specific area on the board
+                return pos in self.areas[of][area]
         # try side-neutral areas next
         if area == '':  # any side-neutral area on the board
             return any(pos in a for _, a in self.custom_areas.items() if isinstance(a, set))
         if area in self.custom_areas and isinstance(self.custom_areas[area], set):  # a side-neutral area on the board
             return pos in self.custom_areas[area]
         try:  # treating as notation (possibly generic)
-            return any(all(i in {-1, j} for i, j in zip(res(fra(area), last_pos), pos)) for last_pos in last)
+            return any(all(i in {ANY, j} for i, j in zip(res(fra(area), last_pos), pos)) for last_pos in last)
         except ValueError:  # if all else fails...
             return False
 
@@ -2278,7 +2279,7 @@ class Board(Window):
                                 history_rules, ('last', 'move'), [last_history_move], ('match', 'move')
                             )
                             for rule in history_rules:
-                                rule['match'].setdefault('move', set()).add(last_history_move.type())
+                                rule['match'].setdefault('move', set()).add(last_history_move.type_str())
                             move_types = [s for s in (
                                 'move' if not last_history_move.captured_piece else 'capture',
                                 'promotion' if promotion else None,
@@ -2410,7 +2411,7 @@ class Board(Window):
                         continue
                     move_rule_dict = {}
                     for move in piece.moves() if chain_moves is None else chain_moves:
-                        move_type = move.type()
+                        move_type = move.type_str()
                         if move_type not in move_rule_dict:
                             move_rule_dict[move_type] = self.filter(piece_rules, 'move', [move], ('match', 'move'))
                         move_rules = move_rule_dict[move_type]
