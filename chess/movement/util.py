@@ -251,14 +251,13 @@ def from_algebraic_map(
     return {k: result[k] for k in sorted(result)}
 
 
-def resolve(pos: Position, lasts: list[Position] = ()) -> Position:
+def resolve(pos: Position, last: Position = (-2, -2)) -> Position:
     if -2 not in pos:
         return pos
-    for last in lasts[::-1]:
-        if pos[0] == -2 and last[0] != -2:
-            pos = (last[0], pos[1])
-        if pos[1] == -2 and last[1] != -2:
-            pos = (pos[0], last[1])
-        if -2 not in pos:
-            return pos
+    if pos == (-2, -2):
+        return last
+    if pos[0] == -2 and pos[1] == last[1]:
+        pos = (last[0], pos[1])
+    if pos[1] == -2 and pos[0] == last[0]:
+        pos = (pos[0], last[1])
     return pos

@@ -408,7 +408,7 @@ class Board(Window):
                 return False
             if isinstance(data[0], int):
                 return self.in_area(template, data, last=last)  # type: ignore
-            return self.in_area(template, *data, last=last)  # type: ignore
+            return self.in_area(template, data[1], data[0], last=last)  # type: ignore
         if isinstance(data, Move):
             return fits(template, data.type())
         if isinstance(data, Piece):
@@ -420,16 +420,17 @@ class Board(Window):
                 return fits(template, data.__name__)
         return fits(template, data)
 
-    def fits_one(self, template_data: Index, path: Unpacked[Key], data: Any = (), last: Any = (), fit: bool = True):
-        path, last = (repack(x) for x in (path, last))
+    def fits_one(self, t: Index, p: Unpacked[Key], d: Any = (), l: Any = (), fit: bool = True):
+        p, l = (repack(x) for x in (p, l))
+        lf = lambda ts, *fs: list(find(ts, *fs))
         def split_templates(templates: Index, fields: Sequence[Key]) -> dict[bool, Collection]:
             results = {False: set(), True: set()}
-            for s in repack(find(templates, *fields)):
+            for s in lf(templates, *fields):
                 (results[False].add(s[1:]) if isinstance(s, str) and s[0:1] == '!' else results[True].add(s))
             return results
         def match_templates(s: Collection):
-            return any(self.fits(t, data, find(template_data, *last)) for t in s) if fit else any(d in s for d in data)
-        for k, part in split_templates(template_data, path).items():
+            return any(self.fits(x, d, lf(t, *l)) for x in s) if fit else ('*' in s or any(e in s for e in d))
+        for k, part in split_templates(t, p).items():
             if part and k != match_templates(part):
                 return False
         return True
@@ -1590,7 +1591,7 @@ class Board(Window):
             'check': 0,
         }
         default_last_rules = {
-            'ago': 1,
+            'ago': [1],
             'piece': ["*"],
             'move': ["*"],
             'type': ["*"],
@@ -1818,7 +1819,7 @@ class Board(Window):
         if area in self.custom_areas and isinstance(self.custom_areas[area], set):  # a side-neutral area on the board
             return pos in self.custom_areas[area]
         try:  # treating as notation (possibly generic)
-            return all(i in {-1, j} for i, j in zip(res(fra(area), last), pos))
+            return any(all(i in {-1, j} for i, j in zip(res(fra(area), last_pos), pos)) for last_pos in last)
         except ValueError:  # if all else fails...
             return False
 
@@ -2282,7 +2283,7 @@ class Board(Window):
                 for rule in last_history_rules:
                     rule['match'] = {}
                 if self.move_history:
-                    depths = {last['ago'] for rule in state_rules for last in rule['last']}
+                    depths = {ago for rule in state_rules for last in rule['last'] for ago in last['ago']}
                     min_depth, max_depth = min(depths, default=0), max(depths, default=0)
                     i = int(not self.chain_start)
                     last_history_moves = []
@@ -2301,9 +2302,11 @@ class Board(Window):
                             continue
                         old_history_rules = last_history_rules
                         last_history_rules, history_rules = [], []
-                        _ = [(
-                            history_rules if i in {last['ago'] for last in rule['last']} else last_history_rules
-                        ).append(rule) for rule in old_history_rules]
+                        for rule in old_history_rules:
+                            if i in {ago for last in rule['last'] for ago in last['ago']}:
+                                history_rules.append(rule)
+                            else:
+                                last_history_rules.append(rule)
                         if not last_history_move:
                             history_rules += self.filter(
                                 history_rules, ('last', 'type'), ['pass'], ('match', 'type'), False
@@ -2317,14 +2320,16 @@ class Board(Window):
                             side = self.get_turn_side(-i)
                             drop = promotion = False
                             if isinstance(last_history_move.piece, NoPiece) or not last_history_move.pos_from:
-                                piece = type(last_history_move.promotion or last_history_move.piece)
+                                piece = last_history_move.promotion or last_history_move.piece
                                 drop = issubclass(last_history_move.movement_type or type, DropMovement)
                             else:
-                                piece = type(last_history_move.piece or last_history_move.promotion)
+                                piece = last_history_move.piece
                                 promotion = last_history_move.promotion
-                            history_rules = self.filter(history_rules, ('last', 'piece'), [piece], ('match', 'piece'))
+                            history_rules = self.filter(
+                                history_rules, ('last', 'piece'), [type(piece)], ('match', 'piece')
+                            )
                             for rule in history_rules:
-                                rule['match'].setdefault('piece', set()).add(piece)
+                                rule['match'].setdefault('piece', set()).add(type(piece))
                             history_rules = self.filter(
                                 history_rules, ('last', 'move'), [last_history_move], ('match', 'move')
                             )
@@ -2348,13 +2353,13 @@ class Board(Window):
                                 rule['match'].setdefault('from', []).append(poss[-2])
                                 rule['match'].setdefault('to', []).append(poss[-1])
                             history_rules = self.filter(
-                                history_rules, ('last', 'from'), [(side, pos_from)], ('match', 'poss')
+                                history_rules, ('last', 'from'), [(side, pos_from)], ('match', 'pos')
                             )
                             history_rules = self.filter(
-                                history_rules, ('last', 'to'), [(side, pos_to)], ('match', 'poss')
+                                history_rules, ('last', 'to'), [(side, pos_to)], ('match', 'pos')
                             )
                             history_rules = self.filter(
-                                history_rules, ('last', 'old'), [piece.movement.total_moves], ('match', 'old')
+                                history_rules, ('last', 'old'), [piece.movement.total_moves], ('match', 'old'), False
                             )
                             if capture := last_history_move.captured_piece:
                                 history_rules = self.filter(
@@ -2378,8 +2383,8 @@ class Board(Window):
                     pass_rules = self.filter(pass_rules, 'piece', last=('match', 'piece'))
                     pass_rules = self.filter(pass_rules, 'move', last=('match', 'move'))
                     pass_rules = self.filter(pass_rules, 'type', last=('match', 'type'))
-                    pass_rules = self.filter(pass_rules, 'from', last=('match', 'poss'))
-                    pass_rules = self.filter(pass_rules, 'to', last=('match', 'poss'))
+                    pass_rules = self.filter(pass_rules, 'from', last=('match', 'pos'))
+                    pass_rules = self.filter(pass_rules, 'to', last=('match', 'pos'))
                     pass_rules = self.filter(pass_rules, 'take', last=('match', 'take'))
                     pass_rules = self.filter(pass_rules, 'new', last=('match', 'new'))
                     pass_rules = self.filter(pass_rules, 'old', last=('match', 'old'))
@@ -2416,8 +2421,8 @@ class Board(Window):
                         for pos in side_drops[piece_type]:
                             if not self.not_a_piece(pos):
                                 continue
-                            pos_rules = self.filter(drop_rules, 'from', [(turn_side, pos)], ('match', 'poss'))
-                            pos_rules = self.filter(pos_rules, 'to', [(turn_side, pos)], ('match', 'poss'))
+                            pos_rules = self.filter(drop_rules, 'from', [(turn_side, pos)], ('match', 'pos'))
+                            pos_rules = self.filter(pos_rules, 'to', [(turn_side, pos)], ('match', 'pos'))
                             if not pos_rules:
                                 continue
                             take_rules = self.filter(pos_rules, 'take', last=('match', 'take'))
@@ -2455,7 +2460,7 @@ class Board(Window):
                     if not piece_rule_dict[piece_type]:
                         continue
                     piece_rules = self.filter(
-                        piece_rule_dict[piece_type], 'old', [piece.movement.total_moves], ('match', 'old')
+                        piece_rule_dict[piece_type], 'old', [piece.movement.total_moves], ('match', 'old'), False
                     )
                     if not piece_rules:
                         continue
@@ -2492,8 +2497,8 @@ class Board(Window):
                                 poss.extend((pos_from, pos_to))
                                 rule['match'].setdefault('from', []).append(poss[-2])
                                 rule['match'].setdefault('to', []).append(poss[-1])
-                            move_rules = self.filter(move_rules, 'from', [(turn_side, pos_from)], ('match', 'poss'))
-                            move_rules = self.filter(move_rules, 'to', [(turn_side, pos_to)], ('match', 'poss'))
+                            move_rules = self.filter(move_rules, 'from', [(turn_side, pos_from)], ('match', 'pos'))
+                            move_rules = self.filter(move_rules, 'to', [(turn_side, pos_to)], ('match', 'pos'))
                             if capture := chained_move.captured_piece:
                                 move_rules = self.filter(move_rules, 'take', [type(capture)], ('match', 'take'))
                             if not move_rules:

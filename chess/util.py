@@ -142,17 +142,16 @@ def repack(l: Unpacked[T], bound: type = Sequence) -> Sequence[T]:
     return l if isinstance(l, bound) and not isinstance(l, str) else [l]
 
 
-# Function to traverse any data object using a sequence of keys or indices. Returns the value at the specified location.
-def find(data: Index[T], *fields: Key) -> T | None:
+# Function to traverse any data object using sequences of keys or indices. Returns the values at the specified location.
+def find(data: Index[T], *fields: Key) -> Collection[T] | None:
+    if not fields:
+        return data if isinstance(data, Collection) else (data,)
+    if isinstance(data, Sequence) and isinstance(fields[0], str):
+        return chain.from_iterable(find(x, *fields) for x in data)
     try:
-        return find(data[fields[0]], *fields[1:]) if fields else data
+        return find(data[fields[0]], *fields[1:])
     except (IndexError, KeyError, TypeError):
-        return None
-
-
-# Same as find(), but returns a list of values for each group of keys or indices. Skips groups that do not have a value.
-def find_all(data: Index[T], *field_groups: Sequence[Key]) -> T:
-    return [value for fields in field_groups if (value := find(data, *fields)) is not None]
+        return ()
 
 
 # Simple template matching function. Matches an object or a group thereof with a template, and treats '*' as a wildcard.
