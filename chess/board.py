@@ -2253,6 +2253,8 @@ class Board(Window):
                 state_rules = list(chain.from_iterable(state_groups.get(k, ()) for k in (
                     0, *(side.value * (-1 if check_sides.get(side, False) else 1) for side in (Side.WHITE, Side.BLACK))
                 )))  # 0: any state, +side: side not in check, -side: side in check
+                if not state_rules:
+                    continue
                 last_history_rules = state_rules.copy()
                 for rule in last_history_rules:
                     rule['match'] = {}
@@ -2350,7 +2352,9 @@ class Board(Window):
                             last_history_rules += history_rules
                             last_history_move = last_history_move.chained_move
                         i -= 1
-                if not self.chain_start and last_history_rules:
+                if not last_history_rules:
+                    continue
+                if not self.chain_start:
                     pass_rules = self.filter(
                         last_history_rules, 'type', ['pass'], ('match', 'type'), False
                     )
