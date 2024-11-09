@@ -3509,10 +3509,11 @@ class Board(Window):
                 NoPiece(self, pos=move.pos_from) if move.swapped_piece is None else move.swapped_piece
             )
             self.piece_sprite_list.append(self.pieces[abs_from[0]][abs_from[1]])
-        if move.captured_piece is not None and (capture_pos := move.captured_piece.board_pos) != move.pos_to:
+        if move.captured_piece is not None and move.captured_piece.board_pos != move.pos_to:
             # piece was captured on a different square than the one the capturing piece moved to (e.g. en passant)
             # create a blank piece on the square it was captured on
-            self.pieces[capture_pos[0]][capture_pos[1]] = NoPiece(self, pos=capture_pos)
+            capture_pos = self.get_absolute(move.captured_piece.board_pos)
+            self.pieces[capture_pos[0]][capture_pos[1]] = NoPiece(self, pos=move.captured_piece.board_pos)
             self.piece_sprite_list.append(self.pieces[capture_pos[0]][capture_pos[1]])
         if move.piece is not None and move.pos_from is None:
             # piece was added to the board, update it and add it to the sprite list
@@ -3640,8 +3641,8 @@ class Board(Window):
                 self.piece_sprite_list.append(move.piece)
         if move.captured_piece is not None:
             # piece was captured, restore it on the square it was captured on
-            capture_pos = move.captured_piece.board_pos
-            if capture_pos != move.pos_to:
+            capture_pos = self.get_absolute(move.captured_piece.board_pos)
+            if move.pos_to != move.captured_piece.board_pos:
                 # piece was captured on a different square than the one the capturing piece moved to (e.g. en passant)
                 # empty the square it was captured on (it was not emptied earlier because it was not the one moved to)
                 self.piece_sprite_list.remove(self.pieces[capture_pos[0]][capture_pos[1]])
@@ -4440,10 +4441,10 @@ class Board(Window):
     def replace(self, piece: Piece, new_piece: Piece) -> None:
         new_piece.board_pos = None
         new_piece = copy(new_piece)
-        pos = piece.board_pos
+        pos = self.get_absolute(piece.board_pos)
         self.piece_sprite_list.remove(self.pieces[pos[0]][pos[1]])
         self.pieces[pos[0]][pos[1]] = new_piece
-        self.set_position(new_piece, pos)
+        self.set_position(new_piece, piece.board_pos)
         self.update_piece(new_piece)
         if not isinstance(piece, (NoPiece, Obstacle)):
             new_piece.set_color(
@@ -4837,6 +4838,7 @@ class Board(Window):
         if (
             self.game_loaded or self.board_width != default_board_width or self.board_height != default_board_height
             or self.visual_board_width != default_board_width or self.visual_board_height != default_board_height
+            or self.notation_offset != (0, 0)
         ):
             offset_string = ', '.join(f"{x:+}" if x else "0" for x in self.notation_offset)
             if self.board_width == old_width and self.board_height == old_height:

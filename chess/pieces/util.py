@@ -1,3 +1,4 @@
+from chess.movement.util import to_algebraic
 from chess.pieces.piece import Piece
 from chess.pieces.side import Side
 from chess.pieces.types import Empty, Immune
@@ -24,6 +25,23 @@ class UtilityPiece(Piece):
 
     def __str__(self):
         return self.name.strip() if self.side is self.default_side else super().__str__()
+
+    def __repr__(self):
+        string = f"{self.side} {self.name}" if self.side != self.default_side else self.name
+        if self.board_pos:
+            string = f"{self.board.get_absolute(self.board_pos)} {string} at {to_algebraic(self.board_pos)}"
+        suffixes = []
+        if self.movement and self.movement.total_moves:
+            suffixes.append(f"Moves: {self.movement.total_moves}")
+        if self.promoted_from:
+            suffixes.append(f"From: {self.promoted_from}")
+        if self.should_hide is not False:
+            suffixes.append("Always hide" if self.should_hide else "Can be hidden")
+        elif self.is_hidden:
+            suffixes.append("Hidden")
+        if suffixes:
+            string += f" ({', '.join(suffixes)})"
+        return f"<{string}>"
 
 
 class BackgroundPiece(UtilityPiece):

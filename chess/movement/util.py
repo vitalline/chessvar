@@ -149,7 +149,6 @@ def from_algebraic(pos: str) -> GenericPosition | None:
         return None
     if pos == UNKNOWN:
         return None
-    pos = pos.lower()
     sign_alpha = lambda x: (i := from_alpha(x)) + (1 if i < 0 else 0)
     if pos[0] in generics and pos[-1] in generics:
         return pos[0], pos[-1]
@@ -171,15 +170,16 @@ def is_algebraic(pos: str) -> bool:
 
 
 def sort_key(pos: str | GenericPosition) -> tuple:
+    case_alpha = lambda x: ((a := to_alpha(x + (0 if x < 0 else 1))).islower(), a)
     if isinstance(pos, str):
-        return '0', pos
+        return '0', False, pos, False, pos
     if pos[0] in generics and pos[1] in generics:
-        return '1', pos[0], pos[1]
+        return '1', False, pos[0], False, pos[1]
     if pos[0] in generics:
-        return '2', pos[0], to_alpha(pos[1] + (0 if pos[1] < 0 else 1))
+        return '2', False, pos[0], *case_alpha(pos[1])
     if pos[1] in generics:
-        return '2', to_alpha(pos[0] + (0 if pos[0] < 0 else 1)), pos[1]
-    return '2', to_alpha(pos[0] + (0 if pos[0] < 0 else 1)), to_alpha(pos[1] + (0 if pos[1] < 0 else 1))
+        return '2', *case_alpha(pos[0]), False, pos[1]
+    return '2', *case_alpha(pos[0]), *case_alpha(pos[1])
 
 
 def to_algebraic_map(

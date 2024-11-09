@@ -100,7 +100,7 @@ class Piece(Sprite):
     def __repr__(self):
         string = f"{self.side} {self.name}"
         if self.board_pos:
-            string = f"{self.board_pos} {string} at {to_algebraic(self.board_pos)}"
+            string = f"{self.board.get_absolute(self.board_pos)} {string} at {to_algebraic(self.board_pos)}"
         suffixes = []
         if self.movement and self.movement.total_moves:
             suffixes.append(f"Moves: {self.movement.total_moves}")
