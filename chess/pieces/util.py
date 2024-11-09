@@ -20,7 +20,7 @@ class UtilityPiece(Piece):
         self.is_hidden = False
 
     @classmethod
-    def type(cls) -> str:
+    def type_str(cls) -> str:
         return cls.__name__
 
     def __str__(self):
