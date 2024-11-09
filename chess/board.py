@@ -1210,8 +1210,9 @@ class Board(Window):
                 turn_data[1] = Side(turn_data[1])
             self.ply_count = ply_count
             self.turn_data = turn_data
+            self.turn_side, self.turn_rules = self.get_turn_entry()
             if self.turn_side != turn_data[1]:
-                self.log(f"Error: Turn side does not match ({ self.turn_side} was {turn_data[1]})")
+                self.log(f"Error: Turn side does not match ({self.turn_side} was {turn_data[1]})")
                 self.turn_side = turn_data[1]
         self.log_armies()
         self.log_info()
