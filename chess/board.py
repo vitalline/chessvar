@@ -5284,6 +5284,40 @@ class Board(Window):
                 if self.promotion_piece:
                     self.move_history.append(move)
                     self.update_caption()
+                elif move.promotion:
+                    self.move_history.append(move)
+                    self.log(f"Drop: {move}")
+                    chained_move = move.chained_move
+                    if chained_move:
+                        self.move(chained_move)
+                        self.update_auto_capture_markers(chained_move)
+                        chained_move.set(piece=copy(chained_move.piece))
+                    while chained_move:
+                        move_type = (
+                            'Edit' if chained_move.is_edit
+                            else 'Drop' if chained_move.movement_type == DropMovement
+                            else 'Move'
+                        )
+                        self.log(f"{move_type}: {chained_move}")
+                        chained_move = chained_move.chained_move
+                        if chained_move:
+                            self.move(chained_move)
+                            self.update_auto_capture_markers(chained_move)
+                            chained_move.set(piece=copy(chained_move.piece))
+                    self.unload_end_data()
+                    self.load_pieces()
+                    if not move.is_edit:
+                        self.shift_ply(+1)
+                        self.load_check()
+                        self.update_end_data(self.move_history[-1])
+                    else:
+                        self.load_check()
+                        self.update_end_data()
+                    self.load_moves()
+                    self.reload_end_data()
+                    self.compare_history()
+                    self.advance_turn()
+                return
         if held_buttons & MOUSE_BUTTON_LEFT:
             if self.game_over:
                 self.deselect_piece()
