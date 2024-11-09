@@ -96,10 +96,10 @@ Alt + Shift + P: place wall pieces
 Alt + H: toggle showing placed pieces
 Alt + Shift + H: toggle hiding placed pieces
 Ctrl + X: update probabilistic pieces (only selected piece if one exists)
-Ctrl + [,]: offset notation left by one file
- ... + Alt: offset notation down by one rank
-Ctrl + [.]: offset notation right by one file
+Ctrl + [,]: offset notation right by one file
  ... + Alt: offset notation up by one rank
+Ctrl + [.]: offset notation left by one file
+ ... + Alt: offset notation down by one rank
 Ctrl + "[": remove last file
  ... + Alt: remove last rank
 Ctrl + "]": add extra file
