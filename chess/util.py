@@ -133,13 +133,13 @@ def deduplicate(l: list[T]) -> list[T]:
 
 
 # Function to turn a sequence into its single element if it has exactly one element. If not, returns the Sequence as is.
-def unpack(l: Sequence[T]) -> Unpacked[T]:
-    return l[0] if isinstance(l, Sequence) and not isinstance(l, str) and len(l) == 1 else l
+def unpack(l: Sequence[T], bound: type = Sequence) -> Unpacked[T]:
+    return l[0] if isinstance(l, bound) and not isinstance(l, str) and len(l) == 1 else l
 
 
 # Function to turn any non-sequence object into a one-element sequence containing the object or return a Sequence as is.
-def repack(l: Unpacked[T]) -> Sequence[T]:
-    return l if isinstance(l, Sequence) and not isinstance(l, str) else [l]
+def repack(l: Unpacked[T], bound: type = Sequence) -> Sequence[T]:
+    return l if isinstance(l, bound) and not isinstance(l, str) else [l]
 
 
 # Function to traverse any data object using a sequence of keys or indices. Returns the value at the specified location.

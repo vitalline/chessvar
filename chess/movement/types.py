@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from copy import copy
+from itertools import chain
 from math import ceil, floor
 from typing import TYPE_CHECKING
 
@@ -24,7 +25,7 @@ class RiderMovement(BaseMovement):
         boundless: int = 0, loop: int = 0
     ):
         super().__init__(board)
-        self.directions = repack(directions or [])
+        self.directions = repack(directions or [], list)
         self.boundless = boundless
         self.loop = loop
         self.data = {}
@@ -443,8 +444,8 @@ class CastlingMovement(BaseMovement):
         self.direction = direction
         self.other_piece = other_piece
         self.other_direction = other_direction
-        self.movement_gap = repack(movement_gap or [])
-        self.en_passant_gap = repack(en_passant_gap or [])
+        self.movement_gap = repack(movement_gap or [], list)
+        self.en_passant_gap = repack(en_passant_gap or [], list)
 
     def moves(self, pos_from: Position, piece: Piece, theoretical: bool = False):
         if self.total_moves:
@@ -561,7 +562,7 @@ class EnPassantRiderMovement(RiderMovement):
 class BaseMultiMovement(BaseMovement):
     def __init__(self, board: Board, movements: Unpacked[BaseMovement] | None = None):
         super().__init__(board)
-        self.movements = repack(movements or [])
+        self.movements = repack(movements or [], list)
         for movement in self.movements:
             movement.board = board  # just in case.
 
@@ -600,12 +601,12 @@ class IndexMovement(BaseMultiMovement):
         iteration_sub: int = 0,
         cycle_mode: int = 0,
     ):
-        self.movement_index = tuple(repack(movements or []) for movements in (movement_index or []))
+        self.movement_index = tuple(repack(movements or [], list) for movements in (movement_index or []))
         self.iteration_type = iteration_type
         self.iteration_div = iteration_div
         self.iteration_sub = iteration_sub
         self.cycle_mode = cycle_mode
-        super().__init__(board, sum(self.movement_index, []))
+        super().__init__(board, list(chain.from_iterable(self.movement_index)))
 
     def moves(self, pos_from: Position, piece: Piece, theoretical: bool = False, index: int | None = None):
         mark = '#'
@@ -776,7 +777,7 @@ class BentMovement(RepeatBentMovement):
         super().__init__(
             board, movements,
             start_index=start_index,
-            step_count=len(repack(movements)) if movements else 0,
+            step_count=len(repack(movements, list)) if movements else 0,
             loop=loop,
         )
 
@@ -876,10 +877,10 @@ class MultiMovement(BaseMultiMovement):
         move: Unpacked[BaseMovement] | None = None,
         capture: Unpacked[BaseMovement] | None = None
     ):
-        self.both = repack(both or [])
-        self.move = repack(move or [])
-        self.capture = repack(capture or [])
-        super().__init__(board, self.both + self.move + self.capture)
+        self.both = repack(both or [], list)
+        self.move = repack(move or [], list)
+        self.capture = repack(capture or [], list)
+        super().__init__(board, [*self.both, *self.move, *self.capture])
 
     def moves(self, pos_from: Position, piece: Piece, theoretical: bool = False):
         if theoretical:
@@ -893,7 +894,7 @@ class MultiMovement(BaseMultiMovement):
                 for move in movement.moves(pos_from, piece, theoretical):
                     yield copy(move).unmark('n').mark('c')
         else:
-            for movement in self.both + self.move:
+            for movement in (*self.both, *self.move):
                 for move in movement.moves(pos_from, piece, theoretical):
                     chained_move = move
                     while chained_move:
@@ -903,7 +904,7 @@ class MultiMovement(BaseMultiMovement):
                         chained_move = chained_move.chained_move
                     else:
                         yield copy(move)
-            for movement in self.both + self.capture:
+            for movement in (*self.both, *self.capture):
                 for move in movement.moves(pos_from, piece, theoretical):
                     chained_move = move
                     while chained_move:
@@ -997,9 +998,9 @@ class ColorMovement(BaseMultiMovement):
         light: Unpacked[BaseMovement] | None = None,
         dark: Unpacked[BaseMovement] | None = None
     ):
-        self.light = repack(light or [])
-        self.dark = repack(dark or [])
-        super().__init__(board, self.light + self.dark)
+        self.light = repack(light or [], list)
+        self.dark = repack(dark or [], list)
+        super().__init__(board, [*self.light, *self.dark])
 
     def moves(self, pos_from: Position, piece: Piece, theoretical: bool = False):
         if (legal := self.board.is_light_square(pos_from)) or theoretical:
@@ -1026,11 +1027,11 @@ class SideMovement(BaseMultiMovement):
         bottom: Unpacked[BaseMovement] | None = None,
         top: Unpacked[BaseMovement] | None = None
     ):
-        self.left = repack(left or [])
-        self.right = repack(right or [])
-        self.bottom = repack(bottom or [])
-        self.top = repack(top or [])
-        super().__init__(board, self.left + self.right)
+        self.left = repack(left or [], list)
+        self.right = repack(right or [], list)
+        self.bottom = repack(bottom or [], list)
+        self.top = repack(top or [], list)
+        super().__init__(board, [*self.left, *self.right, *self.bottom, *self.top])
 
     def moves(self, pos_from: Position, piece: Piece, theoretical: bool = False):
         if (legal := pos_from[1] < ceil(self.board.board_width / 2)) or theoretical:
@@ -1090,8 +1091,8 @@ class BaseChoiceMovement(BaseMultiMovement):
     def __init__(self, board: Board, movements: dict[str, Unpacked[BaseMovement]] | None = None):
         if movements is None:
             movements = {}
-        self.movement_dict = {key: repack(value) for key, value in movements.items()}
-        super().__init__(board, sum(self.movement_dict.values(), []))
+        self.movement_dict = {key: repack(value, list) for key, value in movements.items()}
+        super().__init__(board, list(chain.from_iterable(self.movement_dict.values())))
 
     def __copy_args__(self):
         return self.board, {key: unpack(value) for key, value in self.movement_dict.items()}
@@ -1125,12 +1126,12 @@ class RelayMovement(BaseChoiceMovement):
         if movements is None:
             movements = {}
         movement_dict = {
-            key: (repack(packed[0]), repack(packed[1]))
+            key: (repack(packed[0], list), repack(packed[1], list))
             if len(packed := value if isinstance(value, (list, tuple)) else [value]) > 1
-            else (repack(packed[0]), repack(copy(packed[0])))
+            else (repack(packed[0], list), repack(copy(packed[0]), list))
             for key, value in movements.items()
         }
-        super().__init__(board, {key: sum(list(value), []) for key, value in movement_dict.items()})
+        super().__init__(board, {key: list(chain.from_iterable(value)) for key, value in movement_dict.items()})
         self.movement_dict = movement_dict
 
     def moves(self, pos_from: Position, piece: Piece, theoretical: bool = False):
