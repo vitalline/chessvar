@@ -41,6 +41,38 @@ max_seed = 2 ** 32 - 1
 
 penultima_textures = [f'ghost{s}' if s else None for s in ('R', 'N', 'B', 'Q', None, 'B', 'N', 'R')]
 
+default_rules = {
+    'order': 0,
+    'state': 0,
+    'last': [],
+    'piece': ["*"],
+    'move': ["*"],
+    'type': ["!pass"],
+    'from': ["*"],
+    'to': ["*"],
+    'take': ["*"],
+    'new': ["*"],
+    'old': ["*"],
+    'check': 0,
+}
+
+default_last_rules = {
+    'ago': [1],
+    'piece': ["*"],
+    'move': ["*"],
+    'type': ["*"],
+    'from': ["*"],
+    'to': ["*"],
+    'take': ["*"],
+    'new': ["*"],
+    'old': ["*"],
+}
+
+default_end_rules = {
+    'checkmate': {'': 1, "King": 1, "Royal": 1},
+    'stalemate': {'': 0},
+}
+
 action_types = {
     v: k for k, vs in {
         'move': ('m', 'move'),

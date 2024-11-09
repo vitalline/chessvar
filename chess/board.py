@@ -24,7 +24,8 @@ from chess.config import Config
 from chess.data import base_rng, max_seed, get_set_data, get_set_name
 from chess.data import default_board_width, default_board_height, default_size
 from chess.data import min_width, min_height, min_size, max_size, size_step
-from chess.data import action_types, end_types, penultima_textures, piece_groups
+from chess.data import action_types, end_types, piece_groups, penultima_textures
+from chess.data import default_rules, default_last_rules, default_end_rules
 from chess.debug import debug_info, save_piece_data, save_piece_sets, save_piece_types
 from chess.movement.base import BaseMovement
 from chess.movement.move import Move
@@ -740,32 +741,12 @@ class Board(Window):
             'ply': self.ply_count,
             'turn': [self.turn_data[0], self.turn_data[1].value, self.turn_data[2]],
             'order': [
-                side[0].value if side[1] is None else
-                [side[0].value, unpack([{k: v for k, v in {
-                    'order': d.get('order'),
-                    'state': d.get('state', 0),
-                    'last': unpack([{sk: sv for sk, sv in {
-                        'ago': unpack([t for t in s.get('ago', [])]),
-                        'piece': unpack([t for t in s.get('piece', [])]),
-                        'move': unpack([t for t in s.get('move', [])]),
-                        'type': unpack([t for t in s.get('type', [])]),
-                        'from': unpack([t for t in s.get('from', [])]),
-                        'to': unpack([t for t in s.get('to', [])]),
-                        'take': unpack([t for t in s.get('take', [])]),
-                        'new': unpack([t for t in s.get('new', [])]),
-                        'old': unpack([t for t in s.get('old', [])]),
-                    }.items() if sv} for s in d.get('last', [])]),
-                    'piece': unpack([t for t in d.get('piece', [])]),
-                    'move': unpack([t for t in d.get('move', [])]),
-                    'type': unpack([t for t in d.get('type', [])]),
-                    'from': unpack([t for t in d.get('from', [])]),
-                    'to': unpack([t for t in d.get('to', [])]),
-                    'take': unpack([t for t in d.get('take', [])]),
-                    'new': unpack([t for t in d.get('new', [])]),
-                    'old': unpack([t for t in d.get('old', [])]),
-                    'check': d.get('check', 0),
-                }.items() if v} for d in side[1]])]
-                for side in self.custom_turn_order
+                side[0].value if side[1] is None else [
+                    side[0].value, unpack([{mk: unpack([
+                        {lk: unpack(lv) for lk in sorted(default_last_rules) if (lv := ld.get(lk))}
+                        if isinstance(ld, dict) else ld for ld in mv
+                    ]) for mk in sorted(default_rules) if (mv := md.get(mk))} for md in side[1]])
+                ] for side in self.custom_turn_order
             ],
             'end': {
                 (side.value if isinstance(side, Side) else side): {
@@ -1054,30 +1035,10 @@ class Board(Window):
             self.log(f"Error: Invalid ply count ({ply_count})")
             ply_count = 1
         self.custom_turn_order = [
-            (Side(int(side[0])), [{k: v for k, v in {
-                'order': d.get('order', 0),
-                'state': d.get('state', 0),
-                'last': [{sk: sv for sk, sv in {
-                    'ago': [t for t in repack(s.get('ago', []))],
-                    'piece': [t for t in repack(s.get('piece', []))],
-                    'move': [t for t in repack(s.get('move', []))],
-                    'type': [t for t in repack(s.get('type', []))],
-                    'from': [t for t in repack(s.get('from', []))],
-                    'to': [t for t in repack(s.get('to', []))],
-                    'take': [t for t in repack(s.get('take', []))],
-                    'new': [t for t in repack(s.get('new', []))],
-                    'old': [t for t in repack(s.get('old', []))],
-                }.items() if sv} for s in repack(d.get('last', []))],
-                'piece': [t for t in repack(d.get('piece', []))],
-                'move': [t for t in repack(d.get('move', []))],
-                'type': [t for t in repack(d.get('type', []))],
-                'from': [t for t in repack(d.get('from', []))],
-                'to': [t for t in repack(d.get('to', []))],
-                'take': [t for t in repack(d.get('take', []))],
-                'new': [t for t in repack(d.get('new', []))],
-                'old': [t for t in repack(d.get('old', []))],
-                'check': d.get('check', 0),
-            }.items() if v} for d in repack(side[1])])
+            (Side(int(side[0])), [{mk: [
+                {lk: repack(lv) for lk in default_last_rules if (lv := ld.get(lk))}
+                if isinstance(ld, dict) else ld for ld in repack(mv)
+            ] for mk in default_rules if (mv := md.get(mk))} for md in repack(side[1])])
             if isinstance(side, list) and len(side) > 1 else (Side(int(side)), None)
             for side in data.get('order', [])
         ]
@@ -1576,31 +1537,6 @@ class Board(Window):
     def reset_turn_order(self) -> None:
         start_turns, loop_turns = [], []
         start_ended = False
-        default_rules = {
-            'order': 0,
-            'state': 0,
-            'last': [],
-            'piece': ["*"],
-            'move': ["*"],
-            'type': ["!pass"],
-            'from': ["*"],
-            'to': ["*"],
-            'take': ["*"],
-            'new': ["*"],
-            'old': ["*"],
-            'check': 0,
-        }
-        default_last_rules = {
-            'ago': [1],
-            'piece': ["*"],
-            'move': ["*"],
-            'type': ["*"],
-            'from': ["*"],
-            'to': ["*"],
-            'take': ["*"],
-            'new': ["*"],
-            'old': ["*"],
-        }
         to_pure_type = lambda s: action_types.get(s, s)
         to_pure_move = lambda s: t.__name__ if isinstance((t := load_movement_type(s) or s), type) else t
         to_type = lambda s: '!' + to_pure_type(s[1:]) if s[0:1] == '!' else to_pure_type(s)
@@ -1614,12 +1550,16 @@ class Board(Window):
                 for field in default_rules:
                     if field not in rule:
                         rule[field] = default_rules[field]
+                    elif not isinstance(default_rules[field], list):
+                        rule[field] = unpack(rule[field])
                 rule['move'] = [to_move(s) for s in rule['move']]
                 rule['type'] = [to_type(s) for s in rule['type']]
                 for last in rule['last']:
                     for field in default_last_rules:
                         if field not in last:
                             last[field] = default_last_rules[field]
+                        elif not isinstance(default_last_rules[field], list):
+                            last[field] = unpack(last[field])
                     last['move'] = [to_move(s) for s in last['move']]
                     last['type'] = [to_type(s) for s in last['type']]
             (loop_turns if start_ended else start_turns).append((side, rules))
@@ -1659,16 +1599,19 @@ class Board(Window):
                     self.end_data.setdefault(side, {}).setdefault(condition, {}).setdefault('', 0)
             if side is Side.NONE:
                 continue
-            if 'checkmate' not in self.end_rules[side] and 'capture' not in self.end_rules[side]:
-                self.end_rules[side]['checkmate'] = {'': 1, "King": 1}
-                self.end_data[side]['checkmate'] = {'': 0, "King": 0}
-                if "Royal" in self.piece_groups:
-                    self.end_rules[side]['checkmate']["Royal"] = 1
-                    self.end_data[side]['checkmate']["Royal"] = 0
-            if 'stalemate' not in self.end_rules[side]:
-                self.end_rules[side]['stalemate'] = {'': 0}
-                self.end_data[side]['stalemate'] = {'': 0}
-
+            for condition, condition_data in default_end_rules.items():
+                if condition not in self.end_rules[side]:
+                    if condition == 'checkmate' and 'capture' in self.end_rules[side]:
+                        continue
+                    self.end_rules[side][condition] = {}
+                    self.end_data[side][condition] = {}
+                    for group, group_data in condition_data.items():
+                        group_exists = group == '' or group in (
+                            *self.piece_groups, *(piece.name for piece in self.piece_sets[side])
+                        )
+                        if group_exists:
+                            self.end_rules[side][condition][group] = group_data
+                            self.end_data[side][condition][group] = 0
 
     def get_piece_sets(
         self,
