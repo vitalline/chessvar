@@ -1,3 +1,5 @@
+chessvar - Chess Variant Player
+
 Controls:
 Mouse, Arrow keys: move selection
 LMB, Enter: select piece, move selected piece (click or drag)
@@ -8,15 +10,13 @@ Escape: exit application
 
 Restart hotkeys:
 Ctrl + R: restart game with current armies (twice: refresh data)
-Ctrl + Alt + R: clear custom data and restart game
-
-Start new game hotkeys:
 Shift + R: start game with new random armies
 Shift + C: start game with new chaotic armies
 Alt + C: start game with new asymmetrical chaotic armies
 Shift + X: start game with new extremely chaotic armies
 Alt + X: start game with new asymmetrical extremely chaotic armies
-... + Ctrl (to any of the above): use one new army of the same type for both players
+... + Ctrl (for new armies): use the same army for both players
+Ctrl + Shift + E: erase all custom data and restart game
 
 Custom start hotkeys:
 Shift + W: cycle white army forward (+1)
@@ -65,6 +65,7 @@ Ctrl + F: flip board
 Ctrl + G: reset graphics mode (colors)
 Shift + G: cycle graphics mode forward (+1)
 ... + Ctrl: cycle graphics mode backward (-1)
+Ctrl + I: print game information (if applicable)
 
 Save/load hotkeys:
 Ctrl + C: save current configuration
@@ -81,8 +82,10 @@ Ctrl + S: save game state
 Alt + E: save configuration, game log, debug log, and game state
 ... + Ctrl: also save verbose game log
 ... + Shift: also save debug listings
-Alt + R: reload last loaded game state
-... + Shift: reload last saved game state
+Alt + R: reload last loaded game file
+... + Ctrl: without reading file contents
+... + Shift: use last saved game file instead
+... + F (instead of R): and reload move history
 Alt + S: save current position as starting position
 
 Edit hotkeys:
@@ -118,10 +121,3 @@ RMB, Backspace: remove piece
 Shift + RMB/Backspace: replace piece
 Ctrl + RMB/Backspace: revoke first move of a piece
 Alt + RMB/Backspace: promote or drop piece
-
-Source:
-https://www.reddit.com/r/chessvariants/comments/190l46o/2024_chess_with_different_armies_thread/
-https://www.reddit.com/r/chessvariants/comments/15dzby8/new_and_even_more_thought_out_chess_with/
-https://www.reddit.com/r/chessvariants/comments/vmdk1s/a_new_and_improved_chess_with_different_armies/
-https://en.wikipedia.org/wiki/Chess_with_different_armies
-https://www.chessvariants.org/unequal.dir/cwda.html

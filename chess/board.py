@@ -7,7 +7,7 @@ from itertools import chain, product, zip_longest
 from json import loads, JSONDecodeError
 from math import ceil, floor, isqrt
 from os import makedirs, name as os_name, system
-from os.path import dirname, isfile, join
+from os.path import dirname, isfile, join, split, relpath, getsize
 from random import Random
 from sys import argv
 from traceback import print_exc
@@ -92,10 +92,15 @@ class Board(Window):
         self.variant = ''  # name of the variant being played
         self.load_data = None  # last loaded data
         self.load_dict = None  # last loaded data, parsed from JSON
-        self.load_path = None  # path to the last loaded data file
-        self.save_info = [None]  # list of comment strings in save data
+        self.load_name = ''  # name of the last loaded data file
+        self.load_path = str(join(base_dir, self.board_config['save_path']))  # directory of the last loaded file
+        self.auto_data = None  # last auto-saved data
+        self.auto_name = ''  # name of the last auto-saved data file
+        self.auto_path = str(join(base_dir, self.board_config['autosave_path']))  # directory for auto-saved files
         self.save_data = None  # last saved data
-        self.save_path = None  # path to the last saved data file
+        self.save_name = ''  # name of the last saved data file
+        self.save_path = str(join(base_dir, self.board_config['save_path']))  # directory of the last saved file
+        self.save_info = []  # list of comment strings in save data
         self.save_loaded = False  # whether a save was successfully loaded
         self.game_loaded = False  # whether the game had successfully loaded
         self.skip_mouse_move = 0  # setting this to >=1 skips mouse movement events
@@ -141,8 +146,8 @@ class Board(Window):
         self.hide_move_markers = self.board_config['hide_moves']  # whether to hide the move markers; None uses above
         self.hide_edit_pieces = False  # whether to mark pieces placed in edit mode as hidden
         self.auto_moves = True  # whether to skip move animations if allowed
-        self.flip_mode = False  # whether the board is flipped
-        self.edit_mode = False  # allows to edit the board position if set to True
+        self.flip_mode = self.board_config['flip_board']  # whether the board is flipped
+        self.edit_mode = self.board_config['edit_mode']  # allows to edit the board position if set to True
         self.game_over = False  # act 6 act 6 intermission 3 (game over)
         self.trickster_color_index = 0  # hey wouldn't it be funny if there was an easter egg here
         self.trickster_color_delta = 0  # but it's not like that's ever going to happen right
@@ -257,7 +262,12 @@ class Board(Window):
 
         # set up the board
         self.resize_board()
-        self.load(argv[1] if len(argv) > 1 else None)
+        save_path = None
+        if len(argv) > 1:
+            save_path = argv[1]
+        elif save_name := self.board_config['use_save'].strip():
+            save_path = join(self.save_path, save_name)
+        self.load(save_path)
         if not self.save_loaded:
             self.reset_custom_data()
             self.reset_board()
@@ -546,7 +556,6 @@ class Board(Window):
         self.end_condition = None
         self.win_side = Side.NONE
         self.game_over = False
-        self.edit_mode = False
         self.chain_start = None
         self.promotion_piece = None
         self.action_count = 0
@@ -579,6 +588,9 @@ class Board(Window):
             update = not self.move_history
 
         if update:
+            if self.board_config['edit_mode']:
+                self.edit_mode = True
+                self.log("Mode: EDIT", False)
             self.edit_piece_set_id = self.board_config['edit_id']
             self.roll_history = []
             self.future_move_history = []
@@ -668,12 +680,13 @@ class Board(Window):
         self.reload_end_data()
         self.update_status()
 
-    def dump_board(self, partial: bool = False) -> str:
+    def dump_board(self, trim: bool = False) -> str:
         wh = self.board_width, self.board_height, *self.notation_offset
         whn = *wh, {}
         whc = *wh, {k: v for k, v in self.custom_areas.items() if isinstance(v, set)}
         wha = defaultdict(lambda: whn, {side: (*wh, self.areas.get(side) or {}) for side in (Side.WHITE, Side.BLACK)})
         data = {
+            'info': '\n'.join(self.save_info),
             'variant': self.custom_variant,
             'board_size': [self.board_width, self.board_height],
             'offset': list(self.notation_offset),
@@ -805,16 +818,16 @@ class Board(Window):
             new_rng = Random(seed)
             if rng.getstate() != new_rng.getstate():
                 data[f"{k}_state"] = save_rng(rng)
-        if partial and self.load_dict is not None:
+        if trim and self.load_dict is not None:
             data = {k: v for k, v in data.items() if k in self.load_dict}
-        if self.alias_dict:
+        if self.alias_dict and self.board_config['recursive_aliases'] is not None:
             data = {'alias': self.alias_dict, **condense(data, self.alias_dict, self.board_config['recursive_aliases'])}
-        indent = self.board_config['save_indent']
-        compression = self.board_config['save_compression']
+        indent = self.board_config['indent']
+        compression = self.board_config['compression']
         if indent is None:
             return dumps(data, separators=(',', ':'), ensure_ascii=False)
         else:
-            return dumps(data, indent=indent, compression=compression, ensure_ascii=False)
+            return dumps(data, compression=compression, indent=indent, ensure_ascii=False)
 
     def load_board(self, dump: str, with_history: bool = False) -> bool:
         try:
@@ -855,7 +868,7 @@ class Board(Window):
         self.alias_dict = data.get('alias', {})
         if 'alias' in data:
             del data['alias']
-        if self.alias_dict:
+        if self.alias_dict and self.board_config['recursive_aliases'] is not None:
             data = expand(data, self.alias_dict, self.board_config['recursive_aliases'])
 
         subs_dict = {}
@@ -890,6 +903,7 @@ class Board(Window):
         data = substitute(data, subs_dict)
 
         self.custom_variant = data.get('variant', '')
+        self.save_info = list(chain.from_iterable(str(x).split('\n') for x in repack(data.get('info', ''))))
 
         # might have to add more error checking to saving/loading, even if at the cost of slight redundancy.
         # who knows when someone decides to introduce a breaking change and absolutely destroy all the saves
@@ -1328,7 +1342,7 @@ class Board(Window):
             self.custom_pieces = self.past_custom_pieces
         else:
             self.past_custom_pieces = {**self.past_custom_pieces, **self.custom_pieces}
-        self.save_info = [None]
+        self.save_info = []
         self.custom_variant = ''
         self.alias_dict = {}
         self.custom_areas = {}
@@ -1425,7 +1439,7 @@ class Board(Window):
             Side.WHITE: [self.get_relative((self.board_height - 1, i)) for i in range(self.board_width)],
             Side.BLACK: [self.get_relative((0, i)) for i in range(self.board_width)],
         }
-        split = {side: len(piece_sets[side]) // 2 for side in self.piece_sets}
+        middle = {side: len(piece_sets[side]) // 2 for side in self.piece_sets}
         custom_pawns = {
             side: self.custom_pawns.get(side)
             if isinstance(self.custom_pawns, dict)
@@ -1435,11 +1449,11 @@ class Board(Window):
             promotions = []
             used_piece_set = set()
             for pieces in (
-                piece_sets[side][split[side] - 1::-1], piece_sets[side.opponent()][split[side.opponent()] - 1::-1],
-                piece_sets[side][split[side] + 1:], piece_sets[side.opponent()][split[side.opponent()] + 1:],
+                piece_sets[side][middle[side] - 1::-1], piece_sets[side.opponent()][middle[side.opponent()] - 1::-1],
+                piece_sets[side][middle[side] + 1:], piece_sets[side.opponent()][middle[side.opponent()] + 1:],
                 [
-                    *piece_sets[side.opponent()][split[side.opponent()]:split[side.opponent()] + 1],
-                    *piece_sets[side][split[side]:split[side] + 1],
+                    *piece_sets[side.opponent()][middle[side.opponent()]:middle[side.opponent()] + 1],
+                    *piece_sets[side][middle[side]:middle[side] + 1],
                 ],
             ):
                 promotion_types = []
@@ -1479,7 +1493,7 @@ class Board(Window):
             else:
                 piece_sets = self.get_piece_sets(self.edit_piece_set_id)[0]
         self.edit_promotions = {side: [] for side in self.piece_sets}
-        split = {side: len(piece_sets[side]) // 2 for side in self.piece_sets}
+        middle = {side: len(piece_sets[side]) // 2 for side in self.piece_sets}
         for side in self.edit_promotions:
             used_piece_set = set()
             side_pawns = (
@@ -1493,13 +1507,13 @@ class Board(Window):
                 else self.custom_pawns
             )
             for pieces in (
-                piece_sets[side][split[side] - 1::-1], piece_sets[side.opponent()][split[side.opponent()] - 1::-1],
-                piece_sets[side][split[side] + 1:], piece_sets[side.opponent()][split[side.opponent()] + 1:],
+                piece_sets[side][middle[side] - 1::-1], piece_sets[side.opponent()][middle[side.opponent()] - 1::-1],
+                piece_sets[side][middle[side] + 1:], piece_sets[side.opponent()][middle[side.opponent()] + 1:],
                 [
-                    *piece_sets[side.opponent()][split[side.opponent()]:split[side.opponent()] + 1],
+                    *piece_sets[side.opponent()][middle[side.opponent()]:middle[side.opponent()] + 1],
                     *(opponent_pawns if opponent_pawns is not None else [Pawn]),
                     *(side_pawns if side_pawns is not None else [Pawn]),
-                    *piece_sets[side][split[side]:split[side] + 1],
+                    *piece_sets[side][middle[side]:middle[side] + 1],
                 ],
             ):
                 promotion_types = []
@@ -3576,7 +3590,9 @@ class Board(Window):
             self.show_moves(False)
             self.draw(0)
             self.select_piece(move.pos_to)
-            if self.auto_moves and self.board_config['fast_chain'] and not self.game_over:
+            if self.auto_moves and (
+                self.board_config['fast_moves'] or self.board_config['fast_chain']
+            ) and not self.game_over:
                 self.try_auto()
         else:
             self.chain_start = None
@@ -4264,7 +4280,7 @@ class Board(Window):
                 drop_type_list.extend(piece_type for _ in drops)
             if not drop_list:
                 return
-            if self.auto_moves and self.board_config['fast_drop'] and len(drop_list) == 1:
+            if self.auto_moves and self.board_config['fast_drops'] and len(drop_list) == 1:
                 promotion_piece = self.promotion_piece
                 self.promotion_piece = True
                 drop = drop_list[0]
@@ -4947,7 +4963,7 @@ class Board(Window):
         self.log(f"Info: Resized to {self.width}x{self.height}", False)
 
     def set_visible(self, visible: bool = True) -> None:
-        if self.board_config['save_update_mode'] < 0 and self.load_data is None:
+        if self.board_config['update_mode'] < 0 and self.load_data is None:
             visible = False
         super().set_visible(visible)
 
@@ -5389,7 +5405,9 @@ class Board(Window):
                     self.show_moves(False)
                     self.draw(0)
                     self.select_piece(move.pos_to)
-                    if self.auto_moves and self.board_config['fast_chain'] and not self.game_over:
+                    if self.auto_moves and (
+                        self.board_config['fast_moves'] or self.board_config['fast_chain']
+                    ) and not self.game_over:
                         self.try_auto()
                 else:
                     self.chain_start = None
@@ -5478,32 +5496,37 @@ class Board(Window):
                         self.custom_layout[piece.board_pos] = copy(piece)
                 self.log("Info: Custom layout saved")
             elif modifiers & key.MOD_ACCEL and not modifiers & key.MOD_SHIFT:  # Save
-                save_path = get_file_name('save', 'json')
-                self.save(save_path)
+                self.save(get_file_name('save', 'json', str(join(base_dir, self.board_config['save_path']))))
             elif modifiers & key.MOD_ACCEL and modifiers & key.MOD_SHIFT:  # Save as
                 self.deactivate()
                 self.draw(0)
                 self.log("Info: Selecting a file to save to", False)
-                save_path = select_save_name()
+                save_path = select_save_name(self.save_name or get_file_name('save', 'json', path=''), self.save_path)
                 if save_path:
                     self.save(save_path)
                 else:
                     self.log("Info: Save cancelled", False)
                 self.activate()
         if symbol == key.R:  # Restart
-            if modifiers & key.MOD_ALT and modifiers & key.MOD_ACCEL:  # Reset custom data
-                self.log("Info: Clearing custom data")
-                self.reset_custom_data()
-                self.log("Info: Starting new game", bool(self.hide_pieces))
-                self.reset_board()
-            elif modifiers & key.MOD_ALT:  # Reload save data
-                data = self.save_data if modifiers & key.MOD_SHIFT else self.load_data
-                if data is not None:
-                    whence = 'saved to' if modifiers & key.MOD_SHIFT else 'loaded from'
-                    path = self.save_path if modifiers & key.MOD_SHIFT else self.load_path
-                    state = '' if isfile(path) else '(deleted) '
-                    self.log(f"Info: Reloading data {whence} {state}{path}")
-                    self.load_board(data)
+            if modifiers & key.MOD_ALT:  # Reload save
+                which = 'saved' if modifiers & key.MOD_SHIFT else 'loaded'
+                if modifiers & key.MOD_SHIFT:
+                    path = join(self.save_path, self.save_name) if self.save_path and self.save_name else None
+                else:
+                    path = join(self.load_path, self.load_name) if self.load_path and self.load_name else None
+                if not path:
+                    self.log(f"Info: No file {which} yet!", False)
+                elif modifiers & key.MOD_ACCEL:  # Reload save data
+                    data = self.save_data if modifiers & key.MOD_SHIFT else self.load_data
+                    if data is not None:
+                        state = '' if isfile(path) else '(deleted) '
+                        self.log(f"Info: Reloading last {which} state: {state}{path}")
+                        self.load_board(data)
+                elif isfile(path):  # Reload save file
+                    self.log(f"Info: Reloading last {which} file: {path}")
+                    self.load(str(path))
+                else:
+                    self.log(f"Info: Last {which} file not found: {path}", False)
             elif modifiers & key.MOD_SHIFT:  # Randomize piece sets
                 blocked_ids = set(self.board_config['block_ids'])
                 set_id_list = list(i for i in range(len(piece_groups)) if i not in blocked_ids)
@@ -5644,8 +5667,7 @@ class Board(Window):
                 debug_log_data = debug_info(self)
                 self.save_log(debug_log_data, 'debug')
                 self.log("Info: Debug information saved", False)
-                save_path = get_file_name('save', 'json')
-                self.save(save_path)
+                self.save(get_file_name('save', 'json', str(join(base_dir, self.board_config['save_path']))))
                 if modifiers & key.MOD_ACCEL:
                     self.save_log(self.verbose_data, 'verbose')
                     self.log("Info: Verbose log file saved", False)
@@ -5655,20 +5677,24 @@ class Board(Window):
                     save_piece_sets()
                     save_piece_types()
                     self.log("Info: Debug listings saved", False)
-            else:
-                if modifiers & key.MOD_SHIFT:  # Empty board
-                    self.empty_board()
-                if modifiers & key.MOD_ACCEL and not partial_move:  # Edit mode (toggle)
-                    self.edit_mode = not self.edit_mode
-                    self.log(f"Mode: {'EDIT' if self.edit_mode else 'PLAY'}", False)
-                    self.deselect_piece()
-                    self.unload_end_data()
-                    self.load_pieces()
-                    self.load_check()
-                    self.load_moves()
-                    self.hide_moves()
-                    self.reload_end_data()
-                    self.advance_turn()
+            elif modifiers & key.MOD_ACCEL and modifiers & key.MOD_SHIFT:  # Erase custom data
+                self.log("Info: Clearing custom data")
+                self.reset_custom_data()
+                self.log("Info: Starting new game", bool(self.hide_pieces))
+                self.reset_board()
+            elif modifiers & key.MOD_SHIFT:  # Empty board
+                self.empty_board()
+            elif modifiers & key.MOD_ACCEL and not partial_move:  # Edit mode (toggle)
+                self.edit_mode = not self.edit_mode
+                self.log(f"Mode: {'EDIT' if self.edit_mode else 'PLAY'}", False)
+                self.deselect_piece()
+                self.unload_end_data()
+                self.load_pieces()
+                self.load_check()
+                self.load_moves()
+                self.hide_moves()
+                self.reload_end_data()
+                self.advance_turn()
         if symbol == key.W:  # White
             if modifiers & key.MOD_ALT:  # Reset white set to default
                 self.piece_set_ids[Side.WHITE] = 0
@@ -5847,17 +5873,36 @@ class Board(Window):
                             self.start_promotion(promotion_piece, self.edit_promotions[promotion_side])
                             self.update_caption()
         if symbol == key.F:
-            if modifiers & key.MOD_ACCEL and not modifiers & key.MOD_SHIFT:  # Flip board
+            if modifiers & key.MOD_ALT:  # Reload save (with history)
+                which = 'saved' if modifiers & key.MOD_SHIFT else 'loaded'
+                if modifiers & key.MOD_SHIFT:
+                    path = join(self.save_path, self.save_name) if self.save_path and self.save_name else None
+                else:
+                    path = join(self.load_path, self.load_name) if self.load_path and self.load_name else None
+                if not path:
+                    self.log(f"Info: No file {which} yet!", False)
+                elif modifiers & key.MOD_ACCEL:  # Reload save data
+                    data = self.save_data if modifiers & key.MOD_SHIFT else self.load_data
+                    if data is not None:
+                        state = '' if isfile(path) else '(deleted) '
+                        self.log(f"Info: Reloading last {which} state: {state}{path}")
+                        self.load_board(data, True)
+                elif isfile(path):  # Reload save file
+                    self.log(f"Info: Reloading last {which} file: {path}")
+                    self.load(str(path), True)
+                else:
+                    self.log(f"Info: Last {which} file not found: {path}", False)
+            elif modifiers & key.MOD_ACCEL and not modifiers & key.MOD_SHIFT:  # Flip board
                 self.flip_board()
                 self.log("Info: Board flipped", False)
-            if not modifiers & key.MOD_ACCEL and modifiers & key.MOD_SHIFT:  # Fast-forward
+            elif not modifiers & key.MOD_ACCEL and modifiers & key.MOD_SHIFT:  # Fast-forward
                 self.auto_moves = False
                 if self.future_move_history:
                     self.log("Info: Fast-forwarding", False)
                 while self.future_move_history:
                     self.redo_last_move()
                 self.auto_moves = True
-            if modifiers & key.MOD_ACCEL and modifiers & key.MOD_SHIFT:  # Fast-forward, but slowly. (Reload history)
+            elif modifiers & key.MOD_ACCEL and modifiers & key.MOD_SHIFT:  # Fast-forward, but slowly. (Reload history)
                 self.log("Info: Reloading history", False)
                 self.log("Info: Starting new game", bool(self.hide_pieces))
                 if not self.reload_history():
@@ -5985,12 +6030,14 @@ class Board(Window):
         if symbol == key.Y and modifiers & key.MOD_ACCEL:  # Redo
             self.redo_last_finished_move()
             self.update_caption()
+        if symbol == key.I and modifiers & key.MOD_ACCEL:  # Info
+            self.log_info()
         if symbol == key.L:
             if modifiers & key.MOD_ALT:  # Load save data
                 self.deactivate()
                 self.draw(0)
                 self.log("Info: Selecting a file to load from", False)
-                load_path = select_save_data()
+                load_path = select_save_data(self.load_name or None, self.load_path)
                 if load_path:
                     self.load(load_path, with_history=modifiers & key.MOD_SHIFT)
                     if not self.save_loaded:
@@ -6066,76 +6113,69 @@ class Board(Window):
                 round(self.highlight.center_x), round(self.highlight.center_y),  MOUSE_BUTTON_RIGHT, modifiers
             )
 
-    def load(self, path: str | None, with_history: bool = False) -> None:
+    def load(self, path: str | None, with_history: bool = False) -> bool:
         if not path:
-            return
-        update_mode = abs(self.board_config['save_update_mode'])
+            return False
+        update_mode = abs(self.board_config['update_mode'])
         should_update = bool(update_mode)
         if should_update:
             update_mode -= 1
+        load_attempted = False
         # noinspection PyBroadException
         try:
-            save_path = join(base_dir, path)
-            if not isfile(save_path):
-                return
-            self.log(f"Info: Loading from {path}")
-            self.save_info = []
-            save_data = ''
-            save_data_start, save_data_end = False, False
-            with open(save_path, mode='r', encoding='utf-8') as file:
-                for line in file.read().splitlines():
-                    stripped_line = line.strip()
-                    if not stripped_line:
-                        continue
-                    if stripped_line[0] == '#':
-                        if save_data_start:
-                            save_data_end = True
-                        self.save_info.append(stripped_line[1:].strip())
-                    elif not save_data_start:
-                        save_data_start = True
-                        self.save_info.append(None)
-                        save_data = line
-                    elif save_data_end:
-                        self.log("Error: Comments within save data are not supported")
-                        save_data = ''
-                    else:
-                        save_data = f"{save_data}\n{line}"
-                if not save_data:
-                    self.log_info()
-                    self.save_info.append(None)
-                    return
+            if not isfile(path):
+                return False
+            if (limit := self.board_config['size_limit']) and (save_size := getsize(path)) > limit:
+                units = {0: 'B', 1: 'KB', 2: 'MB', 3: 'GB', 4: 'TB'}
+                parts = [save_size, limit]
+                exact = [True, True]
+                i = 0
+                while limit > 1024:
+                    exact = [x and part % 1024 == 0 for x, part in zip(exact, parts)]
+                    parts = [part / 1024 for part in parts]
+                    i += 1
+                precs = [0 if x else 2 for x in exact]
+                precs[0] = max(precs)
+                ratio = '/'.join(f"{x:.{p}f}" for x, p in zip(parts, precs))
+                self.log(f"Error: File \"{path}\" is too large to load ({ratio} {units[i]})")
+                return False
+            self.log(f"Info: Loading from \"{path}\"")
+            with open(path, mode='r', encoding='utf-8') as file:
+                save_data = file.read()
+            load_attempted = True
             if self.load_board(save_data, with_history=update_mode & 1 if should_update else with_history):
+                self.load_path, self.load_name = split(path)
                 if should_update:
-                    self.save(save_path)
+                    self.save(path)
         except Exception:
-            self.log(f"Error: Failed to load from {path}")
+            self.log(f"Error: Failed to load \"{path}\"")
             print_exc()
+        finally:
+            return load_attempted
 
     def save(self, path: str | None, auto: bool = False) -> None:
         if not path:
             return
-        data = self.dump_board(self.board_config[f"partial_{'auto' * auto}save"])  # completely unnecessary but whatever
-        if auto and data == self.save_data:
+        data = self.dump_board(self.board_config[f"trim_{'auto' * auto}save"])
+        if auto and data == self.auto_data:
             return
         makedirs(dirname(path), exist_ok=True)
         with open(path, mode='w', encoding='utf-8') as file:
-            first_line = True
-            for string in self.save_info:
-                if first_line:
-                    first_line = False
-                else:
-                    file.write('\n')
-                if isinstance(string, str):
-                    file.write(f"# {string}")
-                elif string is None:
-                    file.write(f"{data}")
-        self.save_data = data
-        self.save_path = path
-        saved = 'Auto-saved' if auto else 'Saved'
-        self.log(f"Info: {saved} to {path}", False)
+            file.write(data)
+        if auto:
+            self.auto_data = data
+            self.auto_path, self.auto_name = split(path)
+            self.log(f"Info: Auto-saved to \"{path}\"", False)
+        else:
+            self.save_data = data
+            self.save_path, self.save_name = split(path)
+            self.log(f"Info: Saved to \"{path}\"", False)
 
     def auto_save(self) -> None:
-        self.save(get_file_name('autosave', 'json', in_dir=join(base_dir, 'auto')), auto=True)
+        self.save(
+            get_file_name('autosave', 'json', path=str(join(base_dir, self.board_config['autosave_path']))),
+            auto=True
+        )
 
     def log(self, string: str, important: bool = True, *, prefix: str | None = None) -> None:
         if prefix is None:
@@ -6166,8 +6206,7 @@ class Board(Window):
         if info is None:
             info = self.save_info
         for line in info:
-            if isinstance(line, str):
-                self.log(f"Note: {line}", False)
+            self.log(line, False, prefix='Note')
 
     def log_armies(self):
         if self.custom_variant or self.custom_layout:
@@ -6191,7 +6230,8 @@ class Board(Window):
         if not log_data:
             log_data = self.log_data
         if log_data:
-            with open(get_file_name(log_name, 'txt'), mode='w', encoding='utf-8') as log_file:
+            save_path = join(base_dir, self.board_config['log_path'], get_file_name(log_name, 'txt'))
+            with open(save_path, mode='w', encoding='utf-8') as log_file:
                 log_file.write('\n'.join(log_data))
 
     def clear_log(self, console: bool = True, log: bool = True, verbose: bool = True) -> None:
@@ -6217,10 +6257,14 @@ class Board(Window):
         config['set_seed'] = self.set_seed
         config['roll_seed'] = self.roll_seed
         config['verbose'] = self.verbose
+        try:
+            config['save_path'] = relpath(self.save_path, base_dir)
+        except ValueError:
+            config['save_path'] = self.save_path
         config.save(get_file_name('config', 'ini'))
 
     def run(self):
-        if self.board_config['save_update_mode'] < 0 and self.load_data is not None:
+        if self.board_config['update_mode'] < 0 and self.load_data is not None:
             self.close()
         else:
             self.set_visible()

@@ -26,7 +26,14 @@ setup(
     version='0.3.0',
     options={'build_exe': {
         'build_exe': join('dist', 'chess'),
-        'include_files': gen_data_files(['assets']) + [(s,) * 2 for s in ('readme.txt', 'cwda_2024.txt')]
+        'include_files': gen_data_files(['assets']) + [
+            (s,) * 2 for s in (
+                'cwda_2024.txt',
+                'config.txt',
+                'readme.txt',
+                'source.txt',
+            )
+        ]
     }},
     executables=[
         Executable('main.py', target_name='chessvar.exe'),

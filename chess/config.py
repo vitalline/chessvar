@@ -5,42 +5,59 @@ from os.path import isfile
 from typing import Any
 
 DEFAULT_CONFIG = {
-    'Chess': {
+    "INIT": {
         'color_id': 0,
         'white_id': 0,
         'black_id': 0,
         'edit_id': '',
+        'edit_mode': False,
+        'flip_board': False,
         'hide_pieces': 0,
         'hide_moves': '',
-        'fast_moves': False,
-        'fast_chain': True,
-        'fast_turn_pass': True,
-        'fast_promotion': True,
-        'fast_drop': False,
         'use_drops': False,
+        'use_save': '',
+    },
+    "SEED": {
+        'block_ids': '',
+        'block_ids_chaos': '',
         'chaos_mode': 0,
         'chaos_seed': '',
         'set_seed': '',
         'roll_seed': '',
         'update_roll_seed': True,
-        'block_ids': '',
-        'block_ids_chaos': '',
-        'recursive_aliases': True,
-        'save_indent': '',
-        'save_compression': 0,
-        'save_update_mode': 0,
-        'partial_save': False,
-        'partial_autosave': False,
-        'autosave_act': 0,
-        'autosave_ply': 0,
-        'autosave_time': 0,
-        'verbose': True,
-        'log_info': True,
+    },
+    "SKIP": {
+        'fast_moves': False,
+        'fast_chain': True,
+        'fast_drops': False,
+        'fast_promotion': True,
+        'fast_turn_pass': True,
+    },
+    "LOGS": {
+        'log_path': 'logs',
         'log_pass': '',
+        'log_info': True,
         'log_prefix': 1,
         'status_prefix': 1,
         'status_string': True,
+        'verbose': True,
     },
+    "SAVE": {
+        'save_path': 'save',
+        'indent': '',
+        'compression': 0,
+        'update_mode': 0,
+        'size_limit': '1M',
+        'trim_save': False,
+        'recursive_aliases': True,
+    },
+    "AUTO": {
+        'autosave_path': 'auto',
+        'autosave_act': 0,
+        'autosave_ply': 0,
+        'autosave_time': 0,
+        'trim_autosave': False,
+    }
 }
 
 
@@ -66,7 +83,7 @@ class Config(dict):
                         self[item] = self.base_config.getint(section, item)
                 except ValueError:
                     self[item] = DEFAULT_CONFIG[section][item]
-                if item in {'log_pass', 'status_string', 'verbose'}:
+                if item in {'hide_moves', 'log_pass', 'status_string', 'verbose'}:
                     try:
                         self[item] = self.base_config.getboolean(section, item)
                     except ValueError:
@@ -75,6 +92,15 @@ class Config(dict):
                     self[item] = [
                         int(s) for i in self.base_config[section][item].split(',') if (s := i.strip()).isdigit()
                     ]
+                if item.startswith('size_'):
+                    self[item] = 0
+                    data = self.base_config[section][item].strip().upper()
+                    if data[-1:] == 'B':
+                        data = data[:-1]
+                    exponent = {'K': 10, 'M': 20, 'G': 30, 'T': 40}.get(data[-1:], 0)
+                    data = data[:-1] if exponent else data
+                    if data.isdigit():
+                        self[item] = int(data) << exponent
                 if (
                     item == 'save_indent'
                     or item.endswith('_id')
@@ -86,28 +112,24 @@ class Config(dict):
                         self[item] = self.base_config.getint(section, item)
                     else:
                         self[item] = self.base_config[section][item]
-                if item == 'hide_moves':
-                    if self.base_config[section][item].strip() == '':
-                        self[item] = None
-                    else:
-                        self[item] = self.base_config.getboolean(section, item)
 
     def save(self, path: str) -> None:
         for section in self.base_config:
             for item in self.base_config[section]:
-                self.base_config[section][item] = str(self[item])
-                if item.startswith('block_'):
+                if self[item] is None:
+                    self.base_config[section][item] = ''
+                elif item.startswith('block_'):
                     self.base_config[section][item] = ', '.join(str(s) for s in self[item])
-                if (
-                    item == 'save_indent'
-                    or item.endswith('_id')
-                    or (item.endswith('_seed') and not item.startswith('update_'))
-                ):
-                    if self[item] is None:
-                        self.base_config[section][item] = ''
-                if item == 'hide_moves':
-                    if self[item] is None:
-                        self.base_config[section][item] = ''
+                elif item.startswith('size_'):
+                    value = self[item]
+                    for exponent in ['', 'K', 'M', 'G', 'T']:
+                        if value & 1023 == 0:
+                            value >>= 10
+                        else:
+                            break
+                    self.base_config[section][item] = f'{value}{exponent}'
+                else:
+                    self.base_config[section][item] = str(self[item])
         with open(path, mode='w', encoding='utf-8') as file:
             self.base_config.write(file)
 

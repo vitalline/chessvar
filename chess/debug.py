@@ -355,7 +355,7 @@ def debug_info(board: Board) -> list[str]:
                     ('path', "Texture path"),
                     ('file', "Texture file"),
                     ('cb', "Colorbound", False),
-                    ('movement', None, None, lambda x: dumps(x, indent=2, compression=3, ensure_ascii=False)),
+                    ('movement', None, None, lambda x: dumps(x, compression=3, indent=2, ensure_ascii=False)),
                 ):
                     key_data = key_data if isinstance(key_data, tuple) else (key_data,)
                     key_data = key_data + (None,) * (4 - len(key_data))

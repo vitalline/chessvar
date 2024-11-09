@@ -193,11 +193,11 @@ def fits(template: str, data: Any) -> bool:
 
 # Function to generate a file name based on a name, extension and timestamp (if not provided, the current time is used).
 def get_file_name(
-    name: str, ext: str, in_dir: str = base_dir, ts: datetime | None = None, ts_format: str = "%Y-%m-%d_%H-%M-%S"
+    name: str, ext: str, path: str = base_dir, ts: datetime | None = None, ts_format: str = "%Y-%m-%d_%H-%M-%S"
 ) -> str:
     name_args = [name, (ts or datetime.now()).strftime(ts_format)]
     full_name = '_'.join(s for s in name_args if s).translate(invalid_chars_trans_table)
-    return os.path.join(in_dir, f"{full_name}.{ext}")
+    return os.path.join(path, f"{full_name}.{ext}")
 
 
 # Function to check if a string contains another string as a prefix, a suffix, or a substring, optionally ignoring case.
@@ -210,18 +210,19 @@ def find_string(string: Any, part: Any, side: int = 0, case: bool = False) -> bo
 
 
 # Function to select a file to open. Returns the path of the selected file.
-def select_save_data() -> str:
+def select_save_data(file: str = None, path: str = base_dir) -> str:
     return filedialog.askopenfilename(
-        initialdir=base_dir,
+        initialdir=path,
+        initialfile=file,
         filetypes=[("JSON save file", "*.json")],
     )
 
 
 # Function to select a file to save. Returns the path of the selected file.
-def select_save_name() -> str:
+def select_save_name(file: str = None, path: str = base_dir) -> str:
     return filedialog.asksaveasfilename(
-        initialdir=base_dir,
-        initialfile=get_file_name('save', 'json', in_dir=''),
+        initialdir=path,
+        initialfile=file,
         filetypes=[("JSON save file", "*.json")],
         defaultextension='.json',
     )
@@ -261,6 +262,8 @@ def is_layered(obj: AnyJson, depth: int = 0) -> bool:
 # Alternative JSON dump function that allows for more control over the output format.
 def dumps(data: AnyJson, **kwargs: Any) -> str:
     compression = kwargs.pop('compression', 0)
+    if not compression:
+        return json_dumps(data, **kwargs)
     result = ''
     stack = [copy(data)]
     info_stack = [{'depth': 0, 'pad': 0, 'compress': not is_layered(stack[-1], compression)}]
@@ -269,6 +272,7 @@ def dumps(data: AnyJson, **kwargs: Any) -> str:
     indent = indent or 0
     item_sep, key_sep = kwargs.pop('separators', ('', ''))
     item_sep, key_sep = item_sep or ', ', key_sep or ': '
+    strip = kwargs.pop('strip', True)
     sep = ''
     while True:
         if not stack:
@@ -287,8 +291,9 @@ def dumps(data: AnyJson, **kwargs: Any) -> str:
                     {'depth': info['depth'] + 1, 'pad': info['pad'] + (not info['compress']), 'compress': compress}
                 )
             if not info_stack[-1]['compress'] and sep:
+                if strip:
+                    result = result.rstrip()
                 result += f"{nl}{'':{info['pad'] * indent}}"
-            info = info_stack[-1]
             if start:
                 sep = ''
                 result += f"{start}"
@@ -303,6 +308,8 @@ def dumps(data: AnyJson, **kwargs: Any) -> str:
                 k = next(iter(item))
                 v = stack[-1].pop(k)
                 if not info['compress']:
+                    if strip:
+                        result = result.rstrip()
                     result += f"{nl}{'':{info['pad'] * indent}}"
                 if not isinstance(k, str):
                     k = json_dumps(k, **kwargs)
@@ -314,6 +321,8 @@ def dumps(data: AnyJson, **kwargs: Any) -> str:
                 end = "]"
             else:
                 if start and not info['compress']:
+                    if strip:
+                        result = result.rstrip()
                     result += f"{nl}{'':{info['pad'] * indent}}"
                 result += sep
                 stack.append(copy(stack[-1].pop(0)))
@@ -326,6 +335,8 @@ def dumps(data: AnyJson, **kwargs: Any) -> str:
             compress = info_stack.pop()['compress']
             info = info_stack[-1]
             if not start and not compress:
+                if strip:
+                    result = result.rstrip()
                 result += f"{nl}{'':{info['pad'] * indent}}"
             result += end
 

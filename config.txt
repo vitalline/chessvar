@@ -1,0 +1,88 @@
+Configuration Settings
+
+INIT:  Initialize game state with predefined settings
+  - color_id (0):  ID of the color scheme to use
+  - white_id (0):  ID of white starting army
+  - black_id (0):  ID of black starting army
+    - >= 0:  use predefined army
+    - < 0:  use chaotic army
+  - edit_id (None):  ID of army to place pieces from in edit mode
+    - int:  see above
+    - None:  use currently selected armies
+    - "custom":  use custom pieces
+    - "wall":  use obstacle pieces
+  - edit_mode (False):  start in edit mode
+  - hide_pieces (0):  piece hiding mode
+    - 0:  show all pieces
+    - 1:  only show presence (pieceblind mode)
+    - 2:  only show type (Penultima mode)
+  - hide_moves (None):  whether to hide move markers
+    - None:  only if pieces are hidden
+    - True/False:  hide/show move markers
+  - use_drops (False):  whether piece drops are allowed by default
+  - use_save (None):  save file to preload (if not defined by command line)
+
+SEED:  Randomization settings
+  - block_ids (None):  army IDs which are prevented from randomly appearing, separated by commas
+  - block_ids_chaos (None):  army IDs that are disallowed in chaotic armies, separated by commas
+  - chaos_mode (0):  mode for chaotic army generation
+    - 0:  only use predefined armies
+    - 1:  4 piece types (on matching positions)
+    - 2:  7 piece types (on matching positions)
+    - 3:  4 piece types (anywhere)
+    - 4:  7 piece types (anywhere)
+  - chaos_seed (None):  seed for chaotic army generation (if any)
+  - set_seed (None):  seed for predefined army selection (if any)
+  - roll_seed (None):  seed for probabilistic move types (if any)
+  - update_roll_seed (True):  whether to generate new roll seeds when the match is restarted
+
+SKIP:  Granular options for automatically making forced moves
+  - fast_moves (False):  if there is one legal move, make it
+  - fast_chain (True):  same as above, but only for move chain continuations
+  - fast_drops (False):  if only one drop to the selected square is available, make it
+  - fast_promotion (True):  if only one promotion of the moving piece is available, make it
+  - fast_turn_pass (True):  if the only legal option is to pass the turn, do so
+
+LOGS:  Logging and status settings
+  - log_path ("logs"):  directory to save logs in
+  - log_info (True):  whether to log game information on load
+  - log_pass (None):  whether to log turn passes
+    - None:  only if turn pass was optional
+    - True/False:  always/never log
+  - log_prefix (1):  type of prefix to use for logging
+    - -1:  no prefix
+    - 0:  ply count
+    - 1:  turn count and player
+    - 2:  turn count, player, and move number (per player per turn)
+    - 3:  ply count, turn count, player, and move number
+  - status_prefix (1):  type of prefix to use for the status string (same as above)
+  - status_string (True):  what is shown in the status string
+    - True:  show prefix, current game state, and selected move/piece
+    - False:  only show prefix, or variant name if no prefix is used
+    - None:  only show variant name
+  - verbose (True):  whether to use verbose console output by default
+
+SAVE:  Saving and loading settings
+  - save_path ("save"):  default directory to store save files in
+  - indent (None):  number of spaces to use for indentation in save files
+  - compression (0):  level of whitespace compression in save files
+    - 0:  no compression (standard JSON output)
+    - > 0:  compress elements with depth less than or equal to this value
+  - update_mode (0):  how to handle loading a save file
+    - 0:  load the save file as is
+    - 1:  load the save file and immediately save it again
+    - 2:  load the save file, reload the move history, and save it again
+    - -1, -2:  same as above, but if the save file was preloaded, exit after saving
+  - size_limit (0):  maximum save file size to load (supports suffixes, 0 for no limit)
+  - trim_save (False):  whether to remove fields absent from the original save file
+  - recursive_aliases (True):  resolution method for aliases in save files
+    - True:  resolve aliases recursively
+    - False:  resolve aliases once
+    - None:  do not resolve aliases
+
+AUTO:  Auto-save settings
+  - autosave_path ("auto"):  directory to store auto-saves in
+  - autosave_act (0):  how many actions should pass between auto-saves
+  - autosave_ply (0):  how many plies should pass between auto-saves
+  - autosave_time (0):  how many seconds should pass between auto-saves
+  - trim_autosave (False):  whether to remove fields absent from the original save file in auto-saves
