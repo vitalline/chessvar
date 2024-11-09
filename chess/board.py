@@ -399,7 +399,7 @@ class Board(Window):
     def fits(self, template: str, data: Any, last: Any = ()) -> bool:
         if template == '*':
             return True
-        if template in {'', '_'}:
+        if template in {'', '_'} and last:
             return self.fits(template, last)
         if isinstance(data, list):
             return any(self.fits(template, item, last) for item in data)
