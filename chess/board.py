@@ -1542,7 +1542,7 @@ class Board(Window):
         to_type = lambda s: '!' + to_pure_type(s[1:]) if s[0:1] == '!' else to_pure_type(s)
         to_move = lambda s: '!' + to_pure_move(s[1:]) if s[0:1] == '!' else to_pure_move(s)
         for i, turn in enumerate(self.custom_turn_order or [(Side.WHITE, [{}]), (Side.BLACK, [{}])]):
-            side, rules = turn[0], turn[1]
+            side, rules = turn[0], [copy(rule) for rule in turn[1]]
             if side == Side.NONE:
                 start_ended = True
                 continue
@@ -1554,6 +1554,7 @@ class Board(Window):
                         rule[field] = unpack(rule[field])
                 rule['move'] = [to_move(s) for s in rule['move']]
                 rule['type'] = [to_type(s) for s in rule['type']]
+                rule['last'] = [copy(last) for last in rule['last']]
                 for last in rule['last']:
                     for field in default_last_rules:
                         if field not in last:
