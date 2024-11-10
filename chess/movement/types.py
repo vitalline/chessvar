@@ -7,7 +7,7 @@ from typing import TYPE_CHECKING
 
 from chess.movement.base import BaseMovement
 from chess.movement.move import Move
-from chess.movement.util import AnyDirection, Direction, Position, add, sub, mul, ddiv
+from chess.movement.util import AnyDirection, Direction, Position, add, sub, mul, ddiv, from_algebraic_map
 from chess.pieces.types import Immune, Slow, Delayed, Delayed1
 from chess.util import Unpacked, Unset, sign, repack, unpack
 
@@ -98,31 +98,34 @@ class RiderMovement(BaseMovement):
                 data = self.data.copy()
                 if self.skip_condition(move, direction, piece, theoretical):
                     continue
-                if not theoretical:
-                    royal_ep_markers = self.board.royal_ep_markers.get(piece.side.opponent(), {})
-                    if move.pos_to in royal_ep_markers:
-                        for chained_move in (
-                            Move(
-                                pos_from=move.pos_to, pos_to=royal_ep_markers[move.pos_to],
-                                movement_type=RoyalEnPassantMovement, piece=piece,
-                                captured_piece=self.board.get_piece(royal_ep_markers[move.pos_to]),
-                            ).mark(self.default_mark),
-                            Move(
-                                pos_from=move.pos_to, pos_to=move.pos_to,
-                                movement_type=move.movement_type, piece=piece,
-                            ).mark(self.default_mark),
-                        ):
-                            yield copy(move).set(chained_move=chained_move)
-                    else:
-                        yield move
-                else:
-                    yield move
+                yield from self.chain(move, piece, theoretical)
                 self.steps = steps  # this is a hacky way to make sure the step count stays correct after the yield
                 # this is because the step count will be reset to 0 if self.moves() is called before the next yield
                 self.data = data  # same thing for self.data, because it's also updated by successive moves() calls
                 self.bounds = bounds  # and same for self.bounds... notice the pattern yet? good. now don't forget.
             else:
                 direction_id += 1
+
+    def chain(self, move: Move, piece: Piece, theoretical: bool = False):
+        if not theoretical:
+            royal_ep_markers = self.board.royal_ep_markers.get(piece.side.opponent(), {})
+            if move.pos_to in royal_ep_markers:
+                for chained_move in (
+                    Move(
+                        pos_from=move.pos_to, pos_to=royal_ep_markers[move.pos_to],
+                        movement_type=RoyalEnPassantMovement, piece=piece,
+                        captured_piece=self.board.get_piece(royal_ep_markers[move.pos_to]),
+                    ).mark(self.default_mark),
+                    Move(
+                        pos_from=move.pos_to, pos_to=move.pos_to,
+                        movement_type=move.movement_type, piece=piece,
+                    ).mark(self.default_mark),
+                ):
+                    yield copy(move).set(chained_move=chained_move)
+            else:
+                yield move
+        else:
+            yield move
 
     def skip_condition(self, move: Move, direction: AnyDirection, piece: Piece, theoretical: bool = False) -> bool:
         if len(direction) < 4:
@@ -559,6 +562,34 @@ class EnPassantRiderMovement(RiderMovement):
                     move.movement_type = type(self)
                     move.mark('f')
             yield move
+
+
+class AbsoluteMovement(RiderMovement):
+    def __init__(self, board: Board, areas: Unpacked[str] | None = None, stay: int = 0):
+        super().__init__(board)
+        self.areas = repack(areas or [], list)
+        self.stay = stay
+
+    def moves(self, pos_from: Position, piece: Piece, theoretical: bool = False):
+        for pos_to in from_algebraic_map(
+            self.areas, self.board.width, self.board.height,
+            *self.board.notation_offset, self.board.areas.get(piece.side)
+        ):
+            pos_to = self.transform(pos_to)
+            if self.stay or pos_to != pos_from:
+                move = Move(pos_from=pos_from, pos_to=pos_to, movement_type=type(self)).mark(self.default_mark)
+                yield from self.chain(move, piece, theoretical)
+
+    def __copy_args__(self):
+        return self.board, unpack(self.areas), self.stay
+
+
+class FreeMovement(AbsoluteMovement):
+    def __init__(self, board: Board, stay: int = 0):
+        super().__init__(board, '*', stay)
+
+    def __copy_args__(self):
+        return self.board, self.stay
 
 
 class BaseMultiMovement(BaseMovement):
