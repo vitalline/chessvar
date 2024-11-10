@@ -233,18 +233,19 @@ def save_menu(path: str = base_dir, file: str = None) -> str:
     )
 
 
-# Function to find the correct texture path based on the provided path.
-def get_texture_path(path: str) -> str:
-    if os.path.isabs(path):
-        if os.path.isfile(path):
-            return path
-    else:
-        base_path = os.path.join(base_dir, path)
-        if os.path.isfile(base_path):
-            return base_path
-        curr_path = os.path.join(os.getcwd(), path)
-        if os.path.isfile(curr_path):
-            return curr_path
+# Function to find the correct texture path based on the provided paths.
+def get_texture_path(*paths: str) -> str:
+    for path in paths:
+        if os.path.isabs(path):
+            if os.path.isfile(path):
+                return path
+        else:
+            base_path = os.path.join(base_dir, path)
+            if os.path.isfile(base_path):
+                return base_path
+            curr_path = os.path.join(os.getcwd(), path)
+            if os.path.isfile(curr_path):
+                return curr_path
     return default_texture
 
 

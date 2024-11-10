@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from copy import copy
+from os.path import join
 from typing import TYPE_CHECKING
 
 from arcade import Color, Sprite, load_texture
@@ -10,7 +11,7 @@ from chess.movement.types import is_active
 from chess.movement.util import Position, to_algebraic
 from chess.pieces.side import Side
 from chess.pieces.types import Double, Enemy, Empty, Immune
-from chess.util import CUSTOM_PREFIX, Default, get_texture_path
+from chess.util import CUSTOM_PREFIX, Default, get_texture_path, normalize
 
 if TYPE_CHECKING:
     from chess.board import Board
@@ -44,7 +45,7 @@ class Piece(Sprite):
         self.texture_side = self.side
         self.texture_name = self.file_name
         super().__init__(
-            get_texture_path(self.texture_path()),
+            normalize(self.texture_path()),
             flipped_horizontally=self.flipped_horizontally,
             flipped_vertically=self.flipped_vertically,
         )
@@ -242,8 +243,9 @@ class Piece(Sprite):
     def group_str(cls) -> str | None:
         return cls.group_data
 
-    def texture_path(self) -> str:
-        return f"assets/{self.texture_folder}/{self.texture_side.file_prefix()}{self.texture_name}.png"
+    def texture_path(self, base_dir: str = 'assets') -> str:
+        path = join(self.texture_folder, self.texture_side.file_prefix() + self.texture_name + '.png')
+        return get_texture_path(*(join(root, path) for root in (base_dir, self.board.board_config['asset_path'])))
 
     def reload(
         self,
@@ -265,7 +267,7 @@ class Piece(Sprite):
         self.texture_folder = asset_folder or self.texture_folder
         self.texture_side = side or self.texture_side
         self.texture_name = file_name or self.texture_name
-        texture_path = get_texture_path(self.texture_path())
+        texture_path =  normalize(self.texture_path())
         if flipped_horizontally is None:
             flipped_horizontally = self.flipped_horizontally
         else:

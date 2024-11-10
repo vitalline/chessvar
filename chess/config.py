@@ -6,6 +6,7 @@ from typing import Any
 
 DEFAULT_CONFIG = {
     "INIT": {
+        'asset_path': 'assets',
         'color_id': 0,
         'white_id': 0,
         'black_id': 0,

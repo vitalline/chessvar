@@ -1,6 +1,7 @@
 Configuration Settings
 
 INIT:  Initialize game state with predefined settings
+  - asset_path ("assets"):  directory to load assets from
   - color_id (0):  ID of the color scheme to use
   - white_id (0):  ID of white starting army
   - black_id (0):  ID of black starting army
