@@ -2619,8 +2619,12 @@ class Board(Window):
                                             future_rules.append(rule)
                                         else:
                                             next_future_rules.append(rule)
-                                    future_types = {'move': True, 'capture': False, 'promotion': False}
-                                    future_promo = None
+                                    future_rules = self.filter(
+                                        future_rules, ('next', 'piece'), [type(move.piece)], ('match', 'piece')
+                                    )
+                                    future_rules = self.filter(
+                                        future_rules, ('next', 'move'), [chained_move], ('match', 'move')
+                                    )
                                     for rule in future_rules:
                                         rule['match'].setdefault('pos', [])
                                     pos_from = chained_move.pos_from or chained_move.pos_to
@@ -2648,6 +2652,8 @@ class Board(Window):
                                         future_rules = self.filter(
                                             future_rules, ('next', loss_type), [type(future_loss)], ('match', loss_type)
                                         )
+                                    future_types = {'move': True, 'capture': False, 'promotion': False}
+                                    future_promo = None
                                     if not future_rules:
                                         legal = False
                                     elif chained_move:
@@ -2656,7 +2662,10 @@ class Board(Window):
                                         future_types['capture'] = future_types['capture'] or bool(ch.captured_piece)
                                         future_types['promotion'] = future_types['promotion'] or bool(ch.promotion)
                                         future_promo = future_promo or ch.promotion
-                                    if future_promo:
+                                        future_rules = self.filter(
+                                            future_rules, ('next', 'type'), future_types, ('match', 'type')
+                                        )
+                                    if future_rules and future_promo:
                                         p_type = type(future_promo) if isinstance(future_promo, Piece) else future_promo
                                         future_rules = self.filter(
                                             future_rules, ('next', 'new'), [p_type], ('match', 'new')
