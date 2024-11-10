@@ -5,7 +5,8 @@ import sys
 from copy import deepcopy
 from typing import TYPE_CHECKING, TextIO
 
-from chess.data import end_types, get_piece_types, get_set_data, get_set_name, piece_groups
+from chess.data import piece_groups, get_piece_types, get_set_data, get_set_name
+from chess.data import end_types, prefix_types, typed_prefixes, prefix_chars
 from chess.movement.types import DropMovement
 from chess.movement.util import ANY, to_alpha as b26
 from chess.movement.util import to_algebraic as toa, from_algebraic as fra
@@ -460,6 +461,36 @@ def debug_info(board: Board) -> list[str]:
         start, loop = loop, start
     if not start and not loop:
         loop = [(Side.WHITE, None), (Side.BLACK, None)]
+    def default_builder(data_value):
+        if isinstance(data_value, list):
+            return ', '.join(map(default_builder, data_value))
+        data_value = str(data_value)
+        prefix_set = set()
+        prefix_list = []
+        while data_value[:1] in prefix_types:
+            if not data_value:
+                prefix_list.append(prefix_chars['last'])
+                prefix_set.add(prefix_chars['last'])
+                break
+            if data_value[:1] not in prefix_set:
+                prefix_list.append(data_value[:1])
+                prefix_set.add(data_value[:1])
+            data_value = data_value[1:]
+        prefixes = []
+        if prefix_chars['not'] in prefix_set:
+            prefixes.append('NOT')
+            prefix_set.discard(prefix_chars['not'])
+        if prefix_chars['any'] in prefix_set:
+            prefixes.append('any')
+            prefix_set.discard(prefix_chars['any'])
+        if prefix_chars['last'] in prefix_set:
+            prefixes.append('last')
+            prefix_set.discard(prefix_chars['last'])
+        prefixes.append(', '.join(prefix_types[ch] for ch in prefix_list if ch in prefix_types and ch in prefix_set))
+        if prefixes[0].islower():
+            prefixes[0] = prefixes[0].capitalize()
+        prefixes.append(data_value)
+        return f"{' '.join(prefixes)}" or 'None'
     start_count = 0
     start_index = 0
     debug_log.append(f"Turn order ({len(start) + len(loop)}):")
@@ -476,37 +507,37 @@ def debug_info(board: Board) -> list[str]:
                     debug_log.append(f"{pad:{pad_count}}{i + 1}: {turn_side} ({len(turn_rules)}):")
                     for ri, rule in enumerate(turn_rules):
                         debug_log.append(f"{pad:{pad_count + 2}}Option {ri + 1}:")
-                        last_data = []
-                        for li, last in enumerate(rule.get('last', [])):
-                            last_data.append(f"Last option {li + 1}:")
-                            for key_data in (
-                                ('ago', "Moves ago"),
-                                'piece',
-                                ('move', "Move type"),
-                                ('type', "Action type"),
-                                ('from', None, lambda x: ', '.join(map(str, x))),
-                                ('to', None, lambda x: ', '.join(map(str, x))),
-                                ('take', "Captured"),
-                                'new',
-                                ('old', "Total moves"),
-                            ):
-                                key_data = key_data if isinstance(key_data, tuple) else (key_data,)
-                                key_data = key_data + (None,) * (3 - len(key_data))
-                                key, string, b = key_data[:3]
-                                if key not in last:
-                                    continue
-                                if string is None:
-                                    string = key.capitalize()
-                                if b is None:
-                                    c = lambda x: x.capitalize() if isinstance(x, str) and x[0:1] != '!' else str(x)
-                                    a = lambda x: f"NOT {x[1:]}" if isinstance(x, str) and x[0:1] == '!' else c(x)
-                                    b = lambda x: (', '.join(map(a, x)) if isinstance(x, list) else a(x)) or 'None'
-                                last_data.append(f"{string}:")
-                                value = b(last[key]).splitlines()
-                                if len(value) > 1:
-                                    last_data.extend(f"{pad:2}{line}" for line in value)
-                                else:
-                                    last_data[-1] += f" {value[0]}"
+                        last_data, next_data = [], []
+                        for sub_data, field, when in ((last_data, 'last', 'ago'), (next_data, 'next', 'until')):
+                            for si, sub_rule in enumerate(rule.get(field, [])):
+                                sub_data.append(f"{field.capitalize()} option {si + 1}:")
+                                for key_data in (
+                                    ('by', "Moves ago"),
+                                    'piece',
+                                    ('move', "Move type"),
+                                    ('type', "Action type"),
+                                    ('from', None, lambda x: ', '.join(map(str, x))),
+                                    ('to', None, lambda x: ', '.join(map(str, x))),
+                                    ('take', "Captured"),
+                                    ('lose', "Lost"),
+                                    ('new', "New piece"),
+                                    ('old', "Total moves"),
+                                ):
+                                    key_data = key_data if isinstance(key_data, tuple) else (key_data,)
+                                    key_data = key_data + (None,) * (3 - len(key_data))
+                                    key, string, builder = key_data[:3]
+                                    if key not in sub_rule:
+                                        continue
+                                    if string is None:
+                                        string = key.capitalize()
+                                    if builder is None:
+                                        builder = default_builder
+                                    sub_data.append(f"{string}:")
+                                    value = builder(sub_rule[key]).splitlines()
+                                    if len(value) > 1:
+                                        sub_data.extend(f"{pad:2}{line}" for line in value)
+                                    else:
+                                        sub_data[-1] += f" {value[0]}"
                         for key_data in (
                             'order',
                             (
@@ -517,30 +548,29 @@ def debug_info(board: Board) -> list[str]:
                                 }.get(x, 'Unknown')
                             ),
                             ('last', "Last moves", lambda _: '\n'.join(last_data)),
+                            ('next', "Next moves", lambda _: '\n'.join(next_data)),
                             'piece',
                             ('move', "Move type"),
                             ('type', 'Action type'),
                             ('from', None, lambda x: ', '.join(map(str, x))),
                             ('to', None, lambda x: ', '.join(map(str, x))),
                             ('take', "Captured"),
-                            'new',
+                            ('lose', "Lost"),
+                            ('new', "New piece"),
                             ('old', "Total moves"),
                             ('check', "Check", lambda x: {0: 'Any', 1: 'Yes', -1: 'No'}.get(x, 'Unknown')),
                         ):
                             key_data = key_data if isinstance(key_data, tuple) else (key_data,)
                             key_data = key_data + (None,) * (3 - len(key_data))
-                            key, string, build = key_data[:3]
+                            key, string, builder = key_data[:3]
                             if key not in rule:
                                 continue
                             if string is None:
                                 string = key.capitalize()
-                            if build is None:
-                                c = lambda x: x.capitalize() if isinstance(x, str) and x[0:1] != '!' else str(x)
-                                a = lambda x: f"NOT {x[1:]}" if isinstance(x, str) and x[0:1] == '!' else c(x)
-                                b = lambda x: (', '.join(map(a, x)) if isinstance(x, list) else a(x)) or 'None'
-                                build = b
+                            if builder is None:
+                                builder = default_builder
                             debug_log.append(f"{pad:{pad_count + 4}}{string}:")
-                            value = build(rule[key]).splitlines()
+                            value = builder(rule[key]).splitlines()
                             if len(value) > 1:
                                 debug_log.extend(f"{pad:{pad_count + 6}}{line}" for line in value)
                             else:

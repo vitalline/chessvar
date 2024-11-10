@@ -61,25 +61,28 @@ default_rules = {
     'order': 0,
     'state': 0,
     'last': [],
+    'next': [],
     'piece': ["*"],
     'move': ["*"],
     'type': ["!pass"],
     'from': ["*"],
     'to': ["*"],
     'take': ["*"],
+    'lose': ["*"],
     'new': ["*"],
     'old': ["*"],
     'check': 0,
 }
 
-default_last_rules = {
-    'ago': [1],
+default_sub_rules = {
+    'by': [1],
     'piece': ["*"],
     'move': ["*"],
     'type': ["*"],
     'from': ["*"],
     'to': ["*"],
     'take': ["*"],
+    'lose': ["*"],
     'new': ["*"],
     'old': ["*"],
 }

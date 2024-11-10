@@ -25,7 +25,7 @@ from chess.data import base_rng, max_seed, get_set_data, get_set_name
 from chess.data import default_board_width, default_board_height, default_size
 from chess.data import min_width, min_height, min_size, max_size, size_step
 from chess.data import action_types, end_types, piece_groups, penultima_textures
-from chess.data import default_rules, default_last_rules, default_end_rules
+from chess.data import default_rules, default_sub_rules, default_end_rules
 from chess.data import prefix_chars as pch, prefix_types, typed_prefixes
 from chess.debug import debug_info, save_piece_data, save_piece_sets, save_piece_types
 from chess.movement.base import BaseMovement
@@ -812,7 +812,7 @@ class Board(Window):
             'order': [
                 side[0].value if side[1] is None else [
                     side[0].value, unpack([{mk: unpack([
-                        {lk: unpack(lv) for lk in sorted(default_last_rules) if (lv := ld.get(lk))}
+                        {lk: unpack(lv) for lk in sorted(default_sub_rules) if (lv := ld.get(lk))}
                         if isinstance(ld, dict) else ld for ld in mv
                     ]) for mk in sorted(default_rules) if (mv := md.get(mk)) is not None} for md in side[1]])
                 ] for side in self.custom_turn_order
@@ -1107,7 +1107,7 @@ class Board(Window):
             ply_count = 1
         self.custom_turn_order = [
             (Side(int(side[0])), [{mk: [
-                {lk: repack(lv) for lk in default_last_rules if (lv := ld.get(lk))}
+                {lk: repack(lv) for lk in default_sub_rules if (lv := ld.get(lk))}
                 if isinstance(ld, dict) else ld for ld in repack(mv)
             ] for mk in default_rules if (mv := md.get(mk)) is not None} for md in repack(side[1])])
             if isinstance(side, list) and len(side) > 1 else (Side(int(side)), None)
@@ -1634,15 +1634,16 @@ class Board(Window):
                         rule[field] = unpack(rule[field])
                 rule['move'] = [to_move(s) for s in rule['move']]
                 rule['type'] = [to_type(s) for s in rule['type']]
-                rule['last'] = [copy(last) for last in rule['last']]
-                for last in rule['last']:
-                    for field in default_last_rules:
-                        if field not in last:
-                            last[field] = default_last_rules[field]
-                        elif not isinstance(default_last_rules[field], list):
-                            last[field] = unpack(last[field])
-                    last['move'] = [to_move(s) for s in last['move']]
-                    last['type'] = [to_type(s) for s in last['type']]
+                for field in ('last', 'next'):
+                    rule[field] = [copy(sub_rule) for sub_rule in rule[field]]
+                    for sub_rule in rule[field]:
+                        for sub_field in default_sub_rules:
+                            if sub_field not in sub_rule:
+                                sub_rule[sub_field] = default_sub_rules[sub_field]
+                            elif not isinstance(default_sub_rules[sub_field], list):
+                                sub_rule[sub_field] = unpack(sub_rule[sub_field])
+                        sub_rule['move'] = [to_move(s) for s in sub_rule['move']]
+                        sub_rule['type'] = [to_type(s) for s in sub_rule['type']]
             (loop_turns if start_ended else start_turns).append((side, rules))
         if start_turns and not loop_turns and not start_ended:
             start_turns, loop_turns = loop_turns, start_turns
@@ -2309,7 +2310,7 @@ class Board(Window):
                 for rule in last_history_rules:
                     rule['match'] = {}
                 if self.move_history:
-                    depths = {ago for rule in state_rules for last in rule['last'] for ago in last['ago']}
+                    depths = {by for rule in state_rules for last in rule['last'] for by in last['by']}
                     min_depth, max_depth = min(depths, default=0), max(depths, default=0)
                     i = int(not self.chain_start)
                     last_history_moves = []
@@ -2329,7 +2330,7 @@ class Board(Window):
                         old_history_rules = last_history_rules
                         last_history_rules, history_rules = [], []
                         for rule in old_history_rules:
-                            if i in {ago for last in rule['last'] for ago in last['ago']}:
+                            if i in {by for last in rule['last'] for by in last['by']}:
                                 history_rules.append(rule)
                             else:
                                 last_history_rules.append(rule)
@@ -2391,11 +2392,12 @@ class Board(Window):
                                 history_rules, ('last', 'old'), [piece.movement.total_moves], ('match', 'old'), False
                             )
                             if capture := last_history_move.captured_piece:
+                                capture_type = 'take' if piece.side == turn_side else 'lose'
                                 history_rules = self.filter(
-                                    history_rules, ('last', 'take'), [type(capture)], ('match', 'take')
+                                    history_rules, ('last', capture_type), [type(capture)], ('match', capture_type)
                                 )
                                 for rule in history_rules:
-                                    rule['match'].setdefault('take', set()).add(type(capture))
+                                    rule['match'].setdefault(capture_type, set()).add(type(capture))
                             if promotion:
                                 history_rules = self.filter(
                                     history_rules, ('last', 'new'), [type(promotion)], ('match', 'new')
@@ -2417,6 +2419,7 @@ class Board(Window):
                     pass_rules = self.filter(pass_rules, 'from', last=('match', 'pos'))
                     pass_rules = self.filter(pass_rules, 'to', last=('match', 'pos'))
                     pass_rules = self.filter(pass_rules, 'take', last=('match', 'take'))
+                    pass_rules = self.filter(pass_rules, 'lose', last=('match', 'lose'))
                     pass_rules = self.filter(pass_rules, 'new', last=('match', 'new'))
                     pass_rules = self.filter(pass_rules, 'old', last=('match', 'old'))
                     if pass_rules and self.check_side != turn_side:
@@ -2458,6 +2461,9 @@ class Board(Window):
                                 continue
                             take_rules = self.filter(pos_rules, 'take', last=('match', 'take'))
                             if not take_rules:
+                                continue
+                            lose_rules = self.filter(take_rules, 'lose', last=('match', 'lose'))
+                            if not lose_rules:
                                 continue
                             old_rules = self.filter(take_rules, 'old', last=('match', 'old'))
                             if not old_rules:
@@ -2510,54 +2516,31 @@ class Board(Window):
                             and not move.piece.captures(move.captured_piece)
                         ):
                             continue
-                        # NB: The logic below considers one promotion per move, and does not keep track of piece amounts
-                        # during the move analysis. Very complex moves can break this. Might need to rethink this later.
-                        move_types = {
-                            'move': True,
-                            'capture': False,
-                            'promotion': False
-                        }
+                        move_types = {'move': True, 'capture': False, 'promotion': False}
                         promotion = None
-                        chained_move = move
                         move_rules = deepcopy(move_rules)
-                        while chained_move:
-                            for rule in move_rules:
-                                rule['match'].setdefault('pos', [])
-                            pos_from = chained_move.pos_from or chained_move.pos_to
-                            pos_to = chained_move.pos_to or chained_move.pos_from
-                            move_rules = self.filter(move_rules, 'from', [(turn_side, pos_from)], ('match', 'pos'))
-                            for rule in move_rules:
-                                rule['match'].setdefault('pos', []).append(pos_from)
-                                rule['match'].setdefault('from', []).append(pos_from)
-                            move_rules = self.filter(move_rules, 'to', [(turn_side, pos_to)], ('match', 'pos'))
-                            for rule in move_rules:
-                                rule['match'].setdefault('pos', []).append(pos_to)
-                                rule['match'].setdefault('to', []).append(pos_to)
-                            if capture := chained_move.captured_piece:
-                                move_rules = self.filter(move_rules, 'take', [type(capture)], ('match', 'take'))
-                            if not move_rules:
-                                break
-                            chained_move = chained_move.chained_move
+                        for rule in move_rules:
+                            rule['match'].setdefault('pos', [])
+                        pos_from = move.pos_from or move.pos_to
+                        pos_to = move.pos_to or move.pos_from
+                        move_rules = self.filter(move_rules, 'from', [(turn_side, pos_from)], ('match', 'pos'))
+                        for rule in move_rules:
+                            rule['match'].setdefault('pos', []).append(pos_from)
+                            rule['match'].setdefault('from', []).append(pos_from)
+                        move_rules = self.filter(move_rules, 'to', [(turn_side, pos_to)], ('match', 'pos'))
+                        for rule in move_rules:
+                            rule['match'].setdefault('pos', []).append(pos_to)
+                            rule['match'].setdefault('to', []).append(pos_to)
+                        if capture := move.captured_piece:
+                            capture_type = 'take' if move.piece.side == turn_side else 'lose'
+                            move_rules = self.filter(move_rules, capture_type, [type(capture)], ('match', capture_type))
                         if not move_rules:
                             continue
-                        chained_move = move
-                        while chained_move and chained_move.chained_move and (
-                            issubclass(chained_move.movement_type or type, CastlingMovement) or
-                            issubclass(chained_move.chained_move.movement_type or type, CloneMovement) or
-                            isinstance((chained_move.piece or self.no_piece).movement, AutoCaptureMovement)
-                        ):
-                            move_types['move'] = move_types['move'] and not chained_move.captured_piece
-                            move_types['capture'] = move_types['capture'] or bool(chained_move.captured_piece)
-                            move_types['promotion'] = move_types['promotion'] or bool(chained_move.promotion)
-                            promotion = promotion or chained_move.promotion
-                            chained_move = chained_move.chained_move
-                        if chained_move:
-                            move_types['move'] = move_types['move'] and not chained_move.captured_piece
-                            move_types['capture'] = move_types['capture'] or bool(chained_move.captured_piece)
-                            move_types['promotion'] = move_types['promotion'] or bool(chained_move.promotion)
-                            promotion = promotion or chained_move.promotion
-                        if not move_rules:
-                            continue
+                        if move:
+                            move_types['move'] = move_types['move'] and not move.captured_piece
+                            move_types['capture'] = move_types['capture'] or bool(move.captured_piece)
+                            move_types['promotion'] = move_types['promotion'] or bool(move.promotion)
+                            promotion = promotion or move.promotion
                         if promotion:
                             promotion_type = type(promotion) if isinstance(promotion, Piece) else promotion
                             move_rules = self.filter(move_rules, 'new', [promotion_type], ('match', 'new'))
@@ -2612,6 +2595,12 @@ class Board(Window):
                                     self.load_check(turn_side)
                                     if self.check_side == turn_side:
                                         legal = False
+                            looks = {by for rule in type_rules for next_rule in rule['next'] for by in next_rule['by']}
+                            min_depth, max_depth = min(looks, default=0), max(looks, default=0)
+                            j = 1
+                            new_limit_groups = {}
+                            new_limit_hits = {}
+                            next_future_rules = deepcopy(type_rules)
                             while legal and chained_move:
                                 self.update_move(chained_move)
                                 if (
@@ -2622,26 +2611,94 @@ class Board(Window):
                                     skipped = True
                                     legal = False
                                     break
-                                self.move(chained_move)
-                                if isinstance(chained_move.promotion, Piece):
-                                    self.promotion_piece = True
-                                    self.replace(chained_move.piece, chained_move.promotion)
-                                    self.update_promotion_auto_captures(chained_move)
-                                    self.promotion_piece = None
-                                else:
-                                    self.update_auto_capture_markers(chained_move)
-                                move_chain.append(chained_move)
-                                if (
-                                    {'check', 'checkmate'}.intersection(self.end_rules[turn_side.opponent()])
-                                    and chained_move and issubclass(type(move.piece), Slow)
-                                ):
-                                    self.load_pieces()
-                                    if move.piece.board_pos in self.royal_markers[turn_side]:
-                                        self.load_check(turn_side)
-                                        if self.check_side == turn_side:
+                                if min_depth <= j <= max_depth:
+                                    old_future_rules = next_future_rules
+                                    next_future_rules, future_rules = [], []
+                                    for rule in old_future_rules:
+                                        if j in {by for next_rule in rule['next'] for by in next_rule['by']}:
+                                            future_rules.append(rule)
+                                        else:
+                                            next_future_rules.append(rule)
+                                    future_types = {'move': True, 'capture': False, 'promotion': False}
+                                    future_promo = None
+                                    for rule in future_rules:
+                                        rule['match'].setdefault('pos', [])
+                                    pos_from = chained_move.pos_from or chained_move.pos_to
+                                    pos_to = chained_move.pos_to or chained_move.pos_from
+                                    future_rules = self.filter(
+                                        future_rules, ('next', 'from'), [(turn_side, pos_from)], ('match', 'pos')
+                                    )
+                                    for rule in future_rules:
+                                        rule['match'].setdefault('pos', []).append(pos_from)
+                                        rule['match'].setdefault('from', []).append(pos_from)
+                                    future_rules = self.filter(
+                                        future_rules, ('next', 'to'), [(turn_side, pos_to)], ('match', 'pos')
+                                    )
+                                    for rule in future_rules:
+                                        rule['match'].setdefault('pos', []).append(pos_to)
+                                        rule['match'].setdefault('to', []).append(pos_to)
+                                    if chained_move.piece and chained_move.piece.movement:
+                                        future_rules = self.filter(
+                                            future_rules, ('next', 'old'),
+                                            [chained_move.piece.movement.total_moves],
+                                            ('match', 'old'), False
+                                        )
+                                    if future_loss := chained_move.captured_piece:
+                                        loss_type = 'take' if chained_move.piece.side == turn_side else 'lose'
+                                        future_rules = self.filter(
+                                            future_rules, ('next', loss_type), [type(future_loss)], ('match', loss_type)
+                                        )
+                                    if not future_rules:
+                                        legal = False
+                                    elif chained_move:
+                                        ch = chained_move
+                                        future_types['move'] = future_types['move'] and not ch.captured_piece
+                                        future_types['capture'] = future_types['capture'] or bool(ch.captured_piece)
+                                        future_types['promotion'] = future_types['promotion'] or bool(ch.promotion)
+                                        future_promo = future_promo or ch.promotion
+                                    if future_promo:
+                                        p_type = type(future_promo) if isinstance(future_promo, Piece) else future_promo
+                                        future_rules = self.filter(
+                                            future_rules, ('next', 'new'), [p_type], ('match', 'new')
+                                        )
+                                        if not future_rules:
                                             legal = False
+                                            break
+                                        self.load_pieces()  # update piece counts
+                                        if p_type not in new_limit_hits:
+                                            if p_type not in new_limit_groups:
+                                                new_limit_groups[p_type] = [g for g in limits if self.fits(g, p_type)]
+                                            new_limit_hits[p_type] = [
+                                                self.piece_counts[turn_side].get(g, 0) for g in new_limit_groups[p_type]
+                                            ]
+                                        for g in new_limit_groups[p_type]:
+                                            if self.piece_counts[turn_side].get(g, 0) >= limits[g]:
+                                                new_limit_hits[p_type] = True
+                                                break
+                                        if new_limit_hits[p_type]:
+                                            continue
+                                if legal:
+                                    self.move(chained_move)
+                                    if isinstance(chained_move.promotion, Piece):
+                                        self.promotion_piece = True
+                                        self.replace(chained_move.piece, chained_move.promotion)
+                                        self.update_promotion_auto_captures(chained_move)
+                                        self.promotion_piece = None
+                                    else:
+                                        self.update_auto_capture_markers(chained_move)
+                                    move_chain.append(chained_move)
+                                    if (
+                                        {'check', 'checkmate'}.intersection(self.end_rules[turn_side.opponent()])
+                                        and chained_move and issubclass(type(move.piece), Slow)
+                                    ):
+                                        self.load_pieces()
+                                        if move.piece.board_pos in self.royal_markers[turn_side]:
+                                            self.load_check(turn_side)
+                                            if self.check_side == turn_side:
+                                                legal = False
                                 if legal:
                                     chained_move = chained_move.chained_move
+                                    j += 1
                             if legal:
                                 self.load_pieces()
                                 self.load_check(turn_side)
