@@ -215,6 +215,7 @@ def to_algebraic_map(
             return {k: sorted(result[k]) for k in sorted(result)}
     # Step 3: Check if there exists a set of ranks and files that covers all positions in the sequence
     result = {}  # NB: we erase the previous result to avoid mixing area names and rank/file templates
+    remain = set(poss)
     # a) find all files listed for each rank
     by_row = {row: set() for row, _ in poss}
     for pos in poss:
