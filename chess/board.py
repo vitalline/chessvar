@@ -424,11 +424,30 @@ class Board(Window):
                         self.turn_data[2] += 1
         self.turn_side, self.turn_rules = self.get_turn_entry()
 
+    def keys(self, data):
+        if isinstance(data, Move):
+            return data.type_str(),
+        if isinstance(data, Piece):
+            return data.side.name.lower(), *self.keys(type(data))
+        if isinstance(data, type):
+            if issubclass(data, Piece):
+                return data.group_str(), data.name, data.type_str()
+            if issubclass(data, BaseMovement):
+                return data.__name__,
+        if isinstance(data, list):
+            return (k for x in data for k in self.keys(x))
+        if isinstance(data, tuple) and data:
+            return *((x for x in data[1:]) if isinstance(data[0], Side) else (data,)),
+        if data:
+            return data,
+        return ()
+
     def fits(self, template: str, data: Any, last: Any = ()) -> bool:
         if template == '*':
             return True
         if template in {'', '_'} and last:
-            return self.fits(template, last)
+            data_set = set(k for k in self.keys(data) if k is not None)
+            return any(last_key in data_set for last_key in self.keys(last))
         if isinstance(data, list):
             return any(self.fits(template, item, last) for item in data)
         if isinstance(data, tuple):
@@ -437,16 +456,7 @@ class Board(Window):
             if isinstance(data[0], int):
                 return self.in_area(template, data, last=last)  # type: ignore
             return self.in_area(template, data[1], data[0], last=last)  # type: ignore
-        if isinstance(data, Move):
-            return fits(template, data.type_str())
-        if isinstance(data, Piece):
-            return fits(template, data.side.name.lower()) or self.fits(template, type(data))
-        if isinstance(data, type):
-            if issubclass(data, Piece):
-                return fits(template, (data.group_str(), data.name, data.type_str()))
-            if issubclass(data, BaseMovement):
-                return fits(template, data.__name__)
-        return fits(template, data)
+        return fits(template, self.keys(data))
 
     def fits_one(self, t: Index, p: Unpacked[Key], d: Any = (), l: Any = (), fit: bool = True):
         p, l = (repack(x) for x in (p, l))
@@ -903,7 +913,7 @@ class Board(Window):
         data = substitute(data, subs_dict)
 
         self.custom_variant = data.get('variant', '')
-        self.save_info = list(chain.from_iterable(str(x).split('\n') for x in repack(data.get('info', ''))))
+        self.save_info = list(chain.from_iterable(str(x).split('\n') for x in repack(data.get('info', ()))))
 
         # might have to add more error checking to saving/loading, even if at the cost of slight redundancy.
         # who knows when someone decides to introduce a breaking change and absolutely destroy all the saves
@@ -2304,7 +2314,7 @@ class Board(Window):
                             for rule in history_rules:
                                 rule['match'].setdefault('type', set()).add('pass')
                             last_history_rules += history_rules
-                        if last_history_move.is_edit:
+                        elif last_history_move.is_edit:
                             continue
                         while last_history_move:
                             side = self.get_turn_side(-i)
@@ -2335,19 +2345,22 @@ class Board(Window):
                             )
                             for rule in history_rules:
                                 rule['match'].setdefault('type', set()).update(move_types)
+                            for rule in history_rules:
+                                rule['match'].setdefault('pos', [])
                             pos_from = last_history_move.pos_from or last_history_move.pos_to
                             pos_to = last_history_move.pos_to or last_history_move.pos_from
-                            for rule in history_rules:
-                                poss = rule['match'].setdefault('pos', [])
-                                poss.extend((pos_from, pos_to))
-                                rule['match'].setdefault('from', []).append(poss[-2])
-                                rule['match'].setdefault('to', []).append(poss[-1])
                             history_rules = self.filter(
                                 history_rules, ('last', 'from'), [(side, pos_from)], ('match', 'pos')
                             )
+                            for rule in history_rules:
+                                rule['match'].setdefault('pos', []).append(pos_from)
+                                rule['match'].setdefault('from', []).append(pos_from)
                             history_rules = self.filter(
                                 history_rules, ('last', 'to'), [(side, pos_to)], ('match', 'pos')
                             )
+                            for rule in history_rules:
+                                rule['match'].setdefault('pos', []).append(pos_to)
+                                rule['match'].setdefault('to', []).append(pos_to)
                             history_rules = self.filter(
                                 history_rules, ('last', 'old'), [piece.movement.total_moves], ('match', 'old'), False
                             )
@@ -2482,15 +2495,18 @@ class Board(Window):
                         chained_move = move
                         move_rules = deepcopy(move_rules)
                         while chained_move:
+                            for rule in move_rules:
+                                rule['match'].setdefault('pos', [])
                             pos_from = chained_move.pos_from or chained_move.pos_to
                             pos_to = chained_move.pos_to or chained_move.pos_from
-                            for rule in move_rules:
-                                poss = rule['match'].setdefault('pos', [])
-                                poss.extend((pos_from, pos_to))
-                                rule['match'].setdefault('from', []).append(poss[-2])
-                                rule['match'].setdefault('to', []).append(poss[-1])
                             move_rules = self.filter(move_rules, 'from', [(turn_side, pos_from)], ('match', 'pos'))
+                            for rule in move_rules:
+                                rule['match'].setdefault('pos', []).append(pos_from)
+                                rule['match'].setdefault('from', []).append(pos_from)
                             move_rules = self.filter(move_rules, 'to', [(turn_side, pos_to)], ('match', 'pos'))
+                            for rule in move_rules:
+                                rule['match'].setdefault('pos', []).append(pos_to)
+                                rule['match'].setdefault('to', []).append(pos_to)
                             if capture := chained_move.captured_piece:
                                 move_rules = self.filter(move_rules, 'take', [type(capture)], ('match', 'take'))
                             if not move_rules:
@@ -4226,9 +4242,9 @@ class Board(Window):
         message = self.get_status_string()
         if message:
             self.set_caption(f"{prefix} {message}")
-        elif self.board_config['status_prefix'] == 0 or self.turn_data[0] == 0:
+        elif self.board_config['status_prefix'] == 0 and self.turn_data[0] > 0:
             self.set_caption(f"{prefix} {self.turn_data[1]} to move")
-        elif self.board_config['status_prefix'] == 1:
+        elif self.board_config['status_prefix'] == 1 and self.turn_data[0] > 0:
             self.set_caption(f"[{prefix[1:-1] or '???'} to move]")
         else:
             self.set_caption(prefix)
