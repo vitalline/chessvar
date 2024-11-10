@@ -230,7 +230,7 @@ class Piece(Sprite):
         return getattr(cls, 'colorbound', False)
 
     @classmethod
-    def type_str(cls) -> str:
+    def type_str(cls) -> str | None:
         if cls.type_data is None:
             if cls.__name__.startswith(CUSTOM_PREFIX):
                 cls.type_data = cls.__name__.removeprefix(CUSTOM_PREFIX)
@@ -239,7 +239,7 @@ class Piece(Sprite):
         return cls.type_data
 
     @classmethod
-    def group_str(cls) -> str:
+    def group_str(cls) -> str | None:
         return cls.group_data
 
     def texture_path(self) -> str:

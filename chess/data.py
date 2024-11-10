@@ -41,6 +41,22 @@ max_seed = 2 ** 32 - 1
 
 penultima_textures = [f'ghost{s}' if s else None for s in ('R', 'N', 'B', 'Q', None, 'B', 'N', 'R')]
 
+prefix_types = {
+    '!': 'not',
+    '@': 'name',
+    '#': 'tag',
+    '$': 'type',
+    '&': 'group',
+    '=': 'side',
+    '*': 'any',
+    '_': 'last',
+    '': 'last',  # so that notations like "!#" would correspond to "not last tag" without the need to write an extra "_"
+}
+prefix_chars = {v: k for k, v in prefix_types.items() if k}
+
+generic_prefixes = {'!', '*', '_', ''}
+typed_prefixes = set(prefix_types.keys()) - generic_prefixes
+
 default_rules = {
     'order': 0,
     'state': 0,

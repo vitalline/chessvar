@@ -26,13 +26,14 @@ from chess.data import default_board_width, default_board_height, default_size
 from chess.data import min_width, min_height, min_size, max_size, size_step
 from chess.data import action_types, end_types, piece_groups, penultima_textures
 from chess.data import default_rules, default_last_rules, default_end_rules
+from chess.data import prefix_chars as pch, prefix_types, typed_prefixes
 from chess.debug import debug_info, save_piece_data, save_piece_sets, save_piece_types
 from chess.movement.base import BaseMovement
 from chess.movement.move import Move
 from chess.movement.types import AutoCaptureMovement, AutoRangedAutoCaptureRiderMovement
 from chess.movement.types import CastlingMovement, CastlingPartnerMovement
 from chess.movement.types import CloneMovement, DropMovement, ProbabilisticMovement
-from chess.movement.util import Position, GenericPosition, ANY
+from chess.movement.util import Position, GenericPosition, ANY, LAST, NONE
 from chess.movement.util import add, to_alpha as b26, resolve as res
 from chess.movement.util import to_algebraic as toa, from_algebraic as fra, is_algebraic as isa
 from chess.movement.util import to_algebraic_map as tom, from_algebraic_map as frm
@@ -426,28 +427,51 @@ class Board(Window):
 
     def keys(self, data):
         if isinstance(data, Move):
-            return data.type_str(),
-        if isinstance(data, Piece):
-            return data.side.name.lower(), *self.keys(type(data))
-        if isinstance(data, type):
+            if data.tag:
+                yield pch['tag'] + data.tag
+            if data.type_str():
+                yield pch['type'] + data.type_str()
+        elif isinstance(data, Piece):
+            if data.side:
+                yield from (pch['side'] + data.side.name.lower(), pch['side'] + str(data.side.value))
+            yield from self.keys(type(data))
+        elif isinstance(data, type):
             if issubclass(data, Piece):
-                return data.group_str(), data.name, data.type_str()
+                if data.group_str():
+                    yield pch['group'] + data.group_str()
+                if data.name:
+                    yield pch['name'] + data.name
+                if data.type_str():
+                    yield pch['type'] + data.type_str()
             if issubclass(data, BaseMovement):
-                return data.__name__,
-        if isinstance(data, list):
-            return (k for x in data for k in self.keys(x))
-        if isinstance(data, tuple) and data:
-            return *((x for x in data[1:]) if isinstance(data[0], Side) else (data,)),
-        if data:
-            return data,
-        return ()
+                yield pch['type'] + data.__name__
+        elif isinstance(data, list):
+            yield from (k for x in data if x for k in self.keys(x) if k)
+        elif data:
+            if isinstance(data, tuple):
+                if isinstance(data[0], Side):
+                    yield from (x for x in data[1:] if x)
+                else:
+                    yield data
+            else:
+                yield data
 
     def fits(self, template: str, data: Any, last: Any = ()) -> bool:
-        if template == '*':
+        if template == ANY:
             return True
-        if template in {'', '_'} and last:
-            data_set = set(k for k in self.keys(data) if k is not None)
-            return any(last_key in data_set for last_key in self.keys(last))
+        def double(x):
+            if isinstance(x, str) and ((y := x.lstrip(''.join(prefix_types))) and y != x):
+                return x, y
+            return x,
+        if template in {NONE, LAST, *typed_prefixes} and last:
+            data_set = set(
+                x for k in self.keys(data)
+                if template in {NONE, LAST}
+                or isinstance(k, str)
+                and k.startswith(template)
+                for x in double(k)
+            )
+            return any(data_set.intersection(double(k)) for k in self.keys(last))
         if isinstance(data, list):
             return any(self.fits(template, item, last) for item in data)
         if isinstance(data, tuple):
@@ -456,7 +480,8 @@ class Board(Window):
             if isinstance(data[0], int):
                 return self.in_area(template, data, last=last)  # type: ignore
             return self.in_area(template, data[1], data[0], last=last)  # type: ignore
-        return fits(template, self.keys(data))
+        data_set = set(x for k in self.keys(data) for x in double(k))
+        return fits(template, data_set)
 
     def fits_one(self, t: Index, p: Unpacked[Key], d: Any = (), l: Any = (), fit: bool = True):
         p, l = (repack(x) for x in (p, l))
@@ -594,13 +619,14 @@ class Board(Window):
 
         self.shift_ply(+1)
 
+        if self.edit_mode != self.board_config['edit_mode']:
+            self.edit_mode = self.board_config['edit_mode']
+            self.log(f"Mode: {'EDIT' if self.edit_mode else 'PLAY'}", False)
+
         if update is None:
             update = not self.move_history
 
         if update:
-            if self.board_config['edit_mode']:
-                self.edit_mode = True
-                self.log("Mode: EDIT", False)
             self.edit_piece_set_id = self.board_config['edit_id']
             self.roll_history = []
             self.future_move_history = []
@@ -788,7 +814,7 @@ class Board(Window):
                     side[0].value, unpack([{mk: unpack([
                         {lk: unpack(lv) for lk in sorted(default_last_rules) if (lv := ld.get(lk))}
                         if isinstance(ld, dict) else ld for ld in mv
-                    ]) for mk in sorted(default_rules) if (mv := md.get(mk))} for md in side[1]])
+                    ]) for mk in sorted(default_rules) if (mv := md.get(mk)) is not None} for md in side[1]])
                 ] for side in self.custom_turn_order
             ],
             'end': {
@@ -1083,7 +1109,7 @@ class Board(Window):
             (Side(int(side[0])), [{mk: [
                 {lk: repack(lv) for lk in default_last_rules if (lv := ld.get(lk))}
                 if isinstance(ld, dict) else ld for ld in repack(mv)
-            ] for mk in default_rules if (mv := md.get(mk))} for md in repack(side[1])])
+            ] for mk in default_rules if (mv := md.get(mk)) is not None} for md in repack(side[1])])
             if isinstance(side, list) and len(side) > 1 else (Side(int(side)), None)
             for side in data.get('order', [])
         ]
@@ -2334,7 +2360,7 @@ class Board(Window):
                                 history_rules, ('last', 'move'), [last_history_move], ('match', 'move')
                             )
                             for rule in history_rules:
-                                rule['match'].setdefault('move', set()).add(last_history_move.type_str())
+                                rule['match'].setdefault('move', []).append(last_history_move)
                             move_types = [s for s in (
                                 'move' if not last_history_move.captured_piece else 'capture',
                                 'promotion' if promotion else None,
@@ -2471,7 +2497,7 @@ class Board(Window):
                         continue
                     move_rule_dict = {}
                     for move in piece.moves() if chain_moves is None else chain_moves:
-                        move_type = move.type_str()
+                        move_type = move.tag, move.type_str()
                         if move_type not in move_rule_dict:
                             move_rule_dict[move_type] = self.filter(piece_rules, 'move', [move], ('match', 'move'))
                         move_rules = move_rule_dict[move_type]
