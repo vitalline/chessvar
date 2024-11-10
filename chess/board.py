@@ -726,8 +726,8 @@ class Board(Window):
         whc = *wh, {k: v for k, v in self.custom_areas.items() if isinstance(v, set)}
         wha = defaultdict(lambda: whn, {side: (*wh, self.areas.get(side) or {}) for side in (Side.WHITE, Side.BLACK)})
         data = {
-            'info': '\n'.join(self.save_info),
             'variant': self.custom_variant,
+            'info': '\n'.join(self.save_info),
             'board_size': [self.board_width, self.board_height],
             'offset': list(self.notation_offset),
             'borders': [toa((ANY, col)) for col in self.border_cols] + [toa((row, ANY)) for row in self.border_rows],
