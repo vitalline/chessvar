@@ -94,31 +94,25 @@ def print_piece_types(fp: TextIO = sys.stdout, side: Side = Side.WHITE) -> None:
         fp.write(f"{name}: {path}, {file}\n")
 
 
-def save_piece_data(board: Board, file_path: str = None) -> None:
-    with open(
-        file_path or get_file_name('debug_piece_data', 'json', ts_format=''),
-        mode='w',
-        encoding='utf-8',
-    ) as fp:
+def save_piece_data(board: Board, file_path: str = None) -> str:
+    file_path = file_path or get_file_name('debug_piece_data', 'json', ts_format='')
+    with open(file_path, mode='w', encoding='utf-8') as fp:
         print_piece_data(board, fp)
+    return file_path
 
 
-def save_piece_sets(file_path: str = None) -> None:
-    with open(
-        file_path or get_file_name('debug_piece_sets', 'txt', ts_format=''),
-        mode='w',
-        encoding='utf-8',
-    ) as fp:
+def save_piece_sets(file_path: str = None) -> str:
+    file_path = file_path or get_file_name('debug_piece_sets', 'txt', ts_format='')
+    with open(file_path, mode='w', encoding='utf-8') as fp:
         print_piece_sets(fp)
+    return file_path
 
 
-def save_piece_types(file_path: str = None, side: Side = Side.WHITE) -> None:
-    with open(
-        file_path or get_file_name('debug_piece_types', 'txt', ts_format=''),
-        mode='w',
-        encoding='utf-8',
-    ) as fp:
+def save_piece_types(file_path: str = None, side: Side = Side.WHITE) -> str:
+    file_path = file_path or get_file_name('debug_piece_types', 'txt', ts_format='')
+    with open(file_path, mode='w', encoding='utf-8') as fp:
         print_piece_types(fp, side)
+    return file_path
 
 
 def debug_info(board: Board) -> list[str]:

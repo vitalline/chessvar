@@ -7,7 +7,7 @@ from itertools import chain, product, zip_longest
 from json import loads, JSONDecodeError
 from math import ceil, floor, isqrt
 from os import makedirs, name as os_name, system
-from os.path import dirname, isfile, join, split, relpath, getsize
+from os.path import dirname, getsize, isfile, join, relpath, split
 from random import Random
 from sys import argv
 from traceback import print_exc
@@ -46,9 +46,9 @@ from chess.pieces.util import NoPiece, Obstacle, Block, Border, Shield, Void, Wa
 from chess.save import condense, expand, condense_algebraic as cnd_alg, expand_algebraic as exp_alg, substitute
 from chess.save import load_move, load_piece, load_rng, load_piece_type, load_custom_type, load_movement_type
 from chess.save import save_move, save_piece, save_rng, save_piece_type, save_custom_type
-from chess.util import base_dir, config_path, get_file_name, select_save_data, select_save_name, Key, Index, Unpacked
-from chess.util import Default, Unset, unpack, repack, sign, spell
-from chess.util import deduplicate, dumps, find, find_string, fits
+from chess.util import base_dir, config_path, get_file_name, select_save_data, select_save_name
+from chess.util import Default, Unset, Key, Index, Unpacked, unpack, repack, sign, spell
+from chess.util import deduplicate, dumps, find, find_string, fits, normalize
 
 
 class Board(Window):
@@ -226,6 +226,10 @@ class Board(Window):
         self.promotion_area_sprite_list = SpriteList()  # sprites for the promotion area background tiles
         self.promotion_piece_sprite_list = SpriteList()  # sprites for the possible promotion pieces
         self.save_interval = 0  # time since the last autosave
+
+        # normalize file paths
+        paths = self.auto_path, self.load_path, self.save_path
+        self.auto_path, self.load_path, self.save_path = map(normalize, paths)
 
         # load piece set ids from the config
         for side in self.piece_set_ids:
@@ -1256,7 +1260,7 @@ class Board(Window):
         if with_history:
             success = self.reload_history()
             if not success:
-                self.log("Error: Failed to reload history!")
+                self.log("Error: Failed to reload history")
         else:
             if self.move_history:
                 last_move = self.move_history[-1]
@@ -5604,7 +5608,7 @@ class Board(Window):
                         self.custom_layout[piece.board_pos] = copy(piece)
                 self.log("Info: Custom layout saved")
             elif modifiers & key.MOD_ACCEL and not modifiers & key.MOD_SHIFT:  # Save
-                self.save(get_file_name('save', 'json', str(join(base_dir, self.board_config['save_path']))))
+                self.quick_save()
             elif modifiers & key.MOD_ACCEL and modifiers & key.MOD_SHIFT:  # Save as
                 self.deactivate()
                 self.draw(0)
@@ -5613,7 +5617,7 @@ class Board(Window):
                 if save_path:
                     self.save(save_path)
                 else:
-                    self.log("Info: Save cancelled", False)
+                    self.log("Info: Saving cancelled", False)
                 self.activate()
         if symbol == key.R:  # Restart
             if modifiers & key.MOD_ALT:  # Reload save
@@ -5622,19 +5626,20 @@ class Board(Window):
                     path = join(self.save_path, self.save_name) if self.save_path and self.save_name else None
                 else:
                     path = join(self.load_path, self.load_name) if self.load_path and self.load_name else None
+                path = normalize(path) if path else None
                 if not path:
-                    self.log(f"Info: No file {which} yet!", False)
+                    self.log(f"Error: No file {which} yet")
                 elif modifiers & key.MOD_ACCEL:  # Reload save data
                     data = self.save_data if modifiers & key.MOD_SHIFT else self.load_data
                     if data is not None:
                         state = '' if isfile(path) else '(deleted) '
-                        self.log(f"Info: Reloading last {which} state: {state}{path}")
+                        self.log(f"Info: Reloading last {which} state in {state}\"{path}\"")
                         self.load_board(data)
                 elif isfile(path):  # Reload save file
-                    self.log(f"Info: Reloading last {which} file: {path}")
-                    self.load(str(path))
+                    self.log(f"Info: Reloading last {which} file")
+                    self.load(path)
                 else:
-                    self.log(f"Info: Last {which} file not found: {path}", False)
+                    self.log(f"Error: Last {which} file not found at \"{path}\"")
             elif modifiers & key.MOD_SHIFT:  # Randomize piece sets
                 blocked_ids = set(self.board_config['block_ids'])
                 set_id_list = list(i for i in range(len(piece_groups)) if i not in blocked_ids)
@@ -5663,7 +5668,6 @@ class Board(Window):
                 self.load_chaos_sets(1 + bool(modifiers & key.MOD_ALT), modifiers & key.MOD_ACCEL)
             elif modifiers & key.MOD_ACCEL:  # Config
                 self.save_config()
-                self.log("Info: Configuration saved", False)
         if symbol == key.X:
             if modifiers & (key.MOD_SHIFT | key.MOD_ALT):  # Extreme chaos mode
                 self.load_chaos_sets(3 + bool(modifiers & key.MOD_ALT), modifiers & key.MOD_ACCEL)
@@ -5768,23 +5772,13 @@ class Board(Window):
         if symbol == key.E:
             if modifiers & key.MOD_ALT:  # Everything
                 self.save_config()
-                self.log("Info: Configuration saved", False)
                 self.save_log()
-                self.log("Info: Log file saved", False)
-                self.log("Info: Saving debug information", False)
-                debug_log_data = debug_info(self)
-                self.save_log(debug_log_data, 'debug')
-                self.log("Info: Debug information saved", False)
-                self.save(get_file_name('save', 'json', str(join(base_dir, self.board_config['save_path']))))
+                self.save_debug_log()
+                self.quick_save()
                 if modifiers & key.MOD_ACCEL:
-                    self.save_log(self.verbose_data, 'verbose')
-                    self.log("Info: Verbose log file saved", False)
+                    self.save_verbose_log()
                 if modifiers & key.MOD_SHIFT:
-                    self.log("Info: Saving debug listings", False)
-                    save_piece_data(self)
-                    save_piece_sets()
-                    save_piece_types()
-                    self.log("Info: Debug listings saved", False)
+                    self.save_debug_data()
             elif modifiers & key.MOD_ACCEL and modifiers & key.MOD_SHIFT:  # Erase custom data
                 self.log("Info: Clearing custom data")
                 self.reset_custom_data()
@@ -5987,19 +5981,20 @@ class Board(Window):
                     path = join(self.save_path, self.save_name) if self.save_path and self.save_name else None
                 else:
                     path = join(self.load_path, self.load_name) if self.load_path and self.load_name else None
+                path = normalize(path) if path else None
                 if not path:
-                    self.log(f"Info: No file {which} yet!", False)
+                    self.log(f"Error: No file {which} yet")
                 elif modifiers & key.MOD_ACCEL:  # Reload save data
                     data = self.save_data if modifiers & key.MOD_SHIFT else self.load_data
                     if data is not None:
                         state = '' if isfile(path) else '(deleted) '
-                        self.log(f"Info: Reloading last {which} state: {state}{path}")
+                        self.log(f"Info: Reloading last {which} state in {state}\"{path}\"")
                         self.load_board(data, True)
                 elif isfile(path):  # Reload save file
-                    self.log(f"Info: Reloading last {which} file: {path}")
-                    self.load(str(path), True)
+                    self.log(f"Info: Reloading last {which} file")
+                    self.load(path, True)
                 else:
-                    self.log(f"Info: Last {which} file not found: {path}", False)
+                    self.log(f"Error: Last {which} file not found at \"{path}\"")
             elif modifiers & key.MOD_ACCEL and not modifiers & key.MOD_SHIFT:  # Flip board
                 self.flip_board()
                 self.log("Info: Board flipped", False)
@@ -6014,7 +6009,7 @@ class Board(Window):
                 self.log("Info: Reloading history", False)
                 self.log("Info: Starting new game", bool(self.hide_pieces))
                 if not self.reload_history():
-                    self.log("Error: Failed to reload history!")
+                    self.log("Error: Failed to reload history")
                 if self.edit_mode:
                     self.moves = {side: {} for side in self.moves}
                     self.chain_moves = {side: {} for side in self.chain_moves}
@@ -6153,7 +6148,7 @@ class Board(Window):
                         self.reset_board()
                         self.log_special_modes()
                 else:
-                    self.log("Info: Load cancelled", False)
+                    self.log("Info: Loading cancelled", False)
                 self.activate()
             else:  # Log
                 if modifiers & key.MOD_ACCEL and modifiers & key.MOD_SHIFT:  # Toggle verbose
@@ -6165,28 +6160,15 @@ class Board(Window):
                         self.log(f"Info: Verbose output: {'ON' if self.verbose else 'OFF'}", False)
                 elif modifiers & key.MOD_ACCEL:  # Save log
                     self.save_log()
-                    self.log("Info: Log file saved", False)
                 elif modifiers & key.MOD_SHIFT:  # Save verbose log
-                    self.save_log(self.verbose_data, 'verbose')
-                    self.log("Info: Verbose log file saved", False)
+                    self.save_verbose_log()
         if symbol == key.D:  # Debug
             if modifiers & key.MOD_ACCEL:  # Save debug log
-                self.log("Info: Saving debug information", False)
-                debug_log_data = debug_info(self)
-                self.save_log(debug_log_data, 'debug')
-                self.log("Info: Debug information saved", False)
+                self.save_debug_log()
             if modifiers & key.MOD_SHIFT:  # Print debug log
-                self.log("Info: Printing debug information", False)
-                debug_log_data = debug_info(self)
-                for string in debug_log_data:
-                    print(f"[Debug] {string}")
-                self.log("Info: Debug information printed", False)
+                self.print_debug_log()
             if modifiers & key.MOD_ALT:  # Save debug listings
-                self.log("Info: Saving debug listings", False)
-                save_piece_data(self)
-                save_piece_sets()
-                save_piece_types()
-                self.log("Info: Debug listings saved", False)
+                self.save_debug_data()
         if symbol == key.SLASH:  # (?) Random
             if self.edit_mode:
                 return
@@ -6224,6 +6206,7 @@ class Board(Window):
     def load(self, path: str | None, with_history: bool = False) -> bool:
         if not path:
             return False
+        path = normalize(path)
         update_mode = abs(self.board_config['update_mode'])
         should_update = bool(update_mode)
         if should_update:
@@ -6256,7 +6239,7 @@ class Board(Window):
                 if should_update:
                     self.save(path)
         except Exception:
-            self.log(f"Error: Failed to load \"{path}\"")
+            self.log(f"Error: Failed to load data from \"{path}\"")
             print_exc()
         finally:
             return load_attempted
@@ -6264,6 +6247,7 @@ class Board(Window):
     def save(self, path: str | None, auto: bool = False) -> None:
         if not path:
             return
+        path = normalize(path)
         data = self.dump_board(self.board_config[f"trim_{'auto' * auto}save"])
         if auto and data == self.auto_data:
             return
@@ -6279,9 +6263,12 @@ class Board(Window):
             self.save_path, self.save_name = split(path)
             self.log(f"Info: Saved to \"{path}\"", False)
 
+    def quick_save(self) -> None:
+        self.save(get_file_name('save', 'json', str(join(base_dir, self.board_config['save_path']))))
+
     def auto_save(self) -> None:
         self.save(
-            get_file_name('autosave', 'json', path=str(join(base_dir, self.board_config['autosave_path']))),
+            get_file_name('auto', 'json', str(join(base_dir, self.board_config['autosave_path']))),
             auto=True
         )
 
@@ -6334,13 +6321,44 @@ class Board(Window):
         if self.use_drops:
             self.log("Info: Drops enabled")
 
-    def save_log(self, log_data: list[str] | None = None, log_name: str = 'log') -> None:
+    def save_log_data(self, log_data: list[str] | None = None, log_name: str = 'log') -> str | None:
         if not log_data:
             log_data = self.log_data
         if log_data:
             save_path = join(base_dir, self.board_config['log_path'], get_file_name(log_name, 'txt'))
             with open(save_path, mode='w', encoding='utf-8') as log_file:
                 log_file.write('\n'.join(log_data))
+            return str(save_path)
+
+    def save_debug_data(self) -> None:
+        self.log("Info: Saving debug listings", False)
+        data_path = save_piece_data(self)
+        self.log(f"Info: Piece data listings saved to \"{data_path}\"", False)
+        sets_path = save_piece_sets()
+        self.log(f"Info: Piece set listings saved to \"{sets_path}\"", False)
+        type_path = save_piece_types()
+        self.log(f"Info: Piece type listings saved to \"{type_path}\"", False)
+
+    def print_debug_log(self) -> None:
+        self.log("Info: Printing debug information", False)
+        debug_log_data = debug_info(self)
+        for string in debug_log_data:
+            print(f"[Debug] {string}")
+        self.log("Info: Debug information printed", False)
+
+    def save_debug_log(self) -> None:
+        self.log("Info: Saving debug information", False)
+        debug_log_data = debug_info(self)
+        debug_log_path = normalize(self.save_log_data(debug_log_data, 'debug'))
+        self.log(f"Info: Debug information saved to \"{debug_log_path}\"", False)
+
+    def save_verbose_log(self) -> None:
+        log_path = normalize(self.save_log_data(self.verbose_data, 'verbose'))
+        self.log(f"Info: Verbose log file saved to \"{log_path}\"", False)
+
+    def save_log(self) -> None:
+        log_path = normalize(self.save_log_data())
+        self.log(f"Info: Log file saved to \"{log_path}\"", False)
 
     def clear_log(self, console: bool = True, log: bool = True, verbose: bool = True) -> None:
         self.log("Info: Log cleared", False)
@@ -6366,10 +6384,13 @@ class Board(Window):
         config['roll_seed'] = self.roll_seed
         config['verbose'] = self.verbose
         try:
-            config['save_path'] = relpath(self.save_path, base_dir)
+            save_path = relpath(self.save_path, base_dir)
         except ValueError:
-            config['save_path'] = self.save_path
-        config.save(get_file_name('config', 'ini'))
+            save_path = self.save_path
+        config['save_path'] = normalize(save_path, '/')
+        config_file_path = normalize(get_file_name('config', 'ini'))
+        config.save(config_file_path)
+        self.log(f"Info: Configuration saved to \"{config_file_path}\"", False)
 
     def run(self):
         if self.board_config['update_mode'] < 0 and self.load_data is not None:

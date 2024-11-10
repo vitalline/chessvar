@@ -40,7 +40,7 @@ invalid_chars = ':<>|"?*'
 # Translation table to replace invalid characters with underscores.
 invalid_chars_trans_table = str.maketrans(invalid_chars, '_' * len(invalid_chars))
 
-# Dictionary to convert numbers to words.
+# Dictionary for converting numbers to words.
 numbers = {
     0: 'zero', 1: 'one', 2: 'two', 3: 'three', 4: 'four',
     5: 'five', 6: 'six', 7: 'seven', 8: 'eight', 9: 'nine',
@@ -198,6 +198,11 @@ def get_file_name(
     name_args = [name, (ts or datetime.now()).strftime(ts_format)]
     full_name = '_'.join(s for s in name_args if s).translate(invalid_chars_trans_table)
     return os.path.join(path, f"{full_name}.{ext}")
+
+
+# Function to convert a path to an absolute path and change all path separators to the one provided (os.sep by default).
+def normalize(path: str, sep: str = os.sep) -> str:
+    return os.path.abspath(path).translate(str.maketrans('\\/', sep * 2))
 
 
 # Function to check if a string contains another string as a prefix, a suffix, or a substring, optionally ignoring case.
