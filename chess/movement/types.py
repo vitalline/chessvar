@@ -150,7 +150,7 @@ class RiderMovement(BaseMovement):
                 and not piece.skips(next_piece)) or (move.pos_from != move.pos_to and (
                 piece != (captured_piece := self.board.get_piece(move.pos_to))
                 and piece.captures(captured_piece) and not piece.skips(captured_piece)))
-                # the "move.pos_from != move.pos_to" check for the captured piece is necessary for Inverse and Relay, as
+                # the "move.pos_from != move.pos_to" check for the captured piece is necessary for InverseMovement since
                 # without it, the hypothetical "opposing piece" used to simulate the movement would try to capture ours!
             ))
         )
@@ -572,11 +572,14 @@ class AbsoluteMovement(RiderMovement):
 
     def moves(self, pos_from: Position, piece: Piece, theoretical: bool = False):
         for pos_to in from_algebraic_map(
-            self.areas, self.board.width, self.board.height,
+            self.areas, self.board.board_width, self.board.board_height,
             *self.board.notation_offset, self.board.areas.get(piece.side)
         ):
             pos_to = self.transform(pos_to)
             if self.stay or pos_to != pos_from:
+                to_piece = self.board.get_piece(pos_to)
+                if piece.blocked_by(to_piece):
+                    continue
                 move = Move(pos_from=pos_from, pos_to=pos_to, movement_type=type(self)).mark(self.default_mark)
                 yield from self.chain(move, piece, theoretical)
 
@@ -927,7 +930,10 @@ class MultiMovement(BaseMultiMovement):
                 for move in movement.moves(pos_from, piece, theoretical):
                     yield copy(move).unmark('n').mark('c')
         else:
-            for movement in (*self.both, *self.move):
+            for movement in self.both:
+                for move in movement.moves(pos_from, piece, theoretical):
+                    yield copy(move)
+            for movement in self.move:
                 for move in movement.moves(pos_from, piece, theoretical):
                     chained_move = move
                     while chained_move:
@@ -936,14 +942,14 @@ class MultiMovement(BaseMultiMovement):
                             break
                         chained_move = chained_move.chained_move
                     else:
-                        yield copy(move)
-            for movement in (*self.both, *self.capture):
+                        yield copy(move).unmark('n').mark('m')
+            for movement in self.capture:
                 for move in movement.moves(pos_from, piece, theoretical):
                     chained_move = move
                     while chained_move:
                         captured_piece = chained_move.captured_piece or self.board.get_piece(chained_move.pos_to)
                         if piece.captures(captured_piece):
-                            yield copy(move)
+                            yield copy(move).unmark('n').mark('c')
                             break
                         chained_move = chained_move.chained_move
 
