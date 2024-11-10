@@ -296,11 +296,10 @@ def dumps(data: AnyJson, **kwargs: Any) -> str:
                 info_stack.append(
                     {'depth': info['depth'] + 1, 'pad': info['pad'] + (not info['compress']), 'compress': compress}
                 )
-            if not info_stack[-1]['compress'] and sep:
-                if strip:
-                    result = result.rstrip()
-                result += f"{nl}{'':{info['pad'] * indent}}"
-            if start:
+                if not info_stack[-1]['compress'] and sep:
+                    if strip:
+                        result = result.rstrip()
+                    result += f"{nl}{'':{info['pad'] * indent}}"
                 sep = ''
                 result += f"{start}"
         end = ''
