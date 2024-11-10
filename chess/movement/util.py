@@ -190,15 +190,18 @@ def to_algebraic_map(
     y_offset: int,
     areas: dict[str, Collection[Position]],
 ) -> dict[str, Sequence[Position]]:
+    # Step 1: Check if the position sequence contains every position on the board
     rows, cols = set(y + y_offset for y in range(height)), set(x + x_offset for x in range(width))
     remain = set(poss)
     all_squares = {(row, col) for row in rows for col in cols}
     if remain == all_squares:  # if all positions are listed
         # use '*' (ANY) to represent all possible positions
         return {ANY: sorted(poss)}
+    # Step 2: Check if there exists a group of areas that, when combined, covers all positions in the sequence
     result = {}
+    # find all areas listed for each position
     by_area = {area: set() for area in areas}
-    for pos in poss:  # find all areas listed for each position
+    for pos in poss:
         for area in areas:
             if pos in areas[area]:
                 by_area[area].add(pos)
@@ -209,8 +212,11 @@ def to_algebraic_map(
             remain.difference_update(areas[area])
         if not remain:  # if all listed positions were discarded, return the result
             return {k: sorted(result[k]) for k in sorted(result)}
-    by_row = {row: set() for row, _ in remain}
-    for pos in poss:  # find all files listed for each rank
+    # Step 3: Check if there exists a set of ranks and files that covers all positions in the sequence
+    result = {}  # NB: we erase the previous result to avoid mixing area names and rank/file templates
+    # a) find all files listed for each rank
+    by_row = {row: set() for row, _ in poss}
+    for pos in poss:
         by_row[pos[0]].add(pos[1])
     for row in by_row:
         if by_row[row] == cols:  # if all positions for the nth rank are listed
@@ -222,8 +228,9 @@ def to_algebraic_map(
             return {
                 k if isinstance(k, str) else to_algebraic(k): sorted(result[k]) for k in sorted(result, key=sort_key)
             }
-    by_col = {col: set() for _, col in remain}
-    for pos in poss:  # find all ranks listed for each file
+    # b) find all ranks listed for each file
+    by_col = {col: set() for _, col in poss}
+    for pos in poss:
         by_col[pos[1]].add(pos[0])
     for col in by_col:
         if by_col[col] == rows:  # if all positions for the l file are listed
@@ -235,7 +242,8 @@ def to_algebraic_map(
             return {
                 k if isinstance(k, str) else to_algebraic(k): sorted(result[k]) for k in sorted(result, key=sort_key)
             }
-    result |= {pos: [pos] for pos in remain}  # add the remaining positions to the result
+    # Step 4: Add the remaining positions to the result
+    result |= {pos: [pos] for pos in remain}
     return {
         k if isinstance(k, str) else to_algebraic(k): sorted(result[k]) for k in sorted(result, key=sort_key)
     }
