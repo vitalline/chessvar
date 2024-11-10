@@ -102,8 +102,7 @@ class Config(dict):
                     if data.isdigit():
                         self[item] = int(data) << exponent
                 if (
-                    item == 'save_indent'
-                    or item.endswith('_id')
+                    item == 'indent' or item.endswith('_id')
                     or (item.endswith('_seed') and not item.startswith('update_'))
                 ):
                     if self.base_config[section][item].strip() == '':
