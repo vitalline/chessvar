@@ -3230,10 +3230,21 @@ class Board(Window):
                 is_final_turn = current_side != next_side
                 for side in {current_side, current_side.opponent()}:
                     side_target_dict, side_marker_dict = target_dict.get(side, {}), marker_dict.get(side, {})
+                    for pos in list(side_marker_dict):
+                        if isinstance(self.get_piece(pos), NoPiece):
+                            continue
+                        if side_marker_dict[pos] == pos:
+                            continue
+                        pos_target_set = side_target_dict.get(side_marker_dict[pos], set())
+                        if {Delayed, Delayed1}.intersection(pos_target_set):
+                            if not (side == current_side and is_final_turn and chain_end):
+                                continue
+                        side_marker_dict.pop(pos, None)
+                        pos_target_set.discard(pos)
                     for pos in list(side_target_dict):
                         if move and pos == move.pos_to:
                             continue
-                        pos_target_set = side_target_dict.get(pos, ())
+                        pos_target_set = side_target_dict.get(pos, set())
                         if 'skip' in pos_target_set:
                             pos_target_set.discard('skip')
                             continue
@@ -3248,6 +3259,7 @@ class Board(Window):
                         markers = side_target_dict.pop(pos, ())
                         for marker in markers:
                             side_marker_dict.pop(marker, None)
+
             if move:
                 if move.captured_piece is not None:
                     for pos in target_dict.get(move.captured_piece.side, {}).pop(move.captured_piece.board_pos, ()):
