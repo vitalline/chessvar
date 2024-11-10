@@ -170,16 +170,17 @@ def is_algebraic(pos: str) -> bool:
 
 
 def sort_key(pos: str | GenericPosition) -> tuple:
-    case_alpha = lambda x: ((a := to_alpha(x + (0 if x < 0 else 1))).islower(), a)
+    sort_rank = lambda x: ('0', x)
+    sort_file = lambda x: ('0' if x < 0 else '1', abs(x))
     if isinstance(pos, str):
-        return '0', False, pos, False, pos
+        return '0', '', pos, '', pos
     if pos[0] in generics and pos[1] in generics:
-        return '1', False, pos[0], False, pos[1]
+        return '1', '', pos[0], '', pos[1]
     if pos[0] in generics:
-        return '2', False, pos[0], *case_alpha(pos[1])
+        return '2', '', pos[0], *sort_file(pos[1])
     if pos[1] in generics:
-        return '2', *case_alpha(pos[0]), False, pos[1]
-    return '2', *case_alpha(pos[0]), *case_alpha(pos[1])
+        return '2', *sort_rank(pos[0]), '', pos[1]
+    return '2', *sort_rank(pos[0]), *sort_file(pos[1])
 
 
 def to_algebraic_map(
