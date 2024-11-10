@@ -46,7 +46,7 @@ from chess.pieces.util import NoPiece, Obstacle, Block, Border, Shield, Void, Wa
 from chess.save import condense, expand, condense_algebraic as cnd_alg, expand_algebraic as exp_alg, substitute
 from chess.save import load_move, load_piece, load_rng, load_piece_type, load_custom_type, load_movement_type
 from chess.save import save_move, save_piece, save_rng, save_piece_type, save_custom_type
-from chess.util import base_dir, config_path, get_file_name, select_save_data, select_save_name
+from chess.util import base_dir, config_path, get_file_name, load_menu, save_menu
 from chess.util import Default, Unset, Key, Index, Unpacked, unpack, repack, sign, spell
 from chess.util import deduplicate, dumps, find, find_string, fits, normalize
 
@@ -5625,7 +5625,10 @@ class Board(Window):
                 self.deactivate()
                 self.draw(0)
                 self.log("Info: Selecting a file to save to", False)
-                save_path = select_save_name(self.save_name or get_file_name('save', 'json', path=''), self.save_path)
+                if not self.save_name and self.load_name:
+                    save_path = save_menu(self.load_path, self.load_name)
+                else:
+                    save_path = save_menu(self.save_path, self.save_name or get_file_name('save', 'json', path=''))
                 if save_path:
                     self.save(save_path)
                 else:
@@ -6152,7 +6155,10 @@ class Board(Window):
                 self.deactivate()
                 self.draw(0)
                 self.log("Info: Selecting a file to load from", False)
-                load_path = select_save_data(self.load_name or None, self.load_path)
+                if not self.load_name and self.save_name:
+                    load_path = load_menu(self.save_path, self.save_name)
+                else:
+                    load_path = load_menu(self.load_path, self.load_name or None)
                 if load_path:
                     self.load(load_path, with_history=modifiers & key.MOD_SHIFT)
                     if not self.save_loaded:

@@ -215,20 +215,20 @@ def find_string(string: Any, part: Any, side: int = 0, case: bool = False) -> bo
 
 
 # Function to select a file to open. Returns the path of the selected file.
-def select_save_data(file: str = None, path: str = base_dir) -> str:
+def load_menu(path: str = base_dir, file: str = None) -> str:
     return filedialog.askopenfilename(
         initialdir=path,
         initialfile=file,
-        filetypes=[("JSON save file", "*.json")],
+        filetypes=[("JSON file", "*.json")],
     )
 
 
 # Function to select a file to save. Returns the path of the selected file.
-def select_save_name(file: str = None, path: str = base_dir) -> str:
+def save_menu(path: str = base_dir, file: str = None) -> str:
     return filedialog.asksaveasfilename(
         initialdir=path,
         initialfile=file,
-        filetypes=[("JSON save file", "*.json")],
+        filetypes=[("JSON file", "*.json")],
         defaultextension='.json',
     )
 
