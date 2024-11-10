@@ -865,7 +865,7 @@ class Board(Window):
         indent = self.board_config['indent']
         compression = self.board_config['compression']
         if indent is None:
-            return dumps(data, separators=(',', ':'), ensure_ascii=False)
+            return dumps(data, separators=(',', ':'), indent=indent, ensure_ascii=False)
         else:
             return dumps(data, compression=compression, indent=indent, ensure_ascii=False)
 
@@ -943,7 +943,7 @@ class Board(Window):
         data = substitute(data, subs_dict)
 
         self.custom_variant = data.get('variant', '')
-        self.save_info = list(chain.from_iterable(str(x).split('\n') for x in repack(data.get('info', ()))))
+        self.save_info = list(chain.from_iterable(str(x).split('\n') for x in repack(data.get('info') or ())))
 
         # might have to add more error checking to saving/loading, even if at the cost of slight redundancy.
         # who knows when someone decides to introduce a breaking change and absolutely destroy all the saves
