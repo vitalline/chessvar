@@ -313,8 +313,10 @@ def debug_info(board: Board) -> list[str]:
                                 suffixes.append(f"Moves: {to_piece.movement.total_moves}")
                             if to_piece.promoted_from:
                                 suffixes.append(f"Promoted from: {name(to_piece.promoted_from, side)}")
-                            if to_piece.should_hide is not None:
+                            if to_piece.should_hide is not None and not isinstance(to_piece, UtilityPiece):
                                 suffixes.append("Always hide" if to_piece.should_hide else "Never hide")
+                            if to_piece.should_hide is not False and isinstance(to_piece, UtilityPiece):
+                                suffixes.append("Always hide" if to_piece.should_hide else "Can be hidden")
                         suffix = f" ({', '.join(suffixes)})" if suffixes else ''
                         piece_list.append(f"{name(to_piece, side)}{suffix}")
                     piece_list = ', '.join(string for string in piece_list)
@@ -422,8 +424,10 @@ def debug_info(board: Board) -> list[str]:
             suffixes.append(f"Moves: {piece.movement.total_moves}")
         if piece.promoted_from:
             suffixes.append(f"Promoted from: {name(piece.promoted_from, piece.side)}")
-        if piece.should_hide is not None:
+        if piece.should_hide is not None and not isinstance(piece, UtilityPiece):
             suffixes.append("Always hide" if piece.should_hide else "Never hide")
+        if piece.should_hide is not False and isinstance(piece, UtilityPiece):
+            suffixes.append("Always hide" if piece.should_hide else "Can be hidden")
         suffix = f" ({', '.join(suffixes)})" if suffixes else ''
         if string not in neutral_areas:
             poss = frm([string], board.board_width, board.board_height, offset_x, offset_y, neutral_areas)
