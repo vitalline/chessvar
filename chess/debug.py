@@ -36,12 +36,16 @@ def get_piece_mapping(board: Board, side: Side = Side.WHITE) -> dict[str, list[s
                     defaults[piece.name] = piece_type
                 if not default and len(set_mapping[piece.name]) > 1:
                     mapping[piece.name] = [None] + mapping[piece.name]
+    custom_piece_names = [piece.name for piece in board.custom_pieces.values()]
+    custom_piece_name_counts = {}
+    for name in custom_piece_names:
+        custom_piece_name_counts[name] = custom_piece_name_counts.get(name, 0) + 1
     for side in (side, side.opponent()):
         for new_piece in board.piece_sets.get(side, []):
-            add_piece(new_piece, save_piece_type(new_piece) not in board.custom_pieces)
+            add_piece(new_piece, custom_piece_name_counts.get(new_piece.name, 1) == 1)
         pawns = board.custom_pawns if board.custom_pawns is not None else [Pawn]
         for new_piece in (pawns.get(side, []) if isinstance(pawns, dict) else pawns):
-            add_piece(new_piece, save_piece_type(new_piece) not in board.custom_pieces)
+            add_piece(new_piece, custom_piece_name_counts.get(new_piece.name, 1) == 1)
     for _, new_piece in board.custom_pieces.items():
         add_piece(new_piece)
     for piece_set_id in range(len(piece_groups)):
