@@ -303,6 +303,8 @@ class Board(Window):
         board_size = width, height
         col = round((x - origin[0]) / size + (board_size[0] - 1) / 2)
         row = round((y - origin[1]) / size + (board_size[1] - 1) / 2)
+        col, row = (board_size[0] - 1 - col, board_size[1] - 1 - row) if flip else (col, row)
+        col, row = (col + offset[0], row + offset[1])
         for border_col in border_cols:
             if col > border_col:
                 col -= 1
@@ -313,8 +315,6 @@ class Board(Window):
                 row -= 1
             elif row == border_row:
                 return None
-        col, row = (board_size[0] - 1 - col, board_size[1] - 1 - row) if flip else (col, row)
-        col, row = (col + offset[0], row + offset[1])
         return row, col
 
     def get_screen_position(
@@ -341,10 +341,10 @@ class Board(Window):
         offset = offset or self.notation_offset
         flip = flip if flip is not None else self.flip_mode
         board_size = width, height
-        col, row = (col - offset[0], row - offset[1])
-        col, row = (board_size[0] - 1 - col, board_size[1] - 1 - row) if flip else (col, row)
         col += sum(1 for border_col in border_cols if col >= border_col)
         row += sum(1 for border_row in border_rows if row >= border_row)
+        col, row = (col - offset[0], row - offset[1])
+        col, row = (board_size[0] - 1 - col, board_size[1] - 1 - row) if flip else (col, row)
         x = (col - (board_size[0] - 1) / 2) * size + origin[0]
         y = (row - (board_size[1] - 1) / 2) * size + origin[1]
         return x, y
