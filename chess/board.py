@@ -41,7 +41,7 @@ from chess.pieces.groups.classic import Pawn, King
 from chess.pieces.groups.colorbound import King as CBKing
 from chess.pieces.piece import Piece, is_active
 from chess.pieces.side import Side
-from chess.pieces.types import Delayed, Delayed1, Slow
+from chess.pieces.types import Delayed, Delayed1, Slow, Shared
 from chess.pieces.util import NoPiece, Obstacle, Block, Border, Shield, Void, Wall
 from chess.save import condense, expand, condense_algebraic as cnd_alg, expand_algebraic as exp_alg, substitute
 from chess.save import load_move, load_piece, load_rng, load_piece_type, load_custom_type, load_movement_type
@@ -1912,24 +1912,30 @@ class Board(Window):
         royal_group_values = {Side.WHITE: {}, Side.BLACK: {}}
         for row, col in product(range(self.board_height), range(self.board_width)):
             piece = self.get_piece(self.get_relative((row, col)))
-            side = piece.side
-            if side in self.movable_pieces and not isinstance(piece, NoPiece):
-                self.movable_pieces[side].append(piece)
-                for group in self.piece_limits.get(side, self.piece_limits):
-                    if self.fits(group, piece):
-                        self.piece_counts[side][group] = self.piece_counts[side].get(group, 0) + 1
-                for area, group in self.get_area_groups(piece, side):
-                    self.area_groups[side].setdefault(area, {}).setdefault(group, []).append(piece)
-                is_royal, royal_group = self.get_royal_state(piece, side)
-                if is_royal:
-                    self.royal_groups[side].setdefault(royal_group, []).append(piece)
-                    royal_group_values[side][royal_group] = is_royal
-                if isinstance(piece.movement, ProbabilisticMovement):
-                    self.probabilistic_pieces[side].append(piece)
-                if isinstance(piece.movement, AutoRangedAutoCaptureRiderMovement):
-                    self.auto_ranged_pieces[side].append(piece)
-            elif isinstance(piece, Obstacle):
-                self.obstacles.append(piece)
+            if isinstance(piece, Shared):
+                sides = (Side.WHITE, Side.BLACK)
+            elif not isinstance(piece, NoPiece):
+                sides = piece.side,
+            else:
+                sides = ()
+            for side in sides:
+                if side in self.movable_pieces:
+                    self.movable_pieces[side].append(piece)
+                    for group in self.piece_limits.get(side, self.piece_limits):
+                        if self.fits(group, piece):
+                            self.piece_counts[side][group] = self.piece_counts[side].get(group, 0) + 1
+                    for area, group in self.get_area_groups(piece, side):
+                        self.area_groups[side].setdefault(area, {}).setdefault(group, []).append(piece)
+                    is_royal, royal_group = self.get_royal_state(piece, side)
+                    if is_royal:
+                        self.royal_groups[side].setdefault(royal_group, []).append(piece)
+                        royal_group_values[side][royal_group] = is_royal
+                    if isinstance(piece.movement, ProbabilisticMovement):
+                        self.probabilistic_pieces[side].append(piece)
+                    if isinstance(piece.movement, AutoRangedAutoCaptureRiderMovement):
+                        self.auto_ranged_pieces[side].append(piece)
+                elif isinstance(piece, Obstacle):
+                    self.obstacles.append(piece)
         for side, data in self.royal_groups.items():
             for group, pieces in data.items():
                 value = royal_group_values[side][group]
@@ -2267,7 +2273,7 @@ class Board(Window):
                 self.roll_history.append({})
             while len(self.probabilistic_piece_history) < self.ply_count:
                 self.probabilistic_piece_history.append(set())
-            if turn_side == self.turn_side and probabilistic_pieces[turn_side]:
+            if turn_side == self.turn_side and probabilistic_pieces.get(turn_side):
                 signature = set()
                 for piece in probabilistic_pieces[turn_side]:
                     signature |= {(piece.board_pos, type(piece))}
@@ -2491,7 +2497,10 @@ class Board(Window):
                                 else:
                                     drop_types.add(drop_type)
                             # NB: Querying check status after a move is NYI for drop moves
-                            self.moves[turn_side].setdefault('drop', {}).setdefault(pos, {})[piece_type] = drop_types
+                            if drop_types:
+                                drop_dict = self.moves[turn_side].setdefault('drop', {})
+                                pos_drop_dict = drop_dict.setdefault(pos, {})
+                                pos_drop_dict[piece_type] = drop_types
                 for piece in movable_pieces[turn_side] if chain_moves is None else [last_chain_move.piece]:
                     piece_type = type(piece)
                     if piece_type not in piece_rule_dict:
@@ -2943,11 +2952,12 @@ class Board(Window):
             piece = self.get_piece(pos)
             if self.hide_move_markers is False or not piece.is_hidden and not isinstance(piece, NoPiece):
                 move_dict = {}
+                piece_side = self.turn_side if isinstance(piece, Shared) else piece.side
                 use_type_markers = self.move_type_markers
-                if self.display_theoretical_moves.get(piece.side, False):
-                    move_dict = self.theoretical_moves.get(piece.side, {})
-                elif self.display_moves.get(piece.side, False):
-                    move_dict = self.moves.get(piece.side, {})
+                if self.display_theoretical_moves.get(piece_side, False):
+                    move_dict = self.theoretical_moves.get(piece_side, {})
+                elif self.display_moves.get(piece_side, False):
+                    move_dict = self.moves.get(piece_side, {})
                 pos_dict = {k: v for k, v in move_dict.get(pos, {}).items()}
                 if  not use_type_markers and self.can_pass() and pos not in pos_dict:
                     pos_dict[pos] = [False]
@@ -3123,6 +3133,8 @@ class Board(Window):
     def update_auto_captures(self, move: Move, side: Side) -> None:
         if move.is_edit:
             return
+        if side not in self.auto_capture_markers:
+            return
         while move.chained_move and not (
             issubclass(move.chained_move.movement_type or type, AutoCaptureMovement)
             and ((piece := move.chained_move.piece) and piece.side == side)
@@ -3160,13 +3172,13 @@ class Board(Window):
 
     def load_auto_capture_markers(self, side: Side = Side.ANY) -> None:
         for side in self.auto_ranged_pieces if side is Side.ANY else (side,):
-            for piece in self.auto_ranged_pieces[side]:
+            for piece in self.auto_ranged_pieces.get(side, []):
                 if isinstance(piece.movement, AutoRangedAutoCaptureRiderMovement):
                     piece.movement.mark(piece.board_pos, piece)
 
     def clear_auto_capture_markers(self, side: Side = Side.ANY) -> None:
         for side in self.auto_capture_markers if side is Side.ANY else (side,):
-            self.auto_capture_markers[side].clear()
+            self.auto_capture_markers.get(side, {}).clear()
 
     def update_auto_capture_markers(self, move: Move, recursive: bool = False) -> None:
         while move:
@@ -3465,11 +3477,12 @@ class Board(Window):
         if self.edit_mode:
             return
         opponent = self.turn_side.opponent()
-        if not self.moves.get(self.turn_side) and self.moves_queried.get(self.turn_side, False):
-            if 'checkmate' in self.end_rules[opponent] and self.check_side == self.turn_side:
-                self.end_data[opponent]['checkmate'][''] = 1
-            if 'stalemate' in self.end_rules[opponent] and self.check_side != self.turn_side:
-                self.end_data[opponent]['stalemate'][''] = 1
+        for side in {self.turn_side, self.turn_side.opponent()}:
+            if not self.moves.get(side) and self.moves_queried.get(side, False):
+                if 'checkmate' in self.end_rules[opponent] and self.check_side == side:
+                    self.end_data[opponent]['checkmate'][''] = 1
+                if 'stalemate' in self.end_rules[opponent] and self.check_side != side:
+                    self.end_data[opponent]['stalemate'][''] = 1
 
     def unload_end_data(self, _: Move | None = None) -> None:
         for side in {self.turn_side, self.turn_side.opponent()}:
@@ -3801,7 +3814,7 @@ class Board(Window):
             captured_piece = move.piece if move.pos_to is None else move.captured_piece
             if captured_piece is not None and move.piece.side in self.captured_pieces:
                 capture_type = captured_piece.promoted_from or type(captured_piece)
-                if capture_type in self.drops[move.piece.side]:
+                if capture_type in self.drops.get(move.piece.side, {}):
                     # droppable piece was captured, remove it from the roster of captured pieces
                     for i, piece in enumerate(self.captured_pieces[move.piece.side][::-1]):
                         if piece == capture_type:
@@ -3873,7 +3886,7 @@ class Board(Window):
                 if chained_move.promotion is not None:
                     if chained_move.placed_piece is not None:
                         turn_side = self.get_turn_side()
-                        if chained_move.placed_piece in self.drops[turn_side]:
+                        if chained_move.placed_piece in self.drops.get(turn_side, {}):
                             self.captured_pieces[turn_side].append(chained_move.placed_piece)
                     if not isinstance(chained_move.piece, NoPiece):
                         self.update_piece(chained_move.piece)
@@ -5248,7 +5261,11 @@ class Board(Window):
             if (
                 pos != self.selected_square
                 and not self.not_a_piece(pos)
-                and (self.turn_side == self.get_side(pos) or self.edit_mode)
+                and (
+                    (piece := self.get_piece(pos)).side == self.turn_side
+                    or isinstance(piece, Shared)
+                    or self.edit_mode
+                )
             ):
                 self.deselect_piece()  # just in case we had something previously selected
                 self.select_piece(pos)

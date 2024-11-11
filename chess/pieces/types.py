@@ -14,6 +14,14 @@ class Immune(object):
     # Cannot be captured by other pieces
     pass
 
+class Neutral(object):
+    # Does not belong to any player
+    pass
+
+class Shared(object):
+    # Can be moved by either player
+    pass
+
 class Slow(object):
     # Can be captured en passant on any squares it moved through during the last move chain
     pass

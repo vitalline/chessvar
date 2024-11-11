@@ -364,7 +364,7 @@ def debug_info(board: Board) -> list[str]:
                     ('cls', "Type"),
                     'name',
                     ('path', "Texture path"),
-                    ('file', "Texture file"),
+                    ('file', "Texture name"),
                     ('cb', "Colorbound", False),
                     ('movement', None, None, lambda x: dumps(x, compression=3, indent=2, ensure_ascii=False)),
                 ):

@@ -10,7 +10,7 @@ from chess.movement.base import BaseMovement
 from chess.movement.types import is_active
 from chess.movement.util import Position, to_algebraic
 from chess.pieces.side import Side
-from chess.pieces.types import Double, Enemy, Empty, Immune
+from chess.pieces.types import Double, Enemy, Empty, Immune, Neutral
 from chess.util import CUSTOM_PREFIX, Default, get_texture_path, normalize
 
 if TYPE_CHECKING:
@@ -29,13 +29,13 @@ class Piece(Sprite):
         board: Board,
         movement: BaseMovement | None = None,
         pos: Position | None = None,
-        side: Side = Side.NONE,
+        side: Side | None = None,
         **kwargs
     ):
         self.board = board
         self.movement = movement
         self.board_pos = pos
-        self.side = side
+        self.side = Side.NEUTRAL if isinstance(self, Neutral) else side if side is not None else Side.NONE
         self.promoted_from = None
         self.flipped_horizontally = False
         self.flipped_vertically = False
@@ -96,7 +96,7 @@ class Piece(Sprite):
         return ()
 
     def __str__(self):
-        return f"{self.side} {'???' if self.is_hidden else self.name}".strip()
+        return f"{self.side if not isinstance(self, Neutral) else ''} {'???' if self.is_hidden else self.name}".strip()
 
     def __repr__(self):
         string = f"{self.side} {self.name}"
@@ -125,7 +125,7 @@ class Piece(Sprite):
         clone = type(self)(
             board=self.board,
             pos=self.board_pos,
-            side=side,
+            side=side if not isinstance(self, Neutral) else None,
         )
         clone.movement = copy(self.movement)
         clone.promoted_from = self.promoted_from

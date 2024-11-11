@@ -99,8 +99,11 @@ class Move(object):
             and (self.movement_type is None) == (other.movement_type is None)
             and (self.movement_type is None or self.movement_type.__name__ == other.movement_type.__name__)
             and type(self.piece) is type(other.piece)
+            and (not self.piece or self.piece.matches(other.piece))
             and type(self.captured_piece) is type(other.captured_piece)
+            and (not self.captured_piece or self.piece.matches(other.captured_piece))
             and type(self.swapped_piece) is type(other.swapped_piece)
+            and (not self.swapped_piece or self.piece.matches(other.swapped_piece))
             and self.placed_piece is other.placed_piece
             and (not self.promotion or self.promotion.matches(other.promotion))
             and (

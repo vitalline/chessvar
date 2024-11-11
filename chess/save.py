@@ -17,6 +17,7 @@ from chess.movement.util import to_algebraic as toa, from_algebraic as fra
 from chess.movement.util import to_algebraic_map as tom, from_algebraic_map as frm
 from chess.pieces import types as piece_types
 from chess.pieces.piece import Piece
+from chess.pieces.types import Neutral
 from chess.pieces.util import UtilityPiece, NoPiece
 from chess.util import CUSTOM_PREFIX, UNSET_STRING, Unset, AnyJson, AnyJsonType, IntIndex
 
@@ -222,7 +223,10 @@ def save_piece(piece: Piece | frozenset | None) -> dict | str | None:
     return {k: v for k, v in {
         'cls': save_piece_type(type(piece)),
         'pos': toa(piece.board_pos) if piece.board_pos else None,
-        'side': piece.side.value if not isinstance(piece, UtilityPiece) or piece.side != piece.default_side else None,
+        'side': (
+            piece.side.value if not isinstance(piece, Neutral)
+            and not (isinstance(piece, UtilityPiece) and piece.side == piece.default_side) else None
+        ),
         'from': save_piece_type(piece.promoted_from) if piece.promoted_from else None,
         'moves': piece.movement.total_moves if piece.movement else None,
         'show': None if isinstance(piece, UtilityPiece) or piece.should_hide is None else not piece.should_hide,

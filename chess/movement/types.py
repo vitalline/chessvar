@@ -573,7 +573,7 @@ class AbsoluteMovement(RiderMovement):
     def moves(self, pos_from: Position, piece: Piece, theoretical: bool = False):
         for pos_to in from_algebraic_map(
             self.areas, self.board.board_width, self.board.board_height,
-            *self.board.notation_offset, self.board.areas.get(piece.side)
+            *self.board.notation_offset, self.board.areas.get(piece.side) or {}
         ):
             pos_to = self.transform(pos_to)
             if self.stay or pos_to != pos_from:
