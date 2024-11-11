@@ -16,7 +16,6 @@ DEFAULT_CONFIG = {
         'hide_pieces': 0,
         'hide_moves': '',
         'use_drops': False,
-        'use_save': '',
     },
     "SEED": {
         'block_ids': '',
@@ -45,6 +44,8 @@ DEFAULT_CONFIG = {
     },
     "SAVE": {
         'save_path': 'save',
+        'load_path': 'save',
+        'load_save': '',
         'indent': '',
         'compression': 0,
         'update_mode': 0,

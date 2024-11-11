@@ -21,7 +21,6 @@ INIT:  Initialize game state with predefined settings
     - None:  only if pieces are hidden
     - True/False:  hide/show move markers
   - use_drops (False):  whether piece drops are allowed by default
-  - use_save (None):  save file to preload (if not defined by command line)
 
 SEED:  Randomization settings
   - block_ids (None):  army IDs which are prevented from randomly appearing, separated by commas
@@ -65,6 +64,8 @@ LOGS:  Logging and status settings
 
 SAVE:  Saving and loading settings
   - save_path ("save"):  default directory to store save files in
+  - load_path ("save"):  default directory to load save files from
+  - load_save (None):  save file to preload (unless defined otherwise by command line)
   - indent (None):  number of spaces to use for indentation in save files
   - compression (0):  level of whitespace compression in save files
     - 0:  no compression (standard JSON output)

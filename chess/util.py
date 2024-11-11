@@ -191,20 +191,6 @@ def fits(template: str, data: Any) -> bool:
     return False
 
 
-# Function to generate a file name based on a name, extension and timestamp (if not provided, the current time is used).
-def get_file_name(
-    name: str, ext: str, path: str = base_dir, ts: datetime | None = None, ts_format: str = "%Y-%m-%d_%H-%M-%S"
-) -> str:
-    name_args = [name, (ts or datetime.now()).strftime(ts_format)]
-    full_name = '_'.join(s for s in name_args if s).translate(invalid_chars_trans_table)
-    return os.path.join(path, f"{full_name}.{ext}")
-
-
-# Function to convert a path to an absolute path and change all path separators to the one provided (os.sep by default).
-def normalize(path: str, sep: str = os.sep) -> str:
-    return os.path.abspath(path).translate(str.maketrans('\\/', sep * 2))
-
-
 # Function to check if a string contains another string as a prefix, a suffix, or a substring, optionally ignoring case.
 def find_string(string: Any, part: Any, side: int = 0, case: bool = False) -> bool:
     if not isinstance(string, str) or not isinstance(part, str):
@@ -212,6 +198,18 @@ def find_string(string: Any, part: Any, side: int = 0, case: bool = False) -> bo
     if not case:
         string, part = string.lower(), part.lower()
     return part in string if not side else (string.startswith(part) if side < 0 else string.endswith(part))
+
+
+# Function to generate a file name based on a name, extension and timestamp (if not provided, the current time is used).
+def get_file_name(name: str, ext: str, ts: datetime | None = None, ts_format: str = "%Y-%m-%d_%H-%M-%S") -> str:
+    name_args = [name, (ts or datetime.now()).strftime(ts_format)]
+    full_name = '_'.join(s for s in name_args if s).translate(invalid_chars_trans_table)
+    return f"{full_name}.{ext}"
+
+
+# Function to generate a default path for saving or loading files.
+def get_file_path(name: str, ext: str, path: str = '') -> str:
+    return normalize(os.path.join(base_dir, path, get_file_name(name, ext)))
 
 
 # Function to select a file to open. Returns the path of the selected file.
@@ -231,6 +229,11 @@ def save_menu(path: str = base_dir, file: str = None) -> str:
         filetypes=[("JSON file", "*.json")],
         defaultextension='.json',
     )
+
+
+# Function to convert a path to an absolute path and change all path separators to the one provided (os.sep by default).
+def normalize(path: str, sep: str = os.sep) -> str:
+    return os.path.abspath(path).translate(str.maketrans('\\/', sep * 2))
 
 
 # Function to find the correct texture path based on the provided paths.

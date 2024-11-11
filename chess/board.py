@@ -46,7 +46,7 @@ from chess.pieces.util import NoPiece, Obstacle, Block, Border, Shield, Void, Wa
 from chess.save import condense, expand, condense_algebraic as cnd_alg, expand_algebraic as exp_alg, substitute
 from chess.save import load_move, load_piece, load_rng, load_piece_type, load_custom_type, load_movement_type
 from chess.save import save_move, save_piece, save_rng, save_piece_type, save_custom_type
-from chess.util import base_dir, config_path, get_file_name, load_menu, save_menu
+from chess.util import base_dir, config_path, get_file_name, get_file_path, load_menu, save_menu
 from chess.util import Default, Unset, Key, Index, Unpacked, unpack, repack, sign, spell
 from chess.util import deduplicate, dumps, find, find_string, fits, normalize
 
@@ -94,7 +94,7 @@ class Board(Window):
         self.load_data = None  # last loaded data
         self.load_dict = None  # last loaded data, parsed from JSON
         self.load_name = ''  # name of the last loaded data file
-        self.load_path = str(join(base_dir, self.board_config['save_path']))  # directory of the last loaded file
+        self.load_path = str(join(base_dir, self.board_config['load_path']))  # directory of the last loaded file
         self.auto_data = None  # last auto-saved data
         self.auto_name = ''  # name of the last auto-saved data file
         self.auto_path = str(join(base_dir, self.board_config['autosave_path']))  # directory for auto-saved files
@@ -270,7 +270,7 @@ class Board(Window):
         save_path = None
         if len(argv) > 1:
             save_path = argv[1]
-        elif save_name := self.board_config['use_save'].strip():
+        elif save_name := self.board_config['load_save'].strip():
             save_path = join(self.save_path, save_name)
         self.load(save_path)
         if not self.save_loaded:
@@ -5628,7 +5628,7 @@ class Board(Window):
                 if not self.save_name and self.load_name:
                     save_path = save_menu(self.load_path, self.load_name)
                 else:
-                    save_path = save_menu(self.save_path, self.save_name or get_file_name('save', 'json', path=''))
+                    save_path = save_menu(self.save_path, self.save_name or get_file_name('save', 'json'))
                 if save_path:
                     self.save(save_path)
                 else:
@@ -6282,13 +6282,10 @@ class Board(Window):
             self.log(f"Info: Saved to \"{path}\"", False)
 
     def quick_save(self) -> None:
-        self.save(get_file_name('save', 'json', str(join(base_dir, self.board_config['save_path']))))
+        self.save(get_file_path('save', 'json', self.board_config['save_path']))
 
     def auto_save(self) -> None:
-        self.save(
-            get_file_name('auto', 'json', str(join(base_dir, self.board_config['autosave_path']))),
-            auto=True
-        )
+        self.save(get_file_path('auto', 'json', self.board_config['autosave_path']), auto=True)
 
     def log(self, string: str, important: bool = True, *, prefix: str | None = None) -> None:
         if prefix is None:
@@ -6343,7 +6340,7 @@ class Board(Window):
         if not log_data:
             log_data = self.log_data
         if log_data:
-            save_path = join(base_dir, self.board_config['log_path'], get_file_name(log_name, 'txt'))
+            save_path = get_file_path(log_name, 'txt', self.board_config['log_path'])
             with open(save_path, mode='w', encoding='utf-8') as log_file:
                 log_file.write('\n'.join(log_data))
             return str(save_path)
@@ -6401,14 +6398,15 @@ class Board(Window):
         config['set_seed'] = self.set_seed
         config['roll_seed'] = self.roll_seed
         config['verbose'] = self.verbose
-        try:
-            save_path = relpath(self.save_path, base_dir)
-        except ValueError:
-            save_path = self.save_path
-        config['save_path'] = normalize(save_path, '/')
-        config_file_path = normalize(get_file_name('config', 'ini'))
-        config.save(config_file_path)
-        self.log(f"Info: Configuration saved to \"{config_file_path}\"", False)
+        for name, path in (('load_path', self.load_path), ('save_path', self.save_path)):
+            try:
+                path = relpath(path, base_dir)
+            except ValueError:
+                pass
+            config[name] = normalize(path, '/')
+        save_path = get_file_path('config', 'ini')
+        config.save(save_path)
+        self.log(f"Info: Configuration saved to \"{save_path}\"", False)
 
     def run(self):
         if self.board_config['update_mode'] < 0 and self.load_data is not None:
