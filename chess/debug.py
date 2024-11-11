@@ -6,7 +6,7 @@ from copy import deepcopy
 from typing import TYPE_CHECKING, TextIO
 
 from chess.data import piece_groups, get_piece_types, get_set_data, get_set_name
-from chess.data import end_types, prefix_types, typed_prefixes, prefix_chars
+from chess.data import end_types, prefix_types, prefix_chars
 from chess.movement.types import DropMovement
 from chess.movement.util import ANY, to_alpha as b26
 from chess.movement.util import to_algebraic as toa, from_algebraic as fra
@@ -127,6 +127,10 @@ def debug_info(board: Board) -> list[str]:
         return get_piece_name(piece, piece_mapping.get(piece_side(piece) or side, piece_mapping[side]))
     debug_log = []  # noqa
     debug_log.append(f"Board size: {board.board_width}x{board.board_height}")
+    if offset_x or offset_y:
+        debug_log.append(f"Notation offset: {', '.join(f'{x:+}' if x else '0' for x in board.notation_offset)}")
+    else:
+        debug_log.append("Notation offset: None")
     debug_log.append("Borders:")
     if board.border_cols or board.border_rows:
         file_splits = list(f'{s26(x)}/{s26(x + 1)}' for x in board.border_cols)
@@ -141,6 +145,7 @@ def debug_info(board: Board) -> list[str]:
             debug_log.append(f"{pad:2}Ranks (0): None")
     else:
         debug_log[-1] += " None"
+    debug_log.append(f"Visual board size: {board.visual_board_width}x{board.visual_board_height}")
     debug_log.append(f"Screen size: {board.width}x{board.height}")
     debug_log.append(f"Square size: {board.square_size}")
     debug_log.append(f"Windowed screen size: {board.windowed_size[0]}x{board.windowed_size[1]}")
@@ -285,9 +290,14 @@ def debug_info(board: Board) -> list[str]:
                         if row in rows:
                             continue
                         rows.add(row)
-                    if rows == set(range(board.board_height)):
+                    all_rows = True
+                    for abs_row in range(board.board_height):
+                        if abs_row + offset_y not in rows:
+                            all_rows = False
+                            break
+                    if all_rows:
                         rows = {ANY}
-                    mapping = {toa((row, ANY)): (max(row, 0), 0) for row in rows}
+                    mapping = {toa((row, ANY)): (0 if row == ANY else row, 0) for row in rows}
                 for string, pos in mapping.items():
                     piece_list = []
                     for to_piece in section_rules[piece][pos]:
