@@ -760,8 +760,9 @@ class Board(Window):
             },
             'pawn': {
                 k.value: unpack([save_piece_type(t) for t in v]) for k, v in self.custom_pawns.items()
-            } if isinstance(self.custom_pawns, dict) else
-            unpack([save_piece_type(t) for t in self.custom_pawns]) if self.custom_pawns is not None else None,
+            } if isinstance(self.custom_pawns, dict)
+            else unpack([save_piece_type(t) for t in self.custom_pawns])
+            if self.custom_pawns is not None else None,
             'pieces': cnd_alg({
                 p.board_pos: save_piece(p.on(None))
                 for pieces in [*self.movable_pieces.values(), self.obstacles] for p in pieces
@@ -775,7 +776,7 @@ class Board(Window):
                 side.value: {
                     save_piece_type(f): cnd_alg({
                         p: unpack([
-                            (save_piece if isinstance(t, Piece) else save_piece_type)(t) for t in l
+                            (save_piece if isinstance(t, Piece) else save_piece_type)(t, f) for t in l
                         ]) for p, l in s.items()
                     }, *wha[side]) for f, s in d.items()
                 } for side, d in self.custom_promotions.items()
@@ -784,7 +785,7 @@ class Board(Window):
                 side.value: {
                     save_piece_type(f): cnd_alg({
                         p: unpack([
-                            (save_piece if isinstance(t, Piece) else save_piece_type)(t) for t in l
+                            (save_piece if isinstance(t, Piece) else save_piece_type)(t, f) for t in l
                         ]) for p, l in s.items()
                     }, *wha[side]) for f, s in d.items()
                 } for side, d in self.custom_drops.items()
@@ -1048,7 +1049,8 @@ class Board(Window):
             Side(int(v)): {
                 load_piece_type(f, c): {
                     p: [
-                        (load_piece_type(t, c) if isinstance(t, str) else load_piece(t, self, c)) for t in repack(l)
+                        (load_piece_type(t, c, f) if isinstance(t, str) else load_piece(t, self, c, f))
+                        for t in repack(l)
                     ] for p, l in exp_alg(s, *wha[Side(int(v))]).items()
                 } for f, s in d.items()
             } for v, d in data.get('promotions', {}).items()
@@ -1057,7 +1059,8 @@ class Board(Window):
             Side(int(v)): {
                 load_piece_type(f, c): {
                     p: [
-                        (load_piece_type(t, c) if isinstance(t, str) else load_piece(t, self, c)) for t in repack(l)
+                        (load_piece_type(t, c, f) if isinstance(t, str) else load_piece(t, self, c, f))
+                        for t in repack(l)
                     ] for p, l in exp_alg(s, *wha[Side(int(v))]).items()
                 } for f, s in d.items()
             } for v, d in data.get('drops', {}).items()

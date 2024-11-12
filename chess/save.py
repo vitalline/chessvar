@@ -11,12 +11,12 @@ from warnings import warn
 from chess.movement import types as movement_types
 from chess.movement.base import BaseMovement
 from chess.movement.move import Move
-from chess.pieces.side import Side
-from chess.movement.util import Position, sort_key
+from chess.movement.util import LAST, Position, sort_key
 from chess.movement.util import to_algebraic as toa, from_algebraic as fra
 from chess.movement.util import to_algebraic_map as tom, from_algebraic_map as frm
 from chess.pieces import types as piece_types
 from chess.pieces.piece import Piece
+from chess.pieces.side import Side
 from chess.pieces.types import Neutral
 from chess.pieces.util import UtilityPiece, NoPiece
 from chess.util import CUSTOM_PREFIX, UNSET_STRING, Unset, AnyJson, AnyJsonType, IntIndex
@@ -151,19 +151,30 @@ def substitute(data: AnyJson, subs: IntIndex | dict[int, IntIndex], side: Side =
     return result
 
 
-def save_piece_type(piece_type: type[Piece] | frozenset | None) -> str | None:
+def save_piece_type(
+    piece_type: type[Piece] | frozenset | None,
+    last: type[Piece] | None = None,
+) -> str | None:
     if piece_type is None:
         return None
     if piece_type is Unset:
         return UNSET_STRING
+    if piece_type is last:
+        return LAST
     return piece_type.type_str()
 
 
-def load_piece_type(data: str | None, from_dict: dict | None) -> type[Piece] | frozenset | None:
+def load_piece_type(
+    data: str | None,
+    from_dict: dict | None = None,
+    last: str | None = None,
+) -> type[Piece] | frozenset | None:
     if not data:
         return None
     if data == UNSET_STRING:
         return Unset
+    if data == LAST:
+        return load_piece_type(last, from_dict)
     if from_dict and data in from_dict:
         return from_dict[data]
     parts = data.split('.', 1)
@@ -213,7 +224,10 @@ def load_movement_type(data: list | str | None) -> type[BaseMovement] | frozense
     return None
 
 
-def save_piece(piece: Piece | frozenset | None) -> dict | str | None:
+def save_piece(
+    piece: Piece | frozenset | None,
+    last: type[Piece] | None = None,
+) -> dict | str | None:
     if piece is None:
         return None
     if piece is Unset:
@@ -221,19 +235,23 @@ def save_piece(piece: Piece | frozenset | None) -> dict | str | None:
     if isinstance(piece, NoPiece):
         return toa(piece.board_pos) if piece.board_pos else None
     return {k: v for k, v in {
-        'cls': save_piece_type(type(piece)),
+        'cls': save_piece_type(type(piece), last),
         'pos': toa(piece.board_pos) if piece.board_pos else None,
         'side': (
             piece.side.value if not isinstance(piece, Neutral)
             and not (isinstance(piece, UtilityPiece) and piece.side == piece.default_side) else None
         ),
-        'from': save_piece_type(piece.promoted_from) if piece.promoted_from else None,
+        'from': save_piece_type(piece.promoted_from, last) if piece.promoted_from else None,
         'moves': piece.movement.total_moves if piece.movement else None,
         'show': None if isinstance(piece, UtilityPiece) or piece.should_hide is None else not piece.should_hide,
     }.items() if v or (k == 'show' and v is False)}
 
 
-def load_piece(data: dict | str | None, board: Board, from_dict: dict | None) -> Piece | frozenset | None:
+def load_piece(
+    data: dict | str | None, board: Board,
+    from_dict: dict | None = None,
+    last: str | None = None,
+) -> Piece | frozenset | None:
     if not data:
         return None
     if data == UNSET_STRING:
@@ -241,13 +259,13 @@ def load_piece(data: dict | str | None, board: Board, from_dict: dict | None) ->
     if isinstance(data, str):
         return NoPiece(board, pos=fra(data))
     side = Side(data.get('side', 0))
-    piece_type = load_piece_type(data.get('cls'), from_dict) or NoPiece
+    piece_type = load_piece_type(data.get('cls'), from_dict, last) or NoPiece
     piece = piece_type(
         board=board,
         pos=fra(data['pos']) if 'pos' in data else None,  # type: ignore
         side=side,
     )
-    piece.promoted_from = load_piece_type(data.get('from'), from_dict)
+    piece.promoted_from = load_piece_type(data.get('from'), from_dict, last)
     show_piece = data.get('show')
     if show_piece is not None:
         piece.is_hidden = piece.should_hide = not show_piece
