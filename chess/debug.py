@@ -5,8 +5,8 @@ import sys
 from copy import deepcopy
 from typing import TYPE_CHECKING, TextIO
 
-from chess.data import piece_groups, get_piece_types, get_set_data, get_set_name
-from chess.data import end_types, prefix_types, prefix_chars
+from chess.data import get_piece_types, get_set_data, get_set_name, piece_groups
+from chess.data import action_types, end_types, prefix_chars, prefix_types, type_prefixes
 from chess.movement.types import DropMovement
 from chess.movement.util import ANY, to_alpha as b26
 from chess.movement.util import to_algebraic as toa, from_algebraic as fra
@@ -481,28 +481,29 @@ def debug_info(board: Board) -> list[str]:
         prefix_list = []
         while data_value[:1] in prefix_types:
             if not data_value:
-                prefix_list.append(prefix_chars['last'])
-                prefix_set.add(prefix_chars['last'])
+                if prefix_chars['last'] not in prefix_set:
+                    prefix_list.append(prefix_chars['last'])
+                    prefix_set.add(prefix_chars['last'])
                 break
             if data_value[:1] not in prefix_set:
                 prefix_list.append(data_value[:1])
                 prefix_set.add(data_value[:1])
             data_value = data_value[1:]
-        prefixes = []
-        if prefix_chars['not'] in prefix_set:
-            prefixes.append('NOT')
-            prefix_set.discard(prefix_chars['not'])
-        if prefix_chars['any'] in prefix_set:
-            prefixes.append('any')
-            prefix_set.discard(prefix_chars['any'])
-        if prefix_chars['last'] in prefix_set:
-            prefixes.append('last')
-            prefix_set.discard(prefix_chars['last'])
-        prefixes.append(', '.join(prefix_types[ch] for ch in prefix_list if ch in prefix_types and ch in prefix_set))
-        if prefixes[0].islower():
-            prefixes[0] = prefixes[0].capitalize()
-        prefixes.append(data_value)
-        return f"{' '.join(prefixes)}" or 'None'
+        generic_prefix_list, typed_prefix_list = [], []
+        for ch in prefix_list:
+            (typed_prefix_list if ch in type_prefixes else generic_prefix_list).append(prefix_types[ch])
+        generic_prefix = ' '.join(s.capitalize() for s in generic_prefix_list)
+        typed_prefix = ', '.join(s.capitalize() for s in typed_prefix_list)
+        return f"{' '.join(s for s in (generic_prefix, typed_prefix, data_value) if s)}" or 'None'
+    def action_builder(data_value):
+        if isinstance(data_value, list):
+            return ', '.join(action_builder(x) for x in data_value)
+        invert = False
+        if data_value[:1] == prefix_chars['not']:
+            data_value = data_value[1:]
+            invert = True
+        data_string = action_types[data_value] if data_value in action_types else f"unknown ({data_value})"
+        return ("Not " if invert else '') + data_string.capitalize()
     start_count = 0
     start_index = 0
     debug_log.append(f"Turn order ({len(start) + len(loop)}):")
@@ -519,17 +520,16 @@ def debug_info(board: Board) -> list[str]:
                     debug_log.append(f"{pad:{pad_count}}{i + 1}: {turn_side} ({len(turn_rules)}):")
                     for ri, rule in enumerate(turn_rules):
                         debug_log.append(f"{pad:{pad_count + 2}}Option {ri + 1}:")
-                        last_data, next_data = [], []
-                        for sub_data, field, when in ((last_data, 'last', 'ago'), (next_data, 'next', 'until')):
+                        for field, when in (('last', 'ago'), ('next', 'until')):
                             for si, sub_rule in enumerate(rule.get(field, [])):
-                                sub_data.append(f"{field.capitalize()} option {si + 1}:")
+                                debug_log.append(f"{pad:{pad_count + 4}}{field.capitalize()} option {si + 1}:")
                                 for key_data in (
-                                    ('by', "Moves ago"),
+                                    ('by', f"Moves {when}"),
                                     'piece',
                                     ('move', "Move type"),
-                                    ('type', "Action type"),
-                                    ('from', None, lambda x: ', '.join(map(str, x))),
-                                    ('to', None, lambda x: ', '.join(map(str, x))),
+                                    ('type', "Action type", action_builder),
+                                    'from',
+                                    'to',
                                     ('take', "Captured"),
                                     ('lose', "Lost"),
                                     ('new', "New piece"),
@@ -544,28 +544,26 @@ def debug_info(board: Board) -> list[str]:
                                         string = key.capitalize()
                                     if builder is None:
                                         builder = default_builder
-                                    sub_data.append(f"{string}:")
+                                    debug_log.append(f"{pad:{pad_count + 6}}{string}:")
                                     value = builder(sub_rule[key]).splitlines()
                                     if len(value) > 1:
-                                        sub_data.extend(f"{pad:2}{line}" for line in value)
+                                        debug_log.extend(f"{pad:{pad_count + 8}}{line}" for line in value)
                                     else:
-                                        sub_data[-1] += f" {value[0]}"
+                                        debug_log[-1] += f" {value[0]}"
                         for key_data in (
                             'order',
                             (
                                 'state', "Board state", lambda x: {
                                     0: "Any",
-                                    1: "White is NOT in check", -1: "White is in check",
-                                    2: "Black is NOT in check", -2: "Black is in check",
+                                    1: "White is not in check", -1: "White is in check",
+                                    2: "Black is not in check", -2: "Black is in check",
                                 }.get(x, 'Unknown')
                             ),
-                            ('last', "Last moves", lambda _: '\n'.join(last_data)),
-                            ('next', "Next moves", lambda _: '\n'.join(next_data)),
                             'piece',
                             ('move', "Move type"),
-                            ('type', 'Action type'),
-                            ('from', None, lambda x: ', '.join(map(str, x))),
-                            ('to', None, lambda x: ', '.join(map(str, x))),
+                            ('type', 'Action type', action_builder),
+                            'from',
+                            'to',
                             ('take', "Captured"),
                             ('lose', "Lost"),
                             ('new', "New piece"),

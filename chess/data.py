@@ -55,7 +55,7 @@ prefix_types = {
 prefix_chars = {v: k for k, v in prefix_types.items() if k}
 
 generic_prefixes = {'!', '*', '_', ''}
-typed_prefixes = set(prefix_types.keys()) - generic_prefixes
+type_prefixes = set(prefix_types.keys()) - generic_prefixes
 
 default_rules = {
     'order': 0,

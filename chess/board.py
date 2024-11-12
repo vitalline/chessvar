@@ -26,7 +26,7 @@ from chess.data import default_board_width, default_board_height, default_size
 from chess.data import min_width, min_height, min_size, max_size, size_step
 from chess.data import action_types, end_types, piece_groups, penultima_textures
 from chess.data import default_rules, default_sub_rules, default_end_rules
-from chess.data import prefix_chars as pch, prefix_types, typed_prefixes
+from chess.data import prefix_chars as pch, prefix_types, type_prefixes
 from chess.debug import debug_info, save_piece_data, save_piece_sets, save_piece_types
 from chess.movement.base import BaseMovement
 from chess.movement.move import Move
@@ -467,7 +467,7 @@ class Board(Window):
             if isinstance(x, str) and ((y := x.lstrip(''.join(prefix_types))) and y != x):
                 return x, y
             return x,
-        if template in {NONE, LAST, *typed_prefixes} and last:
+        if template in {NONE, LAST, *type_prefixes} and last:
             data_set = set(
                 x for k in self.keys(data)
                 if template in {NONE, LAST}
