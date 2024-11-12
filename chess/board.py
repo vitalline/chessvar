@@ -3062,9 +3062,9 @@ class Board(Window):
         if with_move and self.move_history and not self.edit_mode:
             index = -1
             while (
-                index >= -len(self.move_history)
-                and self.get_turn_side(index) == self.get_turn_side(-1) and (self.move_history[index] is None
-                or issubclass(self.move_history[index].movement_type or type, DropMovement))
+                index > -len(self.move_history) and self.get_turn_side(index) == self.get_turn_side(-1)
+                and (self.move_history[index] is None or self.move_history[index].movement_type
+                and issubclass(self.move_history[index].movement_type, DropMovement))
             ):
                 index -= 1
             move = self.move_history[index]
