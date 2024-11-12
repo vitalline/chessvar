@@ -6272,15 +6272,11 @@ class Board(Window):
             if (limit := self.board_config['size_limit']) and (save_size := getsize(path)) > limit:
                 units = {0: 'B', 1: 'KB', 2: 'MB', 3: 'GB', 4: 'TB'}
                 parts = [save_size, limit]
-                exact = [True, True]
                 i = 0
                 while parts[1] >= 1024:
-                    exact = [x and p % 1024 == 0 for x, p in zip(exact, parts)]
-                    parts = [part / 1024 for part in parts]
+                    parts = [x / 1024 for x in parts]
                     i += 1
-                precs = [0 if x else max(0, 3 - len(str(int(p)))) for x, p in zip(exact, parts)]
-                precs[0] = max(precs)
-                ratio = '/'.join(f"{x:.{p}f}" for x, p in zip(parts, precs))
+                ratio = '/'.join(f"{x:.{max(0, 3 - len(str(int(x))))}f}" for x in parts)
                 self.log(f"Error: File \"{path}\" is too large to load ({ratio} {units[i]})")
                 return False
             self.log(f"Info: Loading from \"{path}\"")
