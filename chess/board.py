@@ -2968,34 +2968,46 @@ class Board(Window):
             pos = self.highlight_square
         if self.on_board(pos) and with_markers:
             piece = self.get_piece(pos)
-            if self.hide_move_markers is False or not piece.is_hidden and not isinstance(piece, NoPiece):
+            if self.hide_move_markers is False or not piece.is_hidden:
                 move_dict = {}
-                piece_side = self.turn_side if isinstance(piece, Shared) else piece.side
+                piece_side = self.turn_side if isinstance(piece, (NoPiece, Shared)) else piece.side
                 use_type_markers = self.move_type_markers
+                type_marker_alpha = 255
                 if self.display_theoretical_moves.get(piece_side, False):
                     move_dict = self.theoretical_moves.get(piece_side, {})
+                    type_marker_alpha = 224
                 elif self.display_moves.get(piece_side, False):
                     move_dict = self.moves.get(piece_side, {})
                 pos_dict = {k: v for k, v in move_dict.get(pos, {}).items()}
-                if  not use_type_markers and self.can_pass() and pos not in pos_dict:
-                    pos_dict[pos] = [False]
+                if pos not in pos_dict:
+                    if self.can_pass() and piece_side == self.turn_side and not isinstance(piece, NoPiece):
+                        pos_dict[pos] = ['x' if use_type_markers else 'pass']
+                    if self.use_drops and pos in self.moves.get(self.turn_side, {}).get('drop', {}):
+                        pos_dict[pos] = ['v' if use_type_markers else 'drop']
                 for pos_to, moves in pos_dict.items():
                     move_marker_list = []
                     move_marker_set = set()
                     move_marker_seven = ''
                     for move in moves:
-                        if move is False:
-                            move_marker_list.append(False)
-                            move_marker_set.add(False)
-                        elif not use_type_markers:
-                            if not move.is_legal:
-                                continue
+                        if not use_type_markers:
                             if move_marker_set or move_marker_list:
                                 break
-                            move_marker_list.append(self.not_a_piece(pos_to))
-                            move_marker_set.add(move_marker_list[-1])
+                            if move == 'pass':
+                                move_marker_list.append('capture')
+                                move_marker_set.add('pass')
+                            elif move == 'drop':
+                                move_marker_list.append('move')
+                                move_marker_set.add('drop')
+                            elif isinstance(move, str):
+                                continue
+                            elif not move.is_legal:
+                                continue
+                            else:
+                                move_marker_list.append('move' if self.not_a_piece(pos_to) else 'capture')
+                                move_marker_set.add(move_marker_list[-1])
                         else:
-                            for mark in move.marks:
+                            marks = move if isinstance(move, str) else move.marks
+                            for mark in marks:
                                 if mark in {'7', '/'}:
                                     move_marker_seven += mark
                                 elif move_marker_seven:
@@ -3012,7 +3024,7 @@ class Board(Window):
                     if not move_marker_list:
                         continue
                     if not use_type_markers:
-                        mark = Sprite(f"assets/util/{'move' if move_marker_list[0] else 'capture'}.png")
+                        mark = Sprite(f"assets/util/{move_marker_list[0]}.png")
                         mark.color = self.color_scheme[f"{'selection' if self.selected_square else 'highlight'}_color"]
                         mark.position = self.get_screen_position(pos_to)
                         mark.scale = self.square_size / mark.texture.width
@@ -3043,6 +3055,7 @@ class Board(Window):
                             )
                             mark.scale = (self.square_size / width) / mark.texture.width * (2 if area > 1 else 1)
                             mark.angle = angle
+                            mark.alpha = type_marker_alpha
                             self.type_sprite_list.append(mark)
                             move_sprites[pos_to].append(mark)
                         with_move = False
