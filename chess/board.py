@@ -2320,21 +2320,32 @@ class Board(Window):
                 for rule in last_history_rules:
                     rule['match'] = {}
                 if self.move_history:
+                    last_history_moves = {}
                     depths = {by for rule in state_rules for last in rule['last'] for by in last['by']}
-                    min_depth, max_depth = min(depths, default=0), max(depths, default=0)
+                    starts, finals = set(), set()
+                    _ = [(starts if x < 0 else finals).add(x) for x in depths]
+                    min_index, max_index = max(starts, default=0), min(starts, default=0)
+                    i = 1
+                    for last_history_move in self.move_history:
+                        if i > -max_index:
+                            break
+                        if last_history_move and last_history_move.is_edit:
+                            continue
+                        if i in starts:
+                            last_history_moves[i] = last_history_move
+                        i += 1
+                    min_depth, max_depth = min(finals, default=0), max(finals, default=0)
                     i = int(not self.chain_start)
-                    last_history_moves = []
                     for last_history_move in self.move_history[::-1]:
                         if i > max_depth:
                             break
                         if last_history_move and last_history_move.is_edit:
                             continue
-                        last_history_moves.append(last_history_move)
+                        if i in finals:
+                            last_history_moves[i] = last_history_move
                         i += 1
-                    i -= 1
-                    for last_history_move in last_history_moves[::-1]:
-                        if i < min_depth:
-                            break
+                    for i in sorted(last_history_moves, key=lambda x: (sign(x), -x)):
+                        last_history_move = last_history_moves[i]
                         if last_history_move and last_history_move.is_edit:
                             continue
                         old_history_rules = last_history_rules
@@ -2685,20 +2696,24 @@ class Board(Window):
                                         )
                                         if not future_rules:
                                             legal = False
-                                            break
-                                        self.load_pieces()  # update piece counts
-                                        if p_type not in new_limit_hits:
-                                            if p_type not in new_limit_groups:
-                                                new_limit_groups[p_type] = [g for g in limits if self.fits(g, p_type)]
-                                            new_limit_hits[p_type] = [
-                                                self.piece_counts[turn_side].get(g, 0) for g in new_limit_groups[p_type]
-                                            ]
-                                        for g in new_limit_groups[p_type]:
-                                            if self.piece_counts[turn_side].get(g, 0) >= limits[g]:
-                                                new_limit_hits[p_type] = True
-                                                break
-                                        if new_limit_hits[p_type]:
-                                            continue
+                                        else:
+                                            self.load_pieces()  # update piece counts
+                                            if p_type not in new_limit_hits:
+                                                if p_type not in new_limit_groups:
+                                                    new_limit_groups[p_type] = [
+                                                        g for g in limits if self.fits(g, p_type)
+                                                    ]
+                                                new_limit_hits[p_type] = [
+                                                    self.piece_counts[turn_side].get(g, 0)
+                                                    for g in new_limit_groups[p_type]
+                                                ]
+                                            for g in new_limit_groups[p_type]:
+                                                if self.piece_counts[turn_side].get(g, 0) >= limits[g]:
+                                                    new_limit_hits[p_type] = True
+                                                    break
+                                            if new_limit_hits[p_type]:
+                                                legal = False
+                                    next_future_rules += future_rules
                                 if legal:
                                     self.move(chained_move)
                                     if isinstance(chained_move.promotion, Piece):
