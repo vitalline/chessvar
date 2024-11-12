@@ -6274,11 +6274,11 @@ class Board(Window):
                 parts = [save_size, limit]
                 exact = [True, True]
                 i = 0
-                while limit > 1024:
-                    exact = [x and part % 1024 == 0 for x, part in zip(exact, parts)]
+                while parts[1] >= 1024:
+                    exact = [x and p % 1024 == 0 for x, p in zip(exact, parts)]
                     parts = [part / 1024 for part in parts]
                     i += 1
-                precs = [0 if x else 2 for x in exact]
+                precs = [0 if x else max(0, 3 - len(str(int(p)))) for x, p in zip(exact, parts)]
                 precs[0] = max(precs)
                 ratio = '/'.join(f"{x:.{p}f}" for x, p in zip(parts, precs))
                 self.log(f"Error: File \"{path}\" is too large to load ({ratio} {units[i]})")
