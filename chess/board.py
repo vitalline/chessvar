@@ -1848,7 +1848,7 @@ class Board(Window):
         if area in self.custom_areas and isinstance(self.custom_areas[area], set):  # a side-neutral area on the board
             return pos in self.custom_areas[area]
         try:  # treating as notation (possibly generic)
-            return any(all(i in {ANY, j} for i, j in zip(res(fra(area), last_pos), pos)) for last_pos in last)
+            return any(all(i in {ANY, j} for i, j in zip(res(fra(area), last_pos), pos)) for last_pos in (None, *last))
         except ValueError:  # if all else fails...
             return False
 

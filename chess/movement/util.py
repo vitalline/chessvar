@@ -278,7 +278,9 @@ def from_algebraic_map(
     return {k: result[k] for k in sorted(result)}
 
 
-def resolve(pos: GenericPosition, last: GenericPosition = (LAST, LAST)) -> Position:
+def resolve(pos: GenericPosition, last: GenericPosition = None) -> Position:
+    if last is None:
+        return pos
     if LAST not in pos:
         return pos
     if pos == (LAST, LAST):
