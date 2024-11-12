@@ -25,6 +25,7 @@ DEFAULT_CONFIG = {
         'set_seed': '',
         'roll_seed': '',
         'update_roll_seed': True,
+        'max_seed': 2 ** 32 - 1,
     },
     "SKIP": {
         'fast_moves': False,

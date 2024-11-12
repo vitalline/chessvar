@@ -21,7 +21,7 @@ from arcade import get_screens, start_render
 from chess.color import colors, default_colors, trickster_colors
 from chess.color import average, darken, desaturate, lighten, saturate
 from chess.config import Config
-from chess.data import base_rng, max_seed, get_set_data, get_set_name
+from chess.data import base_rng, get_set_data, get_set_name
 from chess.data import default_board_width, default_board_height, default_size
 from chess.data import min_width, min_height, min_size, max_size, size_step
 from chess.data import action_types, end_types, piece_groups, penultima_textures
@@ -240,19 +240,19 @@ class Board(Window):
         self.roll_seed = (
             self.board_config['roll_seed']
             if self.board_config['roll_seed'] is not None
-            else base_rng.randint(0, max_seed)
+            else base_rng.randint(0, self.board_config['max_seed'])
         )
         self.roll_rng = None  # will be initialized later
         self.set_seed = (
             self.board_config['set_seed']
             if self.board_config['set_seed'] is not None
-            else base_rng.randint(0, max_seed)
+            else base_rng.randint(0, self.board_config['max_seed'])
         )
         self.set_rng = Random(self.set_seed)
         self.chaos_seed = (
             self.board_config['chaos_seed']
             if self.board_config['chaos_seed'] is not None
-            else base_rng.randint(0, max_seed)
+            else base_rng.randint(0, self.board_config['max_seed'])
         )
         self.chaos_rng = Random(self.chaos_seed)
 
@@ -646,7 +646,7 @@ class Board(Window):
             self.roll_rng = Random(self.roll_seed)
         elif update:
             if self.board_config['update_roll_seed']:
-                self.roll_seed = self.roll_rng.randint(0, max_seed)
+                self.roll_seed = self.roll_rng.randint(0, self.board_config['max_seed'])
             self.roll_rng = Random(self.roll_seed)
 
         self.move_history = []
@@ -1356,7 +1356,7 @@ class Board(Window):
         self.reset_penultima_pieces()
 
         if self.board_config['update_roll_seed']:
-            self.roll_seed = self.roll_rng.randint(0, max_seed)
+            self.roll_seed = self.roll_rng.randint(0, self.board_config['max_seed'])
         self.roll_rng = Random(self.roll_seed)
 
         self.move_history = []
@@ -1803,7 +1803,7 @@ class Board(Window):
         self.log(f"Info: Starting new game (with {chaotic} piece {sets})")
         self.chaos_mode = mode
         self.chaos_sets = {}
-        self.chaos_seed = self.chaos_rng.randint(0, max_seed)
+        self.chaos_seed = self.chaos_rng.randint(0, self.board_config['max_seed'])
         self.chaos_rng = Random(self.chaos_seed)
         self.piece_set_ids = {Side.WHITE: -1, Side.BLACK: -1 if same else -2}
         self.reset_custom_data()

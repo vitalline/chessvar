@@ -25,7 +25,6 @@ from chess.pieces.piece import Piece
 from chess.pieces.side import Side
 from chess.pieces.util import NoPiece
 
-
 default_board_width = 8
 default_board_height = 8
 
@@ -37,7 +36,6 @@ max_size = 100.0
 size_step = 5.0
 
 base_rng = Random()
-max_seed = 2 ** 32 - 1
 
 penultima_textures = [f'ghost{s}' if s else None for s in ('R', 'N', 'B', 'Q', None, 'B', 'N', 'R')]
 

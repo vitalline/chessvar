@@ -35,6 +35,7 @@ SEED:  Randomization settings
   - set_seed (None):  seed for predefined army selection (if any)
   - roll_seed (None):  seed for probabilistic move types (if any)
   - update_roll_seed (True):  whether to generate new roll seeds when the match is restarted
+  - max_seed (2 ** 32 - 1):  maximum seed value to use for randomization
 
 SKIP:  Granular options for automatically making forced moves
   - fast_moves (False):  if there is one legal move, make it
