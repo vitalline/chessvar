@@ -2194,7 +2194,7 @@ class Board(Window):
         self,
         force_reload: bool = True,
         moves_for: Side | None = None,
-        theoretical_moves_for:  Side | None = None
+        theoretical_moves_for: Side | None = None
     ) -> None:
         if self.edit_mode:
             self.game_over = False
