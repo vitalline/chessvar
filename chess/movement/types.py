@@ -638,10 +638,10 @@ class IndexMovement(BaseMultiMovement):
         cycle_mode: int = 0,
     ):
         self.movement_index = tuple(repack(movements or [], list) for movements in (movement_index or []))
-        self.iteration_type = iteration_type
-        self.iteration_div = iteration_div
-        self.iteration_sub = iteration_sub
-        self.cycle_mode = cycle_mode
+        self.iteration_type = iteration_type  # 0: [i:i+1], 1: [i:], -1: [:i+1]
+        self.iteration_div = iteration_div    # d: shift i every d moves
+        self.iteration_sub = iteration_sub    # s: do not shift i for the first s moves
+        self.cycle_mode = cycle_mode          # 0: stop at the last i, 1: loop back to 0, -1: invert iteration direction
         super().__init__(board, list(chain.from_iterable(self.movement_index)))
 
     def moves(self, pos_from: Position, piece: Piece, theoretical: bool = False, index: int | None = None):
@@ -661,7 +661,7 @@ class IndexMovement(BaseMultiMovement):
                 mark = ''
         range_index = (
             0 if self.iteration_type < 0 else index,
-            0 if self.iteration_type > 0 else index + 1,
+            len(self.movements) if self.iteration_type > 0 else index + 1,
         )
         for i, movement in enumerate(self.movements):
             for move in movement.moves(pos_from, piece, theoretical):
