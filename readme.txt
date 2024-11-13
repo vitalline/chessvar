@@ -66,6 +66,7 @@ Ctrl + G: reset graphics mode (colors)
 Shift + G: cycle graphics mode forward (+1)
 ... + Ctrl: cycle graphics mode backward (-1)
 Ctrl + I: print game information (if applicable)
+Alt + I: toggle labels between board sections
 
 Save/load hotkeys:
 Ctrl + C: save current configuration

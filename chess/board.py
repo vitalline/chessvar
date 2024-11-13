@@ -218,7 +218,9 @@ class Board(Window):
         self.active_piece = None  # piece that is currently being moved
         self.is_active = True  # whether the window is active or not
         self.is_focused = True  # whether the mouse cursor is over the window
-        self.label_list = []  # labels for the rows and columns
+        self.extra_labels = False  # whether to show additional labels on border rows/columns
+        self.row_label_list = []  # labels for the rows
+        self.col_label_list = []  # labels for the columns
         self.board_sprite_list = SpriteList()  # sprites for the board squares
         self.move_sprite_list = SpriteList()  # sprites for the move markers
         self.type_sprite_list = SpriteList()  # sprites for the type-based move markers
@@ -290,16 +292,18 @@ class Board(Window):
         border_rows: list[int] | None = None,
         offset: tuple[int, int] | None = None,
         flip: bool | None = None,
+        between_cols: bool = False,
+        between_rows: bool = False,
     ) -> Position | None:
         x, y = pos
-        size = size or self.square_size
-        origin = origin or self.origin
-        width = width or self.visual_board_width
-        height = height or self.visual_board_height
-        border_cols = border_cols or self.border_cols
-        border_rows = border_rows or self.border_rows
-        offset = offset or self.notation_offset
-        flip = flip if flip is not None else self.flip_mode
+        size = self.square_size if size is None else size
+        origin = self.origin if origin is None else origin
+        width = self.visual_board_width if width is None else width
+        height = self.visual_board_height if height is None else height
+        border_cols = self.border_cols if border_cols is None else border_cols
+        border_rows = self.border_rows if border_rows is None else border_rows
+        offset = self.notation_offset if offset is None else offset
+        flip = self.flip_mode if flip is None else flip
         board_size = width, height
         col = round((x - origin[0]) / size + (board_size[0] - 1) / 2)
         row = round((y - origin[1]) / size + (board_size[1] - 1) / 2)
@@ -308,12 +312,12 @@ class Board(Window):
         for border_col in border_cols:
             if col > border_col:
                 col -= 1
-            elif col == border_col:
+            elif col == border_col and not between_cols:
                 return None
         for border_row in border_rows:
             if row > border_row:
                 row -= 1
-            elif row == border_row:
+            elif row == border_row and not between_rows:
                 return None
         return row, col
 
@@ -328,21 +332,23 @@ class Board(Window):
         border_rows: list[int] | None = None,
         offset: tuple[int, int] | None = None,
         flip: bool | None = None,
+        between_cols: bool = False,
+        between_rows: bool = False,
     ) -> tuple[float, float]:
         if pos is None:
             return -1, -1
         row, col = pos
-        size = size or self.square_size
-        origin = origin or self.origin
-        width = width or self.visual_board_width
-        height = height or self.visual_board_height
-        border_cols = border_cols or self.border_cols
-        border_rows = border_rows or self.border_rows
-        offset = offset or self.notation_offset
-        flip = flip if flip is not None else self.flip_mode
+        size = self.square_size if size is None else size
+        origin = self.origin if origin is None else origin
+        width = self.visual_board_width if width is None else width
+        height = self.visual_board_height if height is None else height
+        border_cols = self.border_cols if border_cols is None else border_cols
+        border_rows = self.border_rows if border_rows is None else border_rows
+        offset = self.notation_offset if offset is None else offset
+        flip = self.flip_mode if flip is None else flip
         board_size = width, height
-        col += sum(1 for border_col in border_cols if col >= border_col)
-        row += sum(1 for border_row in border_rows if row >= border_row)
+        col += sum(1 for border_col in border_cols if (col > border_col or not between_cols and col == border_col))
+        row += sum(1 for border_row in border_rows if (row > border_row or not between_rows and row == border_row))
         col, row = (col - offset[0], row - offset[1])
         col, row = (board_size[0] - 1 - col, board_size[1] - 1 - row) if flip else (col, row)
         x = (col - (board_size[0] - 1) / 2) * size + origin[0]
@@ -4734,8 +4740,9 @@ class Board(Window):
         self.background_color = self.color_scheme['background_color']
         for sprite in self.obstacles:
             sprite.color = self.color_scheme.get('wall_color', self.color_scheme['background_color'])
-        for sprite in self.label_list:
-            sprite.color = self.color_scheme['text_color']
+        for label_list in (self.row_label_list, self.col_label_list):
+            for sprite in label_list:
+                sprite.color = self.color_scheme['text_color']
         for sprite in self.board_sprite_list:
             position = self.get_board_position(sprite.position)
             sprite.color = self.color_scheme[f"{'light' if self.is_light_square(position) else 'dark'}_square_color"]
@@ -4859,10 +4866,18 @@ class Board(Window):
         ):
             for sprite in sprite_list:
                 self.update_sprite(sprite, *args)
-        for label in self.label_list:
+        for label in self.row_label_list:
             position = label.position
             label.font_size = self.square_size / 2
-            label.x, label.y = self.get_screen_position(self.get_board_position(position, *args))
+            label.x, label.y = self.get_screen_position(
+                self.get_board_position(position, *args, between_cols=True), between_cols=True
+            )
+        for label in self.col_label_list:
+            position = label.position
+            label.font_size = self.square_size / 2
+            label.x, label.y = self.get_screen_position(
+                self.get_board_position(position, *args, between_rows=True), between_rows=True
+            )
         self.deselect_piece()
         self.select_piece(selected_square)
         if self.highlight_square:
@@ -4920,6 +4935,70 @@ class Board(Window):
                 if isinstance(sprite, Piece) and not isinstance(sprite, Obstacle):
                     sprite.angle = 0
 
+    def update_labels(
+        self,
+        width: int = 0,
+        height: int = 0,
+        border_cols: list[int] | None = None,
+        border_rows: list[int] | None = None,
+        offset: tuple[int, int] | None = None,
+    ):
+        width, height = width or self.visual_board_width, height or self.visual_board_height
+        border_cols = self.border_cols if border_cols is None else border_cols
+        border_rows = self.border_rows if border_rows is None else border_rows
+        offset = self.notation_offset if offset is None else offset
+
+        self.row_label_list.clear()
+        self.col_label_list.clear()
+
+        position_kwargs = {
+            'width': width,
+            'height': height,
+            'border_cols': border_cols,
+            'border_rows': border_rows,
+            'offset': offset,
+        }
+
+        label_kwargs = {
+            'anchor_x': 'center',
+            'anchor_y': 'center',
+            'font_name': 'Courier New',
+            'font_size': self.square_size / 2,
+            'bold': True,
+            'align': 'center',
+            'color': self.color_scheme['text_color'],
+        }
+
+        for row in range(self.board_height):
+            rel_row = row + self.notation_offset[1]
+            text = str(rel_row + 1)
+            width = round(self.square_size / 2 * len(text))
+            label_pos_kwargs = copy(position_kwargs)
+            label_pos_kwargs['between_cols'] = True
+            label_cols = [-1, *(col - self.notation_offset[0] for col in self.border_cols), self.board_width]
+            label_poss = []
+            for i, col in enumerate(label_cols):
+                if not self.extra_labels and col not in {-1, self.board_width}:
+                    continue
+                label_pos_kwargs['border_cols'] = border_cols[:i]
+                label_poss.append(self.get_screen_position(self.get_relative((row, col)), **label_pos_kwargs))
+            self.row_label_list.extend(Text(text, *pos, width=width, **label_kwargs) for pos in label_poss)
+
+        for col in range(self.board_width):
+            rel_col = col + self.notation_offset[0]
+            text = b26(rel_col + (0 if rel_col < 0 else 1))
+            width = round(self.square_size / 2 * len(text))
+            label_pos_kwargs = copy(position_kwargs)
+            label_pos_kwargs['between_rows'] = True
+            label_rows = [-1, *(row - self.notation_offset[1] for row in self.border_rows), self.board_height]
+            label_poss = []
+            for i, row in enumerate(label_rows):
+                if not self.extra_labels and row not in {-1, self.board_height}:
+                    continue
+                label_pos_kwargs['border_rows'] = border_rows[:i]
+                label_poss.append(self.get_screen_position(self.get_relative((row, col)), **label_pos_kwargs))
+            self.col_label_list.extend(Text(text, *pos, width=width, **label_kwargs) for pos in label_poss)
+
     def resize_board(
         self,
         width: int = 0,
@@ -4935,7 +5014,6 @@ class Board(Window):
         border_rows = self.border_rows if border_rows is None else border_rows
         notation_offset_x = self.notation_offset[0] if notation_offset_x is None else notation_offset_x
         notation_offset_y = self.notation_offset[1] if notation_offset_y is None else notation_offset_y
-        visual_width, visual_height = width + len(border_cols), height + len(border_rows)
         if (
             self.game_loaded and self.board_width == width and self.board_height == height
             and self.border_cols == border_cols and self.border_rows == border_rows
@@ -4949,16 +5027,20 @@ class Board(Window):
         self.notation_offset = (notation_offset_x, notation_offset_y)
         old_cols, old_rows = self.border_cols, self.border_rows
         self.border_cols, self.border_rows = sorted(border_cols), sorted(border_rows)
-        while self.border_cols and self.border_cols[-1] + self.notation_offset[0] >= self.board_width:
+        while self.border_cols and self.border_cols[0] - self.notation_offset[0] <= 0:
+            self.border_cols.pop(0)
+        while self.border_rows and self.border_rows[0] - self.notation_offset[1] <= 0:
+            self.border_rows.pop(0)
+        while self.border_cols and self.border_cols[-1] - self.notation_offset[0] >= self.board_width:
             self.border_cols.pop()
-        while self.border_rows and self.border_rows[-1] + self.notation_offset[1] >= self.board_height:
+        while self.border_rows and self.border_rows[-1] - self.notation_offset[1] >= self.board_height:
             self.border_rows.pop()
         old_width, old_height = self.visual_board_width, self.visual_board_height
-        self.visual_board_width, self.visual_board_height = visual_width, visual_height
+        self.visual_board_width = self.board_width + len(self.border_cols)
+        self.visual_board_height = self.board_height + len(self.border_rows)
         old_board_size = old_width, old_height
 
         self.board_sprite_list.clear()
-        self.label_list.clear()
 
         position_kwargs = {
             'width': old_width,
@@ -4968,35 +5050,6 @@ class Board(Window):
             'offset': old_offset,
         }
 
-        label_kwargs = {
-            'anchor_x': 'center',
-            'anchor_y': 'center',
-            'font_name': 'Courier New',
-            'font_size': self.square_size / 2,
-            'bold': True,
-            'align': 'center',
-            'color': self.color_scheme['text_color'],
-        }
-
-        for row in range(self.board_height):
-            text = str(row + self.notation_offset[1] + 1)
-            width = round(self.square_size / 2 * len(text))
-            poss = [
-                self.get_screen_position(self.get_relative((row, col)), **position_kwargs)
-                for col in (-1, self.board_width)
-            ]
-            self.label_list.extend(Text(text, *pos, width=width, **label_kwargs) for pos in poss)
-
-        for col in range(self.board_width):
-            rel_col = col + self.notation_offset[0]
-            text = b26(rel_col + (0 if rel_col < 0 else 1))
-            width = round(self.square_size / 2 * len(text))
-            poss = [
-                self.get_screen_position(self.get_relative((row, col)), **position_kwargs)
-                for row in (-1, self.board_height)
-            ]
-            self.label_list.extend(Text(text, *pos, width=width, **label_kwargs) for pos in poss)
-
         for row, col in product(range(self.board_height), range(self.board_width)):
             pos = self.get_relative((row, col))
             sprite = Sprite("assets/util/square.png")
@@ -5004,6 +5057,8 @@ class Board(Window):
             sprite.position = self.get_screen_position(pos, **position_kwargs)
             sprite.scale = self.square_size / sprite.texture.width
             self.board_sprite_list.append(sprite)
+
+        self.update_labels(**position_kwargs)
 
         self.reset_drops()
         self.reset_promotions()
@@ -5146,8 +5201,9 @@ class Board(Window):
     def on_draw(self) -> None:
         self.update_trickster_mode()
         start_render()
-        for label in self.label_list:
-            label.draw()
+        for label_list in (self.row_label_list, self.col_label_list):
+            for label in label_list:
+                label.draw()
         self.board_sprite_list.draw()
         if not self.promotion_area:
             self.highlight.draw()
@@ -6196,8 +6252,13 @@ class Board(Window):
         if symbol == key.Y and modifiers & key.MOD_ACCEL:  # Redo
             self.redo_last_finished_move()
             self.update_caption()
-        if symbol == key.I and modifiers & key.MOD_ACCEL:  # Info
-            self.log_info()
+        if symbol == key.I:  # Info
+            if modifiers & key.MOD_ALT:  # In-between labels
+                self.extra_labels = not self.extra_labels
+                self.log(f"Info: Intermediate labels {'enabled' if self.extra_labels else 'disabled'}", False)
+                self.update_labels()
+            elif modifiers & key.MOD_ACCEL:  # Info
+                self.log_info()
         if symbol == key.L:
             if modifiers & key.MOD_ALT:  # Load save data
                 self.deactivate()
