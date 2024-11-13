@@ -3313,7 +3313,6 @@ class Board(Window):
                         markers = side_target_dict.pop(pos, ())
                         for marker in markers:
                             side_marker_dict.pop(marker, None)
-
             if move:
                 if move.captured_piece is not None:
                     for pos in target_dict.get(move.captured_piece.side, {}).pop(move.captured_piece.board_pos, ()):
