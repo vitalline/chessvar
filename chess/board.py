@@ -2435,10 +2435,10 @@ class Board(Window):
                                     rule['match'].setdefault(capture_type, set()).add(type(capture))
                             if promotion := last_history_move.promotion:
                                 history_rules = self.filter(
-                                    history_rules, ('last', 'new'), [type(promotion)], ('match', 'new')
+                                    history_rules, ('last', 'new'), [type(promotion)], ('match', 'piece')
                                 )
                                 for rule in history_rules:
-                                    rule['match'].setdefault('new', set()).add(type(promotion))
+                                    rule['match'].setdefault('piece', set()).add(type(promotion))
                             last_history_rules += history_rules
                             last_history_move = last_history_move.chained_move
                         i -= 1
@@ -2455,7 +2455,7 @@ class Board(Window):
                     pass_rules = self.filter(pass_rules, 'to', last=('match', 'pos'))
                     pass_rules = self.filter(pass_rules, 'take', last=('match', 'take'))
                     pass_rules = self.filter(pass_rules, 'lose', last=('match', 'lose'))
-                    pass_rules = self.filter(pass_rules, 'new', last=('match', 'new'))
+                    pass_rules = self.filter(pass_rules, 'new', last=('match', 'piece'))
                     pass_rules = self.filter(pass_rules, 'old', last=('match', 'old'))
                     if pass_rules and self.check_side != turn_side:
                         if self.fits_any(pass_rules, 'check', [0], fit=False):
@@ -2483,7 +2483,10 @@ class Board(Window):
                             )
                         if not piece_rule_dict[piece_type]:
                             continue
-                        drop_rules = self.filter(piece_rule_dict[piece_type], 'move', [DropMovement], ('match', 'move'))
+                        drop_rules = deepcopy(piece_rule_dict[piece_type])
+                        for rule in drop_rules:
+                            rule['match'].setdefault('piece', set()).add(piece_type)
+                        drop_rules = self.filter(drop_rules, 'move', [DropMovement], ('match', 'move'))
                         drop_rules = self.filter(drop_rules, 'type', ['drop'], ('match', 'type'), False)
                         if not drop_rules:
                             continue
@@ -2506,7 +2509,7 @@ class Board(Window):
                             drop_types = set()
                             for drop in side_drops[piece_type][pos]:
                                 drop_type = type(drop) if isinstance(drop, Piece) else drop
-                                new_rules = self.filter(old_rules, 'new', [drop_type], ('match', 'new'))
+                                new_rules = self.filter(old_rules, 'new', [drop_type], ('match', 'piece'))
                                 if not new_rules:
                                     continue
                                 if drop_type not in limit_hits:
@@ -2534,9 +2537,10 @@ class Board(Window):
                         )
                     if not piece_rule_dict[piece_type]:
                         continue
-                    piece_rules = self.filter(
-                        piece_rule_dict[piece_type], 'old', [piece.movement.total_moves], ('match', 'old'), False
-                    )
+                    piece_rules = deepcopy(piece_rule_dict[piece_type])
+                    for rule in piece_rules:
+                        rule['match'].setdefault('piece', set()).add(piece_type)
+                    piece_rules = self.filter(piece_rules, 'old', [piece.movement.total_moves], ('match', 'old'), False)
                     if not piece_rules:
                         continue
                     move_rule_dict = {}
@@ -2544,9 +2548,11 @@ class Board(Window):
                         move_type = move.tag, move.type_str()
                         if move_type not in move_rule_dict:
                             move_rule_dict[move_type] = self.filter(piece_rules, 'move', [move], ('match', 'move'))
-                        move_rules = move_rule_dict[move_type]
-                        if not move_rules:
+                        if not move_rule_dict[move_type]:
                             continue
+                        move_rules = deepcopy(move_rule_dict[move_type])
+                        for rule in move_rules:
+                            rule['match'].setdefault('move', []).append(move)
                         self.update_move(move)
                         if (
                             move.captured_piece
@@ -2556,7 +2562,6 @@ class Board(Window):
                             continue
                         move_types = {'move': True, 'capture': False, 'promotion': False}
                         promotion = None
-                        move_rules = deepcopy(move_rules)
                         for rule in move_rules:
                             rule['match'].setdefault('pos', [])
                         pos_from = move.pos_from or move.pos_to
@@ -2572,6 +2577,8 @@ class Board(Window):
                         if capture := move.captured_piece:
                             capture_type = 'take' if move.piece.side == turn_side else 'lose'
                             move_rules = self.filter(move_rules, capture_type, [type(capture)], ('match', capture_type))
+                            for rule in move_rules:
+                                rule['match'].setdefault(capture_type, set()).add(type(capture))
                         if not move_rules:
                             continue
                         if move:
@@ -2581,7 +2588,9 @@ class Board(Window):
                             promotion = promotion or move.promotion
                         if promotion:
                             promotion_type = type(promotion) if isinstance(promotion, Piece) else promotion
-                            move_rules = self.filter(move_rules, 'new', [promotion_type], ('match', 'new'))
+                            move_rules = self.filter(move_rules, 'new', [promotion_type], ('match', 'piece'))
+                            for rule in move_rules:
+                                rule['match'].setdefault('piece', set()).add(promotion_type)
                             if not move_rules:
                                 continue
                             if promotion_type not in limit_hits:
@@ -2611,6 +2620,8 @@ class Board(Window):
                                         self.moves[turn_side]['pass'] = True
                                     self.check_side = old_check_side
                         type_rules = self.filter(move_rules, 'type', move_types, ('match', 'type'), False)
+                        for rule in type_rules:
+                            rule['match'].setdefault('type', set()).update(move_types)
                         if type_rules:
                             self.update_auto_capture_markers(move, True)
                             self.update_auto_captures(move, turn_side.opponent())
@@ -2660,9 +2671,13 @@ class Board(Window):
                                     future_rules = self.filter(
                                         future_rules, ('next', 'piece'), [type(move.piece)], ('match', 'piece')
                                     )
+                                    for rule in future_rules:
+                                        rule['match'].setdefault('piece', set()).add(type(move.piece))
                                     future_rules = self.filter(
                                         future_rules, ('next', 'move'), [chained_move], ('match', 'move')
                                     )
+                                    for rule in future_rules:
+                                        rule['match'].setdefault('move', []).append(chained_move)
                                     for rule in future_rules:
                                         rule['match'].setdefault('pos', [])
                                     pos_from = chained_move.pos_from or chained_move.pos_to
@@ -2690,6 +2705,8 @@ class Board(Window):
                                         future_rules = self.filter(
                                             future_rules, ('next', loss_type), [type(future_loss)], ('match', loss_type)
                                         )
+                                        for rule in future_rules:
+                                            rule['match'].setdefault(loss_type, set()).add(type(future_loss))
                                     future_types = {'move': True, 'capture': False, 'promotion': False}
                                     future_promo = None
                                     if not future_rules:
@@ -2703,11 +2720,15 @@ class Board(Window):
                                         future_rules = self.filter(
                                             future_rules, ('next', 'type'), future_types, ('match', 'type')
                                         )
+                                        for rule in future_rules:
+                                            rule['match'].setdefault('type', set()).update(future_types)
                                     if future_rules and future_promo:
                                         p_type = type(future_promo) if isinstance(future_promo, Piece) else future_promo
                                         future_rules = self.filter(
-                                            future_rules, ('next', 'new'), [p_type], ('match', 'new')
+                                            future_rules, ('next', 'new'), [p_type], ('match', 'piece')
                                         )
+                                        for rule in future_rules:
+                                            rule['match'].setdefault('piece', set()).add(p_type)
                                         if not future_rules:
                                             legal = False
                                         else:
