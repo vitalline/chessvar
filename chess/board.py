@@ -2332,16 +2332,16 @@ class Board(Window):
                     last_history_moves = {}
                     depths = {by for rule in state_rules for last in rule['last'] for by in last['by']}
                     starts, finals = set(), set()
-                    _ = [(starts if x < 0 else finals).add(x) for x in depths]
-                    min_index, max_index = max(starts, default=0), min(starts, default=0)
+                    _ = [(starts.add(-x) if x < 0 else finals.add(x)) for x in depths]
+                    min_index, max_index = min(starts, default=0), max(starts, default=0)
                     i = 1
                     for last_history_move in self.move_history:
-                        if i > -max_index:
+                        if i > max_index:
                             break
                         if last_history_move and last_history_move.is_edit:
                             continue
                         if i in starts:
-                            last_history_moves[i] = last_history_move
+                            last_history_moves[-i] = last_history_move
                         i += 1
                     min_depth, max_depth = min(finals, default=0), max(finals, default=0)
                     i = int(not self.chain_start)
@@ -2428,7 +2428,7 @@ class Board(Window):
                                 )
                                 for rule in history_rules:
                                     rule['match'].setdefault(capture_type, set()).add(type(capture))
-                            if promotion:
+                            if promotion := last_history_move.promotion:
                                 history_rules = self.filter(
                                     history_rules, ('last', 'new'), [type(promotion)], ('match', 'new')
                                 )
@@ -4494,47 +4494,34 @@ class Board(Window):
         side_promotions = self.promotions[move.piece.side]
         if type(move.piece) not in side_promotions:
             return
-        limits = self.piece_limits.get(move.piece.side, self.piece_limits)
-        limit_groups = {}
-        limit_hits = {}
         promotion_squares = side_promotions[type(move.piece)]
-        for square in (move.pos_to, move.pos_from):
-            if square not in promotion_squares:
-                continue
-            promotions = []
-            for promotion in promotion_squares[square]:
-                promotion_type = type(promotion) if isinstance(promotion, Piece) else promotion
-                if promotion_type not in limit_hits:
-                    if promotion_type not in limit_groups:
-                        limit_groups[promotion_type] = {g for g in limits if self.fits(g, promotion_type)}
-                    limit_hits[promotion_type] = False
-                    for g in limit_groups[promotion_type]:
-                        if self.piece_counts[move.piece.side].get(g, 0) >= limits[g]:
-                            limit_hits[promotion_type] = True
-                            break
-                if not limit_hits[promotion_type]:
-                    promotions.append(promotion)
-            if not promotions:
-                return
-            if self.auto_moves and self.board_config['fast_promotion'] and len(promotions) == 1:
-                self.promotion_piece = True
-                promotion = promotions[0]
-                if isinstance(promotion, Piece):
-                    promotion = promotion.of(promotion.side or move.piece.side).on(square)
-                else:
-                    promotion = promotion(board=self, pos=square, side=move.piece.side)
-                promoted_from = promotion.promoted_from or move.piece.promoted_from
-                if not isinstance(move.piece, NoPiece):
-                    promoted_from = promoted_from or type(move.piece)
-                if type(promotion) != promoted_from:
-                    promotion.promoted_from = promoted_from
-                move.set(promotion=promotion)
-                self.replace(move.piece, move.promotion)
-                self.update_promotion_auto_captures(move)
-                self.promotion_piece = promotion_piece
-                return
-            self.start_promotion(move.piece, promotions)
+        if not {move.pos_from, move.pos_to}.intersection(promotion_squares):
             return
+        promotions = []
+        for promotion_move in self.moves.get(move.piece.side, {}).get(move.pos_from, {}).get(move.pos_to, []):
+            if promotion_move.promotion:
+                promotions.append(promotion_move.promotion)
+        if not promotions:
+            return
+        if self.auto_moves and self.board_config['fast_promotion'] and len(promotions) == 1:
+            self.promotion_piece = True
+            promotion = promotions[0]
+            if isinstance(promotion, Piece):
+                promotion = promotion.of(promotion.side or move.piece.side).on(move.pos_to)
+            else:
+                promotion = promotion(board=self, pos=move.pos_to, side=move.piece.side)
+            promoted_from = promotion.promoted_from or move.piece.promoted_from
+            if not isinstance(move.piece, NoPiece):
+                promoted_from = promoted_from or type(move.piece)
+            if type(promotion) != promoted_from:
+                promotion.promoted_from = promoted_from
+            move.set(promotion=promotion)
+            self.replace(move.piece, move.promotion)
+            self.update_promotion_auto_captures(move)
+            self.promotion_piece = promotion_piece
+            return
+        self.start_promotion(move.piece, promotions)
+        return
 
     def start_promotion(
         self, piece: Piece, promotions: list[Piece | type[Piece]], drops: list[type[Piece]] | None = None
