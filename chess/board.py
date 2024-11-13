@@ -4962,7 +4962,7 @@ class Board(Window):
         for row in range(self.board_height):
             rel_row = row + self.notation_offset[1]
             text = str(rel_row + 1)
-            width = round(self.square_size / 2 * len(text))
+            text_width = round(self.square_size / 2 * len(text))
             label_pos_kwargs = copy(position_kwargs)
             label_pos_kwargs['between_cols'] = True
             label_cols = [-1, *(col - self.notation_offset[0] for col in self.border_cols), self.board_width]
@@ -4970,14 +4970,13 @@ class Board(Window):
             for i, col in enumerate(label_cols):
                 if not self.extra_labels and col not in {-1, self.board_width}:
                     continue
-                label_pos_kwargs['border_cols'] = border_cols[:i]
                 label_poss.append(self.get_screen_position(self.get_relative((row, col)), **label_pos_kwargs))
-            self.row_label_list.extend(Text(text, *pos, width=width, **label_kwargs) for pos in label_poss)
+            self.row_label_list.extend(Text(text, *pos, width=text_width, **label_kwargs) for pos in label_poss)
 
         for col in range(self.board_width):
             rel_col = col + self.notation_offset[0]
             text = b26(rel_col + (0 if rel_col < 0 else 1))
-            width = round(self.square_size / 2 * len(text))
+            text_width = round(self.square_size / 2 * len(text))
             label_pos_kwargs = copy(position_kwargs)
             label_pos_kwargs['between_rows'] = True
             label_rows = [-1, *(row - self.notation_offset[1] for row in self.border_rows), self.board_height]
@@ -4985,9 +4984,8 @@ class Board(Window):
             for i, row in enumerate(label_rows):
                 if not self.extra_labels and row not in {-1, self.board_height}:
                     continue
-                label_pos_kwargs['border_rows'] = border_rows[:i]
                 label_poss.append(self.get_screen_position(self.get_relative((row, col)), **label_pos_kwargs))
-            self.col_label_list.extend(Text(text, *pos, width=width, **label_kwargs) for pos in label_poss)
+            self.col_label_list.extend(Text(text, *pos, width=text_width, **label_kwargs) for pos in label_poss)
 
     def resize_board(
         self,
