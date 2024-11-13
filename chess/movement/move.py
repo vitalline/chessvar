@@ -51,7 +51,7 @@ class Move(object):
         return self
 
     def type_str(self) -> str | None:
-        return self.movement_type.__name__ if self.movement_type else None
+        return self.movement_type.type_str() if self.movement_type else None
 
     def set(
         self,
@@ -149,6 +149,40 @@ class Move(object):
             self.is_edit,
             self.is_legal
         )
+
+    def __repr__(self):
+        string = {0: '', 1: '[E] '}.get(self.is_edit, f'[E{self.is_edit}] ')
+        string += f"{self.piece} @ " if self.piece else ''
+        string += toa(self.pos_from) if self.pos_from else '*'
+        if self.pos_from == self.pos_to:
+            string += ' S'
+        elif not self.swapped_piece and (not self.captured_piece or self.captured_piece.board_pos != self.pos_to):
+            string += ' -> '
+            string += toa(self.pos_to) if self.pos_to else '*'
+        if self.captured_piece:
+            string += f" x {self.captured_piece}"
+            if self.captured_piece.board_pos:
+                string += f" @ {toa(self.captured_piece.board_pos)}"
+        if self.swapped_piece:
+            string += f" <-> {self.swapped_piece}"
+            if self.swapped_piece.board_pos:
+                string += f" @ {toa(self.swapped_piece.board_pos)}"
+        if self.placed_piece:
+            string += f" v {self.placed_piece}"
+        if self.promotion is not None:
+            string += ' ^'
+            if self.promotion:
+                if self.promotion.side not in {self.piece.side, Side.NONE}:
+                    string += f" {self.promotion.side}"
+                if self.piece.name != self.promotion.name:
+                    string += f" {self.promotion.name}"
+        if self.chained_move is not None:
+            string += ' &'
+        if self.tag:
+            string += f" #{self.tag}"
+        if self.movement_type:
+            string += f" ${self.type_str()}"
+        return string
 
     def __str__(self) -> str:
         moved = self.pos_from != self.pos_to

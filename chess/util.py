@@ -25,6 +25,9 @@ UNSET_STRING = '*'
 # Prefix for custom piece and/or movement classes.
 CUSTOM_PREFIX = '_custom_'
 
+# Common suffixes for movement classes.
+MOVEMENT_SUFFIXES = ('Movement', 'Rider')
+
 # Path to the directory where the game is running.
 base_dir = os.path.abspath(os.curdir)
 
@@ -382,6 +385,17 @@ def dynamic_super(obj):
             return self.cache[item]
 
     return MROCache()
+
+
+# Metaclass used for overriding the __str__ and/or __repr__ methods of a class.
+class FormatOverride(type):
+    def __new__(mcs, name, bases, namespace, *, str_method=None, repr_method=None):
+        cls = super().__new__(mcs, name, bases, namespace)
+        if str_method is not None:
+            mcs.__str__ = str_method
+        if repr_method is not None:
+            mcs.__repr__ = repr_method
+        return cls
 
 
 # Context manager for temporarily disabling print statements. Anything in a "with no_print()" block will not be printed.

@@ -19,12 +19,10 @@ from chess.pieces.piece import Piece
 from chess.pieces.side import Side
 from chess.pieces.types import Neutral
 from chess.pieces.util import UtilityPiece, NoPiece
-from chess.util import CUSTOM_PREFIX, UNSET_STRING, Unset, AnyJson, AnyJsonType, IntIndex
+from chess.util import CUSTOM_PREFIX, MOVEMENT_SUFFIXES, UNSET_STRING, Unset, AnyJson, AnyJsonType, IntIndex
 
 if TYPE_CHECKING:
     from chess.board import Board
-
-MOVEMENT_SUFFIXES = ('Movement', 'Rider')
 
 TYPE_CONFLICTS = {
     x: s for s in (map(frozenset, (
@@ -192,11 +190,7 @@ def save_movement_type(movement_type: type[BaseMovement] | frozenset | None) -> 
         return UNSET_STRING
     if movement_types.__name__.startswith(CUSTOM_PREFIX):
         return save_custom_movement_type(movement_type)
-    name = movement_type.__name__
-    for suffix in MOVEMENT_SUFFIXES:
-        if name.endswith(suffix, 1):
-            name = name[:-len(suffix)]
-    return name
+    return movement_type.type_str()
 
 
 def load_movement_type(data: list | str | None) -> type[BaseMovement] | frozenset | None:

@@ -3,6 +3,8 @@ from __future__ import annotations
 from copy import deepcopy
 from typing import TYPE_CHECKING
 
+from chess.util import MOVEMENT_SUFFIXES
+
 if TYPE_CHECKING:
     from chess.board import Board
     from chess.movement.move import Move
@@ -30,6 +32,14 @@ class BaseMovement(object):
 
     def set_moves(self, count: int):
         self.total_moves = count
+
+    @classmethod
+    def type_str(cls) -> str:
+        name = cls.__name__
+        for suffix in MOVEMENT_SUFFIXES:
+            if name.endswith(suffix, 1):
+                name = name[:-len(suffix)]
+        return name
 
     def __copy_args__(self):
         return self.board,

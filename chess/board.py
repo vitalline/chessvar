@@ -454,7 +454,7 @@ class Board(Window):
                 if data.type_str():
                     yield pch['type'] + data.type_str()
             if issubclass(data, BaseMovement):
-                yield pch['type'] + data.__name__
+                yield pch['type'] + data.type_str()
         elif isinstance(data, list):
             yield from (k for x in data if x for k in self.keys(x) if k)
         elif data:
@@ -1635,7 +1635,7 @@ class Board(Window):
         start_turns, loop_turns = [], []
         start_ended = False
         to_pure_type = lambda s: action_types.get(s, s)
-        to_pure_move = lambda s: t.__name__ if isinstance((t := load_movement_type(s) or s), type) else t
+        to_pure_move = lambda s: t.type_str() if isinstance((t := load_movement_type(s) or s), type) else t
         to_type = lambda s: '!' + to_pure_type(s[1:]) if s[0:1] == '!' else to_pure_type(s)
         to_move = lambda s: '!' + to_pure_move(s[1:]) if s[0:1] == '!' else to_pure_move(s)
         for i, turn in enumerate(self.custom_turn_order or [(Side.WHITE, [{}]), (Side.BLACK, [{}])]):
@@ -5199,9 +5199,9 @@ class Board(Window):
             self.selection.draw()
         self.move_sprite_list.draw()
         self.piece_sprite_list.draw()
-        self.type_sprite_list.draw()
         if self.active_piece:
             self.active_piece.draw()
+        self.type_sprite_list.draw()
         self.promotion_area_sprite_list.draw()
         if self.promotion_area:
             self.highlight.draw()

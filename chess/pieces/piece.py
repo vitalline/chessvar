@@ -11,13 +11,21 @@ from chess.movement.types import is_active
 from chess.movement.util import Position, to_algebraic
 from chess.pieces.side import Side
 from chess.pieces.types import Double, Enemy, Empty, Immune, Neutral
-from chess.util import CUSTOM_PREFIX, Default, get_texture_path, normalize
+from chess.util import CUSTOM_PREFIX, FormatOverride, Default, get_texture_path, normalize
 
 if TYPE_CHECKING:
     from chess.board import Board
 
 
-class Piece(Sprite):
+def piece_repr(cls: type[Piece]) -> str:
+    return f"<{'custom' if cls.is_custom() else 'class'} '{cls.type_str()}'>"
+
+
+def piece_str(cls: type[Piece]) -> str:
+    return cls.name
+
+
+class Piece(Sprite, metaclass=FormatOverride, repr_method=piece_repr, str_method=piece_str):
     name = '(Piece)'
     file_name = 'none'
     asset_folder = 'util'
@@ -231,9 +239,13 @@ class Piece(Sprite):
         return getattr(cls, 'colorbound', False)
 
     @classmethod
+    def is_custom(cls):
+        return cls.__name__.startswith(CUSTOM_PREFIX)
+
+    @classmethod
     def type_str(cls) -> str | None:
         if cls.type_data is None:
-            if cls.__name__.startswith(CUSTOM_PREFIX):
+            if cls.is_custom():
                 cls.type_data = cls.__name__.removeprefix(CUSTOM_PREFIX)
             else:
                 cls.type_data = f"{cls.__module__.rsplit('.', 1)[-1]}.{cls.__name__}"
