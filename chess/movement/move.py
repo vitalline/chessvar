@@ -172,10 +172,12 @@ class Move(object):
         if self.promotion is not None:
             string += ' ^'
             if self.promotion:
-                if self.promotion.side not in {self.piece.side, Side.NONE}:
+                if self.promotion.side and not (self.piece and self.promotion.side == self.piece.side):
                     string += f" {self.promotion.side}"
                 if self.piece.name != self.promotion.name:
                     string += f" {self.promotion.name}"
+            else:
+                string += ' ?'
         if self.chained_move is not None:
             string += ' &'
         if self.tag:
