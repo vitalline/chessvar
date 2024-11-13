@@ -273,7 +273,7 @@ class Board(Window):
         if len(argv) > 1:
             save_path = argv[1]
         elif save_name := self.board_config['load_save'].strip():
-            save_path = join(self.save_path, save_name)
+            save_path = join(self.load_path, save_name + ('.json' if '.' not in save_name else ''))
         self.load(save_path)
         if not self.save_loaded:
             self.reset_custom_data()
