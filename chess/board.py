@@ -1191,7 +1191,10 @@ class Board(Window):
         if self.roll_rng is None:
             self.roll_rng = Random(self.roll_seed)
 
-        pieces = exp_alg(data.get('pieces', {}), *whc) or old_pieces
+        if 'pieces' in data:
+            pieces = exp_alg(data['pieces'], *whc)
+        else:
+            pieces = old_pieces
 
         for sprite_list in (
             self.piece_sprite_list,
