@@ -987,7 +987,9 @@ class Board(Window):
             self.flip_board()
         new_square_size = min(self.width / (self.visual_board_width + 2), self.height / (self.visual_board_height + 2))
         if window_size is not None and square_size is not None and new_square_size != square_size:
-            self.log(f"Error: Square size does not match (was {square_size}, but is {new_square_size})")
+            self.log(
+                f"Error: Square size does not match (was {round(square_size, 5)}, but is {round(new_square_size, 5)})"
+            )
 
         self.color_index = data.get('color_index', self.color_index)
         self.color_scheme = colors[self.color_index] if self.color_index is not None else default_colors
