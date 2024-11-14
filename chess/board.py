@@ -2801,10 +2801,10 @@ class Board(Window):
                                 if self.check_side == turn_side:
                                     legal = False
                             if legal:
-                                if any_mate_or_capture.intersection(self.end_rules[turn_side.opponent()]):
-                                    for g in self.get_royal_loss(turn_side, move, mate_or_capture):
+                                if any_check_or_mate.intersection(self.end_rules[turn_side.opponent()]):
+                                    for g in self.get_royal_loss(turn_side, move, check_or_mate):
                                         for condition in self.end_rules.get(turn_side.opponent(), {}):
-                                            if condition in any_mate_or_capture:
+                                            if condition in any_check_or_mate:
                                                 need = self.end_rules[turn_side.opponent()][condition].get(g, 0)
                                                 vals = self.end_data.get(turn_side.opponent(), {}).get(condition, {})
                                                 if need == '+':
@@ -2816,10 +2816,10 @@ class Board(Window):
                                         if not legal:
                                             break
                             if legal:
-                                if any_mate_or_capture.intersection(self.end_rules[turn_side]):
-                                    for g in self.get_royal_loss(turn_side.opponent(), move, mate_or_capture):
+                                if any_check_or_mate.intersection(self.end_rules[turn_side]):
+                                    for g in self.get_royal_loss(turn_side.opponent(), move, check_or_mate):
                                         for condition in self.end_rules.get(turn_side, {}):
-                                            if condition in any_mate_or_capture:
+                                            if condition in any_check_or_mate:
                                                 need = self.end_rules[turn_side][condition].get(g, 0)
                                                 vals = self.end_data.get(turn_side, {}).get(condition, {})
                                                 if need == '-':
@@ -2831,7 +2831,8 @@ class Board(Window):
                                         if not legal:
                                             break
                             p_not = pch['not']
-                            if not skipped:
+                            mate = ext(('checkmate',))
+                            if not skipped and not any(end_data[self.turn_side].get(x, {}).get('', 0) for x in mate):
                                 if any_check_or_mate.intersection(self.end_rules[self.turn_side]):
                                     for g in self.get_royal_loss(opponent, move, check_or_mate):
                                         for condition in self.end_rules.get(self.turn_side, {}):
@@ -2849,7 +2850,7 @@ class Board(Window):
                                                     p = p_not if (condition[0:1] == p_not) else ''
                                                     loss_condition = p + 'checkmate'
                                                     end_data[self.turn_side][loss_condition][''] = 1
-                            if not skipped:
+                            if not skipped and not any(end_data[self.turn_side].get(x, {}).get('', 0) for x in mate):
                                 if any_check_or_mate.intersection(self.end_rules[opponent]):
                                     for g in self.get_royal_loss(self.turn_side, move, check_or_mate):
                                         for condition in self.end_rules.get(opponent, {}):
