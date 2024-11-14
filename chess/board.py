@@ -219,6 +219,7 @@ class Board(Window):
         self.is_active = True  # whether the window is active or not
         self.is_focused = True  # whether the mouse cursor is over the window
         self.extra_labels = False  # whether to show additional labels on border rows/columns
+        self.show_history = False  # whether to show all moves made during the opponent's turn
         self.row_label_list = []  # labels for the rows
         self.col_label_list = []  # labels for the columns
         self.board_sprite_list = SpriteList()  # sprites for the board squares
@@ -3092,15 +3093,24 @@ class Board(Window):
                             move_sprites[pos_to].append(mark)
                         with_move = False
         if with_move and self.move_history and not self.edit_mode:
+            history_moves = []
+            draw_for = self.get_turn_side(-1)
             index = -1
-            while (
-                index > -len(self.move_history) and self.get_turn_side(index) == self.get_turn_side(-1)
-                and (self.move_history[index] is None or self.move_history[index].movement_type
-                and issubclass(self.move_history[index].movement_type, DropMovement))
-            ):
+            while index >= -len(self.move_history) and self.get_turn_side(index) == draw_for:
+                move = self.move_history[index]
+                if move is not None:
+                    if move.is_edit:
+                        break
+                    if self.show_history or not issubclass(move.movement_type or type, DropMovement):
+                        history_moves.append(move)
+                    if self.get_turn_side(index - 1) != draw_for and not history_moves:
+                        history_moves.append(move)
+                    if history_moves and not self.show_history:
+                        break
                 index -= 1
-            move = self.move_history[index]
-            if move is not None and not move.is_edit:
+                if index < -len(self.move_history) or self.get_turn_side(index) != draw_for:
+                    break
+            for move in history_moves[::-1]:
                 pos_from, pos_to = move.pos_from, move.pos_to
                 last_move = move
                 captures = []
@@ -6265,8 +6275,12 @@ class Board(Window):
         if symbol == key.I:  # Info
             if modifiers & key.MOD_ALT:  # In-between labels
                 self.extra_labels = not self.extra_labels
-                self.log(f"Info: Intermediate labels {'enabled' if self.extra_labels else 'disabled'}", False)
+                self.log(f"Info: In-between labels {'enabled' if self.extra_labels else 'disabled'}", False)
                 self.update_labels()
+            elif modifiers & key.MOD_SHIFT:  # Info
+                self.show_history = not self.show_history
+                self.log(f"Info: Intermediate moves {'shown' if self.show_history else 'hidden'}", False)
+                self.show_moves()
             elif modifiers & key.MOD_ACCEL:  # Info
                 self.log_info()
         if symbol == key.L:
