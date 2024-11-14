@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from collections.abc import Collection
+from itertools import chain
 from math import ceil
 from random import Random
 
@@ -108,6 +110,11 @@ end_types = {
         'capture': ('x', 'capture'),
     }.items() for v in vs
 }
+
+
+def expand_types(lst: Collection[str]) -> Collection[str]:
+    return chain.from_iterable((p + s for p in ('', prefix_chars['not'])) for s in lst)
+
 
 piece_groups: list[dict[str, str | list[type[Piece]]]] = [
     {

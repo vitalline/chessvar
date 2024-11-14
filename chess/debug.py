@@ -489,6 +489,8 @@ def debug_info(board: Board) -> list[str]:
                 prefix_list.append(data_value[:1])
                 prefix_set.add(data_value[:1])
             data_value = data_value[1:]
+        if {'*', '.'}.intersection(data_value):
+            data_value = f'"{data_value}"'
         generic_prefix_list, typed_prefix_list = [], []
         for ch in prefix_list:
             (typed_prefix_list if ch in type_prefixes else generic_prefix_list).append(prefix_types[ch])
@@ -498,12 +500,12 @@ def debug_info(board: Board) -> list[str]:
     def action_builder(data_value):
         if isinstance(data_value, list):
             return ', '.join(action_builder(x) for x in data_value)
-        invert = False
+        invert_action = False
         if data_value[:1] == prefix_chars['not']:
             data_value = data_value[1:]
-            invert = True
+            invert_action = True
         data_string = action_types[data_value] if data_value in action_types else f"unknown ({data_value})"
-        return ("Not " if invert else '') + data_string.capitalize()
+        return ("Not " if invert_action else '') + data_string.capitalize()
     start_count = 0
     start_index = 0
     debug_log.append(f"Turn order ({len(start) + len(loop)}):")
@@ -596,6 +598,7 @@ def debug_info(board: Board) -> list[str]:
         else:
             debug_log.append("Conflict resolution rules:")
         for rule in board.end_rules[side]:
+            invert, rule = (True, rule[1:]) if rule[:1] == prefix_chars['not'] else (False, rule)
             if rule in standard_conditions:
                 rule_start = rule.capitalize()
                 end_data = board.end_data.get(side, {}).get(rule, {})
@@ -661,6 +664,8 @@ def debug_info(board: Board) -> list[str]:
                     rule_string = f"Be the only one to {rule_string[0].lower() + rule_string[1:]}"
                 else:
                     group_value = int(group_value)
+                if invert:
+                    rule_string = f"Do not {rule_string[0].lower() + rule_string[1:]}"
                 if not group_string:
                     group_string = 'piece' if group in {'', '*'} else group
                     times = abs(int(group_value)) or 1
