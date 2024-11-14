@@ -1623,9 +1623,7 @@ class Board(Window):
                     if side not in area:
                         continue
                     area = area[side]
-                if not area:
-                    continue
-                self.areas[side][name] = area
+                self.areas[side][name] = area or []
             if Pawn.name not in self.areas[side]:
                 rows = range(2) if side == Side.WHITE else range(self.board_height - 2, self.board_height)
                 self.areas[side][Pawn.name] = {
