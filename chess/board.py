@@ -48,7 +48,7 @@ from chess.save import load_move, load_piece, load_rng, load_piece_type, load_cu
 from chess.save import save_move, save_piece, save_rng, save_piece_type, save_custom_type
 from chess.util import base_dir, config_path, get_file_name, get_file_path, load_menu, save_menu
 from chess.util import Default, Unset, Key, Index, Unpacked, unpack, repack, sign, spell
-from chess.util import deduplicate, dumps, find, find_string, fits, normalize
+from chess.util import deduplicate, dumps, find, find_string, fits, normalize, pluralize
 
 
 class Board(Window):
@@ -4287,9 +4287,9 @@ class Board(Window):
                     string += f"{spell(self.end_value, 10).capitalize()}-check!"
             elif self.end_condition == 'capture':
                 if end_group := self.end_group.strip('*'):
-                    string += f"{end_group} captured!"
+                    string += f"{end_group} lost!"
                 else:
-                    string += "Piece captured!"
+                    string += f"{pluralize(self.end_value, 'Piece')} lost!"
             elif self.end_condition in {k for d in self.area_groups.values() for k in d}:
                 string += "Goal reached!"
             else:
