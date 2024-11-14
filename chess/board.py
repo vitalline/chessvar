@@ -2656,9 +2656,7 @@ class Board(Window):
                             skipped = False
                             legal = True
                             check_or_mate = {'check', 'checkmate'}
-                            mate_or_capture = {'check', 'checkmate', 'capture'}
                             any_check_or_mate = set(ext(check_or_mate))
-                            any_mate_or_capture = set(ext(mate_or_capture))
                             if (
                                 any_check_or_mate.intersection(self.end_rules[turn_side.opponent()])
                                 and chained_move and issubclass(type(move.piece), Slow)
