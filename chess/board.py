@@ -1904,7 +1904,7 @@ class Board(Window):
             if not moved or not piece or piece.side != side:
                 continue
             if self.in_area(area, move.pos_to, side):
-                if self.fits(group, piece):
+                if group == '' or self.fits(group, piece):
                     count += 1
                     if max_count and count >= max_count:
                         break
@@ -2123,7 +2123,8 @@ class Board(Window):
                     if isinstance(side_needs, str) and side_needs[-1:] == '!':
                         side_needs = side_needs[:-1] or '1'
                 if side_needs in {'+', '-'}:
-                    side_needs = int(side_needs + '1')
+                    side_needs = side_needs + '1'
+                side_needs = int(side_needs)
                 if 0 < side_needs <= side_count:
                     win_side, win_value, win_group = side, side_needs, group
                 if 0 > side_needs >= -side_count:
@@ -2139,7 +2140,8 @@ class Board(Window):
                         if isinstance(other_needs, str) and other_needs[-1:] == '!':
                             other_needs = other_needs[:-1] or '1'
                     if other_needs in {'+', '-'}:
-                        other_needs = int(other_needs + '1')
+                        other_needs = other_needs + '1'
+                    other_needs = int(other_needs)
                     if 0 < other_needs <= other_count:
                         loss_side, loss_value, loss_group = side, other_needs, group
                     if 0 > other_needs >= -other_count:
@@ -2152,7 +2154,8 @@ class Board(Window):
                         if isinstance(side_needs, str) and side_needs[-1:] == '!':
                             side_needs = side_needs[:-1] or '1'
                             if side_needs in {'+', '-'}:
-                                side_needs = int(side_needs + '1')
+                                side_needs = side_needs + '1'
+                            side_needs = int(side_needs)
                             if side_count >= side_needs:
                                 win_side, win_group, win_value = None, None, 0
                                 side_count -= self.get_new_area_count(
@@ -2164,7 +2167,7 @@ class Board(Window):
                                     win_side, win_value, win_group = opponent, -side_needs, group
                                 if 0 == side_needs and side_count:
                                     draw = True
-            resolution_rules = self.end_rules.get(side, {}).get(condition, {})
+            resolution_rules = self.end_rules.get(Side.NONE, {}).get(condition, {})
             if win_side and loss_side and win_side != loss_side.opponent():
                 if win_value > loss_value:
                     loss_side = None
