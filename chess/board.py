@@ -1688,7 +1688,7 @@ class Board(Window):
                     if keyword in end_types:
                         keyword = end_types[keyword]
                         is_area = False
-                    elif keyword not in self.areas and not isa(keyword):
+                    elif keyword not in self.areas.get(side) and not isa(keyword):
                         continue
                     condition = pch['not'] + keyword if invert else keyword
                     if isinstance(rules, dict):
