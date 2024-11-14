@@ -555,11 +555,11 @@ def debug_info(board: Board) -> list[str]:
                         for key_data in (
                             'order',
                             (
-                                'state', "Board state", lambda x: {
+                                'state', "Board state", lambda l: ', '.join({
                                     0: "Any",
                                     1: "White is not in check", -1: "White is in check",
                                     2: "Black is not in check", -2: "Black is in check",
-                                }.get(x, 'Unknown')
+                                }.get(x, 'Unknown') for x in l)
                             ),
                             'piece',
                             ('move', "Move type"),
@@ -570,7 +570,9 @@ def debug_info(board: Board) -> list[str]:
                             ('lose', "Lost"),
                             ('new', "New piece"),
                             ('old', "Total moves"),
-                            ('check', "Check", lambda x: {0: 'Any', 1: 'Yes', -1: 'No'}.get(x, 'Unknown')),
+                            ('check', "Check", lambda l: ', '.join(
+                                {0: 'Any', 1: 'Yes', -1: 'No'}.get(x, 'Unknown') for x in l
+                            )),
                         ):
                             key_data = key_data if isinstance(key_data, tuple) else (key_data,)
                             key_data = key_data + (None,) * (3 - len(key_data))

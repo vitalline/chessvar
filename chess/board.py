@@ -1675,7 +1675,10 @@ class Board(Window):
             self.end_rules[side] = {}
             if side != side.NONE:
                 self.end_data[side] = {}
-            side_rules = [self.custom_end_rules.get(side, {}), self.custom_end_rules] if self.custom_end_rules else [{}]
+            if side != Side.NONE:
+                side_rules = [self.custom_end_rules.get(side, {}), self.custom_end_rules]
+            else:
+                side_rules = [self.custom_end_rules.get(side, {})]
             for rule_set in side_rules:
                 for condition, rules in rule_set.items():
                     if isinstance(condition, Side):
