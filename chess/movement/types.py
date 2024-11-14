@@ -7,7 +7,8 @@ from typing import TYPE_CHECKING
 
 from chess.movement.base import BaseMovement
 from chess.movement.move import Move
-from chess.movement.util import AnyDirection, Direction, Position, add, sub, mul, ddiv, from_algebraic_map
+from chess.movement.util import ANY, AnyDirection, Direction, Position
+from chess.movement.util import add, sub, mul, ddiv, is_algebraic, from_algebraic_map
 from chess.pieces.types import Immune, Slow, Delayed, Delayed1
 from chess.util import Unpacked, Unset, sign, repack, unpack
 
@@ -1220,26 +1221,52 @@ class RelayMovement(BaseChoiceMovement):
         return self.board, {key: (unpack(value[0]), unpack(value[1])) for key, value in self.movement_dict.items()}
 
 
-class AreaMovement(BaseChoiceMovement):
+class BaseAreaMovement(BaseChoiceMovement):
+    def lookup(self, key: str, invert: bool, piece: Piece) -> bool | None:
+        # Determine if the given condition (or its inversion) covers every square on the board (or none thereof).
+        # Returns True if every square is covered, and False if no squares are covered. If neither, returns None.
+        if key == ANY:
+            return not invert
+        is_area = not is_algebraic(key)
+        side_area = self.board.areas.get(piece.side, {}).get(key)
+        shared_area = self.board.custom_areas.get(key)
+        if is_area and not (side_area or shared_area):
+            return invert
+        return None
+
+
+class AreaMovement(BaseAreaMovement, BaseChoiceMovement):
     def moves(self, pos_from: Position, piece: Piece, theoretical: bool = False):
         for key in self.movement_dict:
             value, invert = (key[1:], True) if key.startswith('!') else (key, False)
             mark = 'e!' if invert else 'e'
+            lookup = self.lookup(value, invert, piece)
+            if lookup is False:
+                continue
             if (legal := self.board.in_area(value, pos_from, piece.side) != invert) or theoretical:
                 for movement in self.movement_dict[key]:
                     for move in movement.moves(pos_from, piece, theoretical):
-                        yield copy(move).set(is_legal=legal).unmark('n').mark(mark)
+                        move = copy(move).set(is_legal=legal)
+                        if not lookup:
+                            move.unmark('n').mark(mark)
+                        yield move
 
 
-class BoundMovement(BaseChoiceMovement):
+class BoundMovement(BaseAreaMovement, BaseChoiceMovement):
     def moves(self, pos_from: Position, piece: Piece, theoretical: bool = False):
         for key in self.movement_dict:
             value, invert = (key[1:], True) if key.startswith('!') else (key, False)
             mark = 'd!' if invert else 'd'
+            lookup = self.lookup(value, invert, piece)
+            if lookup is False:
+                continue
             for movement in self.movement_dict[key]:
                 for move in movement.moves(pos_from, piece, theoretical):
                     if (legal := self.board.in_area(value, move.pos_to, piece.side) != invert) or theoretical:
-                        yield copy(move).set(is_legal=legal).unmark('n').mark(mark)
+                        move = copy(move).set(is_legal=legal)
+                        if not lookup:
+                            move.unmark('n').mark(mark)
+                        yield move
 
 
 class TagMovement(BaseChoiceMovement):
