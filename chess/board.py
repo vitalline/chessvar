@@ -2089,7 +2089,7 @@ class Board(Window):
                             if j >= last[0] and not p.matches(last[1]) and isinstance(p.movement, AutoCaptureMovement):
                                 last = j, p  # normally it's only necessary to analyze moves without promotion. however,
                                 is_new = True  # an auto-capturing piece can, in theory, capture one of the royal pieces
-                                # if we see one, we have to analyze the move chain starting from promotion to the piece,
+                        chained_move = chained_move.chained_move # if we see one, we need to check the move chain for it
                     if not is_new:  # but otherwise we can skip analyzing alternate promotions if we've done one of them
                         break
                     chained_move = move
