@@ -3050,7 +3050,7 @@ class Board(Window):
                 type_marker_alpha = 255
                 if self.display_theoretical_moves.get(piece_side, False):
                     move_dict = self.theoretical_moves.get(piece_side, {})
-                    type_marker_alpha = 224
+                    type_marker_alpha = 192
                 elif self.display_moves.get(piece_side, False):
                     move_dict = self.moves.get(piece_side, {})
                 pos_dict = {k: v for k, v in move_dict.get(pos, {}).items()}
@@ -3358,30 +3358,31 @@ class Board(Window):
                 for side in {current_side, current_side.opponent()}:
                     side_target_dict, side_marker_dict = target_dict.get(side, {}), marker_dict.get(side, {})
                     for pos in list(side_marker_dict):
-                        if isinstance(self.get_piece(pos), NoPiece):
-                            continue
-                        if side_marker_dict[pos] == pos:
-                            continue
                         pos_target_set = side_target_dict.get(side_marker_dict[pos], set())
                         if {Delayed, Delayed1}.intersection(pos_target_set):
                             if not (side == current_side and is_final_turn and chain_end):
                                 continue
+                        if CastlingMovement in pos_target_set:
+                            continue
+                        if side_marker_dict[pos] == pos or isinstance(self.get_piece(pos), NoPiece):
+                            continue
                         side_marker_dict.pop(pos, None)
                         pos_target_set.discard(pos)
                     for pos in list(side_target_dict):
                         if move and pos == move.pos_to:
                             continue
                         pos_target_set = side_target_dict.get(pos, set())
-                        if 'skip' in pos_target_set:
-                            pos_target_set.discard('skip')
+                        if Delayed in pos_target_set and not (side == next_side and is_final_turn and chain_end):
+                            continue
+                        if Delayed1 in pos_target_set and not (side == last_side and is_first_turn):
                             continue
                         if Slow in pos_target_set:
                             if chain_end:
                                 pos_target_set.discard(Slow)
                             continue
-                        if Delayed1 in pos_target_set and not (side == last_side and is_first_turn):
-                            continue
-                        if Delayed in pos_target_set and not (side == next_side and is_final_turn and chain_end):
+                        if CastlingMovement in pos_target_set:
+                            if chain_end:
+                                pos_target_set.discard(CastlingMovement)
                             continue
                         markers = side_target_dict.pop(pos, ())
                         for marker in markers:

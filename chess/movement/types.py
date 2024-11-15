@@ -498,7 +498,7 @@ class CastlingMovement(BaseMovement):
                         marker_set.add(Delayed1)
                     if isinstance(piece, Slow):
                         marker_set.add(Slow)
-                    marker_set.add('skip')
+                    marker_set.add(type(self))
                     self.board.royal_ep_targets.get(piece.side, {})[move.pos_to] = marker_set
                     for pos in positions:
                         self.board.royal_ep_markers.get(piece.side, {})[pos] = move.pos_to
