@@ -2665,7 +2665,7 @@ class Board(Window):
                                     self.promotion_piece = None
                                 move_chain = [move]
                                 chained_move = move.chained_move
-                                skipped = False
+                                skip = False
                                 legal = True
                                 check_or_mate = {'check', 'checkmate'}
                                 any_check_or_mate = set(ext(check_or_mate))
@@ -2691,7 +2691,7 @@ class Board(Window):
                                         and chained_move.piece.skips(chained_move.captured_piece)
                                         and not chained_move.piece.captures(chained_move.captured_piece)
                                     ):
-                                        skipped = True
+                                        skip = True
                                         legal = False
                                         break
                                     if min_depth <= j <= max_depth:
@@ -2742,7 +2742,7 @@ class Board(Window):
                                             for rule in future_rules:
                                                 rule['match'].setdefault(loss_type, set()).add(type(loss))
                                         future_types = {'move': True, 'capture': False, 'promotion': False}
-                                        future_promo = None
+                                        new_piece = None
                                         if not future_rules:
                                             legal = False
                                         elif chained_move:
@@ -2750,14 +2750,14 @@ class Board(Window):
                                             future_types['move'] = future_types['move'] and not ch.captured_piece
                                             future_types['capture'] = future_types['capture'] or bool(ch.captured_piece)
                                             future_types['promotion'] = future_types['promotion'] or bool(ch.promotion)
-                                            future_promo = future_promo or ch.promotion
+                                            new_piece = new_piece or ch.promotion
                                             future_rules = self.filter(
                                                 future_rules, ('next', 'type'), future_types, ('match', 'type')
                                             )
                                             for rule in future_rules:
                                                 rule['match'].setdefault('type', set()).update(future_types)
-                                        if future_rules and future_promo:
-                                            p_type = type(future_promo) if isinstance(future_promo, Piece) else future_promo
+                                        if future_rules and new_piece:
+                                            p_type = type(new_piece) if isinstance(new_piece, Piece) else new_piece
                                             future_rules = self.filter(
                                                 future_rules, ('next', 'new'), [p_type], ('match', 'piece')
                                             )
@@ -2842,7 +2842,7 @@ class Board(Window):
                                                 break
                                 p_not = pch['not']
                                 mate = ext(('checkmate',))
-                                if not skipped and not any(end_data[self.turn_side].get(x, {}).get('', 0) for x in mate):
+                                if not skip and not any(end_data[self.turn_side].get(x, {}).get('', 0) for x in mate):
                                     if any_check_or_mate.intersection(self.end_rules[self.turn_side]):
                                         for g in self.get_royal_loss(opponent, move, check_or_mate):
                                             for condition in self.end_rules.get(self.turn_side, {}):
@@ -2860,7 +2860,7 @@ class Board(Window):
                                                         p = p_not if (condition[0:1] == p_not) else ''
                                                         loss_condition = p + 'checkmate'
                                                         end_data[self.turn_side][loss_condition][''] = 1
-                                if not skipped and not any(end_data[self.turn_side].get(x, {}).get('', 0) for x in mate):
+                                if not skip and not any(end_data[self.turn_side].get(x, {}).get('', 0) for x in mate):
                                     if any_check_or_mate.intersection(self.end_rules[opponent]):
                                         for g in self.get_royal_loss(self.turn_side, move, check_or_mate):
                                             for condition in self.end_rules.get(opponent, {}):
@@ -2889,31 +2889,33 @@ class Board(Window):
                                             move_fits = True
                                         self.check_side = old_check_side
                                     if move_fits:
-                                        pos_from, pos_to = move.pos_from, move.pos_to or move.pos_from
-                                        if pos_from == pos_to and move.captured_piece is not None:
-                                            pos_to = move.captured_piece.board_pos
-                                        self.moves[turn_side].setdefault(pos_from, {}).setdefault(pos_to, []).append(move)
-                                        chained_move = self.chain_start
+                                        p_from, p_to = move.pos_from, move.pos_to or move.pos_from
+                                        if p_from == p_to and move.captured_piece is not None:
+                                            p_to = move.captured_piece.board_pos
+                                        self.moves[turn_side].setdefault(p_from, {}).setdefault(p_to, []).append(move)
+                                        chained = self.chain_start
                                         poss = []
-                                        while chained_move:
-                                            poss.extend((chained_move.pos_from, chained_move.pos_to))
-                                            chained_move = chained_move.chained_move
-                                        chained_move = move
-                                        while chained_move and chained_move.chained_move and (
-                                            issubclass(chained_move.movement_type or type, CastlingMovement) or
-                                            issubclass(chained_move.chained_move.movement_type or type, CloneMovement) or
-                                            isinstance((chained_move.piece or self.no_piece).movement, AutoCaptureMovement)
+                                        while chained:
+                                            poss.extend((chained.pos_from, chained.pos_to))
+                                            chained = chained.chained_move
+                                        chained = move
+                                        while chained and chained.chained_move and (
+                                            issubclass(chained.movement_type or type, CastlingMovement) or
+                                            issubclass(chained.chained_move.movement_type or type, CloneMovement) or
+                                            isinstance((chained.piece or self.no_piece).movement, AutoCaptureMovement)
                                         ):
-                                            poss.extend((chained_move.pos_from, chained_move.pos_to))
-                                            chained_move = chained_move.chained_move
-                                        poss.extend((chained_move.pos_from, chained_move.pos_to))
-                                        if chained_move.chained_move:
-                                            self.chain_moves[turn_side].setdefault(tuple(poss), []).append(
-                                                chained_move.chained_move
-                                            )
-                                for chained_move in move_chain[::-1]:
-                                    self.undo(chained_move)
-                                    self.revert_auto_capture_markers(chained_move)
+                                            poss.extend((chained.pos_from, chained.pos_to))
+                                            chained = chained.chained_move
+                                        poss.extend((chained.pos_from, chained.pos_to))
+                                        chained = chained.chained_move
+                                        if chained and not (
+                                            (chained.piece or self.no_piece).side == turn_side.opponent()
+                                            and issubclass(chained.movement_type or type, AutoCaptureMovement)
+                                        ):
+                                            self.chain_moves[turn_side].setdefault(tuple(poss), []).append(chained)
+                                for chained in move_chain[::-1]:
+                                    self.undo(chained)
+                                    self.revert_auto_capture_markers(chained)
                                 self.en_passant_targets = deepcopy(en_passant_targets)
                                 self.en_passant_markers = deepcopy(en_passant_markers)
                                 self.royal_ep_targets = deepcopy(royal_ep_targets)
@@ -3013,7 +3015,10 @@ class Board(Window):
                         poss.extend((chained_move.pos_from, chained_move.pos_to))
                         chained_move = chained_move.chained_move
                     poss.extend((chained_move.pos_from, chained_move.pos_to))
-                    if chained_move.chained_move or self.chain_moves.get(self.turn_side, {}).get(tuple(poss)):
+                    if chained_move.chained_move and not (
+                        (chained_move.chained_move.piece or self.no_piece).side == self.turn_side.opponent() and
+                        issubclass(chained_move.chained_move.movement_type or type, AutoCaptureMovement)
+                    ) or self.chain_moves.get(self.turn_side, {}).get(tuple(poss)):
                         chained_move.chained_move = Unset  # do not chain moves, we are only counting one-move sequences
                     moves[turn_side].setdefault(move.pos_from, []).append(move)
         return moves
@@ -3687,7 +3692,10 @@ class Board(Window):
                     poss.extend((chained_move.pos_from, chained_move.pos_to))
                     chained_move = chained_move.chained_move
                 poss.extend((chained_move.pos_from, chained_move.pos_to))
-                if chained_move.chained_move or self.chain_moves.get(self.turn_side, {}).get(tuple(poss)):
+                if chained_move.chained_move and not (
+                    (chained_move.chained_move.piece or self.no_piece).side == self.turn_side.opponent() and
+                    issubclass(chained_move.chained_move.movement_type or type, AutoCaptureMovement)
+                ) or self.chain_moves.get(self.turn_side, {}).get(tuple(poss)):
                     chained_move.chained_move = Unset  # do not chain moves because we're updating every move separately
                 self.update_auto_capture_markers(move, True)
                 self.update_auto_captures(move, self.turn_side.opponent())
@@ -4452,6 +4460,7 @@ class Board(Window):
                     chained_move = chained_move.chained_move
                 if chained_move.chained_move is not Unset:
                     poss.extend((chained_move.pos_from, chained_move.pos_to))
+                    # normally the check below would not mark auto-captures as Unset, but there is just not enough space
                     if chained_move.chained_move or self.chain_moves.get(self.turn_side, {}).get(tuple(poss)):
                         chained_move.chained_move = Unset  # don't chain moves since we're only showing selectable moves
                 moves = []
@@ -5703,7 +5712,10 @@ class Board(Window):
                     poss.extend((chained_move.pos_from, chained_move.pos_to))
                     chained_move = chained_move.chained_move
                 poss.extend((chained_move.pos_from, chained_move.pos_to))
-                if chained_move.chained_move or self.chain_moves.get(self.turn_side, {}).get(tuple(poss)):
+                if chained_move.chained_move and not (
+                    (chained_move.chained_move.piece or self.no_piece).side == self.turn_side.opponent() and
+                    issubclass(chained_move.chained_move.movement_type or type, AutoCaptureMovement)
+                ) or self.chain_moves.get(self.turn_side, {}).get(tuple(poss)):
                     chained_move.chained_move = Unset  # do not chain moves since we are selecting chained move manually
                     is_final = False
                 else:
