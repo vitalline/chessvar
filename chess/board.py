@@ -4695,12 +4695,16 @@ class Board(Window):
                 current_col = area_origin[1] + ((new_col + 1) // 2 * ((aim_left + new_col) % 2 * 2 - 1))
             area_squares.append((current_row, current_col))
         side = self.get_promotion_side(piece) if self.edit_mode and not drops else (piece.side or self.turn_side)
+        total = 0
         for promotion, drop, pos in zip_longest(promotions, drops, area_squares):
+            total += 1
             background_sprite = Sprite("assets/util/square.png")
             background_sprite.color = self.color_scheme['promotion_area_color']
             background_sprite.position = self.get_screen_position(pos)
             background_sprite.scale = self.square_size / background_sprite.texture.width
             self.promotion_area_sprite_list.append(background_sprite)
+            if total > area:
+                continue
             if promotion is None:
                 promotion_piece = piece.on(pos)
             elif isinstance(promotion, Piece):
