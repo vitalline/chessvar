@@ -643,6 +643,7 @@ class Board(Window):
             self.roll_history = []
             self.future_move_history = []
             self.probabilistic_piece_history = []
+            self.reset_end_rules()
             self.reset_drops()
             self.reset_promotions()
             self.reset_edit_promotions()
@@ -1364,6 +1365,7 @@ class Board(Window):
         self.roll_history = []
         self.future_move_history = []
         self.probabilistic_piece_history = []
+        self.reset_end_rules()
         self.reset_drops()
         self.reset_promotions()
         self.reset_edit_promotions()
