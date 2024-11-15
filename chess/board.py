@@ -4374,12 +4374,12 @@ class Board(Window):
             hovered_square = self.hovered_square or self.highlight_square
         if self.promotion_piece:
             piece = self.promotion_piece
+            skip = hovered_square in self.promotion_area_drops and self.promotion_area_drops[hovered_square] is None
             if isinstance(piece, NoPiece):
                 if hovered_square in self.promotion_area:
-                    promotion = self.promotion_area[hovered_square]
-                    message = f"{promotion}"
+                    message = "Nothing" if skip else f"{self.promotion_area[hovered_square]}"
                 else:
-                    message = f""
+                    message = ''
                     if self.edit_mode and self.edit_piece_set_id is not None:
                         if find_string('custom', self.edit_piece_set_id, -1):
                             message += "Custom piece"
@@ -4396,6 +4396,10 @@ class Board(Window):
                 self.set_caption(f"{prefix} {message}")
                 return
             message = f"{piece} on {toa(piece.board_pos)}"
+            if skip:
+                message += " does not promote"
+                self.set_caption(f"{prefix} {message}")
+                return
             if not self.edit_mode or (self.move_history and ((m := self.move_history[-1]) and m.is_edit != 1)):
                 message += " promotes"
             else:
@@ -4579,18 +4583,24 @@ class Board(Window):
         promotion_squares = side_promotions[type(move.piece)]
         if not {move.pos_from, move.pos_to}.intersection(promotion_squares):
             return
+        has_promotion = False
         promotions = []
         for promotion_move in self.moves.get(move.piece.side, {}).get(move.pos_from, {}).get(move.pos_to, []):
             if promotion_move.promotion:
                 promotions.append(promotion_move.promotion)
-        if not promotions:
+                has_promotion = True
+            else:
+                promotions.append(None)
+        if not has_promotion:
             return
         if self.auto_moves and self.board_config['fast_promotion'] and len(promotions) == 1:
-            self.promotion_piece = True
             promotion = promotions[0]
+            if promotion is None:
+                return
+            self.promotion_piece = True
             if isinstance(promotion, Piece):
                 promotion = promotion.of(promotion.side or move.piece.side).on(move.pos_to)
-            else:
+            elif isinstance(promotion, type) and issubclass(promotion, Piece):
                 promotion = promotion(board=self, pos=move.pos_to, side=move.piece.side)
             promoted_from = promotion.promoted_from or move.piece.promoted_from
             if not isinstance(move.piece, NoPiece):
@@ -4650,7 +4660,7 @@ class Board(Window):
             yield copy_move
 
     def start_promotion(
-        self, piece: Piece, promotions: list[Piece | type[Piece]], drops: list[type[Piece]] | None = None
+        self, piece: Piece, promotions: list[Piece | type[Piece] | None], drops: list[type[Piece]] | None = None
     ) -> None:
         if drops is None:
             drops = {}
@@ -4687,8 +4697,8 @@ class Board(Window):
             background_sprite.scale = self.square_size / background_sprite.texture.width
             self.promotion_area_sprite_list.append(background_sprite)
             if promotion is None:
-                continue
-            if isinstance(promotion, Piece):
+                promotion_piece = piece.on(pos)
+            elif isinstance(promotion, Piece):
                 promotion_piece = promotion.of(promotion.side or side).on(pos)
                 promotion = type(promotion)
             else:
@@ -4699,7 +4709,7 @@ class Board(Window):
                     promoted_from = promoted_from or type(piece)
                 if type(promotion_piece) != promoted_from:
                     promotion_piece.promoted_from = promoted_from
-            if issubclass(promotion, Piece) and not issubclass(promotion, NoPiece):
+            if promotion is not None and issubclass(promotion, Piece) and not issubclass(promotion, NoPiece):
                 if issubclass(promotion, (King, CBKing)) and promotion not in self.piece_sets[side]:
                     self.update_piece(promotion_piece, asset_folder='other')
                 elif self.edit_mode and self.edit_piece_set_id is not None and not isinstance(piece, Obstacle):
@@ -4722,7 +4732,10 @@ class Board(Window):
                 )
             self.promotion_piece_sprite_list.append(promotion_piece)
             self.promotion_area[pos] = promotion_piece
-            self.promotion_area_drops[pos] = drop
+            if promotion is None:
+                self.promotion_area_drops[pos] = None
+            elif drop is not None:
+                self.promotion_area_drops[pos] = drop
         self.skip_caption_update = False
         self.update_caption()
 
@@ -5414,9 +5427,10 @@ class Board(Window):
                                 self.captured_pieces[self.turn_side].pop(-(i + 1))
                                 break
                         self.update_en_passant_markers(chained_move)
-                    chained_move.set(promotion=self.promotion_area[pos])
-                    self.replace(self.promotion_piece, self.promotion_area[pos])
-                    self.update_promotion_auto_captures(chained_move)
+                    if pos not in self.promotion_area_drops or self.promotion_area_drops[pos] is not None:
+                        chained_move.set(promotion=self.promotion_area[pos])
+                        self.replace(self.promotion_piece, self.promotion_area[pos])
+                        self.update_promotion_auto_captures(chained_move)
                     self.end_promotion()
                     current_move = chained_move
                     while chained_move:
