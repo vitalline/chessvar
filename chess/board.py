@@ -3988,6 +3988,7 @@ class Board(Window):
                 self.revert_end_data(last_move)
                 self.shift_ply(-1)
         last_move = self.move_history.pop()
+        last_move_copy = deepcopy(last_move)
         if last_move is not None:
             move_chain = [last_move]
             while move_chain[-1].chained_move:
@@ -4063,9 +4064,9 @@ class Board(Window):
                     break
             if not matches:
                 self.clear_future_history(self.ply_count)
-                self.future_move_history.append(last_move)
+                self.future_move_history.append(last_move_copy)
         else:
-            self.future_move_history.append(last_move)
+            self.future_move_history.append(last_move_copy)
 
     def redo_last_move(self) -> None:
         self.deselect_piece()
