@@ -4078,21 +4078,22 @@ class Board(Window):
                     and not (past.captured_piece is not None and future.swapped_piece is not None)
                     and not (past.swapped_piece is not None and future.captured_piece is not None)
                 ):
-                    if future.promotion:
+                    if past.promotion is Unset:
+                        if future.promotion is Unset:
+                            return
                         past.promotion = future.promotion
-                        if future.placed_piece is not None:
-                            past.placed_piece = future.placed_piece
-                            for i, piece in enumerate(self.captured_pieces[self.turn_side][::-1]):
-                                if piece == future.placed_piece:
-                                    self.captured_pieces[self.turn_side].pop(-(i + 1))
-                                    break
-                        self.replace(self.promotion_piece, future.promotion)
+                        if future.promotion is not None:
+                            if future.placed_piece is not None:
+                                past.placed_piece = future.placed_piece
+                                for i, piece in enumerate(self.captured_pieces[self.turn_side][::-1]):
+                                    if piece == future.placed_piece:
+                                        self.captured_pieces[self.turn_side].pop(-(i + 1))
+                                        break
+                            self.replace(self.promotion_piece, future.promotion)
                         self.update_promotion_auto_captures(self.move_history[-1])
                         self.end_promotion()
                         piece_was_moved = True
                         break
-                    elif future.promotion is Unset:
-                        return
                     past, future = past.chained_move, future.chained_move
             else:
                 return
@@ -4505,7 +4506,7 @@ class Board(Window):
             self.replace(move.piece, move.promotion)
             self.update_promotion_auto_captures(move)
             self.promotion_piece = promotion_piece
-        else:
+        elif move.promotion is Unset:
             if self.turn_side not in self.drops:
                 return
             if not self.captured_pieces[self.turn_side]:
@@ -4573,6 +4574,8 @@ class Board(Window):
             self.update_promotion_auto_captures(move)
             self.promotion_piece = promotion_piece
             return
+        if move.promotion is not Unset:
+            return
         if is_active(move.chained_move):
             return
         if move.piece.side not in self.promotions:
@@ -4596,6 +4599,7 @@ class Board(Window):
         if self.auto_moves and self.board_config['fast_promotion'] and len(promotions) == 1:
             promotion = promotions[0]
             if promotion is None:
+                move.promotion = None
                 return
             self.promotion_piece = True
             if isinstance(promotion, Piece):
@@ -5430,7 +5434,9 @@ class Board(Window):
                     if pos not in self.promotion_area_drops or self.promotion_area_drops[pos] is not None:
                         chained_move.set(promotion=self.promotion_area[pos])
                         self.replace(self.promotion_piece, self.promotion_area[pos])
-                        self.update_promotion_auto_captures(chained_move)
+                    else:
+                        chained_move.set(promotion=Default)
+                    self.update_promotion_auto_captures(chained_move)
                     self.end_promotion()
                     current_move = chained_move
                     while chained_move:
@@ -5711,8 +5717,6 @@ class Board(Window):
                         self.deselect_piece()
                         return
                 self.update_move(move)
-                if move.promotion is not None:
-                    move.promotion = Unset  # do not auto-promote because we are selecting promotion type manually
                 chained_move = self.chain_start
                 poss = []
                 while chained_move:
@@ -5739,9 +5743,11 @@ class Board(Window):
                 self.update_auto_captures(move, self.turn_side.opponent())
                 chained_move = move
                 while chained_move:
+                    chained_move.promotion = Unset  # do not auto-promote because we're selecting the promotion manually
                     self.move(chained_move)
                     chained_move.set(piece=copy(chained_move.piece))
                     if self.promotion_piece is None:
+                        chained_move.set(promotion=Default)
                         self.log(f"Move: {chained_move}")
                     chained_move = chained_move.chained_move
                     if chained_move:
