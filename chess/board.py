@@ -4598,14 +4598,17 @@ class Board(Window):
     def get_promotions(self, move: Move, promotions: list[Piece | type[Piece] | None] | None = None):
         if promotions is None:
             if not is_active(move):
+                yield move
                 return
             chained_move = move
             while chained_move and is_active(chained_move.chained_move):
                 chained_move = chained_move.chained_move
             if move.piece.side not in self.promotions:
+                yield move
                 return
             side_promotions = self.promotions[move.piece.side]
             if type(move.piece) not in side_promotions:
+                yield move
                 return
             promotion_squares = side_promotions[type(move.piece)]
             for square in (chained_move.pos_to, chained_move.pos_from):
