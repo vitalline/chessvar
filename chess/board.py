@@ -2608,7 +2608,7 @@ class Board(Window):
                             and not base_move.piece.captures(base_move.captured_piece)
                         ):
                             continue
-                        base_move_types = {'move': True, 'capture': False, 'promotion': False}
+                        base_dict = {'move': True, 'capture': False, 'promotion': False}
                         for rule in base_rules:
                             rule['match'].setdefault('pos', [])
                         pos_from = base_move.pos_from or base_move.pos_to
@@ -2628,12 +2628,12 @@ class Board(Window):
                                 rule['match'].setdefault(capture_type, set()).add(type(capture))
                         if not base_rules:
                             continue
-                        base_move_types['move'] = base_move_types['move'] and not base_move.captured_piece
-                        base_move_types['capture'] = base_move_types['capture'] or bool(base_move.captured_piece)
+                        base_dict['move'] = base_dict['move'] and not base_move.captured_piece
+                        base_dict['capture'] = base_dict['capture'] or bool(base_move.captured_piece)
                         for move in self.get_promotions(base_move):
                             move_rules = deepcopy(base_rules)
-                            move_types = copy(base_move_types)
-                            move_types['promotion'] = move_types['promotion'] or bool(move.promotion)
+                            type_dict = copy(base_dict)
+                            type_dict['promotion'] = type_dict['promotion'] or bool(move.promotion)
                             if move.promotion:
                                 p_type = type(move.promotion) if isinstance(move.promotion, Piece) else move.promotion
                                 move_rules = self.filter(move_rules, 'new', [p_type], ('match', 'piece'))
@@ -2651,6 +2651,7 @@ class Board(Window):
                                             break
                                 if limit_hits[p_type]:
                                     continue
+                            move_types = [k for k, v in type_dict.items() if v]
                             move_rules = self.filter(move_rules, 'type', move_types, ('match', 'type'), False)
                             for rule in move_rules:
                                 rule['match'].setdefault('type', set()).update(move_types)
@@ -2741,16 +2742,17 @@ class Board(Window):
                                             )
                                             for rule in future_rules:
                                                 rule['match'].setdefault(loss_type, set()).add(type(loss))
-                                        future_types = {'move': True, 'capture': False, 'promotion': False}
+                                        future_dict = {'move': True, 'capture': False, 'promotion': False}
                                         new_piece = None
                                         if not future_rules:
                                             legal = False
                                         elif chained_move:
                                             ch = chained_move
-                                            future_types['move'] = future_types['move'] and not ch.captured_piece
-                                            future_types['capture'] = future_types['capture'] or bool(ch.captured_piece)
-                                            future_types['promotion'] = future_types['promotion'] or bool(ch.promotion)
                                             new_piece = new_piece or ch.promotion
+                                            future_dict['move'] = future_dict['move'] and not ch.captured_piece
+                                            future_dict['capture'] = future_dict['capture'] or bool(ch.captured_piece)
+                                            future_dict['promotion'] = future_dict['promotion'] or bool(ch.promotion)
+                                            future_types = [k for k, v in future_dict.items() if v]
                                             future_rules = self.filter(
                                                 future_rules, ('next', 'type'), future_types, ('match', 'type')
                                             )
