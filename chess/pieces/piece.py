@@ -7,7 +7,6 @@ from typing import TYPE_CHECKING
 from arcade import Color, Sprite, load_texture
 
 from chess.movement.base import BaseMovement
-from chess.movement.types import is_active
 from chess.movement.util import Position, to_algebraic
 from chess.pieces.side import Side
 from chess.pieces.types import Double, Enemy, Empty, Immune, Neutral
@@ -62,46 +61,7 @@ class Piece(Sprite, metaclass=FormatOverride, repr_method=piece_repr, str_method
 
     def moves(self, theoretical: bool = False):
         if self.movement:
-            for move in self.movement.moves(self.board_pos, self, theoretical):
-                chained_move = move
-                while chained_move and is_active(chained_move.chained_move):
-                    chained_move = chained_move.chained_move
-                if is_active(chained_move):
-                    if self.side in self.board.promotions:
-                        side_promotions = self.board.promotions[self.side]
-                        if type(self) in side_promotions:
-                            promotion_squares = side_promotions[type(self)]
-                            promotion_found = False
-                            for square in (chained_move.pos_to, chained_move.pos_from):
-                                if square in promotion_squares:
-                                    promotions = promotion_squares[square]
-                                    if not promotions:
-                                        break
-                                    promotion_found = True
-                                    for piece in promotions:
-                                        if isinstance(piece, Piece):
-                                            piece = piece.of(piece.side or self.side).on(square)
-                                        else:
-                                            piece = piece(
-                                                board=self.board,
-                                                board_pos=square,
-                                                side=self.side,
-                                            )
-                                        promoted_from = piece.promoted_from or self.promoted_from or type(self)
-                                        if type(piece) != promoted_from:
-                                            piece.promoted_from = promoted_from
-                                        copy_move = copy(move)
-                                        chained_copy = copy_move
-                                        while chained_copy and is_active(chained_copy.chained_move):
-                                            chained_copy.set(chained_move=copy(chained_copy.chained_move))
-                                            chained_copy = chained_copy.chained_move
-                                        chained_copy.set(promotion=piece)
-                                        yield copy_move
-                                    break
-                            if promotion_found:
-                                continue
-                yield move
-        return ()
+            yield from self.movement.moves(self.board_pos, self, theoretical)
 
     def __str__(self):
         return f"{self.side if not isinstance(self, Neutral) else ''} {'???' if self.is_hidden else self.name}".strip()
