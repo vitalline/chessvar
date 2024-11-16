@@ -4602,7 +4602,7 @@ class Board(Window):
         if self.auto_moves and self.board_config['fast_promotion'] and len(promotions) == 1:
             promotion = promotions[0]
             if promotion is None:
-                move.promotion = None
+                move.set(promotion=Default)
                 return
             self.promotion_piece = True
             if isinstance(promotion, Piece):
@@ -5754,7 +5754,8 @@ class Board(Window):
                     self.move(chained_move)
                     chained_move.set(piece=copy(chained_move.piece))
                     if self.promotion_piece is None:
-                        chained_move.set(promotion=Default)
+                        if chained_move.promotion is Unset:
+                            chained_move.set(promotion=Default)
                         self.log(f"Move: {chained_move}")
                     chained_move = chained_move.chained_move
                     if chained_move:
