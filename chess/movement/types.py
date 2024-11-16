@@ -14,7 +14,7 @@ from chess.util import Unpacked, Unset, sign, repack, unpack
 
 if TYPE_CHECKING:
     from chess.board import Board
-    from chess.pieces.piece import Piece
+    from chess.pieces.piece import AbstractPiece as Piece
 
 
 class RiderMovement(BaseMovement):
@@ -891,7 +891,7 @@ class ChainMovement(BaseMultiMovement):
                 last_pos = move_chain[0].pos_from
                 for chained_move in move_chain:
                     self.board.update_move(chained_move)
-                    self.board.move(chained_move)
+                    self.board.move(chained_move, False)
                     if last_pos == chained_move.pos_from:
                         last_pos = chained_move.pos_to
                 chain_options = []
@@ -903,7 +903,7 @@ class ChainMovement(BaseMultiMovement):
                     chained_copy.set(chained_move=copy(last_chained_move))
                     chain_options.append(copy_move)
                 for chained_move in move_chain[::-1]:
-                    self.board.undo(chained_move)
+                    self.board.undo(chained_move, False)
                 yield from chain_options
 
 

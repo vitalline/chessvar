@@ -12,11 +12,11 @@ from chess.movement.util import ANY, to_alpha as b26
 from chess.movement.util import to_algebraic as toa, from_algebraic as fra
 from chess.movement.util import to_algebraic_map as tom, from_algebraic_map as frm
 from chess.pieces.groups.classic import Pawn
-from chess.pieces.piece import Piece
+from chess.pieces.piece import AbstractPiece, Piece
 from chess.pieces.side import Side
 from chess.pieces.util import UtilityPiece, NoPiece, Block, Border, Shield, Void, Wall
 from chess.save import save_piece_type, save_custom_type
-from chess.util import dumps, get_file_name, pluralize, spell, spell_ordinal, sign
+from chess.util import TypeOr, dumps, get_file_name, pluralize, spell, spell_ordinal, sign
 
 if TYPE_CHECKING:
     from chess.board import Board
@@ -26,7 +26,7 @@ def get_piece_mapping(board: Board, side: Side = Side.WHITE) -> dict[str, list[s
     mapping = {}
     set_mapping = {}
     defaults = {}
-    def add_piece(piece: type[Piece], default: bool = False):
+    def add_piece(piece: type[AbstractPiece], default: bool = False):
         piece_type = save_piece_type(piece)
         if piece_type not in set_mapping.setdefault(piece.name, set()):
             set_mapping[piece.name].add(piece_type)
@@ -58,7 +58,7 @@ def get_piece_mapping(board: Board, side: Side = Side.WHITE) -> dict[str, list[s
     return mapping
 
 
-def get_piece_name(piece: Piece | type[Piece], mapping: dict[str, list[str]]) -> str:
+def get_piece_name(piece: TypeOr[AbstractPiece], mapping: dict[str, list[str]]) -> str:
     name = piece.name
     if len(mapping.get(name, ())) <= 1:
         return name
@@ -94,7 +94,9 @@ def print_piece_sets(fp: TextIO = sys.stdout) -> None:
 
 
 def print_piece_types(fp: TextIO = sys.stdout, side: Side = Side.WHITE) -> None:
-    for name, path, file in sorted((n, save_piece_type(t), t.file_name) for t, n in get_piece_types(side).items()):
+    for name, path, file in sorted(
+        (n, save_piece_type(t), (t.file_name if isinstance(t, Piece) else '')) for t, n in get_piece_types(side).items()
+    ):
         fp.write(f"{name}: {path}, {file}\n")
 
 
@@ -124,7 +126,7 @@ def debug_info(board: Board) -> list[str]:
     s26 = lambda x: b26(x + (0 if x < 0 else 1))
     offset_x, offset_y = board.notation_offset
     piece_mapping = {side: get_piece_mapping(board, side) for side in (Side.WHITE, Side.BLACK, Side.NONE)}
-    piece_side = lambda piece: piece.side if isinstance(piece, Piece) else Side.NONE
+    piece_side = lambda piece: piece.side if isinstance(piece, AbstractPiece) else Side.NONE
     def name(piece, side=Side.NONE):
         if not piece or isinstance(piece, NoPiece):
             return 'None'
@@ -306,7 +308,7 @@ def debug_info(board: Board) -> list[str]:
                     piece_list = []
                     for to_piece in section_rules[piece][pos]:
                         suffixes = []
-                        if isinstance(to_piece, Piece):
+                        if isinstance(to_piece, AbstractPiece):
                             if to_piece.side not in {side, Side.NONE}:
                                 suffixes.append(f"Side: {to_piece.side}")
                             if to_piece.movement and to_piece.movement.total_moves:
@@ -346,7 +348,7 @@ def debug_info(board: Board) -> list[str]:
         side_data = board.edit_promotions.get(side, [])
         piece_list = ', '.join(
             ((
-                f"{piece.side}" if isinstance(piece, Piece)
+                f"{piece.side}" if isinstance(piece, AbstractPiece)
                 and not (isinstance(piece, UtilityPiece)
                 and piece.side is piece.default_side) else ""
             ) + name(piece, side)) if piece else 'None' for piece in side_data

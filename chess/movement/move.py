@@ -8,7 +8,7 @@ from chess.util import Default, Unset
 
 if TYPE_CHECKING:
     from chess.movement.base import BaseMovement
-    from chess.pieces.piece import Piece
+    from chess.pieces.piece import AbstractPiece as Piece
 
 
 class Move(object):

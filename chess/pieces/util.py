@@ -1,10 +1,10 @@
 from chess.movement.util import to_algebraic
-from chess.pieces.piece import Piece
+from chess.pieces.piece import AbstractPiece, Piece
 from chess.pieces.side import Side
 from chess.pieces.types import Empty, Immune
 
 
-class UtilityPiece(Piece):
+class UtilityPiece(AbstractPiece):
     name = '(Utility Piece)'
     default_side = Side.NONE
 
@@ -44,7 +44,7 @@ class UtilityPiece(Piece):
         return f"<{string}>"
 
 
-class BackgroundPiece(UtilityPiece):
+class BackgroundPiece(Piece, UtilityPiece):
     name = '(Background Piece)'
 
     def __init__(self, board, **kwargs):
@@ -56,7 +56,7 @@ class BackgroundPiece(UtilityPiece):
         self.set_color()
 
     def set_color(self, *args, **kwargs):
-        self.color = self.board.color_scheme.get('wall_color', self.board.color_scheme['background_color'])
+        self.sprite.color = self.board.color_scheme.get('wall_color', self.board.color_scheme['background_color'])
 
 
 class Shield(BackgroundPiece, Empty):
@@ -80,7 +80,7 @@ class NoSidePiece(UtilityPiece, Empty):
         kwargs['side'] = self.default_side
         super().__init__(board, **kwargs)
 
-    def of(self, side: Side) -> Piece:
+    def of(self, side: Side) -> AbstractPiece:
         side = self.default_side
         return super().of(side)
 

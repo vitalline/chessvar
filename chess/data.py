@@ -23,7 +23,7 @@ from chess.pieces.groups import splash as sp, starbound as st, stone as so, swit
 from chess.pieces.groups import thrash as th
 from chess.pieces.groups import wide as wd
 from chess.pieces.groups import zebra as zb
-from chess.pieces.piece import Piece
+from chess.pieces.piece import AbstractPiece
 from chess.pieces.side import Side
 from chess.pieces.util import NoPiece
 
@@ -302,7 +302,7 @@ piece_groups: list[dict[str, str | list[type[Piece]]]] = [
 ]
 
 
-def get_piece_types(side: Side = Side.WHITE) -> dict[type[Piece], str]:
+def get_piece_types(side: Side = Side.WHITE) -> dict[type[AbstractPiece], str]:
     piece_types = {
         get_set_data(side, i)[j]
         for i in range(len(piece_groups)) for j in [i for i in range(4)] + [7]
@@ -311,12 +311,12 @@ def get_piece_types(side: Side = Side.WHITE) -> dict[type[Piece], str]:
     return {t: t.name + (' (CB)' if t.is_colorbound() or t == cb.King else '') for t in piece_types}
 
 
-def get_set_data(side: Side, set_id: int) -> list[type[Piece]]:
+def get_set_data(side: Side, set_id: int) -> list[type[AbstractPiece]]:
     piece_group = piece_groups[set_id]
     return piece_group.get(f"set_{side.key()[0:1]}", piece_group.get('set', [NoPiece] * default_board_width))
 
 
-def get_set_name(piece_set: list[type[Piece]], include_royals: bool = False) -> str:
+def get_set_name(piece_set: list[type[AbstractPiece]], include_royals: bool = False) -> str:
     piece_name_order = [[i, len(piece_set) - 1 - i] for i in range(ceil(len(piece_set) / 2))]
     piece_names = []
     for group in piece_name_order:

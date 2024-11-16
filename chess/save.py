@@ -15,11 +15,11 @@ from chess.movement.util import LAST, Position, sort_key
 from chess.movement.util import to_algebraic as toa, from_algebraic as fra
 from chess.movement.util import to_algebraic_map as tom, from_algebraic_map as frm
 from chess.pieces import types as piece_types
-from chess.pieces.piece import Piece
+from chess.pieces.piece import AbstractPiece, Piece
 from chess.pieces.side import Side
 from chess.pieces.types import Neutral
 from chess.pieces.util import UtilityPiece, NoPiece
-from chess.util import CUSTOM_PREFIX, MOVEMENT_SUFFIXES, UNSET_STRING, Unset, AnyJson, AnyJsonType, IntIndex
+from chess.util import CUSTOM_PREFIX, MOVEMENT_SUFFIXES, UNSET_STRING, Unset, AnyJson, AnyJsonType, IntIndex, TypeOr
 
 if TYPE_CHECKING:
     from chess.board import Board
@@ -150,8 +150,8 @@ def substitute(data: AnyJson, subs: IntIndex | dict[int, IntIndex], side: Side =
 
 
 def save_piece_type(
-    piece_type: type[Piece] | frozenset | None,
-    last: type[Piece] | None = None,
+    piece_type: type[AbstractPiece] | frozenset | None,
+    last: type[AbstractPiece] | None = None,
 ) -> str | None:
     if piece_type is None:
         return None
@@ -166,7 +166,7 @@ def load_piece_type(
     data: str | None,
     from_dict: dict | None = None,
     last: str | None = None,
-) -> type[Piece] | frozenset | None:
+) -> type[AbstractPiece] | frozenset | None:
     if not data:
         return None
     if data == UNSET_STRING:
@@ -219,8 +219,8 @@ def load_movement_type(data: list | str | None) -> type[BaseMovement] | frozense
 
 
 def save_piece(
-    piece: Piece | frozenset | None,
-    last: type[Piece] | None = None,
+    piece: AbstractPiece | frozenset | None,
+    last: type[AbstractPiece] | None = None,
 ) -> dict | str | None:
     if piece is None:
         return None
@@ -242,10 +242,11 @@ def save_piece(
 
 
 def load_piece(
-    data: dict | str | None, board: Board,
+    board: Board,
+    data: dict | str | None,
     from_dict: dict | None = None,
     last: str | None = None,
-) -> Piece | frozenset | None:
+) -> AbstractPiece | frozenset | None:
     if not data:
         return None
     if data == UNSET_STRING:
@@ -256,18 +257,19 @@ def load_piece(
     piece_type = load_piece_type(data.get('cls'), from_dict, last) or NoPiece
     piece = piece_type(
         board=board,
-        pos=fra(data['pos']) if 'pos' in data else None,  # type: ignore
+        board_pos=fra(data['pos']) if 'pos' in data else None,  # type: ignore
         side=side,
     )
     piece.promoted_from = load_piece_type(data.get('from'), from_dict, last)
-    show_piece = data.get('show')
-    if show_piece is not None:
-        piece.is_hidden = piece.should_hide = not show_piece
     if piece.movement:
         piece.movement.set_moves(data.get('moves', 0))
-    piece.scale = board.square_size / piece.texture.width
-    if not isinstance(piece, NoPiece):
-        board.update_piece(piece)
+    if isinstance(piece, Piece):
+        show_piece = data.get('show')
+        if show_piece is not None:
+            piece.is_hidden = piece.should_hide = not show_piece
+        piece.sprite.scale = board.square_size / piece.sprite.texture.width
+        if not isinstance(piece, NoPiece):
+            board.update_piece(piece)
     return piece
 
 
@@ -313,13 +315,13 @@ def save_movement(movement: BaseMovement | frozenset | None) -> list | str | Non
     return [save_movement_type(type(movement))] + [save_arg(arg) for arg in args]  # save the data as a list
 
 
-def load_movement(data: list | str | None, board: Board, from_dict: dict | None) -> BaseMovement | frozenset | None:
+def load_movement(board: Board, data: list | str | None, from_dict: dict | None) -> BaseMovement | frozenset | None:
     def load_arg(arg: Any) -> Any:  # the logic is slightly less complicated in this helper function but only slightly
         if isinstance(arg, list):  # it's a list, so it's either a direction, a movement, or a list of either of those
             if not arg:  # if it's empty, it's an empty list. duh. just return it as is, same as the last helper func.
                 return arg  # it is the one case where we don't have to do anything. if only life was always this easy
             if isinstance(arg[0], str):  # if the first element is a string, it's a movement, so it needs to be loaded
-                return load_movement(arg, board, from_dict)  # again, inefficient, but it certainly gets the job done.
+                return load_movement(board, arg, from_dict)  # again, inefficient, but it certainly gets the job done.
             if isinstance(arg[0], int):  # if the first element is an integer, it's a direction. or a position, but eh
                 return tuple(arg)  # so we return it as a tuple, because we use tuples for directions basically always
             return [load_arg(x) for x in arg]  # it's either a list of directions or a list of movements. recurse more
@@ -341,7 +343,7 @@ def load_movement(data: list | str | None, board: Board, from_dict: dict | None)
     return load_custom_movement_type(bases)(*args)  # and that's it. we are done. movement loaded successfully. maybe.
 
 
-def save_custom_type(piece: type[Piece] | Piece | None) -> dict | None:
+def save_custom_type(piece: TypeOr[AbstractPiece] | None) -> dict | None:
     if piece is None:
         return None
     piece, piece_type = (piece, type(piece)) if isinstance(piece, Piece) else (None, piece)
@@ -360,7 +362,7 @@ def save_custom_type(piece: type[Piece] | Piece | None) -> dict | None:
     }.items() if v}
 
 
-def load_custom_type(data: dict | None, name: str) -> type[Piece] | None:
+def load_custom_type(data: dict | None, name: str) -> type[AbstractPiece] | None:
     if not data:
         return None
     base_strings = data.get('cls', ())
@@ -389,7 +391,7 @@ def load_custom_type(data: dict | None, name: str) -> type[Piece] | None:
     def init(self, board, **kwargs):
         bases[0].__init__(
             self, board,
-            load_movement(getattr(self, 'movement_data', None), board, board.custom_pieces),
+            load_movement(board, getattr(self, 'movement_data', None), board.custom_pieces),
             **kwargs
         )
 
@@ -429,22 +431,22 @@ def save_move(move: Move | frozenset | None) -> dict | str | None:
     }.items() if v}
 
 
-def load_move(data: dict | str | None, board: Board, from_dict: dict | None) -> Move | frozenset | None:
+def load_move(board: Board, data: dict | str | None, from_dict: dict | None) -> Move | frozenset | None:
     if not data:
         return None
     if data == UNSET_STRING:
         return Unset
     pos_from = fra(data['from']) if 'from' in data else None
     pos_to = fra(data['to']) if 'to' in data else None
-    piece = load_piece(data.get('piece'), board, from_dict)
+    piece = load_piece(board, data.get('piece'), from_dict)
     if not piece:
         piece = NoPiece(board, pos=pos_to or pos_from)
     elif not piece.board_pos:
         piece.board_pos = pos_to or pos_from
-    capture = load_piece(data.get('captured'), board, from_dict)
+    capture = load_piece(board, data.get('captured'), from_dict)
     if capture and not capture.board_pos:
         capture.board_pos = pos_to
-    swapped = load_piece(data.get('swapped'), board, from_dict)
+    swapped = load_piece(board, data.get('swapped'), from_dict)
     if swapped and not swapped.board_pos:
         swapped.board_pos = pos_from
     return Move(
@@ -455,8 +457,8 @@ def load_move(data: dict | str | None, board: Board, from_dict: dict | None) -> 
         captured_piece=capture,
         swapped_piece=swapped,
         placed_piece=load_piece_type(data.get('drop'), from_dict),
-        promotion=load_piece(data.get('promotion'), board, from_dict),
-        chained_move=load_move(data.get('chain'), board, from_dict),
+        promotion=load_piece(board, data.get('promotion'), from_dict),
+        chained_move=load_move(board, data.get('chain'), from_dict),
         is_edit=data.get('edit', 0),
         tag=data.get('tag', None),
     )

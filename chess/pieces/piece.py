@@ -16,18 +16,21 @@ if TYPE_CHECKING:
     from chess.board import Board
 
 
-def piece_repr(cls: type[Piece]) -> str:
+def piece_repr(cls: type[AbstractPiece]) -> str:
     return f"<{'custom' if cls.is_custom() else 'class'} '{cls.type_str()}'>"
 
 
-def piece_str(cls: type[Piece]) -> str:
+def piece_str(cls: type[AbstractPiece]) -> str:
     return cls.name
 
 
-class Piece(Sprite, metaclass=FormatOverride, repr_method=piece_repr, str_method=piece_str):
+class PieceMeta(FormatOverride):
+    def __new__(mcs, name, bases, namespace):
+        return super().__new__(mcs, name, bases, namespace, repr_method=piece_repr, str_method=piece_str)
+
+
+class AbstractPiece(object, metaclass=PieceMeta):
     name = '(Piece)'
-    file_name = 'none'
-    asset_folder = 'util'
     type_data = None
     group_data = None
 
@@ -35,29 +38,17 @@ class Piece(Sprite, metaclass=FormatOverride, repr_method=piece_repr, str_method
         self,
         board: Board,
         movement: BaseMovement | None = None,
-        pos: Position | None = None,
+        board_pos: Position | None = None,
         side: Side | None = None,
         **kwargs
     ):
         self.board = board
         self.movement = movement
-        self.board_pos = pos
+        self.board_pos = board_pos
         self.side = Side.NEUTRAL if isinstance(self, Neutral) else side if side is not None else Side.NONE
         self.promoted_from = None
-        self.flipped_horizontally = False
-        self.flipped_vertically = False
         self.should_hide = None
         self.is_hidden = None
-        self.texture_folder = self.asset_folder
-        self.texture_side = self.side
-        self.texture_name = self.file_name
-        super().__init__(
-            normalize(self.texture_path()),
-            flipped_horizontally=self.flipped_horizontally,
-            flipped_vertically=self.flipped_vertically,
-        )
-        if self.board_pos is not None:
-            self.position = self.board.get_screen_position(self.board_pos)
 
     def moves(self, theoretical: bool = False):
         if self.movement:
@@ -89,27 +80,22 @@ class Piece(Sprite, metaclass=FormatOverride, repr_method=piece_repr, str_method
     def __deepcopy__(self, memo):
         return self.__copy__()
 
-    def of(self, side: Side) -> Piece:
+    def of(self, side: Side) -> AbstractPiece:
         clone = type(self)(
             board=self.board,
-            pos=self.board_pos,
+            board_pos=self.board_pos,
             side=side if not isinstance(self, Neutral) else None,
         )
         clone.movement = copy(self.movement)
         clone.promoted_from = self.promoted_from
-        clone.scale = self.scale
-        clone.should_hide = self.should_hide
-        clone.is_hidden = self.is_hidden
         return clone
 
-    def on(self, pos: Position | None) -> Piece:
+    def on(self, board_pos: Position | None) -> AbstractPiece:
         clone = copy(self)
-        clone.board_pos = pos
-        if pos is not None:
-            clone.position = self.board.get_screen_position(pos)
+        clone.board_pos = board_pos
         return clone
 
-    def matches(self, other: Piece) -> bool:
+    def matches(self, other: AbstractPiece) -> bool:
         return (
             type(self) is type(other)
             and self.side == other.side
@@ -120,7 +106,7 @@ class Piece(Sprite, metaclass=FormatOverride, repr_method=piece_repr, str_method
             )
         )
 
-    def friendly_of(self, what: Piece):
+    def friendly_of(self, what: AbstractPiece):
         if not what:
             return False
         if what == self:
@@ -135,10 +121,10 @@ class Piece(Sprite, metaclass=FormatOverride, repr_method=piece_repr, str_method
             return isinstance(self, (Double, Enemy))
         return True
 
-    def friendly_to(self, what: Piece):
+    def friendly_to(self, what: AbstractPiece):
         return what and what.friendly_of(self)
 
-    def blocked_by(self, what: Piece):
+    def blocked_by(self, what: AbstractPiece):
         if not what:
             return False
         if what == self:
@@ -155,10 +141,10 @@ class Piece(Sprite, metaclass=FormatOverride, repr_method=piece_repr, str_method
             return isinstance(self, Enemy)
         return False
 
-    def blocks(self, what: Piece):
+    def blocks(self, what: AbstractPiece):
         return what and what.blocked_by(self)
 
-    def captures(self, what: Piece):
+    def captures(self, what: AbstractPiece):
         if not what:
             return False
         if isinstance(what, Immune):
@@ -173,10 +159,10 @@ class Piece(Sprite, metaclass=FormatOverride, repr_method=piece_repr, str_method
             return not isinstance(self, Enemy)
         return True
 
-    def captured_by(self, what: Piece):
+    def captured_by(self, what: AbstractPiece):
         return what and what.captures(self)
 
-    def skips(self, what: Piece):
+    def skips(self, what: AbstractPiece):
         if not what:
             return False
         if not issubclass(type(what), Empty):
@@ -191,7 +177,7 @@ class Piece(Sprite, metaclass=FormatOverride, repr_method=piece_repr, str_method
             return isinstance(self, (Double, Enemy))
         return True
 
-    def skipped_by(self, what: Piece):
+    def skipped_by(self, what: AbstractPiece):
         return what and what.skips(self)
 
     @classmethod
@@ -214,6 +200,53 @@ class Piece(Sprite, metaclass=FormatOverride, repr_method=piece_repr, str_method
     @classmethod
     def group_str(cls) -> str | None:
         return cls.group_data
+
+
+class Piece(AbstractPiece):
+    file_name = 'none'
+    asset_folder = 'util'
+
+    def __init__(
+        self,
+        board: Board,
+        movement: BaseMovement | None = None,
+        board_pos: Position | None = None,
+        side: Side | None = None,
+        **kwargs
+    ):
+        super().__init__(
+            board=board,
+            movement=movement,
+            board_pos=board_pos,
+            side=side,
+            **kwargs
+        )
+        self.flipped_horizontally = False
+        self.flipped_vertically = False
+        self.texture_folder = self.asset_folder
+        self.texture_name = self.file_name
+        self.texture_side = Side.NEUTRAL if isinstance(self, Neutral) else side if side is not None else Side.NONE
+        self.sprite = Sprite(
+            normalize(self.texture_path()),
+            flipped_horizontally=self.flipped_horizontally,
+            flipped_vertically=self.flipped_vertically,
+        )
+        if self.board_pos is not None:
+            self.sprite.position = self.board.get_screen_position(self.board_pos)
+
+    def of(self, side: Side) -> AbstractPiece:
+        clone = super().of(side)
+        if isinstance(clone, Piece):
+            clone.sprite.scale = self.sprite.scale
+        clone.should_hide = self.should_hide
+        clone.is_hidden = self.is_hidden
+        return clone
+
+    def on(self, board_pos: Position | None) -> AbstractPiece:
+        clone = super().on(board_pos)
+        if board_pos is not None and isinstance(clone, Piece):
+            clone.sprite.position = self.board.get_screen_position(board_pos)
+        return clone
 
     def texture_path(self, base_dir: str = 'assets') -> str:
         path = join(self.texture_folder, self.texture_side.file_prefix() + self.texture_name + '.png')
@@ -239,7 +272,7 @@ class Piece(Sprite, metaclass=FormatOverride, repr_method=piece_repr, str_method
         self.texture_folder = asset_folder or self.texture_folder
         self.texture_side = side or self.texture_side
         self.texture_name = file_name or self.texture_name
-        texture_path =  normalize(self.texture_path())
+        texture_path = normalize(self.texture_path())
         if flipped_horizontally is None:
             flipped_horizontally = self.flipped_horizontally
         else:
@@ -248,15 +281,15 @@ class Piece(Sprite, metaclass=FormatOverride, repr_method=piece_repr, str_method
             flipped_vertically = self.flipped_vertically
         else:
             self.flipped_vertically = flipped_vertically
-        if self.texture.name != texture_path:
-            color = self.color
+        if self.sprite.texture.name != texture_path:
+            color = self.sprite.color
             new_texture = load_texture(
                 texture_path,
                 flipped_horizontally=flipped_horizontally,
                 flipped_vertically=flipped_vertically,
             )
-            self.texture = new_texture
-            self.color = color
+            self.sprite.texture = new_texture
+            self.sprite.color = color
 
     def set_color(self, color: Color, force_color: bool = False):
         if not self.name:
@@ -267,6 +300,6 @@ class Piece(Sprite, metaclass=FormatOverride, repr_method=piece_repr, str_method
                 side = Side.WHITE  # make piece white so that it can be colored
             if max(color) == min(color):  # if color is grayscale
                 side = self.side  # make piece match the side
-        self.color = color
+        self.sprite.color = color
         if side != self.texture_side:  # if side was defined and does not match the current texture
             self.reload(side=side)

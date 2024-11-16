@@ -121,6 +121,7 @@ def pluralize(number: int | str, singular: str | None = None, plural: str | None
 
 
 T = TypeVar('T')
+TypeOr: TypeAlias = type[T] | T
 Unpacked: TypeAlias = Sequence[T] | T
 StringIndex: TypeAlias = Mapping[str, T]
 IntIndex: TypeAlias = Sequence[T] | Mapping[int, T]

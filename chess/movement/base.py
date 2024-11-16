@@ -9,7 +9,7 @@ if TYPE_CHECKING:
     from chess.board import Board
     from chess.movement.move import Move
     from chess.movement.util import Position
-    from chess.pieces.piece import Piece
+    from chess.pieces.piece import AbstractPiece as Piece
 
 
 class BaseMovement(object):
