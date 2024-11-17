@@ -31,7 +31,7 @@ from chess.debug import debug_info, save_piece_data, save_piece_sets, save_piece
 from chess.movement.base import BaseMovement
 from chess.movement.move import Move
 from chess.movement.types import AutoCaptureMovement, AutoRangedAutoCaptureRiderMovement
-from chess.movement.types import CastlingMovement, CastlingPartnerMovement
+from chess.movement.types import CastlingMovement, CastlingPartnerMovement, ChangingMovement
 from chess.movement.types import CloneMovement, DropMovement, ProbabilisticMovement
 from chess.movement.types import is_active
 from chess.movement.util import Position, GenericPosition, ANY, LAST, NONE
@@ -205,10 +205,8 @@ class Board(Window):
         self.chain_moves = {Side.WHITE: {}, Side.BLACK: {}}  # dictionary of moves chained from a certain move (from/to)
         self.chain_start = None  # move that started the current chain (if any)
         self.theoretical_moves = {Side.WHITE: {}, Side.BLACK: {}}  # dictionary of theoretical moves from any square
-        self.threats = {Side.WHITE: {}, Side.BLACK: {}}  # dictionary of threats to royal pieces
+        self.threats = {}  # inverted version of the above dictionary that only stores positions
         self.moves_queried = {Side.WHITE: False, Side.BLACK: False}  # whether moves have been queried for each side
-        self.theoretical_moves_queried = {Side.WHITE: False, Side.BLACK: False}  # same for theoretical moves
-        self.threats_queried = {Side.WHITE: False, Side.BLACK: False}  # same for threats
         self.display_moves = {Side.WHITE: False, Side.BLACK: False}  # whether to display moves for each side
         self.display_theoretical_moves = {Side.WHITE: False, Side.BLACK: False}  # same for theoretical moves
         self.theoretical_move_markers = True  # whether to display theoretical moves (overrides above)
@@ -727,6 +725,7 @@ class Board(Window):
                 self.pieces[row][col].sprite.scale = self.square_size / self.pieces[row][col].sprite.texture.width
                 self.piece_sprite_list.append(self.pieces[row][col].sprite)
 
+        self.clear_theoretical_moves()
         self.unload_end_data()
         self.load_pieces()
         self.load_check()
@@ -1311,6 +1310,7 @@ class Board(Window):
                         self.try_promotion(self.move_history[-1])
         else:
             if not with_history and not self.edit_mode:
+                self.clear_theoretical_moves()
                 self.unload_end_data()
                 self.load_pieces()
                 self.load_check()
@@ -1392,6 +1392,7 @@ class Board(Window):
                 self.pieces[row][col].sprite.scale = self.square_size / self.pieces[row][col].sprite.texture.width
                 self.piece_sprite_list.append(self.pieces[row][col].sprite)
 
+        self.clear_theoretical_moves()
         self.unload_end_data()
         self.load_pieces()
         self.load_check()
@@ -1853,29 +1854,26 @@ class Board(Window):
         side: Side,
         conditions: set | None = None
     ) -> tuple[str, int, int | str]:
-        piece_type = piece if isinstance(piece, type) else type(piece)
-        royal_types = self.royal_types.setdefault(side, {})
-        if piece_type in royal_types:
-            return royal_types[piece_type]
-        royal_types[piece_type] = '', 0, 0
-        if conditions is not None and not conditions:
-            return royal_types[piece_type]
         if conditions is None:
             conditions = {'check', 'checkmate', 'capture'}
-        else:
-            conditions = {'check', 'checkmate', 'capture'}.intersection(conditions)
+        conditions = {'check', 'checkmate', 'capture'}.intersection(conditions)
+        if not conditions:
+            return '', 0, 0
+        piece_type = piece if isinstance(piece, type) else type(piece)
+        royal_types = self.royal_types.setdefault(side, {}).setdefault(piece_type, {})
         opponent = side.opponent()
         end_rules = self.end_rules[opponent]
         if not end_rules:
-            return royal_types[piece_type]
+            return '', 0, 0
         for condition in end_rules:
             invert, keyword = (True, condition[1:]) if condition[0:1] == pch['not'] else (False, condition)
             if keyword in conditions:
+                if keyword in royal_types:
+                    return royal_types[keyword]
                 for group, value in end_rules.get(condition, {}).items():
                     if self.fits(group, piece):
-                        royal_types[piece_type] = group, (-1 if invert else 1), sign(value)
-                        return royal_types[piece_type]
-        return royal_types[piece_type]
+                        return royal_types.setdefault(keyword, (group, (-1 if invert else 1), value))
+        return '', 0, 0
 
     def in_area(self, area: str, pos: GenericPosition, of: Side = Side.NONE, last: list[GenericPosition] = ()) -> bool:
         if area == ANY:  # all squares on the board, guaranteed to be True
@@ -2030,7 +2028,7 @@ class Board(Window):
         piece_loss.difference_update(piece_gain)
         return piece_loss
 
-    def load_check(self, side: Side | None = None, reload: bool = True):
+    def load_check(self, side: Side | None = None):
         # Can any of the side's royal pieces be captured by the opponent,
         # and are any of the side's anti-royal pieces safe from captures?
         # When side is not specified, checks for the side that moves now.
@@ -2041,8 +2039,7 @@ class Board(Window):
         if self.edit_mode:
             return
         opponent = side.opponent()
-        if reload:
-            self.load_threats(side)
+        self.load_theoretical_moves(opponent)
         threat_dict = self.threats.get(opponent, {})
         if not threat_dict:
             return
@@ -2090,8 +2087,7 @@ class Board(Window):
             group = royal_group(royal)
             if group not in safe_royal_groups and group not in safe_anti_royal_groups:
                 continue
-            threats = threat_dict.get(royal_pos, ())
-            for piece_pos in threats:
+            for piece_pos in threat_dict.get(royal_pos, ()):
                 piece = self.get_piece(piece_pos)
                 if isinstance(piece.movement, ProbabilisticMovement):
                     continue
@@ -2102,11 +2098,6 @@ class Board(Window):
                 for move in moves:
                     chained_move = move
                     while chained_move:
-                        if chained_move.promotion:
-                            piece = chained_move.promotion
-                            if isinstance(piece.movement, AutoCaptureMovement):
-                                chained_move = copy(chained_move)
-                                piece.movement.generate_captures(chained_move, piece)
                         if not chained_move.swapped_piece:
                             if chained_move.pos_to == royal_pos:
                                 if group in safe_royal_groups:
@@ -2148,47 +2139,6 @@ class Board(Window):
         self.check_groups.extend(safe_anti_royal_groups)
         if self.check_groups:
             self.check_side = side
-
-    def load_threats(
-        self,
-        side: Side | None = None,
-        move: Move | None = None,
-        add_list: list[Position] | None = None,
-        remove_list: list[Position] | None = None,
-    ):
-        # Find all pieces that, after any one move made by the given side, can threaten any of the side's (anti-)royals.
-        # Or at least, that's what this function should do. Right now it just checks where the side's opponent can move.
-        # When side is not specified, checks for the side that moves now. If add/remove args specified as well, updates.
-        # If the move argument is specified, builds add/remove lists from the move argument, and updates based on those.
-        if self.game_over and self.win_side is not Side.NONE:
-            return
-        if side is None:
-            side = self.turn_side
-        opponent = side.opponent()
-        if move is not None:
-            add_list = [move.pos_to]
-            remove_list = [move.pos_from]
-            if move.captured_piece:
-                remove_list.append(move.captured_piece.board_pos)
-        if add_list is None:
-            add_list = self.movable_pieces[opponent][:]
-        else:
-            add_list = (self.get_piece(pos) for pos in add_list)
-        if remove_list is None:
-            remove_list = self.movable_pieces[opponent][:]
-        else:
-            remove_list = (self.get_piece(pos) for pos in remove_list)
-        self.threats.setdefault(opponent, {})
-        for piece in set(remove_list):
-            for threats_to in self.threats[opponent].values():
-                threats_to.discard(piece.board_pos)
-        self.ply_simulation += 1
-        for piece in set(add_list):
-            for move in piece.moves(theoretical=True):
-                pos_from, pos_to = move.pos_from, move.pos_to or move.pos_from
-                self.threats[opponent].setdefault(pos_to, set()).add(pos_from)
-        self.ply_simulation -= 1
-        self.threats_queried[side] = True
 
     def load_end_conditions(self, side: Side | None = None):
         # Did the side meet any of its win conditions?
@@ -2296,36 +2246,36 @@ class Board(Window):
                     self.win_side, self.end_group, self.end_value = loss_side.opponent(), loss_group, loss_value
                 return
 
-    def load_theoretical_moves(self, theoretical_moves_for: Side | None = None) -> None:
-        movable_pieces = {side: self.movable_pieces[side].copy() for side in self.movable_pieces}
-        end_data = deepcopy(self.end_data)
-        opponent = self.turn_side.opponent()
-        if not self.theoretical_move_markers:
-            theoretical_moves_for = Side.NONE
-        if theoretical_moves_for is None:
-            self.end_data = deepcopy(end_data)
-            self.load_end_conditions()
-            if self.game_over and self.win_side == self.turn_side:
-                theoretical_moves_for = Side.NONE
-            else:
-                theoretical_moves_for = opponent
-        if theoretical_moves_for == Side.ANY:
-            turn_sides = [self.turn_side, opponent]
-        elif theoretical_moves_for == Side.NONE:
-            turn_sides = []
-        else:
-            turn_sides = [theoretical_moves_for]
-        self.display_theoretical_moves = {side: False for side in self.display_theoretical_moves}
-        for turn_side in turn_sides:
-            self.display_theoretical_moves[turn_side] = True
-            if self.theoretical_moves_queried.get(turn_side, False):
+    def load_theoretical_moves(self, side: Side | None = None) -> None:
+        if side not in self.theoretical_moves:
+            self.theoretical_moves[side] = {}
+        if side not in self.threats:
+            self.threats[side] = {}
+        for piece in self.movable_pieces[side][:]:
+            if piece.board_pos in self.theoretical_moves[side] and not isinstance(piece.movement, ChangingMovement):
                 continue
-            self.theoretical_moves[turn_side] = {}
-            for piece in movable_pieces[turn_side]:
-                for move in piece.moves(theoretical=True):
-                    pos_from, pos_to = move.pos_from, move.pos_to or move.pos_from
-                    self.theoretical_moves[turn_side].setdefault(pos_from, {}).setdefault(pos_to, []).append(move)
-            self.theoretical_moves_queried[turn_side] = True
+            for move in piece.moves(theoretical=True):
+                pos_from, pos_to = move.pos_from, move.pos_to or move.pos_from
+                self.theoretical_moves[side].setdefault(pos_from, {}).setdefault(pos_to, []).append(move)
+                self.threats[side].setdefault(pos_to, set()).add(pos_from)
+
+    def clear_theoretical_moves(self, side: Side | None = None, poss: Unpacked[Position] | None = None) -> None:
+        if side is None:
+            sides = [Side.WHITE, Side.BLACK]
+        else:
+            sides = [side]
+        for side in sides:
+            if side not in self.theoretical_moves:
+                continue
+            threats = self.threats.get(side, {})
+            if poss is None:
+                poss = list(self.theoretical_moves[side])
+            elif isinstance(poss, tuple):
+                poss = [poss]
+            for pos in poss:
+                moves = self.theoretical_moves[side].pop(pos, ())
+                for pos_to in moves:
+                    threats.pop(pos_to, None)
 
     def load_moves(
         self,
@@ -2350,8 +2300,6 @@ class Board(Window):
             self.end_condition = None
             self.win_side = Side.NONE
             self.moves_queried = {side: False for side in self.moves_queried}
-            self.theoretical_moves_queried = {side: False for side in self.theoretical_moves_queried}
-            self.threats_queried = {side: False for side in self.threats_queried}
             self.load_end_conditions()
             if self.game_over and self.win_side is not Side.NONE:
                 losing_side = self.win_side.opponent()
@@ -2373,7 +2321,6 @@ class Board(Window):
         royal_ep_targets = deepcopy(self.royal_ep_targets)
         royal_ep_markers = deepcopy(self.royal_ep_markers)
         end_data = deepcopy(self.end_data)
-        threats = deepcopy(self.threats)
         opponent = self.turn_side.opponent()
         check_side = self.check_side
         check_sides = {check_side: True if check_side and check_side is not Side.NONE else False}
@@ -2763,7 +2710,7 @@ class Board(Window):
                             ):
                                 self.load_pieces()
                                 if move.piece.board_pos in self.royal_markers[turn_side]:
-                                    self.load_check(turn_side, False)
+                                    self.load_check(turn_side)
                                     if self.check_side == turn_side:
                                         legal = False
                             looks = {by for rule in move_rules for next_r in rule['next'] for by in next_r['by']}
@@ -2889,7 +2836,7 @@ class Board(Window):
                                     ):
                                         self.load_pieces()
                                         if move.piece.board_pos in self.royal_markers[turn_side]:
-                                            self.load_check(turn_side, False)
+                                            self.load_check(turn_side)
                                             if self.check_side == turn_side:
                                                 legal = False
                                 if legal:
@@ -2898,7 +2845,7 @@ class Board(Window):
                             move_rules = next_future_rules
                             if legal:
                                 self.load_pieces()
-                                self.load_check(turn_side, False)
+                                self.load_check(turn_side)
                                 if self.check_side == turn_side:
                                     legal = False
                             if legal:
@@ -2974,9 +2921,7 @@ class Board(Window):
                                 if move_rules and not move_fits:
                                     old_check_side = self.check_side
                                     self.load_pieces()
-                                    for chained_move in move_chain:
-                                        self.load_threats(turn_side, move=chained_move)
-                                    self.load_check(opponent, False)
+                                    self.load_check(opponent)
                                     check_requirements = [1 if self.check_side == opponent else -1]
                                     if self.fits_any(move_rules, 'check', check_requirements, fit=False):
                                         move_fits = True
@@ -3009,19 +2954,37 @@ class Board(Window):
                             for chained in move_chain[::-1]:
                                 self.undo(chained, False)
                                 self.revert_auto_capture_markers(chained)
+                            self.load_theoretical_moves(turn_side)
                             self.en_passant_targets = deepcopy(en_passant_targets)
                             self.en_passant_markers = deepcopy(en_passant_markers)
                             self.royal_ep_targets = deepcopy(royal_ep_targets)
                             self.royal_ep_markers = deepcopy(royal_ep_markers)
                             self.end_data = deepcopy(end_data)
-                            self.threats = deepcopy(threats)
                             self.check_side = check_side
                 if self.moves[turn_side]:
                     self.moves_queried[turn_side] = True
                     break
             else:
                 self.moves_queried[turn_side] = True
-        self.load_theoretical_moves(theoretical_moves_for)
+        if not self.theoretical_move_markers:
+            theoretical_moves_for = Side.NONE
+        if theoretical_moves_for is None:
+            self.end_data = deepcopy(end_data)
+            self.load_end_conditions()
+            if self.game_over and self.win_side == self.turn_side:
+                theoretical_moves_for = Side.NONE
+            else:
+                theoretical_moves_for = opponent
+        if theoretical_moves_for == Side.ANY:
+            turn_sides = [self.turn_side, opponent]
+        elif theoretical_moves_for == Side.NONE:
+            turn_sides = []
+        else:
+            turn_sides = [theoretical_moves_for]
+        self.display_theoretical_moves = {side: False for side in self.display_theoretical_moves}
+        for turn_side in turn_sides:
+            self.display_theoretical_moves[turn_side] = True
+            self.load_theoretical_moves(turn_side)
         self.movable_pieces = movable_pieces
         self.piece_counts = piece_counts
         self.area_groups = area_groups
@@ -3039,7 +3002,6 @@ class Board(Window):
         self.royal_ep_markers = royal_ep_markers
         self.check_side = check_side
         self.end_data = end_data
-        self.threats = threats
 
     def unique_moves(self, side: Side | None = None) -> dict[Side, dict[Position, list[Move]]]:
         if side is None:
@@ -3828,6 +3790,83 @@ class Board(Window):
         self.auto_moves = True
         return finished
 
+    def try_auto(self, update: bool = True) -> bool:
+        moves = self.moves[self.turn_side]
+        only_move = None
+        for pos_from in moves:
+            if isinstance(pos_from, str):
+                if only_move is None:
+                    only_move = pos_from
+                    continue
+                else:
+                    only_move = False
+                    break
+            for pos_to in moves[pos_from]:
+                for move in moves[pos_from][pos_to]:
+                    if not move:
+                        continue
+                    if only_move is None:
+                        only_move = move
+                    elif isinstance(only_move, str):
+                        only_move = False
+                        break
+                    elif not only_move.matches(move):
+                        only_move = False
+                        break
+                if only_move is False:
+                    break
+            if only_move is False:
+                break
+        if isinstance(only_move, Move):
+            self.auto(only_move, update)
+            return True
+        return False
+
+    def auto(self, move: Move, update: bool = True) -> None:
+        self.update_auto_capture_markers(move, True)
+        self.update_auto_captures(move, self.turn_side.opponent())
+        chained_move = move
+        while chained_move:
+            self.move(chained_move, update)
+            self.update_auto_capture_markers(chained_move)
+            chained_move.set(piece=copy(chained_move.piece))
+            if self.promotion_piece is None:
+                self.log(f"Move: {chained_move}")
+            chained_move = chained_move.chained_move
+        if self.chain_start is None:
+            self.chain_start = move
+            self.move_history.append(deepcopy(self.chain_start))
+        else:
+            last_move = self.chain_start
+            while last_move.chained_move:
+                last_move = last_move.chained_move
+            last_move.chained_move = move
+        self.unload_end_data()
+        self.load_pieces()
+        if move.chained_move is Unset and not self.promotion_piece:
+            self.load_moves()
+            if update:
+                self.show_moves(False)
+                self.draw(0)
+                self.select_piece(move.pos_to)
+            else:
+                self.selected_square = move.pos_to
+            if self.auto_moves and (
+                self.board_config['fast_moves'] or self.board_config['fast_chain']
+            ) and not self.game_over:
+                self.try_auto(update)
+        else:
+            self.chain_start = None
+            if self.promotion_piece is None:
+                self.shift_ply(+1)
+                self.load_pieces()
+                self.load_check()
+                self.update_end_data(self.move_history[-1])
+                self.load_moves()
+                self.reload_end_data()
+                self.compare_history()
+            self.advance_turn()
+
     def move(self, move: Move, update: bool = True) -> None:
         self.skip_caption_update = True
         self.deselect_piece()
@@ -3875,6 +3914,16 @@ class Board(Window):
                 if capture_type in self.drops[move.piece.side]:
                     # droppable piece was captured, add it to the roster of captured pieces
                     self.captured_pieces[move.piece.side].append(capture_type)
+        for piece, pos in (
+            (move.piece, move.pos_from),
+            (move.swapped_piece, move.pos_to),
+            (move.captured_piece, None)
+        ):
+            if piece is None:
+                continue
+            if pos is None:
+                pos = piece.board_pos
+            self.clear_theoretical_moves(piece.side, pos)
         if (
             move.is_edit != 1 and move.movement_type and move.piece.movement
             and not issubclass(move.movement_type or type, (CloneMovement, DropMovement))
@@ -3893,83 +3942,6 @@ class Board(Window):
             self.update_en_passant_markers(move)
             # as well as for relay moves
             self.update_relay_markers(move)
-
-    def auto(self, move: Move, update: bool = True) -> None:
-        self.update_auto_capture_markers(move, True)
-        self.update_auto_captures(move, self.turn_side.opponent())
-        chained_move = move
-        while chained_move:
-            self.move(chained_move, update)
-            self.update_auto_capture_markers(chained_move)
-            chained_move.set(piece=copy(chained_move.piece))
-            if self.promotion_piece is None:
-                self.log(f"Move: {chained_move}")
-            chained_move = chained_move.chained_move
-        if self.chain_start is None:
-            self.chain_start = move
-            self.move_history.append(deepcopy(self.chain_start))
-        else:
-            last_move = self.chain_start
-            while last_move.chained_move:
-                last_move = last_move.chained_move
-            last_move.chained_move = move
-        self.unload_end_data()
-        self.load_pieces()
-        if move.chained_move is Unset and not self.promotion_piece:
-            self.load_moves()
-            if update:
-                self.show_moves(False)
-                self.draw(0)
-                self.select_piece(move.pos_to)
-            else:
-                self.selected_square = move.pos_to
-            if self.auto_moves and (
-                self.board_config['fast_moves'] or self.board_config['fast_chain']
-            ) and not self.game_over:
-                self.try_auto(update)
-        else:
-            self.chain_start = None
-            if self.promotion_piece is None:
-                self.shift_ply(+1)
-                self.load_pieces()
-                self.load_check()
-                self.update_end_data(self.move_history[-1])
-                self.load_moves()
-                self.reload_end_data()
-                self.compare_history()
-            self.advance_turn()
-
-    def try_auto(self, update: bool = True) -> bool:
-        moves = self.moves[self.turn_side]
-        only_move = None
-        for pos_from in moves:
-            if isinstance(pos_from, str):
-                if only_move is None:
-                    only_move = pos_from
-                    continue
-                else:
-                    only_move = False
-                    break
-            for pos_to in moves[pos_from]:
-                for move in moves[pos_from][pos_to]:
-                    if not move:
-                        continue
-                    if only_move is None:
-                        only_move = move
-                    elif isinstance(only_move, str):
-                        only_move = False
-                        break
-                    elif not only_move.matches(move):
-                        only_move = False
-                        break
-                if only_move is False:
-                    break
-            if only_move is False:
-                break
-        if isinstance(only_move, Move):
-            self.auto(only_move, update)
-            return True
-        return False
 
     def undo(self, move: Move, update: bool = True) -> None:
         abs_from, abs_to = self.get_absolute(move.pos_from), self.get_absolute(move.pos_to)
@@ -4035,6 +4007,10 @@ class Board(Window):
                 if update and isinstance(old_piece, Piece):
                     self.update_piece(old_piece)  # update the piece to reflect current piece hiding mode
                     self.piece_sprite_list.append(old_piece.sprite)
+        for pos in (move.pos_from, move.pos_to):
+            if pos is None:
+                continue
+            self.clear_theoretical_moves(self.get_side(pos), pos)
         if (
             move.is_edit != 1 and move.movement_type and move.piece.movement
             and not issubclass(move.movement_type or type, (CloneMovement, DropMovement))
@@ -4368,11 +4344,11 @@ class Board(Window):
             self.update_caption()  # updating the caption to reflect the edit that was just made
             return  # let's not advance the turn while editing the board to hopefully make things easier for everyone
         self.update_status()
+        self.draw(0)
         if self.auto_moves and not self.game_over:
             if self.board_config['fast_sequences'] or self.board_config['fast_turn_pass']:
                 if 'pass' in self.moves[self.turn_side] and len(self.moves[self.turn_side]) == 1:
                     self.pass_turn()
-            self.draw(0)
             if self.board_config['fast_moves']:
                 self.try_auto()
             elif self.board_config['fast_sequences'] and self.turn_side == self.get_turn_side(-1):
@@ -5359,6 +5335,7 @@ class Board(Window):
             self.update_highlight(old_highlight)
 
         if update and self.game_loaded:
+            self.clear_theoretical_moves()
             self.unload_end_data()
             self.load_pieces()
             self.load_check()

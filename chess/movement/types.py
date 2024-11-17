@@ -375,10 +375,11 @@ class RangedCaptureRiderMovement(RangedMovement, RiderMovement):
 
 
 class AutoCaptureMovement(BaseMovement):
+    # NB: The auto-capture implementation assumes that all pieces that utilize it can never be blocked by another piece.
+    # This is true for the only army that utilizes this movement type, but it may not work correctly in other scenarios.
+
     default_mark = 't'
 
-    # Note: The auto-capture implementation assumes that none of the pieces that utilize it can be blocked mid-movement.
-    # This is true for the only army that utilizes this movement type, but it may not work correctly in other scenarios.
     def generate_captures(self, move: Move, piece: Piece) -> Move:
         if not move.is_edit:
             captures = {}
@@ -596,6 +597,12 @@ class FreeMovement(AbsoluteMovement):
         return self.board, self.stay
 
 
+class ChangingMovement(BaseMovement):
+    # ABC for movements that may change their behavior based on certain conditions. Does not return any moves by itself.
+    # NB: Movement classes that return all theoretical moves, regardless of conditions, needn't inherit from this class.
+    pass
+
+
 class BaseMultiMovement(BaseMovement):
     def __init__(self, board: Board, movements: Unpacked[BaseMovement] | None = None):
         super().__init__(board)
@@ -628,7 +635,7 @@ class BaseMultiMovement(BaseMovement):
         return self.board, unpack(self.movements)
 
 
-class IndexMovement(BaseMultiMovement):
+class IndexMovement(BaseMultiMovement, ChangingMovement):
     def __init__(
         self,
         board: Board,
