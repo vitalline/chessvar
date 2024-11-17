@@ -763,10 +763,12 @@ class RepeatBentMovement(BaseMultiMovement):
                             stop = True
                     move.movement_type = type(self)
                     if not stop or self.loop:
+                        dir_indexes = self.dir_indexes[:]  # oh hey, remember when this very thing was in RiderMovement?
                         if self.start_index <= index and self.skip_count <= true_index:
                             yield copy(move)
                         else:
                             yield copy(move).set(is_legal=False).unmark('n').mark('a')
+                        self.dir_indexes = dir_indexes  # yeah, that's still a thing.
                     if stop:
                         break
                 if (
@@ -775,7 +777,9 @@ class RepeatBentMovement(BaseMultiMovement):
                     and (theoretical or not self.board.get_piece(move.pos_to).side)
                 ):
                     for bent_move in self.moves(move.pos_to, piece, theoretical, true_index + 1):
+                        dir_indexes = self.dir_indexes[:]  # i'm not even going to bother explaining this one
                         yield copy(bent_move).set(pos_from=pos_from)
+                        self.dir_indexes = dir_indexes  # you can probably guess what this does by now, moving on
         else:
             return ()
 
