@@ -858,12 +858,21 @@ class SpinMovement(RepeatBentMovement):
             for i in range(len(self.movement_cycle)):
                 if self.reverse >= 0:
                     self.movements = (self.movement_cycle[i:] + self.movement_cycle[:i])[::+1]
-                    yield from super().moves(pos_from, piece, theoretical, index)
+                    for move in super().moves(pos_from, piece, theoretical, index):
+                        movements = self.movements[:]
+                        yield move
+                        self.movements = movements
                 if self.reverse != 0:
                     self.movements = (self.movement_cycle[i:] + self.movement_cycle[:i])[::-1]
-                    yield from super().moves(pos_from, piece, theoretical, index)
+                    for move in super().moves(pos_from, piece, theoretical, index):
+                        movements = self.movements[:]
+                        yield move
+                        self.movements = movements
         else:
-            yield from super().moves(pos_from, piece, theoretical, index)
+            for move in super().moves(pos_from, piece, theoretical, index):
+                movements = self.movements[:]
+                yield move
+                self.movements = movements
 
     def __copy_args__(self):
         return self.board, unpack(self.movement_cycle), self.reverse, self.start_index, self.step_count, self.loop
