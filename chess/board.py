@@ -2264,18 +2264,22 @@ class Board(Window):
             sides = [Side.WHITE, Side.BLACK]
         else:
             sides = [side]
+        clear_all = poss is None
+        if isinstance(poss, tuple):
+            poss = [poss]
         for side in sides:
             if side not in self.theoretical_moves:
                 continue
             threats = self.threats.get(side, {})
-            if poss is None:
+            if clear_all:
                 poss = list(self.theoretical_moves[side])
-            elif isinstance(poss, tuple):
-                poss = [poss]
             for pos in poss:
                 moves = self.theoretical_moves[side].pop(pos, ())
                 for pos_to in moves:
-                    threats.pop(pos_to, None)
+                    if pos_to in threats:
+                        threats[pos_to].discard(pos)
+                        if not threats[pos_to]:
+                            del threats[pos_to]
 
     def load_moves(
         self,
