@@ -42,6 +42,8 @@ DEFAULT_CONFIG = {
         'log_prefix': 1,
         'status_prefix': 1,
         'status_string': True,
+        'timestamp': '',
+        'timestamp_format': '%Y-%m-%d %H:%M:%S',
         'verbose': True,
     },
     "SAVE": {
@@ -73,7 +75,7 @@ class Config(dict):
 
     def load(self, path: str) -> None:
         self.clear()
-        self.base_config = ConfigParser()
+        self.base_config = ConfigParser(interpolation=None)
         self.base_config.read_dict(DEFAULT_CONFIG)
         if isfile(path):
             self.base_config.read(path)
@@ -87,7 +89,7 @@ class Config(dict):
                         self[item] = self.base_config.getint(section, item)
                 except ValueError:
                     self[item] = DEFAULT_CONFIG[section][item]
-                if item in {'hide_moves', 'log_pass', 'status_string', 'verbose'}:
+                if item in {'hide_moves', 'log_pass', 'status_string', 'timestamp', 'verbose'}:
                     try:
                         self[item] = self.base_config.getboolean(section, item)
                     except ValueError:

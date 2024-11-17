@@ -62,7 +62,15 @@ LOGS:  Logging and status settings
     - True:  show prefix, current game state, and selected move/piece
     - False:  only show prefix, or variant name if no prefix is used
     - None:  only show variant name
+  - timestamp (False):  whether to include timestamps in logs
+    - True:  always include
+    - False:  never include
+    - None:  only include if the log is verbose
+  - timestamp_format ("%Y-%m-%d %H:%M:%S"):  format for timestamps
   - verbose (True):  whether to use verbose console output by default
+    - True:  show all messages
+    - False:  only show important messages
+    - None:  suppress all messages
 
 SAVE:  Saving and loading settings
   - save_path ("save"):  default directory to store save files in

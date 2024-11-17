@@ -3,6 +3,7 @@ from __future__ import annotations
 from collections import defaultdict
 from collections.abc import Collection, Sequence
 from copy import copy, deepcopy
+from datetime import datetime
 from itertools import chain, product, zip_longest
 from json import loads, JSONDecodeError
 from math import ceil, floor, isqrt
@@ -6516,16 +6517,9 @@ class Board(Window):
                     self.log("Info: Loading cancelled", False)
                 self.activate()
             else:  # Log
-                if modifiers & key.MOD_ACCEL and modifiers & key.MOD_SHIFT:  # Toggle verbose
-                    if self.verbose is None:
-                        # The granular log and status settings should really be changeable with hotkeys. Will add later.
-                        pass
-                    else:
-                        self.verbose = not self.verbose
-                        self.log(f"Info: Verbose output: {'ON' if self.verbose else 'OFF'}", False)
-                elif modifiers & key.MOD_ACCEL:  # Save log
+                if modifiers & key.MOD_ACCEL:  # Save log
                     self.save_log()
-                elif modifiers & key.MOD_SHIFT:  # Save verbose log
+                if modifiers & key.MOD_SHIFT:  # Save verbose log
                     self.save_verbose_log()
         if symbol == key.D:  # Debug
             if modifiers & key.MOD_ACCEL:  # Save debug log
@@ -6534,6 +6528,13 @@ class Board(Window):
                 self.print_debug_log()
             if modifiers & key.MOD_ALT:  # Save debug listings
                 self.save_debug_data()
+        if symbol == key.V:
+            if modifiers & key.MOD_ALT and not modifiers & key.MOD_SHIFT:  # Toggle verbose console output
+                self.verbose = not self.verbose
+                self.log(f"Info: Verbose logging {'enabled' if self.verbose else 'disabled'}", False)
+            elif modifiers & key.MOD_ALT:  # Toggle console output
+                self.verbose = False if self.verbose is None else None
+                self.log(f"Info: Logging {'enabled' if self.verbose is not None else 'disabled'}", False)
         if symbol == key.SLASH:  # (?) Random
             if self.edit_mode:
                 return
@@ -6645,13 +6646,21 @@ class Board(Window):
                         prefix = f"(Ply {self.ply_count}) {prefix}"
         if prefix:
             string = f"[{prefix}] {string}"
-        self.verbose_data.append(string)
+        timestamp = ''
+        if self.board_config['timestamp'] is not False:
+            timestamp = f"[{datetime.now().strftime(self.board_config['timestamp_format'])}] "
+        timestamp_string = f"{timestamp}{string}"
+        log_string = timestamp_string if self.board_config['timestamp'] is True else string
+        verbose_string = timestamp_string if self.board_config['timestamp'] is not False else string
+        self.verbose_data.append(verbose_string)
         if important:
-            self.log_data.append(string)
+            self.log_data.append(log_string)
         if self.verbose is None:
             return
-        if important or self.verbose:
-            print(string)
+        if self.verbose:
+            print(verbose_string)
+        elif important:
+            print(log_string)
 
     def log_info(self, info: list[str | None] | None = None):
         if not self.board_config['log_info']:

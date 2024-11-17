@@ -69,12 +69,13 @@ Shift + G: cycle graphics mode forward (+1)
 Ctrl + I: print game information (if applicable)
 Shift + I: toggle intermediate move markers
 Alt + I: toggle labels between board sections
+Alt + V: toggle verbose console output
+... + Shift: toggle all console output
 
 Save/load hotkeys:
 Ctrl + C: save current configuration
 Ctrl + L: save game log
 Shift + L: save verbose game log
-Ctrl + Shift + L: toggle verbose console output
 Alt + L: load saved game state
 ... + Shift: also reload move history
 Ctrl + D: save debug log
