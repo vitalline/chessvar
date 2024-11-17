@@ -171,6 +171,7 @@ class Board(Window):
         self.movable_pieces = {Side.WHITE: [], Side.BLACK: []}  # pieces that can be moved by each side
         self.area_groups = {Side.WHITE: {}, Side.BLACK: {}}  # groups of pieces that have reached certain positions
         self.royal_groups = {Side.WHITE: {}, Side.BLACK: {}}  # groups that are currently considered royal
+        self.royal_types = {Side.WHITE: {}, Side.BLACK: {}}  # types of pieces that are known to be considered royal
         self.royal_pieces = {Side.WHITE: [], Side.BLACK: []}  # these have to stay on the board and should be protected
         self.royal_markers = {Side.WHITE: set(), Side.BLACK: set()}  # squares where the side's royal pieces are
         self.anti_royal_pieces = {Side.WHITE: [], Side.BLACK: []}  # these need to remain attacked at all times
@@ -204,8 +205,10 @@ class Board(Window):
         self.chain_moves = {Side.WHITE: {}, Side.BLACK: {}}  # dictionary of moves chained from a certain move (from/to)
         self.chain_start = None  # move that started the current chain (if any)
         self.theoretical_moves = {Side.WHITE: {}, Side.BLACK: {}}  # dictionary of theoretical moves from any square
+        self.threats = {Side.WHITE: {}, Side.BLACK: {}}  # dictionary of threats to royal pieces
         self.moves_queried = {Side.WHITE: False, Side.BLACK: False}  # whether moves have been queried for each side
         self.theoretical_moves_queried = {Side.WHITE: False, Side.BLACK: False}  # same for theoretical moves
+        self.threats_queried = {Side.WHITE: False, Side.BLACK: False}  # same for threats
         self.display_moves = {Side.WHITE: False, Side.BLACK: False}  # whether to display moves for each side
         self.display_theoretical_moves = {Side.WHITE: False, Side.BLACK: False}  # same for theoretical moves
         self.theoretical_move_markers = True  # whether to display theoretical moves (overrides above)
@@ -1673,13 +1676,14 @@ class Board(Window):
         self.turn_order = start_turns + loop_turns
 
     def reset_end_rules(self) -> None:
+        self.royal_types = {}
         self.end_rules = {}
         self.end_data = {}
         for side in [Side.WHITE, Side.BLACK] + ([Side.NONE] if Side.NONE in self.custom_end_rules else []):
             self.end_rules[side] = {}
             if side != side.NONE:
                 self.end_data[side] = {}
-            if side != Side.NONE:
+                self.royal_types[side] = {}
                 side_rules = [self.custom_end_rules.get(side, {}), self.custom_end_rules]
             else:
                 side_rules = [self.custom_end_rules.get(side, {})]
@@ -1849,27 +1853,29 @@ class Board(Window):
         side: Side,
         conditions: set | None = None
     ) -> tuple[str, int, int | str]:
+        piece_type = piece if isinstance(piece, type) else type(piece)
+        royal_types = self.royal_types.setdefault(side, {})
+        if piece_type in royal_types:
+            return royal_types[piece_type]
+        royal_types[piece_type] = '', 0, 0
         if conditions is not None and not conditions:
-            return '', 0, 0
+            return royal_types[piece_type]
         if conditions is None:
             conditions = {'check', 'checkmate', 'capture'}
+        else:
+            conditions = {'check', 'checkmate', 'capture'}.intersection(conditions)
         opponent = side.opponent()
         end_rules = self.end_rules[opponent]
         if not end_rules:
-            return '', 0, 0
+            return royal_types[piece_type]
         for condition in end_rules:
             invert, keyword = (True, condition[1:]) if condition[0:1] == pch['not'] else (False, condition)
-            if keyword not in conditions:
-                continue
-            if keyword in {'check'}:
+            if keyword in conditions:
                 for group, value in end_rules.get(condition, {}).items():
                     if self.fits(group, piece):
-                        return group, (-1 if invert else 1), sign(value)
-            elif keyword in {'checkmate', 'capture'}:
-                for group, value in end_rules.get(condition, {}).items():
-                    if self.fits(group, piece):
-                        return group, (-1 if invert else 1), value
-        return '', 0, 0
+                        royal_types[piece_type] = group, (-1 if invert else 1), sign(value)
+                        return royal_types[piece_type]
+        return royal_types[piece_type]
 
     def in_area(self, area: str, pos: GenericPosition, of: Side = Side.NONE, last: list[GenericPosition] = ()) -> bool:
         if area == ANY:  # all squares on the board, guaranteed to be True
@@ -2024,8 +2030,9 @@ class Board(Window):
         piece_loss.difference_update(piece_gain)
         return piece_loss
 
-    def load_check(self, side: Side | None = None):
-        # Can any of the side's royal pieces be captured by the opponent?
+    def load_check(self, side: Side | None = None, reload: bool = True):
+        # Can any of the side's royal pieces be captured by the opponent,
+        # and are any of the side's anti-royal pieces safe from captures?
         # When side is not specified, checks for the side that moves now.
         if side is None:
             side = self.turn_side
@@ -2033,15 +2040,21 @@ class Board(Window):
         self.check_groups = set()
         if self.edit_mode:
             return
-        if not set(ext(('check', 'checkmate'))).intersection(self.end_rules[side.opponent()]):
+        opponent = side.opponent()
+        if reload:
+            self.load_threats(side)
+        threat_dict = self.threats.get(opponent, {})
+        if not threat_dict:
+            return
+        if not set(ext(('check', 'checkmate'))).intersection(self.end_rules[opponent]):
             return
         if (
-            not set(ext(('check',))).intersection(self.end_rules[side.opponent()])
+            not set(ext(('check',))).intersection(self.end_rules[opponent])
             and not (self.royal_pieces[side] or self.anti_royal_pieces[side])
         ):
             return
-        end_rules = self.end_rules[side.opponent()]
-        end_data = self.end_data.get(side.opponent())
+        end_rules = self.end_rules[opponent]
+        end_data = self.end_data.get(opponent)
         royal_groups = [
             group for group in self.royal_groups[side]
             if group in end_rules.get('check', {})
@@ -2070,29 +2083,23 @@ class Board(Window):
         anti_royal_checks = {}
         royal_group = lambda of: self.get_royal_group(of, side, {'check', 'checkmate'})
         insert = lambda group, pos: anti_royal_checks.setdefault(group, set()).add(pos)
+        threat_moves = {}
         self.ply_simulation += 1
-        for piece in self.movable_pieces[side.opponent()]:
-            if isinstance(piece.movement, ProbabilisticMovement):
+        for royal_pos in self.royal_markers[side]:
+            royal = self.get_piece(royal_pos)
+            group = royal_group(royal)
+            if group not in safe_royal_groups and group not in safe_anti_royal_groups:
                 continue
-            for base_move in piece.moves():
-                last = 0, piece
-                for i, move in enumerate(self.get_promotions(base_move.set(piece=piece))):
-                    is_new = not i
-                    j = 0
-                    chained_move = move
-                    while chained_move and not is_new:
-                        j += 1
-                        if chained_move.is_edit:
-                            is_new = False
-                            break
-                        if chained_move.promotion:
-                            p = chained_move.promotion
-                            if j >= last[0] and not p.matches(last[1]) and isinstance(p.movement, AutoCaptureMovement):
-                                last = j, p  # normally it's only necessary to analyze moves without promotion. however,
-                                is_new = True  # an auto-capturing piece can, in theory, capture one of the royal pieces
-                        chained_move = chained_move.chained_move # if we see one, we need to check the move chain for it
-                    if not is_new:  # but otherwise we can skip analyzing alternate promotions if we've done one of them
-                        break
+            threats = threat_dict.get(royal_pos, ())
+            for piece_pos in threats:
+                piece = self.get_piece(piece_pos)
+                if isinstance(piece.movement, ProbabilisticMovement):
+                    continue
+                if piece.board_pos in threat_moves:
+                    moves_checked, moves = True, threat_moves[piece.board_pos]
+                else:
+                    moves_checked, moves = False, piece.moves()
+                for move in moves:
                     chained_move = move
                     while chained_move:
                         if chained_move.promotion:
@@ -2101,12 +2108,10 @@ class Board(Window):
                                 chained_move = copy(chained_move)
                                 piece.movement.generate_captures(chained_move, piece)
                         if not chained_move.swapped_piece:
-                            if chained_move.pos_to in self.royal_markers[side]:
-                                group = royal_group(self.get_piece(chained_move.pos_to))
+                            if chained_move.pos_to == royal_pos:
                                 if group in safe_royal_groups:
                                     safe_royal_groups.discard(group)
-                            elif chained_move.pos_to in self.anti_royal_markers[side]:
-                                group = royal_group(self.get_piece(chained_move.pos_to))
+                            elif chained_move.pos_to == royal_pos:
                                 if group in safe_anti_royal_groups:
                                     insert(group, chained_move.pos_to)
                                     if len(anti_royal_checks[group]) == len(self.royal_groups[side].get(group, ())):
@@ -2114,21 +2119,25 @@ class Board(Window):
                             if not safe_royal_groups and not safe_anti_royal_groups:
                                 break
                         if chained_move.captured_piece and chained_move.captured_piece.side == side:
-                            if chained_move.captured_piece.board_pos in self.royal_markers[side]:
-                                group = royal_group(chained_move.captured_piece)
-                                if group in safe_royal_groups:
-                                    safe_royal_groups.discard(group)
+                            if chained_move.captured_piece.board_pos == royal_pos:
+                                pass  # already checked, see above
+                            elif chained_move.captured_piece.board_pos in self.royal_markers[side]:
+                                capture = royal_group(chained_move.captured_piece)
+                                if capture in safe_royal_groups:
+                                    safe_royal_groups.discard(capture)
                             elif chained_move.captured_piece.board_pos in self.anti_royal_markers[side]:
-                                group = royal_group(chained_move.captured_piece)
-                                if group in safe_anti_royal_groups:
-                                    insert(group, chained_move.captured_piece.board_pos)
-                                    if len(anti_royal_checks[group]) == len(self.royal_groups[side].get(group, ())):
-                                        safe_anti_royal_groups.discard(group)
+                                capture = royal_group(chained_move.captured_piece)
+                                if capture in safe_anti_royal_groups:
+                                    insert(capture, chained_move.captured_piece.board_pos)
+                                    if len(anti_royal_checks[capture]) == len(self.royal_groups[side].get(capture, ())):
+                                        safe_anti_royal_groups.discard(capture)
                             if not safe_royal_groups and not safe_anti_royal_groups:
                                 break
                         chained_move = chained_move.chained_move
                     if not safe_royal_groups and not safe_anti_royal_groups:
                         break
+                    if not moves_checked:
+                        threat_moves.setdefault(piece.board_pos, []).append(move)
                 if not safe_royal_groups and not safe_anti_royal_groups:
                     break
             if not safe_royal_groups and not safe_anti_royal_groups:
@@ -2139,6 +2148,47 @@ class Board(Window):
         self.check_groups.extend(safe_anti_royal_groups)
         if self.check_groups:
             self.check_side = side
+
+    def load_threats(
+        self,
+        side: Side | None = None,
+        move: Move | None = None,
+        add_list: list[Position] | None = None,
+        remove_list: list[Position] | None = None,
+    ):
+        # Find all pieces that, after any one move made by the given side, can threaten any of the side's (anti-)royals.
+        # Or at least, that's what this function should do. Right now it just checks where the side's opponent can move.
+        # When side is not specified, checks for the side that moves now. If add/remove args specified as well, updates.
+        # If the move argument is specified, builds add/remove lists from the move argument, and updates based on those.
+        if self.game_over and self.win_side is not Side.NONE:
+            return
+        if side is None:
+            side = self.turn_side
+        opponent = side.opponent()
+        if move is not None:
+            add_list = [move.pos_to]
+            remove_list = [move.pos_from]
+            if move.captured_piece:
+                remove_list.append(move.captured_piece.board_pos)
+        if add_list is None:
+            add_list = self.movable_pieces[opponent][:]
+        else:
+            add_list = (self.get_piece(pos) for pos in add_list)
+        if remove_list is None:
+            remove_list = self.movable_pieces[opponent][:]
+        else:
+            remove_list = (self.get_piece(pos) for pos in remove_list)
+        self.threats.setdefault(opponent, {})
+        for piece in set(remove_list):
+            for threats_to in self.threats[opponent].values():
+                threats_to.discard(piece.board_pos)
+        self.ply_simulation += 1
+        for piece in set(add_list):
+            for move in piece.moves(theoretical=True):
+                pos_from, pos_to = move.pos_from, move.pos_to or move.pos_from
+                self.threats[opponent].setdefault(pos_to, set()).add(pos_from)
+        self.ply_simulation -= 1
+        self.threats_queried[side] = True
 
     def load_end_conditions(self, side: Side | None = None):
         # Did the side meet any of its win conditions?
@@ -2246,6 +2296,37 @@ class Board(Window):
                     self.win_side, self.end_group, self.end_value = loss_side.opponent(), loss_group, loss_value
                 return
 
+    def load_theoretical_moves(self, theoretical_moves_for: Side | None = None) -> None:
+        movable_pieces = {side: self.movable_pieces[side].copy() for side in self.movable_pieces}
+        end_data = deepcopy(self.end_data)
+        opponent = self.turn_side.opponent()
+        if not self.theoretical_move_markers:
+            theoretical_moves_for = Side.NONE
+        if theoretical_moves_for is None:
+            self.end_data = deepcopy(end_data)
+            self.load_end_conditions()
+            if self.game_over and self.win_side == self.turn_side:
+                theoretical_moves_for = Side.NONE
+            else:
+                theoretical_moves_for = opponent
+        if theoretical_moves_for == Side.ANY:
+            turn_sides = [self.turn_side, opponent]
+        elif theoretical_moves_for == Side.NONE:
+            turn_sides = []
+        else:
+            turn_sides = [theoretical_moves_for]
+        self.display_theoretical_moves = {side: False for side in self.display_theoretical_moves}
+        for turn_side in turn_sides:
+            self.display_theoretical_moves[turn_side] = True
+            if self.theoretical_moves_queried.get(turn_side, False):
+                continue
+            self.theoretical_moves[turn_side] = {}
+            for piece in movable_pieces[turn_side]:
+                for move in piece.moves(theoretical=True):
+                    pos_from, pos_to = move.pos_from, move.pos_to or move.pos_from
+                    self.theoretical_moves[turn_side].setdefault(pos_from, {}).setdefault(pos_to, []).append(move)
+            self.theoretical_moves_queried[turn_side] = True
+
     def load_moves(
         self,
         force_reload: bool = True,
@@ -2270,6 +2351,7 @@ class Board(Window):
             self.win_side = Side.NONE
             self.moves_queried = {side: False for side in self.moves_queried}
             self.theoretical_moves_queried = {side: False for side in self.theoretical_moves_queried}
+            self.threats_queried = {side: False for side in self.threats_queried}
             self.load_end_conditions()
             if self.game_over and self.win_side is not Side.NONE:
                 losing_side = self.win_side.opponent()
@@ -2291,6 +2373,7 @@ class Board(Window):
         royal_ep_targets = deepcopy(self.royal_ep_targets)
         royal_ep_markers = deepcopy(self.royal_ep_markers)
         end_data = deepcopy(self.end_data)
+        threats = deepcopy(self.threats)
         opponent = self.turn_side.opponent()
         check_side = self.check_side
         check_sides = {check_side: True if check_side and check_side is not Side.NONE else False}
@@ -2313,6 +2396,7 @@ class Board(Window):
         else:
             turn_sides = [moves_for]
         self.display_moves = {side: False for side in self.display_moves}
+        self.display_theoretical_moves = {side: False for side in self.display_theoretical_moves}
         for turn_side in turn_sides:
             self.display_moves[turn_side] = True
             if self.moves_queried.get(turn_side, False):
@@ -2679,7 +2763,7 @@ class Board(Window):
                             ):
                                 self.load_pieces()
                                 if move.piece.board_pos in self.royal_markers[turn_side]:
-                                    self.load_check(turn_side)
+                                    self.load_check(turn_side, False)
                                     if self.check_side == turn_side:
                                         legal = False
                             looks = {by for rule in move_rules for next_r in rule['next'] for by in next_r['by']}
@@ -2805,15 +2889,16 @@ class Board(Window):
                                     ):
                                         self.load_pieces()
                                         if move.piece.board_pos in self.royal_markers[turn_side]:
-                                            self.load_check(turn_side)
+                                            self.load_check(turn_side, False)
                                             if self.check_side == turn_side:
                                                 legal = False
                                 if legal:
                                     chained_move = chained_move.chained_move
                                     j += 1
+                            move_rules = next_future_rules
                             if legal:
                                 self.load_pieces()
-                                self.load_check(turn_side)
+                                self.load_check(turn_side, False)
                                 if self.check_side == turn_side:
                                     legal = False
                             if legal:
@@ -2889,7 +2974,9 @@ class Board(Window):
                                 if move_rules and not move_fits:
                                     old_check_side = self.check_side
                                     self.load_pieces()
-                                    self.load_check(opponent)
+                                    for chained_move in move_chain:
+                                        self.load_threats(turn_side, move=chained_move)
+                                    self.load_check(opponent, False)
                                     check_requirements = [1 if self.check_side == opponent else -1]
                                     if self.fits_any(move_rules, 'check', check_requirements, fit=False):
                                         move_fits = True
@@ -2927,38 +3014,14 @@ class Board(Window):
                             self.royal_ep_targets = deepcopy(royal_ep_targets)
                             self.royal_ep_markers = deepcopy(royal_ep_markers)
                             self.end_data = deepcopy(end_data)
+                            self.threats = deepcopy(threats)
                             self.check_side = check_side
                 if self.moves[turn_side]:
                     self.moves_queried[turn_side] = True
                     break
             else:
                 self.moves_queried[turn_side] = True
-        if not self.theoretical_move_markers:
-            theoretical_moves_for = Side.NONE
-        if theoretical_moves_for is None:
-            self.end_data = deepcopy(end_data)
-            self.load_end_conditions()
-            if self.game_over and self.win_side == self.turn_side:
-                theoretical_moves_for = Side.NONE
-            else:
-                theoretical_moves_for = opponent
-        if theoretical_moves_for == Side.ANY:
-            turn_sides = [self.turn_side, opponent]
-        elif theoretical_moves_for == Side.NONE:
-            turn_sides = []
-        else:
-            turn_sides = [theoretical_moves_for]
-        self.display_theoretical_moves = {side: False for side in self.display_theoretical_moves}
-        for turn_side in turn_sides:
-            self.display_theoretical_moves[turn_side] = True
-            if self.theoretical_moves_queried.get(turn_side, False):
-                continue
-            self.theoretical_moves[turn_side] = {}
-            for piece in movable_pieces[turn_side]:
-                for move in piece.moves(theoretical=True):
-                    pos_from, pos_to = move.pos_from, move.pos_to or move.pos_from
-                    self.theoretical_moves[turn_side].setdefault(pos_from, {}).setdefault(pos_to, []).append(move)
-            self.theoretical_moves_queried[turn_side] = True
+        self.load_theoretical_moves(theoretical_moves_for)
         self.movable_pieces = movable_pieces
         self.piece_counts = piece_counts
         self.area_groups = area_groups
@@ -2976,6 +3039,7 @@ class Board(Window):
         self.royal_ep_markers = royal_ep_markers
         self.check_side = check_side
         self.end_data = end_data
+        self.threats = threats
 
     def unique_moves(self, side: Side | None = None) -> dict[Side, dict[Position, list[Move]]]:
         if side is None:
@@ -4304,14 +4368,15 @@ class Board(Window):
             self.update_caption()  # updating the caption to reflect the edit that was just made
             return  # let's not advance the turn while editing the board to hopefully make things easier for everyone
         self.update_status()
-        if self.board_config['fast_turn_pass'] and not self.game_over:
-            if 'pass' in self.moves[self.turn_side] and len(self.moves[self.turn_side]) == 1:
-                if self.auto_moves:
+        if self.auto_moves and not self.game_over:
+            if self.board_config['fast_sequences'] or self.board_config['fast_turn_pass']:
+                if 'pass' in self.moves[self.turn_side] and len(self.moves[self.turn_side]) == 1:
                     self.pass_turn()
-                return
-        self.draw(0)
-        if self.auto_moves and self.board_config['fast_moves'] and not self.game_over:
-            self.try_auto()
+            self.draw(0)
+            if self.board_config['fast_moves']:
+                self.try_auto()
+            elif self.board_config['fast_sequences'] and self.turn_side == self.get_turn_side(-1):
+                self.try_auto()
 
     def get_status_string(self) -> str | None:
         if self.game_over:
@@ -6403,7 +6468,7 @@ class Board(Window):
                     self.show_moves()
         if symbol == key.K and not self.hide_move_markers:  # Move marker mode
             selected_square = self.selected_square
-            if modifiers & key.MOD_ALT and modifiers & key.MOD_SHIFT:  # Move type markers
+            if modifiers & key.MOD_ALT and not modifiers & key.MOD_SHIFT:  # Move type markers
                 self.move_type_markers = not self.move_type_markers
                 self.log(f"Info: Using {'typed' if self.move_type_markers else 'regular'} move markers", False)
             elif modifiers & key.MOD_ALT:  # Theoretical move markers

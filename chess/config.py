@@ -32,6 +32,7 @@ DEFAULT_CONFIG = {
         'fast_chain': True,
         'fast_drops': False,
         'fast_promotion': True,
+        'fast_sequences': True,
         'fast_turn_pass': True,
     },
     "LOGS": {
