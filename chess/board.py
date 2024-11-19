@@ -2520,6 +2520,8 @@ class Board(Window):
                                 )
                                 for rule in history_rules:
                                     rule['match'].setdefault('piece', set()).add(type(promotion))
+                            else:
+                                history_rules = self.filter(history_rules, 'new', last=('match', 'piece'))
                             last_history_rules += history_rules
                             last_history_move = last_history_move.chained_move
                         i -= 1
@@ -2693,6 +2695,8 @@ class Board(Window):
                                             break
                                 if limit_hits[p_type]:
                                     continue
+                            else:
+                                move_rules = self.filter(move_rules, 'new', last=('match', 'piece'))
                             if not move_rules:
                                 continue
                             self.update_auto_capture_markers(move, True)
@@ -2797,33 +2801,36 @@ class Board(Window):
                                         )
                                         for rule in future_rules:
                                             rule['match'].setdefault('type', set()).update(future_types)
-                                    if future_rules and new_piece:
-                                        np = new_piece
-                                        p_type = type(np) if isinstance(np, AbstractPiece) else np
-                                        future_rules = self.filter(
-                                            future_rules, ('next', 'new'), [p_type], ('match', 'piece')
-                                        )
-                                        for rule in future_rules:
-                                            rule['match'].setdefault('piece', set()).add(p_type)
-                                        if not future_rules:
-                                            legal = False
-                                        else:
-                                            self.load_pieces()  # update piece counts
-                                            if p_type not in new_limit_hits:
-                                                if p_type not in new_limit_groups:
-                                                    new_limit_groups[p_type] = [
-                                                        g for g in limits if self.fits(g, p_type)
-                                                    ]
-                                                new_limit_hits[p_type] = [
-                                                    self.piece_counts[turn_side].get(g, 0)
-                                                    for g in new_limit_groups[p_type]
-                                                ]
-                                            for g in new_limit_groups[p_type]:
-                                                if self.piece_counts[turn_side].get(g, 0) >= limits[g]:
-                                                    new_limit_hits[p_type] = True
-                                                    break
-                                            if new_limit_hits[p_type]:
+                                    if future_rules:
+                                        if new_piece:
+                                            np = new_piece
+                                            p_type = type(np) if isinstance(np, AbstractPiece) else np
+                                            future_rules = self.filter(
+                                                future_rules, ('next', 'new'), [p_type], ('match', 'piece')
+                                            )
+                                            for rule in future_rules:
+                                                rule['match'].setdefault('piece', set()).add(p_type)
+                                            if not future_rules:
                                                 legal = False
+                                            else:
+                                                self.load_pieces()  # update piece counts
+                                                if p_type not in new_limit_hits:
+                                                    if p_type not in new_limit_groups:
+                                                        new_limit_groups[p_type] = [
+                                                            g for g in limits if self.fits(g, p_type)
+                                                        ]
+                                                    new_limit_hits[p_type] = [
+                                                        self.piece_counts[turn_side].get(g, 0)
+                                                        for g in new_limit_groups[p_type]
+                                                    ]
+                                                for g in new_limit_groups[p_type]:
+                                                    if self.piece_counts[turn_side].get(g, 0) >= limits[g]:
+                                                        new_limit_hits[p_type] = True
+                                                        break
+                                                if new_limit_hits[p_type]:
+                                                    legal = False
+                                        else:
+                                            future_rules = self.filter(future_rules, 'new', last=('match', 'piece'))
                                     next_future_rules += future_rules
                                 if legal:
                                     self.move(chained_move, False)
