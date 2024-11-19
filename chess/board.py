@@ -3908,7 +3908,7 @@ class Board(Window):
             self.pieces[capture_pos[0]][capture_pos[1]] = NoPiece(self, board_pos=move.captured_piece.board_pos)
             if update and isinstance(self.pieces[capture_pos[0]][capture_pos[1]], Piece):
                 self.piece_sprite_list.append(self.pieces[capture_pos[0]][capture_pos[1]].sprite)
-        if update and isinstance(move.piece, Piece) is not None and move.pos_from is None:
+        if update and isinstance(move.piece, Piece) and move.pos_from is None:
             # piece was added to the board, update it and add it to the sprite list
             self.update_piece(move.piece)
             self.piece_sprite_list.append(move.piece.sprite)
@@ -3960,7 +3960,7 @@ class Board(Window):
             if update and isinstance(self.pieces[abs_to[0]][abs_to[1]], Piece) and move.pos_from != move.pos_to:
                 # piece was placed on a different square, empty that square
                 self.piece_sprite_list.remove(self.pieces[abs_to[0]][abs_to[1]].sprite)
-            if update and isinstance(move.piece, Piece) and move.pos_to is None or move.promotion is not None:
+            if update and isinstance(move.piece, Piece) and (move.pos_to is None or move.promotion is not None):
                 # existing piece was removed from the board (possibly promoted to a different piece type)
                 if not self.is_trickster_mode():  # reset_trickster_mode() does not reset removed pieces
                     move.piece.sprite.angle = 0   # so instead we have to do it manually as a workaround
