@@ -108,14 +108,14 @@ def save_piece_data(board: Board, file_path: str = None) -> str:
 
 
 def save_piece_sets(file_path: str = None) -> str:
-    file_path = file_path or get_file_name('debug_piece_sets', 'txt', ts_format='')
+    file_path = file_path or get_file_name('debug_piece_sets', 'log', ts_format='')
     with open(file_path, mode='w', encoding='utf-8') as fp:
         print_piece_sets(fp)
     return file_path
 
 
 def save_piece_types(file_path: str = None, side: Side = Side.WHITE) -> str:
-    file_path = file_path or get_file_name('debug_piece_types', 'txt', ts_format='')
+    file_path = file_path or get_file_name('debug_piece_types', 'log', ts_format='')
     with open(file_path, mode='w', encoding='utf-8') as fp:
         print_piece_types(fp, side)
     return file_path
