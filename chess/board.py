@@ -4776,6 +4776,7 @@ class Board(Window):
                 continue
             if promotion is None:
                 promotion_piece = piece.on(pos)
+                promotion = type(promotion)
             elif not promotion:
                 continue
             elif isinstance(promotion, AbstractPiece):
