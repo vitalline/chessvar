@@ -3705,11 +3705,11 @@ class Board(Window):
                 else:
                     self.log(f"Edit: {self.move_history[-1]}")
             elif next_move.movement_type == DropMovement:
+                self.move_history.append(next_move)
                 pos = next_move.pos_to
                 if not self.not_on_board(pos) and self.not_a_piece(pos):
                     self.try_drop(next_move)
                     if next_move.promotion is Unset:
-                        self.move_history.append(next_move)
                         finished = True
                         break
                     else:
