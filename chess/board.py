@@ -5302,18 +5302,26 @@ class Board(Window):
 
         if (
             self.game_loaded or self.board_width != default_board_width or self.board_height != default_board_height
-            or self.visual_board_width != default_board_width or self.visual_board_height != default_board_height
-            or self.notation_offset != (0, 0)
+            or self.border_cols or self.border_rows or self.notation_offset != (0, 0)
         ):
-            offset_string = ', '.join(f"{x:+}" if x else "0" for x in self.notation_offset)
-            if self.board_width == old_width and self.board_height == old_height:
-                self.log(f"Info: Changed notation offset to ({offset_string})")
-            elif self.notation_offset == old_offset:
+            if self.board_width != old_width or self.board_height != old_height:
                 self.log(f"Info: Changed board size to {self.board_width}x{self.board_height}")
-            else:
-                self.log(
-                    f"Info: Changed board size to {self.board_width}x{self.board_height}, with offset ({offset_string})"
-                )
+            if self.notation_offset != old_offset:
+                offset_string = ', '.join(f"{x:+}" if x else "0" for x in self.notation_offset)
+                self.log(f"Info: Changed notation offset to ({offset_string})")
+            if self.border_cols != old_cols:
+                if self.border_cols:
+                    s26 = lambda x: b26(x + (0 if x < 0 else 1))
+                    file_splits = list(f'{s26(x)}/{s26(x + 1)}' for x in self.border_cols)
+                    self.log(f"Info: Changed file borders to {', '.join(file_splits)}")
+                else:
+                    self.log("Info: Removed file borders")
+            if self.border_rows != old_rows:
+                if self.border_rows:
+                    rank_splits = list(f'{x}/{x + 1}' for x in self.border_rows)
+                    self.log(f"Info: Changed rank borders to {', '.join(rank_splits)}")
+                else:
+                    self.log("Info: Removed rank borders")
             self.update_sprites(
                 self.square_size, self.origin,
                 old_width, old_height,
@@ -5367,7 +5375,10 @@ class Board(Window):
         self.set_visible(False)
         self.set_size(round(max(width, min_width)), round(max(height, min_height)))
         square_size = min(self.width / (self.visual_board_width + 2), self.height / (self.visual_board_height + 2))
-        self.log(f"Info: Resized to {self.width}x{self.height} (Size: {round(square_size, 5)}px)")
+        if self.square_size == square_size:
+            self.log(f"Info: Resized to {self.width}x{self.height}")
+        else:
+            self.log(f"Info: Resized to {self.width}x{self.height} (Size: {round(square_size, 5)}px)")
         self.set_location(x - (self.width - old_width) // 2, y - (self.height - old_height) // 2)
         if not self.fullscreen:
             self.windowed_size = self.width, self.height
@@ -5760,7 +5771,7 @@ class Board(Window):
                 return
             pos = self.get_board_position((x, y))
             if not self.not_on_board(pos) and isinstance((piece := self.get_piece(pos)), NoPiece):
-                move = Move(pos_from=pos, pos_to=pos, movement_type=DropMovement, piece=piece, promotion=Unset)
+                move = Move(pos_from=None, pos_to=pos, movement_type=DropMovement, piece=piece, promotion=Unset)
                 self.try_drop(move)
                 if self.promotion_piece:
                     self.move_history.append(move)

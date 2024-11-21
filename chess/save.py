@@ -252,7 +252,7 @@ def load_piece(
     if data == UNSET_STRING:
         return Unset
     if isinstance(data, str):
-        return NoPiece(board, pos=fra(data))
+        return NoPiece(board, board_pos=fra(data))
     side = Side(data.get('side', 0))
     piece_type = load_piece_type(data.get('cls'), from_dict, last) or NoPiece
     piece = piece_type(
@@ -440,7 +440,7 @@ def load_move(board: Board, data: dict | str | None, from_dict: dict | None) -> 
     pos_to = fra(data['to']) if 'to' in data else None
     piece = load_piece(board, data.get('piece'), from_dict)
     if not piece:
-        piece = NoPiece(board, pos=pos_to or pos_from)
+        piece = NoPiece(board, board_pos=pos_to or pos_from)
     elif not piece.board_pos:
         piece.board_pos = pos_to or pos_from
     capture = load_piece(board, data.get('captured'), from_dict)

@@ -139,16 +139,16 @@ def debug_info(board: Board) -> list[str]:
         debug_log.append("Notation offset: None")
     debug_log.append("Borders:")
     if board.border_cols or board.border_rows:
-        file_splits = list(f'{s26(x)}/{s26(x + 1)}' for x in board.border_cols)
-        if file_splits:
-            debug_log.append(f"{pad:2}Files ({len(file_splits)}): {', '.join(file_splits)} {tuple(board.border_cols)}")
+        if board.border_cols:
+            file_splits = list(f'{s26(x)}/{s26(x + 1)}' for x in board.border_cols)
+            debug_log.append(f"{pad:2}File ({len(file_splits)}): {', '.join(file_splits)} {tuple(board.border_cols)}")
         else:
-            debug_log.append(f"{pad:2}Files (0): None")
-        rank_splits = list(f'{x}/{x + 1}' for x in board.border_rows)
+            debug_log.append(f"{pad:2}File (0): None")
         if board.border_rows:
-            debug_log.append(f"{pad:2}Ranks ({len(rank_splits)}): {', '.join(rank_splits)} {tuple(board.border_rows)}")
+            rank_splits = list(f'{x}/{x + 1}' for x in board.border_rows)
+            debug_log.append(f"{pad:2}Rank ({len(rank_splits)}): {', '.join(rank_splits)} {tuple(board.border_rows)}")
         else:
-            debug_log.append(f"{pad:2}Ranks (0): None")
+            debug_log.append(f"{pad:2}Rank (0): None")
     else:
         debug_log[-1] += " None"
     debug_log.append(f"Visual board size: {board.visual_board_width}x{board.visual_board_height}")

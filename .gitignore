@@ -8,7 +8,7 @@
 /venv/
 /*.bak/
 /**/auto_*.json
-/**/debug_*.txt
+/**/debug_*.log
 /**/debug_*.json
 /**/log_*.txt
 /**/log_*.json
