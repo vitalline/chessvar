@@ -2602,10 +2602,10 @@ class Board(Window):
                     for rule in piece_rules:
                         rule['match'].setdefault('pos', [])
                     piece_pos = piece.board_pos
+                    piece_rules = self.filter(piece_rules, 'from', [(turn_side, piece_pos)], ('match', 'pos'))
                     for rule in piece_rules:
                         rule['match'].setdefault('pos', []).append(piece_pos)
                         rule['match'].setdefault('from', []).append(piece_pos)
-                    piece_rules = self.filter(piece_rules, 'from', [(turn_side, piece_pos)], ('match', 'pos'))
                     if not piece_rules:
                         continue
                     if not self.chain_start and not self.moves[turn_side].get('pass'):
