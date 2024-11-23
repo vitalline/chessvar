@@ -333,10 +333,10 @@ def load_movement(board: Board, data: list | str | None, from_dict: dict | None)
     if data == UNSET_STRING:  # otherwise, we need to load the movement type and the rest of the arguments, so that we
         return Unset  # can create a new instance of the movement type with the arguments we just loaded. very simple.
     bases, data_copy = {}, data.copy()  # oh boy, here comes the hard part. we need to load the movement classes first
-    for i, base_string in enumerate(data):  # for every base class string or list that's at the start of the data list
+    for base_string in data:  # for every base class string or list that is located at the beginning of the data list,
         if base := load_movement_type(base_string):  # we need to load a movement class corresponding to the string or
             bases[base_string] = base  # list. but once we can't, we assume that all the movement classes have already
-            data_copy.pop(i)  # been loaded and that the rest are arguments. so we remove the leading entries from the
+            data_copy.pop(0)  # been loaded and that the rest are arguments. so we remove the leading entries from the
         else:  # argument list until we encounter something that is not a base entry. that's when we know we are done,
             break  # and we can move on to loading the arguments. the bases are stored in a dict for easy access later
     args = board, *[load_arg(arg) for arg in data_copy]  # we need to load the arguments alongside the board object...
