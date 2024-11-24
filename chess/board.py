@@ -2111,8 +2111,8 @@ class Board(Window):
                             if not safe_royal_groups and not safe_anti_royal_groups:
                                 break
                         if chained_move.captured_piece and chained_move.captured_piece.side == side:
-                            if chained_move.captured_piece.board_pos == royal_pos:
-                                pass  # already checked, see above
+                            if chained_move.captured_piece.board_pos == chained_move.pos_to:
+                                pass  # capture by displacement should be covered by the previous checks
                             elif chained_move.captured_piece.board_pos in self.royal_markers[side]:
                                 capture = royal_group(chained_move.captured_piece)
                                 if capture in safe_royal_groups:
