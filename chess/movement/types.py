@@ -484,7 +484,7 @@ class CastlingMovement(BaseMovement):
         return self_move.set(chained_move=other_move),
 
     def update(self, move: Move, piece: Piece):
-        if move.movement_type == type(self):
+        if issubclass(move.movement_type or type, type(self)):
             direction = piece.side.direction(self.direction)
             offset = sub(move.pos_to, move.pos_from)
             if offset == direction:
@@ -529,7 +529,7 @@ class EnPassantTargetRiderMovement(RiderMovement):
             yield move
 
     def update(self, move: Move, piece: Piece):
-        if move.movement_type == type(self):
+        if issubclass(move.movement_type or type, type(self)):
             for direction in self.directions:
                 direction = piece.side.direction(direction)
                 offset = sub(move.pos_to, move.pos_from)
