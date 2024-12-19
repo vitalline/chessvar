@@ -4625,7 +4625,7 @@ class Board(Window):
                     drop = drop(board=self, board_pos=move.piece.board_pos, side=self.turn_side)
                 move.set(promotion=drop, placed_piece=drop_type_list[0])
                 for i, piece in enumerate(self.captured_pieces[self.turn_side][::-1]):
-                    if piece == type(drop):
+                    if piece == move.placed_piece:
                         self.captured_pieces[self.turn_side].pop(-(i + 1))
                         break
                 self.replace(move.piece, move.promotion, update)
