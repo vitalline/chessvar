@@ -2088,7 +2088,13 @@ class Board(Window):
             group = royal_group(royal)
             if group not in safe_royal_groups and group not in safe_anti_royal_groups:
                 continue
-            for piece_pos in threat_dict.get(royal_pos, ()):
+            # we need to check for royal e.p. captures here as well to avoid castling through check
+            # but if the royal piece can be captured e.p. after a specific move, we need to check for that too
+            # therefore, checking both e.p. target dicts is necessary (albeit redundant for most cases)
+            marker_poss = [royal_pos]
+            for target_dict in self.en_passant_targets, self.royal_ep_targets:
+                marker_poss.extend(target_dict.get(side, {}).get(royal_pos, ()))
+            for piece_pos in chain.from_iterable(threat_dict.get(marker_pos, ()) for marker_pos in marker_poss):
                 piece = self.get_piece(piece_pos)
                 if isinstance(piece.movement, ProbabilisticMovement):
                     continue
