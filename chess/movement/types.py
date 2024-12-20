@@ -238,13 +238,13 @@ class HopperRiderMovement(CannonRiderMovement):
 
     def advance_direction(self, move: Move, direction: AnyDirection, pos_from: Position, piece: Piece) -> None:
         super().advance_direction(move, direction, pos_from, piece)
-        if self.data['jumped'] == 0:
+        if self.data['jump'] == 0:
             capture = self.board.get_piece(move.pos_to)
             if piece.captures(capture):
                 self.data['capture'] = capture
 
     def stop_condition(self, move: Move, direction: AnyDirection, piece: Piece, theoretical: bool = False) -> bool:
-        if self.data['jumped'] >= 0 and not theoretical:
+        if self.data['jump'] >= 0 and not theoretical:
             next_pos_to = self.transform(add(move.pos_from, mul(direction[:2], self.steps + 1)))
             if not (self.loop and move.pos_from == next_pos_to) and not self.board.not_a_piece(next_pos_to):
                 return True
@@ -1282,11 +1282,12 @@ class RelayMovement(BaseChoiceMovement):
                         if (piece.friendly_to(relay_piece) != self.check_enemy) and self.board.fits(value, relay_piece):
                             is_relayed = True
                             break
-            if not theoretical and is_relayed == invert:
+            is_legal = is_relayed != invert
+            if not theoretical and not is_legal:
                 continue
             for movement in movements:
                 for move in movement.moves(pos_from, piece, theoretical):
-                    yield copy(move) if not mark else copy(move).set(is_legal=is_relayed).unmark('n').mark(mark)
+                    yield copy(move) if not mark else copy(move).set(is_legal=is_legal).unmark('n').mark(mark)
 
     def __copy_args__(self):
         return (
@@ -1315,7 +1316,10 @@ class CoordinateMovement(BaseChoiceMovement):
             else ([FreeMovement(board)], repack(packed[0], list), [copy(x) for x in repack(packed[0], list)])
             for key, value in movements.items()
         }
-        super().__init__(board, {key: list(chain.from_iterable(value)) for key, value in movement_dict.items()})
+        super().__init__(board, {
+            key: list(chain.from_iterable(value)) if key else value
+            for key, value in movement_dict.items()
+        })
         self.movement_dict = movement_dict
         self.base_movements = self.movement_dict.get('', [])
 
@@ -1374,7 +1378,7 @@ class CoordinateMovement(BaseChoiceMovement):
             for move in movement.moves(pos_from, piece, theoretical):
                 if not theoretical:
                     move = copy(move).set(
-                        captures=self.coordinate_captures(move.pos_to, piece, theoretical)
+                        captured=self.coordinate_captures(move.pos_to, piece, theoretical)
                     ).unmark('n').mark('q')
                 yield move
 

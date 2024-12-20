@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from collections.abc import Collection
 from itertools import zip_longest
 from typing import TYPE_CHECKING
 
@@ -77,7 +78,7 @@ class Move(object):
         self.piece = piece or self.piece
         self.movement_type = movement_type or self.movement_type
         if captured is not None:
-            if not isinstance(captured, list):
+            if not isinstance(captured, Collection):
                 captured = [captured, *self.captured]
             self.captured = sorted(captured or [], key=lambda x: x.board_pos or ())
         self.swapped_piece = swapped_piece or self.swapped_piece
