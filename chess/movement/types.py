@@ -936,13 +936,19 @@ class StageMovement(BaseMultiMovement):
                 yield move
             return ()
         if theoretical:
-            yield from self.movements[index].moves(pos_from, piece, theoretical)
+            for movement in self.movements:
+                yield from movement.moves(pos_from, piece, theoretical)
         else:
-            for move in self.movements[index].moves(pos_from, piece, theoretical):
+            for move in chain([None], self.movements[index].moves(pos_from, piece, theoretical)):
+                if move is None:
+                    yield from self.moves(pos_from, piece, theoretical, index + 1)
+                    continue
                 self.board.update_move(move)
                 self.raise_pieces(move.captured)
+                next_move_exists = False
                 for next_move in self.moves(pos_from, piece, theoretical, index + 1):
                     if next_move.pos_from == move.pos_from and next_move.pos_to == move.pos_to:
+                        next_move_exists = True
                         combined_move = copy(next_move).set(
                             captured=move.captured + next_move.captured,
                             chained_move=move.chained_move or next_move.chained_move,
@@ -952,6 +958,8 @@ class StageMovement(BaseMultiMovement):
                         yield combined_move
                         self.raise_pieces(move.captured)
                 self.lower_pieces(move.captured)
+                if not next_move_exists:
+                    yield move
 
 
 class ChainMovement(BaseMultiMovement):
