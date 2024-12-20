@@ -1289,21 +1289,16 @@ class ChoiceMovement(BaseChoiceMovement):
 class RelayMovement(BaseChoiceMovement):
     def __init__(
         self, board: Board,
-        movements: dict[str,
-            tuple[Unpacked[BaseMovement]] | tuple[Unpacked[BaseMovement], Unpacked[BaseMovement]]
-        ] | None = None,
+        lookup: Unpacked[BaseMovement] | None = None,
+        movements: dict[str, Unpacked[BaseMovement]] | None = None,
         check_enemy: int = 0
     ):
         if movements is None:
             movements = {}
-        movement_dict = {
-            key: (repack(packed[0], list), repack(packed[1], list))
-            if len(packed := value if isinstance(value, (list, tuple)) else [value]) > 1
-            else (repack(packed[0], list), repack(copy(packed[0]), list))
-            for key, value in movements.items()
-        }
-        super().__init__(board, {key: list(chain.from_iterable(value)) for key, value in movement_dict.items()})
-        self.movement_dict = movement_dict
+        lookup = repack(lookup or [], list)
+        movements['!'] = lookup
+        super().__init__(board, movements)
+        self.lookup = lookup
         self.check_enemy = check_enemy
 
     def moves(self, pos_from: Position, piece: Piece, theoretical: bool = False):
@@ -1312,21 +1307,33 @@ class RelayMovement(BaseChoiceMovement):
         tester = copy(piece)
         tester.blocked_by = lambda p: False
         tester.captures = lambda p: p.side
+        lookup_result = None
         for key in self.movement_dict:
+            if key in '!':
+                continue
+            if key not in relay_target_dict or pos_from not in relay_target_dict[key]:
+                if lookup_result is None:
+                    relay_target_dict.setdefault(key, {})[pos_from] = set()
+                    for lookup in self.lookup:
+                        for move in lookup.moves(pos_from, tester, theoretical):
+                            relay_target_dict[key][pos_from].add(move.pos_to)
+                            relay_source_dict.setdefault(move.pos_to, set()).add((key, pos_from))
+                    lookup_result = relay_target_dict[key][pos_from]
+                else:
+                    relay_target_dict.setdefault(key, {})[pos_from] = copy(lookup_result)
+                    for pos_to in lookup_result:
+                        relay_source_dict.setdefault(pos_to, set()).add((key, pos_from))
+        for key in self.movement_dict:
+            if key == '!':
+                continue
             value, invert = (key[1:], True) if key.startswith('!') else (key, False)
-            relays, movements = self.movement_dict[key]
+            movements = self.movement_dict[key]
             is_relayed = False
             if not key:
                 mark = None
                 is_relayed = True
             else:
                 mark = 'r!' if invert else 'r'
-                if key not in relay_target_dict or pos_from not in relay_target_dict[key]:
-                    relay_target_dict.setdefault(key, {})[pos_from] = set()
-                    for relay in relays:
-                        for move in relay.moves(pos_from, tester, theoretical):
-                            relay_target_dict[key][pos_from].add(move.pos_to)
-                            relay_source_dict.setdefault(move.pos_to, set()).add((key, pos_from))
                 if key in relay_target_dict and pos_from in relay_target_dict[key]:
                     for pos in relay_target_dict[key][pos_from]:
                         relay_piece = self.board.get_piece(pos)
@@ -1343,7 +1350,8 @@ class RelayMovement(BaseChoiceMovement):
     def __copy_args__(self):
         return (
             self.board,
-            {key: (unpack(value[0]), unpack(value[1])) for key, value in self.movement_dict.items()},
+            unpack(self.lookup),
+            {key: unpack(value) for key, value in self.movement_dict.items() if key != '!'},
             self.check_enemy,
         )
 
@@ -1351,28 +1359,28 @@ class RelayMovement(BaseChoiceMovement):
 class CoordinateMovement(BaseChoiceMovement):
     def __init__(
         self, board: Board,
-        movements: dict[str, Unpacked[BaseMovement] |
-            tuple[Unpacked[BaseMovement]] | tuple[Unpacked[BaseMovement], Unpacked[BaseMovement]] |
-            tuple[Unpacked[str | BaseMovement], Unpacked[BaseMovement], Unpacked[BaseMovement]]
-        ] | None = None
+        movement: Unpacked[BaseMovement] | None = None,
+        lookup: Unpacked[BaseMovement | str] | None = None,
+        coordination: dict[str, Unpacked[tuple[BaseMovement, BaseMovement]]] | None = None
     ):
-        if movements is None:
-            movements = {}
+        if coordination is None:
+            coordination = {}
+        movement = repack(movement or [], list)
+        lookup = repack(lookup or [], list)
         to_movement = lambda x: AbsoluteMovement(board, x) if isinstance(x, str) else x
-        movement_dict = {
-            key: (repack(value, list)) if not key
-            else ([to_movement(x) for x in repack(packed[0], list)], repack(packed[1], list), repack(packed[2], list))
-            if ((length := len(packed := value if isinstance(value, (list, tuple)) else [value])) > 2)
-            else ([FreeMovement(board)], repack(packed[0], list), repack(packed[1], list)) if length > 1
-            else ([FreeMovement(board)], repack(packed[0], list), [copy(x) for x in repack(packed[0], list)])
-            for key, value in movements.items()
+        lookup = [to_movement(x) for x in lookup]
+        movement_dict: dict[str, Unpacked[BaseMovement | tuple[BaseMovement, BaseMovement]]] = {
+            key: [tuple(x) for x in repack(value, list)] for key, value in coordination.items()
         }
+        movement_dict[''] = movement
+        movement_dict['!'] = lookup
         super().__init__(board, {
-            key: list(chain.from_iterable(value)) if key else value
+            key: list(chain.from_iterable(value)) if key not in '!' else value
             for key, value in movement_dict.items()
         })
         self.movement_dict = movement_dict
-        self.base_movements = self.movement_dict.get('', [])
+        self.movement = movement
+        self.lookup = lookup
 
     def coordinate_captures(self, pos_from: Position, piece: Piece, theoretical: bool = False):
         relay_target_dict = self.board.relay_targets.get(piece.side, {})
@@ -1380,19 +1388,28 @@ class CoordinateMovement(BaseChoiceMovement):
         tester = copy(piece)
         tester.blocked_by = lambda p: False
         tester.captures = lambda p: p.side
+        lookup_result = None
+        for key in self.movement_dict:
+            if key in '!':
+                continue
+            if key not in relay_target_dict or pos_from not in relay_target_dict[key]:
+                if lookup_result is None:
+                    relay_target_dict.setdefault(key, {})[pos_from] = set()
+                    for lookup in self.lookup:
+                        for move in lookup.moves(pos_from, tester, theoretical):
+                            relay_target_dict[key][pos_from].add(move.pos_to)
+                            relay_source_dict.setdefault(move.pos_to, set()).add((key, pos_from))
+                    lookup_result = relay_target_dict[key][pos_from]
+                else:
+                    relay_target_dict.setdefault(key, {})[pos_from] = copy(lookup_result)
+                    for pos_to in lookup_result:
+                        relay_source_dict.setdefault(pos_to, set()).add((key, pos_from))
         coordinate_poss = set()
         for key in self.movement_dict:
-            if not key:
+            if key in '!':
                 continue
             value, invert = (key[1:], True) if key.startswith('!') else (key, False)
-            partner_lookups, movements, partner_movements = self.movement_dict[key]
             partners = []
-            if key not in relay_target_dict or pos_from not in relay_target_dict[key]:
-                relay_target_dict.setdefault(key, {})[pos_from] = set()
-                for lookup in partner_lookups:
-                    for move in lookup.moves(pos_from, tester, theoretical):
-                        relay_target_dict[key][pos_from].add(move.pos_to)
-                        relay_source_dict.setdefault(move.pos_to, set()).add((key, pos_from))
             if key in relay_target_dict and pos_from in relay_target_dict[key]:
                 for pos in relay_target_dict[key][pos_from]:
                     partner = self.board.get_piece(pos)
@@ -1403,14 +1420,13 @@ class CoordinateMovement(BaseChoiceMovement):
             if not theoretical and bool(partners) == invert:
                 continue
             partner_poss = set()
-            def partner_moves():
-                for new_partner in partners:
-                    for partner_movement in partner_movements:
+            for movement, partner_movement in self.movement_dict[key]:
+                def partner_moves():
+                    for new_partner in partners:
                         for partner_move in partner_movement.moves(new_partner.board_pos, new_partner, False):
                             partner_poss.add(partner_move.pos_to)
                             yield partner_move.pos_to
-            pos_generator = partner_moves()
-            for movement in movements:
+                pos_generator = partner_moves()
                 for move in movement.moves(pos_from, piece, theoretical):
                     if move.pos_to in partner_poss:
                         is_legal = True
@@ -1425,7 +1441,7 @@ class CoordinateMovement(BaseChoiceMovement):
         return coordinate_poss
 
     def moves(self, pos_from: Position, piece: Piece, theoretical: bool = False):
-        for movement in self.base_movements:
+        for movement in self.movement:
             for move in movement.moves(pos_from, piece, theoretical):
                 if not theoretical:
                     move = copy(move).set(captured=[
@@ -1434,10 +1450,12 @@ class CoordinateMovement(BaseChoiceMovement):
                 yield move
 
     def __copy_args__(self):
-        return self.board, {
-            key: (unpack(value[0]), unpack(value[1]), unpack(value[2])) if key else unpack(value)
-            for key, value in self.movement_dict.items()
-        }
+        return (
+            self.board,
+            unpack(self.movement),
+            unpack(self.lookup),
+            {key: unpack(value) for key, value in self.movement_dict.items() if key not in '!'},
+        )
 
 
 class BaseAreaMovement(BaseChoiceMovement):

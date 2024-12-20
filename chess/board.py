@@ -4092,9 +4092,10 @@ class Board(Window):
                 self.set_position(move.piece, move.pos_from, update)
                 if update and isinstance(self.pieces[abs_from[0]][abs_from[1]], Piece):
                     self.piece_sprite_list.remove(self.pieces[abs_from[0]][abs_from[1]].sprite)
-            if update and isinstance(self.pieces[abs_to[0]][abs_to[1]], Piece) and move.pos_from != move.pos_to:
-                # piece was placed on a different square, empty that square
-                self.piece_sprite_list.remove(self.pieces[abs_to[0]][abs_to[1]].sprite)
+            if move.pos_to is not None:
+                if update and isinstance(self.pieces[abs_to[0]][abs_to[1]], Piece) and move.pos_from != move.pos_to:
+                    # piece was placed on a different square, empty that square
+                    self.piece_sprite_list.remove(self.pieces[abs_to[0]][abs_to[1]].sprite)
             if update and isinstance(move.piece, Piece) and (move.pos_to is None or move.promotion is not None):
                 # existing piece was removed from the board (possibly promoted to a different piece type)
                 if not self.is_trickster_mode():  # reset_trickster_mode() does not reset removed pieces
