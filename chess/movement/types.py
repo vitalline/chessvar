@@ -1289,13 +1289,17 @@ class RelayMovement(BaseChoiceMovement):
                     yield copy(move) if not mark else copy(move).set(is_legal=is_relayed).unmark('n').mark(mark)
 
     def __copy_args__(self):
-        return self.board, {key: (unpack(value[0]), unpack(value[1])) for key, value in self.movement_dict.items()}
+        return (
+            self.board,
+            {key: (unpack(value[0]), unpack(value[1])) for key, value in self.movement_dict.items()},
+            self.check_enemy,
+        )
 
 
 class CoordinateMovement(BaseChoiceMovement):
     def __init__(
         self, board: Board,
-        movements: dict[str,
+        movements: dict[str, Unpacked[BaseMovement] |
             tuple[Unpacked[BaseMovement]] | tuple[Unpacked[BaseMovement], Unpacked[BaseMovement]] |
             tuple[Unpacked[str | BaseMovement], Unpacked[BaseMovement], Unpacked[BaseMovement]]
         ] | None = None
@@ -1304,41 +1308,43 @@ class CoordinateMovement(BaseChoiceMovement):
             movements = {}
         to_movement = lambda x: AbsoluteMovement(board, x) if isinstance(x, str) else x
         movement_dict = {
-            key: ([to_movement(x) for x in repack(packed[0], list)], repack(packed[1], list), repack(packed[2], list))
+            key: (repack(value, list)) if not key
+            else ([to_movement(x) for x in repack(packed[0], list)], repack(packed[1], list), repack(packed[2], list))
             if ((length := len(packed := value if isinstance(value, (list, tuple)) else [value])) > 2)
-            else ([FreeMovement(board)], repack(packed[0], list), repack(packed[1], list))
-            if length > 1 else ([FreeMovement(board)], repack(packed[0], list), repack(copy(packed[0]), list))
+            else ([FreeMovement(board)], repack(packed[0], list), repack(packed[1], list)) if length > 1
+            else ([FreeMovement(board)], repack(packed[0], list), [copy(x) for x in repack(packed[0], list)])
             for key, value in movements.items()
         }
         super().__init__(board, {key: list(chain.from_iterable(value)) for key, value in movement_dict.items()})
         self.movement_dict = movement_dict
+        self.base_movements = self.movement_dict.get('', [])
 
-    def moves(self, pos_from: Position, piece: Piece, theoretical: bool = False):
+    def coordinate_captures(self, pos_from: Position, piece: Piece, theoretical: bool = False):
         relay_target_dict = self.board.relay_targets.get(piece.side, {})
         relay_source_dict = self.board.relay_sources.get(piece.side, {})
         tester = copy(piece)
         tester.blocked_by = lambda p: False
         tester.captures = lambda p: p.side
+        coordinate_poss = set()
         for key in self.movement_dict:
+            if not key:
+                continue
             value, invert = (key[1:], True) if key.startswith('!') else (key, False)
             partner_lookups, movements, partner_movements = self.movement_dict[key]
             partners = []
-            if not key:
-                mark = None
-                partners = [piece]  # self-partnership galore! jokes aside, this simply means the piece has normal moves
-            else:
-                mark = 'q'
-                if key not in relay_target_dict or pos_from not in relay_target_dict[key]:
-                    relay_target_dict.setdefault(key, {})[pos_from] = set()
-                    for lookup in partner_lookups:
-                        for move in lookup.moves(pos_from, tester, theoretical):
-                            relay_target_dict[key][pos_from].add(move.pos_to)
-                            relay_source_dict.setdefault(move.pos_to, set()).add((key, pos_from))
-                if key in relay_target_dict and pos_from in relay_target_dict[key]:
-                    for pos in relay_target_dict[key][pos_from]:
-                        partner = self.board.get_piece(pos)
-                        if piece.friendly_to(partner) and self.board.fits(value, partner):
-                            partners.append(partner)
+            if key not in relay_target_dict or pos_from not in relay_target_dict[key]:
+                relay_target_dict.setdefault(key, {})[pos_from] = set()
+                for lookup in partner_lookups:
+                    for move in lookup.moves(pos_from, tester, theoretical):
+                        relay_target_dict[key][pos_from].add(move.pos_to)
+                        relay_source_dict.setdefault(move.pos_to, set()).add((key, pos_from))
+            if key in relay_target_dict and pos_from in relay_target_dict[key]:
+                for pos in relay_target_dict[key][pos_from]:
+                    partner = self.board.get_piece(pos)
+                    if piece == partner or not partner.side:
+                        continue
+                    if piece.friendly_to(partner) and self.board.fits(value, partner):
+                        partners.append(partner)
             if not theoretical and bool(partners) == invert:
                 continue
             partner_poss = set()
@@ -1348,26 +1354,34 @@ class CoordinateMovement(BaseChoiceMovement):
                         for partner_move in partner_movement.moves(new_partner.board_pos, new_partner, False):
                             partner_poss.add(partner_move.pos_to)
                             yield partner_move.pos_to
-            pos_generator = () if mark is None else partner_moves()
+            pos_generator = partner_moves()
             for movement in movements:
                 for move in movement.moves(pos_from, piece, theoretical):
-                    is_legal = mark is None
-                    if not is_legal:
-                        if move.pos_to in partner_poss:
-                            is_legal = True
-                        else:
-                            for pos in pos_generator:
-                                if move.pos_to == pos:
-                                    is_legal = True
-                                    break
-                    new_move = copy(move) if not mark else copy(move).set(is_legal=is_legal)
-                    if mark is not None:
-                        new_move.unmark('n').mark(mark)
-                    yield new_move
+                    if move.pos_to in partner_poss:
+                        is_legal = True
+                    else:
+                        is_legal = False
+                        for pos in pos_generator:
+                            if move.pos_to == pos:
+                                is_legal = True
+                                break
+                    if is_legal:
+                        coordinate_poss.add(move.pos_to)
+        return coordinate_poss
+
+    def moves(self, pos_from: Position, piece: Piece, theoretical: bool = False):
+        for movement in self.base_movements:
+            for move in movement.moves(pos_from, piece, theoretical):
+                if not theoretical:
+                    move = copy(move).set(
+                        captures=self.coordinate_captures(move.pos_to, piece, theoretical)
+                    ).unmark('n').mark('q')
+                yield move
 
     def __copy_args__(self):
         return self.board, {
-            key: (unpack(value[0]), unpack(value[1]), unpack(value[2])) for key, value in self.movement_dict.items()
+            key: (unpack(value[0]), unpack(value[1]), unpack(value[2])) if key else unpack(value)
+            for key, value in self.movement_dict.items()
         }
 
 
