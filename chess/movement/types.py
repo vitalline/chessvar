@@ -115,7 +115,7 @@ class RiderMovement(BaseMovement):
                     Move(
                         pos_from=move.pos_to, pos_to=royal_ep_markers[move.pos_to],
                         movement_type=RoyalEnPassantMovement, piece=piece,
-                        captured_piece=self.board.get_piece(royal_ep_markers[move.pos_to]),
+                        captured=self.board.get_piece(royal_ep_markers[move.pos_to]),
                     ).mark(self.default_mark),
                     Move(
                         pos_from=move.pos_to, pos_to=move.pos_to,
@@ -253,7 +253,7 @@ class HopperRiderMovement(CannonRiderMovement):
     def moves(self, pos_from: Position, piece: Piece, theoretical: bool = False):
         for move in super().moves(pos_from, piece, theoretical):
             if not theoretical and self.data['capture']:
-                move.captured_piece = self.data['capture']
+                move.set(captured=self.data['capture'])
             yield move
 
 
@@ -286,7 +286,7 @@ class ProximityRiderMovement(RiderMovement):
     def moves(self, pos_from: Position, piece: Piece, theoretical: bool = False):
         for move in super().moves(pos_from, piece, theoretical):
             if not theoretical and self.data['capture']:
-                move.captured_piece = self.data['capture']
+                move.set(captured=self.data['capture'])
             yield move
 
     def __copy_args__(self):
@@ -376,34 +376,34 @@ class RangedMovement(BaseMovement):
         for move in super().moves(pos_from, piece, theoretical):
             move = copy(move)
             if not theoretical:
-                captured_piece = move.captured_piece or self.board.get_piece(move.pos_to)
+                captured_piece = self.board.get_piece(move.pos_to)
                 if captured_piece.side:
-                    move.captured_piece = captured_piece
-                    move.pos_to = move.pos_from
-                    move.movement_type = RangedMovement
+                    move.set(
+                        pos_to=pos_from,
+                        captured=captured_piece,
+                        movement_type=RangedMovement,
+                    )
             yield move
 
 
 class RangedCaptureRiderMovement(RangedMovement, RiderMovement):
     def moves(self, pos_from: Position, piece: Piece, theoretical: bool = False):
         for move in super().moves(pos_from, piece, theoretical):
-            if not move.captured_piece:
+            if not move.captured:
                 move.movement_type = RiderMovement
             yield move
 
     def skip_condition(self, move: Move, direction: AnyDirection, piece: Piece, theoretical: bool = False) -> bool:
-        if move.captured_piece:
-            pos_to = move.captured_piece.board_pos
-            move.pos_to = pos_to
+        if move.captured:
+            move.pos_to = self.transform(add(move.pos_from, mul(direction[:2], self.steps)))
             result = super().skip_condition(move, direction, piece, theoretical)
             move.pos_to = move.pos_from
             return result
         return super().skip_condition(move, direction, piece, theoretical)
 
     def stop_condition(self, move: Move, direction: AnyDirection, piece: Piece, theoretical: bool = False) -> bool:
-        if move.captured_piece:
-            pos_to = move.captured_piece.board_pos
-            move.pos_to = pos_to
+        if move.captured:
+            move.pos_to = self.transform(add(move.pos_from, mul(direction[:2], self.steps)))
             result = super().stop_condition(move, direction, piece, theoretical)
             move.pos_to = move.pos_from
             return result
@@ -418,21 +418,13 @@ class AutoCaptureMovement(BaseMovement):
 
     def generate_captures(self, move: Move, piece: Piece) -> Move:
         if not move.is_edit:
-            captures = {}
             for capture in super().moves(move.pos_to, piece):
                 captured_piece = self.board.get_piece(capture.pos_to)
                 if piece.captures(captured_piece):
-                    captures[capture.pos_to] = copy(capture).set(
-                        piece=piece, pos_to=move.pos_to,
-                        captured_piece=captured_piece,
+                    move.set(
+                        captured=captured_piece,
                         movement_type=AutoCaptureMovement
                     )
-            last_chain_move = move
-            while last_chain_move.chained_move:
-                last_chain_move = last_chain_move.chained_move
-            for capture_pos_to in sorted(captures):
-                last_chain_move.chained_move = captures[capture_pos_to]
-                last_chain_move = last_chain_move.chained_move
         return move
 
 
@@ -595,9 +587,11 @@ class EnPassantRiderMovement(RiderMovement):
             move.movement_type = RiderMovement
             if not theoretical:
                 marker_dict = self.board.en_passant_markers.get(piece.side.opponent(), {})
-                if not move.captured_piece and move.pos_to in marker_dict:
-                    move.captured_piece = self.board.get_piece(marker_dict[move.pos_to])
-                    move.movement_type = type(self)
+                if move.pos_to in marker_dict:
+                    move.set(
+                        captured=self.board.get_piece(marker_dict[move.pos_to]),
+                        movement_type=type(self),
+                    )
                     move.mark('f')
             yield move
 
@@ -793,8 +787,8 @@ class RepeatBentMovement(BaseMultiMovement):
                 for move in movement.moves(pos_from, piece, theoretical):
                     if any(direction[:2]):
                         pos_to = move.pos_to
-                        if issubclass(move.movement_type, RangedMovement) and move.captured_piece:
-                            pos_to = move.captured_piece.board_pos
+                        if issubclass(move.movement_type, RangedMovement) and move.captured:
+                            pos_to = movement.transform(add(move.pos_from, mul(direction[:2], movement.steps)))
                         if pos_to == pos_from:
                             stop = True
                     move.movement_type = type(self)
@@ -814,7 +808,7 @@ class RepeatBentMovement(BaseMultiMovement):
                 ):
                     for bent_move in self.moves(move.pos_to, piece, theoretical, true_index + 1):
                         dir_indexes = self.dir_indexes[:]  # i'm not even going to bother explaining this one
-                        yield copy(bent_move).set(pos_from=pos_from)
+                        yield copy(bent_move).set(pos_from=pos_from, captured=move.captured + bent_move.captured)
                         self.dir_indexes = dir_indexes  # you can probably guess what this does by now, moving on
         else:
             return ()
@@ -969,7 +963,7 @@ class MultiMovement(BaseMultiMovement):
         board: Board,
         both: Unpacked[BaseMovement] | None = None,
         move: Unpacked[BaseMovement] | None = None,
-        capture: Unpacked[BaseMovement] | None = None
+        capture: Unpacked[BaseMovement] | None = None,
     ):
         self.both = repack(both or [], list)
         self.move = repack(move or [], list)
@@ -995,8 +989,13 @@ class MultiMovement(BaseMultiMovement):
                 for move in movement.moves(pos_from, piece, theoretical):
                     chained_move = move
                     while chained_move:
-                        captured_piece = chained_move.captured_piece or self.board.get_piece(chained_move.pos_to)
-                        if piece.captures(captured_piece) and piece != captured_piece:
+                        is_legal = True
+                        captures = chained_move.captures or [self.board.get_piece(chained_move.pos_to)]
+                        for capture in captures:
+                            if piece.captures(capture) and piece != capture:
+                                is_legal = False
+                                break
+                        if not is_legal:
                             break
                         chained_move = chained_move.chained_move
                     else:
@@ -1005,8 +1004,13 @@ class MultiMovement(BaseMultiMovement):
                 for move in movement.moves(pos_from, piece, theoretical):
                     chained_move = move
                     while chained_move:
-                        captured_piece = chained_move.captured_piece or self.board.get_piece(chained_move.pos_to)
-                        if piece.captures(captured_piece):
+                        is_legal = False
+                        captures = chained_move.captures or [self.board.get_piece(chained_move.pos_to)]
+                        for capture in captures:
+                            if piece.captures(capture):
+                                is_legal = True
+                                break
+                        if is_legal:
                             yield copy(move).unmark('n').mark('c')
                             break
                         chained_move = chained_move.chained_move
@@ -1015,8 +1019,19 @@ class MultiMovement(BaseMultiMovement):
         return self.board, unpack(self.both), unpack(self.move), unpack(self.capture)
 
 
-class RangedMultiMovement(RangedMovement, MultiMovement):
-    pass
+class RangedMultiMovement(MultiMovement):
+    def moves(self, pos_from: Position, piece: Piece, theoretical: bool = False):
+        for move in super().moves(pos_from, piece, theoretical):
+            move = copy(move)
+            if not theoretical:
+                captured_piece = self.board.get_piece(move.pos_to)
+                if captured_piece.side:
+                    move.set(
+                        pos_to=pos_from,
+                        captured=captured_piece,
+                        movement_type=RangedMovement,
+                    ).unmark('n').mark('g')
+            yield move
 
 
 class InverseMovement(BaseMultiMovement):
@@ -1024,8 +1039,7 @@ class InverseMovement(BaseMultiMovement):
         inverse_piece = piece.of(piece.side.opponent())
         for movement in self.movements:
             for move in movement.moves(pos_from, inverse_piece, theoretical):
-                move.piece = piece
-                move.movement_type = type(self)
+                move.set(piece=piece, movement_type=type(self))
                 if move.pos_from == move.pos_to:
                     move.pos_to = None
                 yield move
@@ -1051,7 +1065,7 @@ class CloneMovement(BaseMultiMovement):
 
     def add_clone(self, spawns: dict[Position, Piece], move: Move, piece: Piece, last_pos: Position) -> None:
         if move.pos_from and move.pos_from != move.pos_to:
-            is_capture = move.captured_piece or not self.board.not_a_piece(move.pos_to)
+            is_capture = move.captured or not self.board.not_a_piece(move.pos_to)
             if not (self.move or self.capture) or (self.capture if is_capture else self.move):
                 move_piece = piece if move.pos_from == last_pos else (
                     move.promotion or move.piece

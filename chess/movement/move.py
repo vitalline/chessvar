@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from itertools import zip_longest
 from typing import TYPE_CHECKING
 
 from chess.movement.util import Position, to_algebraic as toa
@@ -18,7 +19,7 @@ class Move(object):
         pos_to: Position | None = None,
         movement_type: type[BaseMovement] | None = None,
         piece: Piece | None = None,
-        captured_piece: Piece | None = None,
+        captured: list[Piece] | Piece | None = None,
         swapped_piece: Piece | None = None,
         placed_piece: type[Piece] | None = None,
         promotion: Piece | frozenset | None = None,
@@ -28,11 +29,13 @@ class Move(object):
         is_edit: int = 0,
         is_legal: bool = True
     ):
+        if isinstance(captured, Piece):
+            captured = [captured]
         self.pos_from = pos_from
         self.pos_to = pos_to
         self.movement_type = movement_type
         self.piece = piece
-        self.captured_piece = captured_piece
+        self.captured = sorted(captured or [], key=lambda x: x.board_pos or ())
         self.swapped_piece = swapped_piece
         self.placed_piece = placed_piece
         self.promotion = promotion
@@ -59,7 +62,7 @@ class Move(object):
         pos_to: Position | None = None,
         movement_type: type[BaseMovement] | None = None,
         piece: Piece | None = None,
-        captured_piece: Piece | None = None,
+        captured: list[Piece] | Piece | None = None,
         swapped_piece: Piece | None = None,
         placed_piece: type[Piece] | None = None,
         promotion: Piece | frozenset | type(Default) | None = None,
@@ -73,7 +76,10 @@ class Move(object):
         self.pos_to = pos_to or self.pos_to
         self.piece = piece or self.piece
         self.movement_type = movement_type or self.movement_type
-        self.captured_piece = captured_piece or self.captured_piece
+        if captured is not None:
+            if isinstance(captured, Piece):
+                captured = [captured, *self.captured]
+            self.captured = sorted(captured or [], key=lambda x: x.board_pos or ())
         self.swapped_piece = swapped_piece or self.swapped_piece
         self.placed_piece = placed_piece or self.placed_piece
         self.promotion = (
@@ -100,8 +106,10 @@ class Move(object):
             and (self.movement_type is None or self.movement_type.__name__ == other.movement_type.__name__)
             and type(self.piece) is type(other.piece)
             and (not self.piece or self.piece.matches(other.piece))
-            and type(self.captured_piece) is type(other.captured_piece)
-            and (not self.captured_piece or self.piece.matches(other.captured_piece))
+            and (not self.captured) == (not other.captured)
+            and (not self.captured or all(
+                type(x) is type(y) and (not x or x.matches(y)) for x, y in zip_longest(self.captured, other.captured)
+            ))
             and type(self.swapped_piece) is type(other.swapped_piece)
             and (not self.swapped_piece or self.piece.matches(other.swapped_piece))
             and self.placed_piece is other.placed_piece
@@ -122,7 +130,7 @@ class Move(object):
             self.pos_to,
             self.movement_type,
             self.piece,
-            self.captured_piece,
+            self.captured.copy(),
             self.swapped_piece,
             self.placed_piece,
             self.promotion,
@@ -139,7 +147,7 @@ class Move(object):
             self.pos_to,
             self.movement_type,
             self.piece.__copy__() if self.piece else self.piece,
-            self.captured_piece.__copy__() if self.captured_piece else self.captured_piece,
+            [x.__copy__() for x in self.captured],
             self.swapped_piece.__copy__() if self.swapped_piece else self.swapped_piece,
             self.placed_piece,
             self.promotion.__copy__() if self.promotion else self.promotion,
@@ -156,13 +164,13 @@ class Move(object):
         string += toa(self.pos_from) if self.pos_from else '*'
         if self.pos_from == self.pos_to:
             string += ' S'
-        elif not self.swapped_piece and (not self.captured_piece or self.captured_piece.board_pos != self.pos_to):
+        elif not self.swapped_piece and (not self.captured or self.pos_to not in {x.board_pos for x in self.captured}):
             string += ' -> '
             string += toa(self.pos_to) if self.pos_to else '*'
-        if self.captured_piece:
-            string += f" x {self.captured_piece}"
-            if self.captured_piece.board_pos:
-                string += f" @ {toa(self.captured_piece.board_pos)}"
+        for capture in self.captured:
+            string += f" x {capture}"
+            if capture.board_pos:
+                string += f" @ {toa(capture.board_pos)}"
         if self.swapped_piece:
             string += f" <-> {self.swapped_piece}"
             if self.swapped_piece.board_pos:
@@ -215,7 +223,7 @@ class Move(object):
                 self.piece.name != self.promotion.name
                 or self.promotion.side not in {self.piece.side, Side.NONE}
             )
-            if self.captured_piece is None and self.swapped_piece is None and not promoted:
+            if not self.captured and self.swapped_piece is None and not promoted:
                 string = f"stays on {toa(self.pos_from)}"
             else:
                 string = f"on {toa(self.pos_from)}"
@@ -233,10 +241,10 @@ class Move(object):
                 string = f"{self.piece} {string}"
         else:
             string = f"Piece {string}"
-        if self.captured_piece:
-            string += f"{comma} takes {self.captured_piece}"
-            if self.captured_piece.board_pos != self.pos_to:
-                string += f" on {toa(self.captured_piece.board_pos)}"
+        for capture in self.captured:
+            string += f"{comma} takes {capture}"
+            if capture.board_pos != self.pos_to:
+                string += f" on {toa(capture.board_pos)}"
             comma = ','
         if self.swapped_piece:
             if self.is_edit == 1:

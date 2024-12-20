@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from base64 import b64decode, b64encode
-from copy import copy
+from copy import copy, deepcopy
 from importlib import import_module
 from random import Random
 from traceback import print_exc
@@ -19,7 +19,8 @@ from chess.pieces.piece import AbstractPiece, Piece
 from chess.pieces.side import Side
 from chess.pieces.types import Neutral
 from chess.pieces.util import UtilityPiece, NoPiece
-from chess.util import CUSTOM_PREFIX, MOVEMENT_SUFFIXES, UNSET_STRING, Unset, AnyJson, AnyJsonType, IntIndex, TypeOr
+from chess.util import CUSTOM_PREFIX, MOVEMENT_SUFFIXES, UNSET_STRING, Unset, AnyJson, AnyJsonType, IntIndex, TypeOr, \
+    unpack, repack
 
 if TYPE_CHECKING:
     from chess.board import Board
@@ -404,12 +405,15 @@ def save_move(move: Move | frozenset | None) -> dict | str | None:
         return None
     if move is Unset:
         return UNSET_STRING
+    move = deepcopy(move)
     piece = move.piece
     if piece and (piece.board_pos == (move.pos_to or move.pos_from)):
         piece = piece.on(None)
-    capture = move.captured_piece
-    if capture and (capture.board_pos == move.pos_to):
-        capture = capture.on(None)
+    captured = move.captured[:]
+    for i, capture in enumerate(captured[:]):
+        if capture and (capture.board_pos == move.pos_to):
+            captured[i] = capture.on(None)
+    move.set(captured=captured)
     swapped = move.swapped_piece
     if swapped and (swapped.board_pos == move.pos_from):
         swapped = swapped.on(None)
@@ -421,7 +425,7 @@ def save_move(move: Move | frozenset | None) -> dict | str | None:
         'to': toa(move.pos_to) if move.pos_to else None,
         'type': save_movement_type(move.movement_type),
         'piece': save_piece(piece),
-        'captured': save_piece(capture),
+        'captured': unpack([save_piece(x) for x in captured]),
         'swapped': save_piece(swapped),
         'drop': save_piece_type(move.placed_piece),
         'promotion': save_piece(promotion),
@@ -443,9 +447,13 @@ def load_move(board: Board, data: dict | str | None, from_dict: dict | None) -> 
         piece = NoPiece(board, board_pos=pos_to or pos_from)
     elif not piece.board_pos:
         piece.board_pos = pos_to or pos_from
-    capture = load_piece(board, data.get('captured'), from_dict)
-    if capture and not capture.board_pos:
-        capture.board_pos = pos_to
+    captured = []
+    capture_data = repack(data.get('captured', []), list)
+    for capture_dict in capture_data:
+        if capture := load_piece(board, capture_dict, from_dict):
+            if not capture.board_pos:
+                capture.board_pos = pos_to
+            captured.append(capture)
     swapped = load_piece(board, data.get('swapped'), from_dict)
     if swapped and not swapped.board_pos:
         swapped.board_pos = pos_from
@@ -454,7 +462,7 @@ def load_move(board: Board, data: dict | str | None, from_dict: dict | None) -> 
         pos_to=pos_to,
         movement_type=load_movement_type(data.get('type')),
         piece=piece,
-        captured_piece=capture,
+        captured=captured,
         swapped_piece=swapped,
         placed_piece=load_piece_type(data.get('drop'), from_dict),
         promotion=load_piece(board, data.get('promotion'), from_dict),

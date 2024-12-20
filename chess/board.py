@@ -2040,10 +2040,11 @@ class Board(Window):
         royal_groups = self.royal_groups.get(side, {})
         is_royal_loss = lambda g, t, v: g and t and (isinstance(v, int) or not royal_groups.get(g))
         while move:
-            if move.captured_piece and move.captured_piece.side == side:
-                royal_group, royal_type, royal_value = self.get_royal_state(move.captured_piece, side, conditions)
-                if is_royal_loss(royal_group, royal_type, royal_value):
-                    (piece_loss if royal_type > 0 else piece_gain).add(royal_group)
+            for capture in move.captured:
+                if capture.side == side:
+                    royal_group, royal_type, royal_value = self.get_royal_state(capture, side, conditions)
+                    if is_royal_loss(royal_group, royal_type, royal_value):
+                        (piece_loss if royal_type > 0 else piece_gain).add(royal_group)
             if move.promotion:
                 if move.piece and move.piece.side == side:
                     royal_group, royal_type, royal_value = self.get_royal_state(move.piece, side, conditions)
@@ -2150,21 +2151,22 @@ class Board(Window):
                                         safe_anti_royal_groups.discard(group)
                             if not safe_royal_groups and not safe_anti_royal_groups:
                                 break
-                        if chained_move.captured_piece and chained_move.captured_piece.side == side:
-                            if chained_move.captured_piece.board_pos == chained_move.pos_to:
-                                pass  # capture by displacement should be covered by the previous checks
-                            elif chained_move.captured_piece.board_pos in self.royal_markers[side]:
-                                capture = royal_group(chained_move.captured_piece)
-                                if capture in safe_royal_groups:
-                                    safe_royal_groups.discard(capture)
-                            elif chained_move.captured_piece.board_pos in self.anti_royal_markers[side]:
-                                capture = royal_group(chained_move.captured_piece)
-                                if capture in safe_anti_royal_groups:
-                                    insert(capture, chained_move.captured_piece.board_pos)
-                                    if len(anti_royal_checks[capture]) == len(self.royal_groups[side].get(capture, ())):
-                                        safe_anti_royal_groups.discard(capture)
-                            if not safe_royal_groups and not safe_anti_royal_groups:
-                                break
+                        for capture in chained_move.captured:
+                            if capture.side == side:
+                                if capture.board_pos == chained_move.pos_to:
+                                    pass  # capture by displacement should be covered by the previous checks
+                                elif capture.board_pos in self.royal_markers[side]:
+                                    taken = royal_group(capture)
+                                    if taken in safe_royal_groups:
+                                        safe_royal_groups.discard(taken)
+                                elif capture.board_pos in self.anti_royal_markers[side]:
+                                    taken = royal_group(capture)
+                                    if taken in safe_anti_royal_groups:
+                                        insert(taken, capture.board_pos)
+                                        if len(anti_royal_checks[taken]) == len(self.royal_groups[side].get(taken, ())):
+                                            safe_anti_royal_groups.discard(taken)
+                                if not safe_royal_groups and not safe_anti_royal_groups:
+                                    break
                         chained_move = chained_move.chained_move
                     if not safe_royal_groups and not safe_anti_royal_groups:
                         break
@@ -2567,7 +2569,7 @@ class Board(Window):
                             for rule in history_rules:
                                 rule['match'].setdefault('move', []).append(last_history_move)
                             move_types = [s for s in (
-                                'move' if not last_history_move.captured_piece else 'capture',
+                                'move' if not last_history_move.captured else 'capture',
                                 'promotion' if promotion else None,
                                 'drop' if drop else None,
                             ) if s]
@@ -2595,13 +2597,14 @@ class Board(Window):
                             history_rules = self.filter(
                                 history_rules, ('last', 'old'), [piece.movement.total_moves], ('match', 'old'), False
                             )
-                            if capture := last_history_move.captured_piece:
+                            if captured := last_history_move.captured:
                                 capture_type = 'take' if piece.side == turn_side else 'lose'
+                                captured_pieces = [type(x) for x in captured]
                                 history_rules = self.filter(
-                                    history_rules, ('last', capture_type), [type(capture)], ('match', capture_type)
+                                    history_rules, ('last', capture_type), captured_pieces, ('match', capture_type)
                                 )
                                 for rule in history_rules:
-                                    rule['match'].setdefault(capture_type, set()).add(type(capture))
+                                    rule['match'].setdefault(capture_type, set()).update(captured_pieces)
                             if promotion := last_history_move.promotion:
                                 history_rules = self.filter(
                                     history_rules, ('last', 'new'), [type(promotion)], ('match', 'piece')
@@ -2734,11 +2737,14 @@ class Board(Window):
                         for rule in base_rules:
                             rule['match'].setdefault('move', []).append(base_move)
                         self.update_move(base_move)
-                        if (
-                            base_move.captured_piece
-                            and base_move.piece.skips(base_move.captured_piece)
-                            and not base_move.piece.captures(base_move.captured_piece)
-                        ):
+                        skip = False
+                        for capture in base_move.captured:
+                            if capture.board_pos != base_move.pos_to:
+                                continue
+                            if base_move.piece.skips(capture) and not base_move.piece.captures(capture):
+                                skip = True
+                                break
+                        if skip:
                             continue
                         base_dict = {'move': True, 'capture': False, 'promotion': False}
                         for rule in base_rules:
@@ -2748,15 +2754,16 @@ class Board(Window):
                         for rule in base_rules:
                             rule['match'].setdefault('pos', []).append(pos_to)
                             rule['match'].setdefault('to', []).append(pos_to)
-                        if capture := base_move.captured_piece:
+                        if captured := base_move.captured:
                             capture_type = 'take' if base_move.piece.side == turn_side else 'lose'
-                            base_rules = self.filter(base_rules, capture_type, [type(capture)], ('match', capture_type))
+                            captured_pieces = [type(x) for x in captured]
+                            base_rules = self.filter(base_rules, capture_type, captured_pieces, ('match', capture_type))
                             for rule in base_rules:
-                                rule['match'].setdefault(capture_type, set()).add(type(capture))
+                                rule['match'].setdefault(capture_type, set()).update(captured_pieces)
                         if not base_rules:
                             continue
-                        base_dict['move'] = base_dict['move'] and not base_move.captured_piece
-                        base_dict['capture'] = base_dict['capture'] or bool(base_move.captured_piece)
+                        base_dict['move'] = base_dict['move'] and not base_move.captured
+                        base_dict['capture'] = base_dict['capture'] or bool(base_move.captured)
                         for move in self.get_promotions(base_move):
                             move_rules = deepcopy(base_rules)
                             type_dict = copy(base_dict)
@@ -2821,13 +2828,14 @@ class Board(Window):
                             next_future_rules = deepcopy(move_rules)
                             while legal and chained_move:
                                 self.update_move(chained_move)
-                                if (
-                                    chained_move.captured_piece
-                                    and chained_move.piece.skips(chained_move.captured_piece)
-                                    and not chained_move.piece.captures(chained_move.captured_piece)
-                                ):
-                                    skip = True
-                                    legal = False
+                                for capture in chained_move.captured:
+                                    if capture.board_pos != chained_move.pos_to:
+                                        continue
+                                    if chained_move.piece.skips(capture) and not chained_move.piece.captures(capture):
+                                        skip = True
+                                        legal = False
+                                        break
+                                if skip:
                                     break
                                 if min_depth <= j <= max_depth:
                                     old_future_rules = next_future_rules
@@ -2869,13 +2877,14 @@ class Board(Window):
                                             [chained_move.piece.movement.total_moves],
                                             ('match', 'old'), False
                                         )
-                                    if loss := chained_move.captured_piece:
+                                    if loss := chained_move.captured:
                                         loss_type = 'take' if chained_move.piece.side == turn_side else 'lose'
+                                        captured_pieces = [type(x) for x in loss]
                                         future_rules = self.filter(
-                                            future_rules, ('next', loss_type), [type(loss)], ('match', loss_type)
+                                            future_rules, ('next', loss_type), captured_pieces, ('match', loss_type)
                                         )
                                         for rule in future_rules:
-                                            rule['match'].setdefault(loss_type, set()).add(type(loss))
+                                            rule['match'].setdefault(loss_type, set()).update(captured_pieces)
                                     future_dict = {'move': True, 'capture': False, 'promotion': False}
                                     new_piece = None
                                     if not future_rules:
@@ -2883,8 +2892,8 @@ class Board(Window):
                                     elif chained_move:
                                         ch = chained_move
                                         new_piece = new_piece or ch.promotion
-                                        future_dict['move'] = future_dict['move'] and not ch.captured_piece
-                                        future_dict['capture'] = future_dict['capture'] or bool(ch.captured_piece)
+                                        future_dict['move'] = future_dict['move'] and not ch.captured
+                                        future_dict['capture'] = future_dict['capture'] or bool(ch.captured)
                                         future_dict['promotion'] = future_dict['promotion'] or bool(ch.promotion)
                                         future_types = [k for k, v in future_dict.items() if v]
                                         future_rules = self.filter(
@@ -3035,9 +3044,11 @@ class Board(Window):
                                     self.check_side = old_check_side
                                 if move_fits:
                                     p_from, p_to = move.pos_from, move.pos_to or move.pos_from
-                                    if p_from == p_to and move.captured_piece is not None:
-                                        p_to = move.captured_piece.board_pos
-                                    self.moves[turn_side].setdefault(p_from, {}).setdefault(p_to, []).append(move)
+                                    if p_from == p_to and move.captured:
+                                        for p2 in (piece.board_pos for piece in move.captured):
+                                            self.moves[turn_side].setdefault(p_from, {}).setdefault(p2, []).append(move)
+                                    else:
+                                        self.moves[turn_side].setdefault(p_from, {}).setdefault(p_to, []).append(move)
                                     chained = self.chain_start
                                     poss = []
                                     while chained:
@@ -3132,8 +3143,11 @@ class Board(Window):
                 sum(v.values(), []) for k, v in self.moves.get(self.turn_side, {}).items() if not isinstance(k, str)
             ), []):
                 move_data = [move.pos_from]
-                if move.pos_from == move.pos_to and move.captured_piece:
-                    move_data.append(move.captured_piece.board_pos)
+                if move.pos_from == move.pos_to and move.captured:
+                    move_data.extend(capture.board_pos for capture in move.captured)
+                    # note that this diverges from the otherwise expected move data,
+                    # but it does match the approach used during legal move searches
+                    # the data tuples are not parsed, only compared, so this is fine
                 else:
                     move_data.append(move.pos_to)
                 if move.promotion is not None:
@@ -3169,7 +3183,7 @@ class Board(Window):
             if pos_from in (side_moves := self.moves[self.turn_side]):
                 if pos_to in (from_moves := side_moves[pos_from]):
                     if to_moves := from_moves[pos_to]:
-                        return copy(to_moves[0])
+                        return copy(to_moves[0]).set(captured=sum((move.captured for move in to_moves), []))
         return None
 
     def show_moves(self, with_markers: bool = True) -> None:
@@ -3298,16 +3312,16 @@ class Board(Window):
                 last_move = move
                 captures = []
                 while last_move.chained_move:
-                    if last_move.captured_piece:
-                        captures.append(last_move.captured_piece.board_pos)
+                    for capture in last_move.captured:
+                        captures.append(capture.board_pos)
                     if last_move.pos_from == pos_to:
                         pos_to = last_move.pos_to
                     last_move = last_move.chained_move
                 if last_move.pos_from == pos_to:
                     pos_to = last_move.pos_to
                 pos_to = pos_to
-                if last_move.captured_piece:
-                    captures.append(last_move.captured_piece.board_pos)
+                for capture in last_move.captured:
+                    captures.append(capture.board_pos)
                 pos = move.piece.board_pos
                 if pos_from is not None and pos_from != pos_to:
                     if pos_from in move_sprites and not self.not_a_piece(pos_from):
@@ -3378,13 +3392,26 @@ class Board(Window):
             move.set(piece=self.get_piece(move.pos_from))
         elif not move.piece and move.pos_to:
             move.set(piece=self.get_piece(move.pos_to))
-        new_piece = move.swapped_piece or move.captured_piece
-        new_piece = self.get_piece(new_piece.board_pos if new_piece is not None else move.pos_to)
-        if move.piece != new_piece and not isinstance(new_piece, NoPiece):
-            if move.swapped_piece is not None:
+        if move.swapped_piece:
+            new_piece = self.get_piece(move.swapped_piece.board_pos if move.swapped_piece is not None else move.pos_to)
+            if not isinstance(new_piece, NoPiece):
                 move.set(swapped_piece=new_piece)
-            else:
-                move.set(captured_piece=new_piece)
+        capture_poss = set()
+        captured_pieces = []
+        has_end = move.pos_to in {None, move.pos_from}
+        for captured in move.captured:
+            if not has_end and captured.board_pos == move.pos_to:
+                has_end = True
+            new_piece = self.get_piece(captured.board_pos)
+            if not isinstance(new_piece, NoPiece) and new_piece.board_pos not in capture_poss:
+                capture_poss.add(new_piece.board_pos)
+                captured_pieces.append(new_piece)
+        if not has_end and not move.swapped_piece:
+            new_piece = self.get_piece(move.pos_to)
+            if not isinstance(new_piece, NoPiece) and new_piece.board_pos not in capture_poss:
+                capture_poss.add(new_piece.board_pos)
+                captured_pieces.append(new_piece)
+        move.set(captured=captured_pieces)
 
     def update_auto_captures(self, move: Move, side: Side) -> None:
         if move.is_edit:
@@ -3404,14 +3431,13 @@ class Board(Window):
             piece = self.get_piece(piece_pos)
             moved = self.get_piece(move.pos_to) if isinstance(move.piece, NoPiece) or move.promotion else move.piece
             if piece.side == side and piece.captures(moved):
-                chained_move = Move(
+                move.chained_move = Move(
                     piece=piece,
                     movement_type=AutoCaptureMovement,
                     pos_from=piece_pos,
                     pos_to=piece_pos,
-                    captured_piece=moved,
+                    captured=moved,
                 )
-                move.chained_move = chained_move
 
     def update_promotion_auto_captures(self, move: Move) -> None:
         piece = self.get_piece(move.pos_to)
@@ -3448,9 +3474,9 @@ class Board(Window):
                     moved_piece.movement.unmark(move.pos_from, moved_piece)
                 if move.pos_from is None or move.is_edit or move.promotion:
                     moved_piece.movement.mark(move.pos_to, moved_piece)
-            if move.captured_piece is not None:
-                if isinstance(move.captured_piece.movement, AutoRangedAutoCaptureRiderMovement):
-                    move.captured_piece.movement.unmark(move.captured_piece.board_pos, move.captured_piece)
+            for capture in move.captured:
+                if isinstance(capture.movement, AutoRangedAutoCaptureRiderMovement):
+                    capture.movement.unmark(capture.board_pos, capture)
             if move.swapped_piece is not None:
                 if isinstance(move.swapped_piece.movement, AutoRangedAutoCaptureRiderMovement):
                     move.swapped_piece.movement.unmark(move.pos_to, move.swapped_piece)
@@ -3476,9 +3502,9 @@ class Board(Window):
                     moved_piece.movement.unmark(move.pos_to, moved_piece)
                 if move.pos_to is None or move.is_edit or move.promotion:
                     moved_piece.movement.mark(move.pos_from, moved_piece)
-            if move.captured_piece is not None:
-                if isinstance(move.captured_piece.movement, AutoRangedAutoCaptureRiderMovement):
-                    move.captured_piece.movement.mark(move.captured_piece.board_pos, move.captured_piece)
+            for capture in move.captured:
+                if isinstance(capture.movement, AutoRangedAutoCaptureRiderMovement):
+                    capture.movement.mark(capture.board_pos, capture)
             if move.swapped_piece is not None:
                 if isinstance(move.swapped_piece.movement, AutoRangedAutoCaptureRiderMovement):
                     move.swapped_piece.movement.unmark(move.pos_from, move.swapped_piece)
@@ -3529,9 +3555,9 @@ class Board(Window):
                         for marker in markers:
                             side_marker_dict.pop(marker, None)
             if move:
-                if move.captured_piece is not None:
-                    for pos in target_dict.get(move.captured_piece.side, {}).pop(move.captured_piece.board_pos, ()):
-                        marker_dict.get(move.captured_piece.side, {}).pop(pos, None)
+                for capture in move.captured:
+                    for pos in target_dict.get(capture.side, {}).pop(capture.board_pos, ()):
+                        marker_dict.get(capture.side, {}).pop(pos, None)
                 for piece, old_pos in ((move.piece, move.pos_from), (move.swapped_piece, move.pos_to)):
                     if piece is None:
                         continue
@@ -3629,9 +3655,9 @@ class Board(Window):
                 for group, pos in sources:
                     if group in targets and pos in targets[group]:
                         targets[group].pop(pos, None)
-            if move.captured_piece:
-                sources = self.relay_sources.get(move.captured_piece.side, {}).pop(move.captured_piece.board_pos, set())
-                targets = self.relay_targets.get(move.captured_piece.side, {})
+            for capture in move.captured:
+                sources = self.relay_sources.get(capture.side, {}).pop(capture.board_pos, set())
+                targets = self.relay_targets.get(capture.side, {})
                 for group, pos in sources:
                     if group in targets and pos in targets[group]:
                         targets[group].pop(pos, None)
@@ -3662,9 +3688,9 @@ class Board(Window):
                 for group, pos in sources:
                     if group in targets and pos in targets[group]:
                         targets[group].pop(pos, None)
-            if move.captured_piece:
-                sources = self.relay_sources.get(move.captured_piece.side, {}).pop(move.captured_piece.board_pos, set())
-                targets = self.relay_targets.get(move.captured_piece.side, {})
+            for capture in move.captured:
+                sources = self.relay_sources.get(capture.side, {}).pop(capture.board_pos, set())
+                targets = self.relay_targets.get(capture.side, {})
                 for group, pos in sources:
                     if group in targets and pos in targets[group]:
                         targets[group].pop(pos, None)
@@ -3992,10 +4018,13 @@ class Board(Window):
             if update and isinstance(self.pieces[abs_to[0]][abs_to[1]], Piece):
                 self.piece_sprite_list.remove(self.pieces[abs_to[0]][abs_to[1]].sprite)
             self.pieces[abs_to[0]][abs_to[1]] = move.piece
-        if update and isinstance(move.captured_piece, Piece) and move.captured_piece.board_pos != move.pos_to:
-            # piece was captured on a different square than the one the capturing piece moved to (e.g. en passant)
-            # empty the square it was captured on (it was not emptied earlier because it was not the one moved to)
-            self.piece_sprite_list.remove(move.captured_piece.sprite)
+        if update:
+            for capture in move.captured:
+                if not isinstance(capture, Piece) or capture.board_pos == move.pos_to:
+                    continue
+                # piece was captured on a different square than the one the capturing piece moved to (e.g. en passant)
+                # empty the square it was captured on (it was not emptied earlier because it was not the one moved to)
+                self.piece_sprite_list.remove(capture.sprite)
         if move.pos_from is not None and move.pos_from != move.pos_to:
             # existing piece was moved to a different square, create a blank piece on the square that was moved from
             self.pieces[abs_from[0]][abs_from[1]] = (
@@ -4003,28 +4032,32 @@ class Board(Window):
             )
             if update and isinstance(self.pieces[abs_from[0]][abs_from[1]], Piece):
                 self.piece_sprite_list.append(self.pieces[abs_from[0]][abs_from[1]].sprite)
-        if move.captured_piece is not None and move.captured_piece.board_pos != move.pos_to:
-            # piece was captured on a different square than the one the capturing piece moved to (e.g. en passant)
-            # create a blank piece on the square it was captured on
-            capture_pos = self.get_absolute(move.captured_piece.board_pos)
-            self.pieces[capture_pos[0]][capture_pos[1]] = NoPiece(self, board_pos=move.captured_piece.board_pos)
-            if update and isinstance(self.pieces[capture_pos[0]][capture_pos[1]], Piece):
-                self.piece_sprite_list.append(self.pieces[capture_pos[0]][capture_pos[1]].sprite)
+        if update:
+            for capture in move.captured:
+                if not isinstance(capture, Piece) or capture.board_pos == move.pos_to:
+                    continue
+                # piece was captured on a different square than the one the capturing piece moved to (e.g. en passant)
+                # create a blank piece on the square it was captured on
+                capture_pos = self.get_absolute(capture.board_pos)
+                self.pieces[capture_pos[0]][capture_pos[1]] = NoPiece(self, board_pos=capture.board_pos)
+                if update and isinstance(self.pieces[capture_pos[0]][capture_pos[1]], Piece):
+                    self.piece_sprite_list.append(self.pieces[capture_pos[0]][capture_pos[1]].sprite)
         if update and isinstance(move.piece, Piece) and move.pos_from is None:
             # piece was added to the board, update it and add it to the sprite list
             self.update_piece(move.piece)
             self.piece_sprite_list.append(move.piece.sprite)
         if move.piece is not None and move.piece.side in self.drops and not move.is_edit == 1:
-            captured_piece = move.piece if move.pos_to is None else move.captured_piece
-            if captured_piece is not None and move.piece.side in self.captured_pieces:
-                capture_type = captured_piece.promoted_from or type(captured_piece)
-                if capture_type in self.drops[move.piece.side]:
-                    # droppable piece was captured, add it to the roster of captured pieces
-                    self.captured_pieces[move.piece.side].append(capture_type)
+            captures = [move.piece] if move.pos_to is None else move.captured
+            for capture in captures:
+                if capture is not None and move.piece.side in self.captured_pieces:
+                    capture_type = capture.promoted_from or type(capture)
+                    if capture_type in self.drops[move.piece.side]:
+                        # droppable piece was captured, add it to the roster of captured pieces
+                        self.captured_pieces[move.piece.side].append(capture_type)
         for piece, pos in (
             (move.piece, move.pos_from),
             (move.swapped_piece, move.pos_to),
-            (move.captured_piece, None)
+            *((capture, None) for capture in move.captured),
         ):
             if piece is None:
                 continue
@@ -4074,31 +4107,34 @@ class Board(Window):
                 self.pieces[abs_from[0]][abs_from[1]] = move.piece
                 if update and isinstance(move.piece, Piece):
                     self.piece_sprite_list.append(move.piece.sprite)
-        if move.captured_piece is not None:
+        capture_poss = set()
+        for capture in move.captured:
+            capture_poss.add(capture.board_pos)
             # piece was captured, restore it on the square it was captured on
-            capture_pos = self.get_absolute(move.captured_piece.board_pos)
-            if move.pos_to != move.captured_piece.board_pos:
+            capture_pos = self.get_absolute(capture.board_pos)
+            if move.pos_to != capture.board_pos:
                 # piece was captured on a different square than the one the capturing piece moved to (e.g. en passant)
                 # empty the square it was captured on (it was not emptied earlier because it was not the one moved to)
                 if update and isinstance(self.pieces[capture_pos[0]][capture_pos[1]], Piece):
                     self.piece_sprite_list.remove(self.pieces[capture_pos[0]][capture_pos[1]].sprite)
-            self.reset_position(move.captured_piece, update)
-            self.pieces[capture_pos[0]][capture_pos[1]] = move.captured_piece
-            if update and isinstance(move.captured_piece, Piece):
+            self.reset_position(capture, update)
+            self.pieces[capture_pos[0]][capture_pos[1]] = capture
+            if update and isinstance(capture, Piece):
                 if not self.is_trickster_mode():  # reset_trickster_mode() does not reset removed pieces
-                    move.captured_piece.sprite.angle = 0  # so we have to do it manually, etc., whatever
-                self.update_piece(move.captured_piece)  # update the piece to reflect current piece hiding mode
-                self.piece_sprite_list.append(move.captured_piece.sprite)
+                    capture.sprite.angle = 0  # so we have to do it manually, etc., whatever
+                self.update_piece(capture)  # update the piece to reflect current piece hiding mode
+                self.piece_sprite_list.append(capture.sprite)
         if move.piece is not None and move.piece.side in self.drops and move.is_edit != 1:
-            captured_piece = move.piece if move.pos_to is None else move.captured_piece
-            if captured_piece is not None and move.piece.side in self.captured_pieces:
-                capture_type = captured_piece.promoted_from or type(captured_piece)
-                if capture_type in self.drops.get(move.piece.side, {}):
-                    # droppable piece was captured, remove it from the roster of captured pieces
-                    for i, piece in enumerate(self.captured_pieces[move.piece.side][::-1]):
-                        if piece == capture_type:
-                            self.captured_pieces[move.piece.side].pop(-(i + 1))
-                            break
+            captures = [move.piece] if move.pos_to is None else move.captured
+            for capture in captures:
+                if capture is not None and move.piece.side in self.captured_pieces:
+                    capture_type = capture.promoted_from or type(capture)
+                    if capture_type in self.drops.get(move.piece.side, {}):
+                        # droppable piece was captured, remove it from the roster of captured pieces
+                        for i, piece in enumerate(self.captured_pieces[move.piece.side][::-1]):
+                            if piece == capture_type:
+                                self.captured_pieces[move.piece.side].pop(-(i + 1))
+                                break
         if move.pos_to is not None and move.pos_from != move.pos_to:
             # piece was added on or moved to a different square, restore the piece that was there before
             old_piece = None
@@ -4106,7 +4142,7 @@ class Board(Window):
                 # piece was swapped with another piece, move the swapped piece to the square that was moved to
                 old_piece = move.swapped_piece
                 self.set_position(move.swapped_piece, move.pos_to, update)
-            elif move.captured_piece is None or move.captured_piece.board_pos != move.pos_to:
+            elif move.pos_to not in capture_poss:
                 # no piece was on the square that was moved to (e.g. non-capturing move, en passant)
                 old_piece = NoPiece(self, board_pos=move.pos_to)  # so create a blank piece on that square
             if old_piece is not None:
@@ -4137,10 +4173,12 @@ class Board(Window):
         if in_promotion:
             if self.move_history and self.future_move_history:
                 past, future = self.move_history[-1], self.future_move_history[-1]
+                opt = lambda x: x or self.no_piece
                 while (
                     past and future and past.pos_from == future.pos_from and past.pos_to == future.pos_to
-                    and not (past.captured_piece is not None and future.swapped_piece is not None)
-                    and not (past.swapped_piece is not None and future.captured_piece is not None)
+                    and (opt(past.swapped_piece).board_pos == opt(future.swapped_piece).board_pos) and all(
+                        opt(x).board_pos == opt(y).board_pos for x, y in zip_longest(past.captured, future.captured)
+                    )
                 ):
                     if future.promotion is not None:
                         past.promotion = future.promotion
@@ -4241,10 +4279,12 @@ class Board(Window):
         if self.promotion_piece is not None:
             if self.move_history and self.future_move_history:
                 past, future = self.move_history[-1], self.future_move_history[-1]
+                opt = lambda x: x or self.no_piece
                 while (
                     past and future and past.pos_from == future.pos_from and past.pos_to == future.pos_to
-                    and not (past.captured_piece is not None and future.swapped_piece is not None)
-                    and not (past.swapped_piece is not None and future.captured_piece is not None)
+                    and (opt(past.swapped_piece).board_pos == opt(future.swapped_piece).board_pos) and all(
+                        opt(x).board_pos == opt(y).board_pos for x, y in zip_longest(past.captured, future.captured)
+                    )
                 ):
                     if past.promotion is Unset:
                         if future.promotion is Unset:
@@ -4613,6 +4653,7 @@ class Board(Window):
             if not hide_move_markers and hovered_square:
                 move = self.find_move(selected_square, hovered_square)
             if move:
+                self.update_move(move)
                 move = deepcopy(move)
                 if move.promotion is not None and type(move.piece) != type(move.promotion):
                     move.promotion = Unset
@@ -5758,7 +5799,7 @@ class Board(Window):
                     piece.board_pos = None
                     move.set(pos_from=None, pos_to=pos, piece=piece)
                     if not self.not_a_piece(pos):
-                        move.set(captured_piece=self.get_piece(pos))
+                        move.set(captured=self.get_piece(pos))
                     if self.square_was_clicked:
                         next_selected_square = pos
                 elif modifiers & key.MOD_SHIFT:
@@ -5774,7 +5815,7 @@ class Board(Window):
                         piece=self.get_piece(self.selected_square)
                     )
                     if not self.not_a_piece(pos):
-                        move.set(captured_piece=self.get_piece(pos))
+                        move.set(captured=self.get_piece(pos))
             elif held_buttons & MOUSE_BUTTON_RIGHT:
                 self.deselect_piece()
                 if self.promotion_piece:
