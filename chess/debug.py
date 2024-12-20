@@ -554,6 +554,30 @@ def debug_info(board: Board) -> list[str]:
                                         debug_log.extend(f"{pad:{pad_count + 8}}{line}" for line in value)
                                     else:
                                         debug_log[-1] += f" {value[0]}"
+                        for field, cond in (('at', 'position'),):
+                            for si, sub_rule in enumerate(rule.get(field, [])):
+                                debug_log.append(f"{pad:{pad_count + 4}}{cond.capitalize()} condition {si + 1}:")
+                                for key_data in (
+                                    'count',
+                                    'piece',
+                                    'side',
+                                    'at',
+                                ):
+                                    key_data = key_data if isinstance(key_data, tuple) else (key_data,)
+                                    key_data = key_data + (None,) * (3 - len(key_data))
+                                    key, string, builder = key_data[:3]
+                                    if key not in sub_rule:
+                                        continue
+                                    if string is None:
+                                        string = key.capitalize()
+                                    if builder is None:
+                                        builder = default_builder
+                                    debug_log.append(f"{pad:{pad_count + 6}}{string}:")
+                                    value = builder(sub_rule[key]).splitlines()
+                                    if len(value) > 1:
+                                        debug_log.extend(f"{pad:{pad_count + 8}}{line}" for line in value)
+                                    else:
+                                        debug_log[-1] += f" {value[0]}"
                         for key_data in (
                             'order',
                             (

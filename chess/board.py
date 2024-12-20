@@ -832,7 +832,7 @@ class Board(Window):
             'order': [
                 side[0].value if side[1] is None else [
                     side[0].value, unpack([{mk: unpack([
-                        {lk: unpack(lv) for lk in sorted(default_sub_rules) if (lv := ld.get(lk))}
+                        {lk: unpack(lv) for lk in sorted(default_sub_rules.get(mk, {})) if (lv := ld.get(lk))}
                         if isinstance(ld, dict) else ld for ld in mv
                     ]) for mk in sorted(default_rules) if (mv := md.get(mk)) is not None} for md in side[1]])
                 ] for side in self.custom_turn_order
@@ -1132,7 +1132,7 @@ class Board(Window):
             ply_count = 1
         self.custom_turn_order = [
             (Side(int(side[0])), [{mk: [
-                {lk: repack(lv) for lk in default_sub_rules if (lv := ld.get(lk))}
+                {lk: repack(lv) for lk in default_sub_rules.get(mk, {}) if (lv := ld.get(lk))}
                 if isinstance(ld, dict) else ld for ld in repack(mv)
             ] for mk in default_rules if (mv := md.get(mk)) is not None} for md in repack(side[1])])
             if isinstance(side, list) and len(side) > 1 else (Side(int(side)), None)
@@ -1664,7 +1664,7 @@ class Board(Window):
                 for field in ('last', 'next'):
                     rule[field] = [copy(sub_rule) for sub_rule in rule[field]]
                     for sub_rule in rule[field]:
-                        for sub_field in default_sub_rules:
+                        for sub_field in default_sub_rules.get(field, {}):
                             if sub_field not in sub_rule:
                                 sub_rule[sub_field] = default_sub_rules[sub_field]
                             elif not isinstance(default_sub_rules[sub_field], list):
@@ -1894,18 +1894,51 @@ class Board(Window):
         except ValueError:  # if all else fails...
             return False
 
-    def get_area_groups(self, piece: AbstractPiece, side: Side) -> list[tuple[str, str]]:
+    def get_area_rules(self, offset: int = 0, origin: int | None = None):
+        turn_rules = self.get_turn_rules(offset, origin)
+        full_rules = {}
+        defaults = default_sub_rules.get('at')
+        for rule_data in turn_rules:
+            if 'at' not in rule_data:
+                continue
+            for condition in rule_data['at']:
+                get_default = lambda x: condition.get(x, defaults.get(x))
+                value = get_default('count')
+                templates, sides = get_default('side'), set()
+                all_sides = {Side.WHITE, Side.BLACK, Side.NEUTRAL}
+                for template in templates:
+                    if template == pch['any']:
+                        sides.update(all_sides)
+                        break
+                    for side in all_sides:
+                        if side not in sides and self.fits(template, side):
+                            sides.add(side)
+                for side in sides:
+                    side_rules = full_rules.setdefault(side, {})
+                    areas = get_default('at')
+                    for area in areas:
+                        area_rules = side_rules.setdefault(area, {})
+                        pieces = get_default('piece')
+                        for piece in pieces:
+                            area_rules.setdefault(piece, value)
+        return full_rules
+
+    def get_area_groups(
+        self, piece: AbstractPiece, side: Side, extra_rules: dict | None = None
+    ) -> list[tuple[str, str]]:
         end_rules = self.end_rules[side]
+        extra_rules = (extra_rules or {}).get(side, {})
         groups = []
-        for condition in end_rules:
-            invert, keyword = (True, condition[1:]) if condition[0:1] == pch['not'] else (False, condition)
-            if keyword in {'check', 'checkmate', 'capture', 'stalemate'}:
-                continue
-            if self.in_area(keyword, piece.board_pos, side) == invert:
-                continue
-            for group, value in end_rules.get(condition, {}).items():
-                if group == '' or self.fits(group, piece):
-                    groups.append((condition, group))
+        for rule_dict in (end_rules, extra_rules):
+            for condition in rule_dict:
+                invert, keyword = (True, condition[1:]) if condition[0:1] == pch['not'] else (False, condition)
+                if rule_dict is end_rules and keyword in {'check', 'checkmate', 'capture', 'stalemate'}:
+                    continue
+                if self.in_area(keyword, piece.board_pos, side) == invert:
+                    continue
+                for group, value in rule_dict.get(condition, {}).items():
+                    if group == '' or self.fits(group, piece):
+                        groups.append((condition, group))
         return groups
 
     def get_new_area_count(self, area: str, group: str, side: Side, max_count: int = 0) -> int:
@@ -1955,6 +1988,7 @@ class Board(Window):
         self.obstacles = []
         royal_types = {Side.WHITE: {}, Side.BLACK: {}}
         royal_values = {Side.WHITE: {}, Side.BLACK: {}}
+        turn_area_rules = self.get_area_rules()
         for row, col in product(range(self.board_height), range(self.board_width)):
             piece = self.get_piece(self.get_relative((row, col)))
             if isinstance(piece, Shared):
@@ -1969,7 +2003,7 @@ class Board(Window):
                     for group in self.piece_limits.get(side, self.piece_limits):
                         if self.fits(group, piece):
                             self.piece_counts[side][group] = self.piece_counts[side].get(group, 0) + 1
-                    for area, group in self.get_area_groups(piece, side):
+                    for area, group in self.get_area_groups(piece, side, turn_area_rules):
                         self.area_groups[side].setdefault(area, {}).setdefault(group, []).append(piece)
                     royal_group, royal_type, royal_value = self.get_royal_state(piece, side)
                     if royal_type:
@@ -2316,6 +2350,10 @@ class Board(Window):
                 losing_side = self.win_side.opponent()
                 self.moves[losing_side] = {}
                 self.moves_queried[losing_side] = True
+        # check if the cached piece data matches the current board state, and only update the former if it doesn't
+        pieces_loaded = True  # generally speaking, Board.load_pieces() should always be called before this method
+        # NB: whenever the board state changes, set the above variable to False forcing a reload after state reset
+        # NB: whenever the cached piece data for the current state is reloaded, set to True to reduce reload count
         movable_pieces = {side: self.movable_pieces[side].copy() for side in self.movable_pieces}
         piece_counts = {side: self.piece_counts[side].copy() for side in self.piece_counts}
         area_groups = {side: self.area_groups[side].copy() for side in self.area_groups}
@@ -2400,14 +2438,58 @@ class Board(Window):
                 order_groups.setdefault(any_rule['order'], []).append(any_rule)
             for order_group in sorted(order_groups, reverse=True):
                 order_rules = order_groups[order_group]
-                state_groups = {}
+                area_rules = []
+                defaults = default_sub_rules.get('at')
                 for order_rule in order_rules:
-                    state_groups.setdefault(order_rule['state'], []).append(order_rule)
+                    if 'at' in order_rule:
+                        match = None
+                        if not pieces_loaded:
+                            self.load_pieces()
+                            pieces_loaded = True
+                        for condition in order_rule['at']:
+                            get_default = lambda x: condition.get(x, defaults.get(x))
+                            count = get_default('count')
+                            total = 0
+                            templates, sides = get_default('side'), set()
+                            all_sides = {Side.WHITE, Side.BLACK, Side.NEUTRAL}
+                            for template in templates:
+                                if template == pch['any']:
+                                    sides.update(all_sides)
+                                    break
+                                for side in all_sides:
+                                    if side not in sides and self.fits(template, side):
+                                        sides.add(side)
+                            for side in sides:
+                                for area in get_default('at'):
+                                    for piece in get_default('piece'):
+                                        total += len(self.area_groups.get(side).get(area, {}).get(piece) or ())
+                                        # NB: count could be negative! in this case, the rule is treated as its inverse,
+                                        # maintaining consistency with the end conditions, where negative goal is a loss
+                                        # is this less intuitive than adding an inverse flag to the condition? perchance
+                                        # the only real upside is that a minus sign is less verbose than a separate flag
+                                        # you'd think this would be enough to define an actually sensible implementation
+                                        if total >= abs(count):  # unfortunately, you'd be completely wrong
+                                            match = count > 0
+                                            break
+                                    if match is not None:
+                                        break
+                                if match is not None:
+                                    break
+                            if match is not None:
+                                break
+                        if not match:  # if the condition is not met, skip the rule
+                            continue
+                    area_rules.append(order_rule)
+                state_groups = {}
+                for area_rule in area_rules:
+                    state_groups.setdefault(area_rule['state'], []).append(area_rule)
                 if set(ext(('check', 'checkmate'))).intersection(self.end_rules[turn_side]):
                     old_check_side = self.check_side
                     if opponent not in check_sides:
                         if {-opponent.value, opponent.value}.intersection(state_groups):
-                            self.load_pieces()
+                            if not pieces_loaded:
+                                self.load_pieces()
+                                pieces_loaded = True
                             self.load_check(opponent)
                             if self.check_side == opponent:
                                 check_sides[opponent] = True
@@ -2631,7 +2713,9 @@ class Board(Window):
                             else:
                                 old_check_side = self.check_side
                                 if opponent not in check_sides:
-                                    self.load_pieces()
+                                    if not pieces_loaded:
+                                        self.load_pieces()
+                                        pieces_loaded = True
                                     self.load_check(opponent)
                                     if self.check_side == opponent:
                                         check_sides[opponent] = True
@@ -2723,6 +2807,7 @@ class Board(Window):
                                 any_check_or_mate.intersection(self.end_rules[turn_side.opponent()])
                                 and chained_move and issubclass(type(move.piece), Slow)
                             ):
+                                pieces_loaded = False
                                 self.load_pieces()
                                 if move.piece.board_pos in self.royal_markers[turn_side]:
                                     self.load_check(turn_side)
@@ -2819,6 +2904,7 @@ class Board(Window):
                                             if not future_rules:
                                                 legal = False
                                             else:
+                                                pieces_loaded = False
                                                 self.load_pieces()  # update piece counts
                                                 if p_type not in new_limit_hits:
                                                     if p_type not in new_limit_groups:
@@ -2852,6 +2938,7 @@ class Board(Window):
                                         any_check_or_mate.intersection(self.end_rules[turn_side.opponent()])
                                         and chained_move and issubclass(type(move.piece), Slow)
                                     ):
+                                        pieces_loaded = False
                                         self.load_pieces()
                                         if move.piece.board_pos in self.royal_markers[turn_side]:
                                             self.load_check(turn_side)
@@ -2862,6 +2949,7 @@ class Board(Window):
                                     j += 1
                             move_rules = next_future_rules
                             if legal:
+                                pieces_loaded = False
                                 self.load_pieces()
                                 self.load_check(turn_side)
                                 if self.check_side == turn_side:
@@ -2938,6 +3026,7 @@ class Board(Window):
                                 move_fits = self.fits_any(move_rules, 'check', [0], fit=False)
                                 if move_rules and not move_fits:
                                     old_check_side = self.check_side
+                                    pieces_loaded = False
                                     self.load_pieces()
                                     self.load_check(opponent)
                                     check_requirements = [1 if self.check_side == opponent else -1]

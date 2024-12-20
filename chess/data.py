@@ -74,7 +74,7 @@ default_rules = {
     'check': 0,
 }
 
-default_sub_rules = {
+default_move_rules = {
     'by': [1],
     'piece': ["*"],
     'move': ["*"],
@@ -85,6 +85,17 @@ default_sub_rules = {
     'lose': ["*"],
     'new': ["*"],
     'old': ["*"],
+}
+
+default_sub_rules = {
+    'last': default_move_rules.copy(),
+    'next': default_move_rules.copy(),
+    'at': {
+        'count': 1,
+        'piece': ["*"],
+        'side': ["*"],
+        'at': ["*"],
+    },
 }
 
 default_end_rules = {
@@ -116,7 +127,7 @@ def expand_types(lst: Collection[str]) -> Collection[str]:
     return chain.from_iterable((p + s for p in ('', prefix_chars['not'])) for s in lst)
 
 
-piece_groups: list[dict[str, str | list[type[Piece]]]] = [
+piece_groups: list[dict[str, str | list[type[AbstractPiece]]]] = [
     {
         'name': "Fabulous FIDEs",
         'set': [fide.Rook, fide.Knight, fide.Bishop, fide.Queen, fide.King, fide.Bishop, fide.Knight, fide.Rook],
