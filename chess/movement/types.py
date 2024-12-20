@@ -915,6 +915,45 @@ class SpinMovement(RepeatBentMovement):
         return self.board, unpack(self.movement_cycle), self.reverse, self.start_index, self.step_count, self.loop
 
 
+class StageMovement(BaseMultiMovement):
+    def raise_pieces(self, pieces: list[Piece]):
+        for piece in pieces:
+            blank = type(self.board.no_piece)(board=self.board, board_pos=piece.board_pos)
+            abs_pos = self.board.get_absolute(piece.board_pos)
+            self.board.pieces[abs_pos[0]][abs_pos[1]] = blank
+
+    def lower_pieces(self, pieces: list[Piece]):
+        for piece in pieces:
+            abs_pos = self.board.get_absolute(piece.board_pos)
+            self.board.pieces[abs_pos[0]][abs_pos[1]] = piece
+
+    def moves(self, pos_from: Position, piece: Piece, theoretical: bool = False, index: int = 0):
+        if index >= len(self.movements):
+            return ()
+        if index == len(self.movements) - 1:
+            for move in self.movements[index].moves(pos_from, piece, theoretical):
+                self.board.update_move(move)
+                yield move
+            return ()
+        if theoretical:
+            yield from self.movements[index].moves(pos_from, piece, theoretical)
+        else:
+            for move in self.movements[index].moves(pos_from, piece, theoretical):
+                self.board.update_move(move)
+                self.raise_pieces(move.captured)
+                for next_move in self.moves(pos_from, piece, theoretical, index + 1):
+                    if next_move.pos_from == move.pos_from and next_move.pos_to == move.pos_to:
+                        combined_move = copy(next_move).set(
+                            captured=move.captured + next_move.captured,
+                            chained_move=move.chained_move or next_move.chained_move,
+                        )
+                        self.lower_pieces(move.captured)
+                        self.board.update_move(combined_move)
+                        yield combined_move
+                        self.raise_pieces(move.captured)
+                self.lower_pieces(move.captured)
+
+
 class ChainMovement(BaseMultiMovement):
     def moves(self, pos_from: Position, piece: Piece, theoretical: bool = False, index: int = 0):
         if index >= len(self.movements):
@@ -1233,12 +1272,17 @@ class ChoiceMovement(BaseChoiceMovement):
                     else:
                         legal = False
                         mark = 'i!' if invert else 'i'
+                        captures = move.captured[:]
                         to_piece = self.board.get_piece(move.pos_to)
+                        if to_piece.side and piece.captures(to_piece):
+                            captures.append(to_piece)
                         if not value:
-                            if (piece == to_piece or not to_piece.side) != invert:
+                            if not captures != invert:
                                 legal = True
-                        elif (piece.captures(to_piece) and self.board.fits(value, to_piece)) != invert:
+                        elif any(piece.captures(x) and self.board.fits(value, x) for x in captures) != invert:
                             legal = True
+                        if not theoretical and not legal:
+                            continue
                         yield copy(move).set(is_legal=legal).unmark('n').mark(mark)
 
 
