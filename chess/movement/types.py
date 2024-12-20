@@ -1396,7 +1396,7 @@ class CoordinateMovement(BaseChoiceMovement):
                 if lookup_result is None:
                     relay_target_dict.setdefault(key, {})[pos_from] = set()
                     for lookup in self.lookup:
-                        for move in lookup.moves(pos_from, tester, theoretical):
+                        for move in lookup.moves(pos_from, tester, True):
                             relay_target_dict[key][pos_from].add(move.pos_to)
                             relay_source_dict.setdefault(move.pos_to, set()).add((key, pos_from))
                     lookup_result = relay_target_dict[key][pos_from]
@@ -1423,11 +1423,14 @@ class CoordinateMovement(BaseChoiceMovement):
             for movement, partner_movement in self.movement_dict[key]:
                 def partner_moves():
                     for new_partner in partners:
-                        for partner_move in partner_movement.moves(new_partner.board_pos, new_partner, False):
+                        partner_tester = copy(new_partner)
+                        partner_tester.blocked_by = lambda p: False
+                        partner_tester.captures = lambda p: p.side
+                        for partner_move in partner_movement.moves(new_partner.board_pos, partner_tester, True):
                             partner_poss.add(partner_move.pos_to)
                             yield partner_move.pos_to
                 pos_generator = partner_moves()
-                for move in movement.moves(pos_from, piece, theoretical):
+                for move in movement.moves(pos_from, tester, True):
                     if move.pos_to in partner_poss:
                         is_legal = True
                     else:
