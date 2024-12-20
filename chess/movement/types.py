@@ -283,6 +283,13 @@ class ProximityRiderMovement(RiderMovement):
             if piece.captures(capture):
                 self.data['capture'] = capture
 
+    def stop_condition(self, move: Move, direction: AnyDirection, piece: Piece, theoretical: bool = False) -> bool:
+        if not theoretical:
+            next_pos_to = self.transform(add(move.pos_from, mul(direction[:2], self.steps + 1)))
+            if not (self.loop and move.pos_from == next_pos_to) and not self.board.not_a_piece(next_pos_to):
+                return True
+        return super().stop_condition(move, direction, piece, theoretical)
+
     def moves(self, pos_from: Position, piece: Piece, theoretical: bool = False):
         for move in super().moves(pos_from, piece, theoretical):
             if not theoretical and self.data['capture']:
