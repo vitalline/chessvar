@@ -809,8 +809,8 @@ class RepeatBentMovement(BaseMultiMovement):
                     if stop:
                         break
                 if (
-                    not stop and move is not None and len(direction) > 2 and direction[2] and
-                    move.pos_to == add(pos_from, piece.side.direction(mul(direction[:2], direction[2])))
+                    not stop and move is not None and (len(direction) < 3 or direction[2] and
+                    move.pos_to == add(pos_from, piece.side.direction(mul(direction[:2], direction[2]))))
                     and (theoretical or not self.board.get_piece(move.pos_to).side)
                 ):
                     for bent_move in self.moves(move.pos_to, piece, theoretical, true_index + 1):
