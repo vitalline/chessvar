@@ -257,6 +257,42 @@ class HopperRiderMovement(CannonRiderMovement):
             yield move
 
 
+class ProximityRiderMovement(RiderMovement):
+    default_mark = 'z'
+
+    def __init__(
+        self, board: Board,
+        directions: Unpacked[AnyDirection] | None = None,
+        distance: int = 0, boundless: int = 0, loop: int = 0
+    ):
+        super().__init__(board, directions, boundless, loop)
+        self.distance = distance
+
+    def initialize_direction(self, direction: AnyDirection, pos_from: Position, piece: Piece) -> None:
+        self.data['capture'] = None
+        if self.distance < 0:
+            capture_pos = self.transform(add(pos_from, mul(direction[:2], self.distance)))
+            capture = self.board.get_piece(capture_pos)
+            if piece.captures(capture):
+                self.data['capture'] = capture
+
+    def advance_direction(self, move: Move, direction: AnyDirection, pos_from: Position, piece: Piece) -> None:
+        if self.distance > 0:
+            capture_pos = self.transform(add(move.pos_to, mul(direction[:2], self.distance)))
+            capture = self.board.get_piece(capture_pos)
+            if piece.captures(capture):
+                self.data['capture'] = capture
+
+    def moves(self, pos_from: Position, piece: Piece, theoretical: bool = False):
+        for move in super().moves(pos_from, piece, theoretical):
+            if not theoretical and self.data['capture']:
+                move.captured_piece = self.data['capture']
+            yield move
+
+    def __copy_args__(self):
+        return self.board, unpack(self.directions), self.distance, self.boundless, self.loop
+
+
 class SpaciousRiderMovement(RiderMovement):
     default_mark = 's'
 
@@ -1188,7 +1224,9 @@ class ChoiceMovement(BaseChoiceMovement):
 class RelayMovement(BaseChoiceMovement):
     def __init__(
         self, board: Board,
-        movements: dict[str, tuple[Unpacked[BaseMovement], Unpacked[BaseMovement]]] | None = None
+        movements: dict[str,
+            tuple[Unpacked[BaseMovement]] | tuple[Unpacked[BaseMovement], Unpacked[BaseMovement]]
+        ] | None = None
     ):
         if movements is None:
             movements = {}
@@ -1204,9 +1242,9 @@ class RelayMovement(BaseChoiceMovement):
     def moves(self, pos_from: Position, piece: Piece, theoretical: bool = False):
         relay_target_dict = self.board.relay_targets.get(piece.side, {})
         relay_source_dict = self.board.relay_sources.get(piece.side, {})
-        relay_tester = copy(piece)
-        relay_tester.blocked_by = lambda p: False
-        relay_tester.captures = lambda p: p.side
+        tester = copy(piece)
+        tester.blocked_by = lambda p: False
+        tester.captures = lambda p: p.side
         for key in self.movement_dict:
             value, invert = (key[1:], True) if key.startswith('!') else (key, False)
             relays, movements = self.movement_dict[key]
@@ -1219,7 +1257,7 @@ class RelayMovement(BaseChoiceMovement):
                 if key not in relay_target_dict or pos_from not in relay_target_dict[key]:
                     relay_target_dict.setdefault(key, {})[pos_from] = set()
                     for relay in relays:
-                        for move in relay.moves(pos_from, relay_tester, theoretical):
+                        for move in relay.moves(pos_from, tester, theoretical):
                             relay_target_dict[key][pos_from].add(move.pos_to)
                             relay_source_dict.setdefault(move.pos_to, set()).add((key, pos_from))
                 if key in relay_target_dict and pos_from in relay_target_dict[key]:
@@ -1239,6 +1277,87 @@ class RelayMovement(BaseChoiceMovement):
 
     def __copy_args__(self):
         return self.board, {key: (unpack(value[0]), unpack(value[1])) for key, value in self.movement_dict.items()}
+
+
+class CoordinateMovement(BaseChoiceMovement):
+    def __init__(
+        self, board: Board,
+        movements: dict[str,
+            tuple[Unpacked[BaseMovement]] | tuple[Unpacked[BaseMovement], Unpacked[BaseMovement]] |
+            tuple[Unpacked[str | BaseMovement], Unpacked[BaseMovement], Unpacked[BaseMovement]]
+        ] | None = None
+    ):
+        if movements is None:
+            movements = {}
+        to_movement = lambda x: AbsoluteMovement(board, x) if isinstance(x, str) else x
+        movement_dict = {
+            key: ([to_movement(x) for x in repack(packed[0], list)], repack(packed[1], list), repack(packed[2], list))
+            if ((length := len(packed := value if isinstance(value, (list, tuple)) else [value])) > 2)
+            else ([FreeMovement(board)], repack(packed[0], list), repack(packed[1], list))
+            if length > 1 else ([FreeMovement(board)], repack(packed[0], list), repack(copy(packed[0]), list))
+            for key, value in movements.items()
+        }
+        super().__init__(board, {key: list(chain.from_iterable(value)) for key, value in movement_dict.items()})
+        self.movement_dict = movement_dict
+
+    def moves(self, pos_from: Position, piece: Piece, theoretical: bool = False):
+        relay_target_dict = self.board.relay_targets.get(piece.side, {})
+        relay_source_dict = self.board.relay_sources.get(piece.side, {})
+        tester = copy(piece)
+        tester.blocked_by = lambda p: False
+        tester.captures = lambda p: p.side
+        for key in self.movement_dict:
+            value, invert = (key[1:], True) if key.startswith('!') else (key, False)
+            partner_lookups, movements, partner_movements = self.movement_dict[key]
+            partners = []
+            if not key:
+                mark = None
+                partners = [piece]  # self-partnership galore! jokes aside, this simply means the piece has normal moves
+            else:
+                mark = 'q'
+                if key not in relay_target_dict or pos_from not in relay_target_dict[key]:
+                    relay_target_dict.setdefault(key, {})[pos_from] = set()
+                    for lookup in partner_lookups:
+                        for move in lookup.moves(pos_from, tester, theoretical):
+                            relay_target_dict[key][pos_from].add(move.pos_to)
+                            relay_source_dict.setdefault(move.pos_to, set()).add((key, pos_from))
+                if key in relay_target_dict and pos_from in relay_target_dict[key]:
+                    for pos in relay_target_dict[key][pos_from]:
+                        partner = self.board.get_piece(pos)
+                        if value.isdigit() and (int(value) == partner.side.value):
+                            partners.append(partner)
+                        elif piece.friendly_to(partner) and self.board.fits(value, partner):
+                            partners.append(partner)
+            if not theoretical and bool(partners) == invert:
+                continue
+            partner_poss = set()
+            def partner_moves():
+                for new_partner in partners:
+                    for partner_movement in partner_movements:
+                        for partner_move in partner_movement.moves(new_partner.board_pos, new_partner, False):
+                            partner_poss.add(partner_move.pos_to)
+                            yield partner_move.pos_to
+            pos_generator = () if mark is None else partner_moves()
+            for movement in movements:
+                for move in movement.moves(pos_from, piece, theoretical):
+                    is_legal = mark is None
+                    if not is_legal:
+                        if move.pos_to in partner_poss:
+                            is_legal = True
+                        else:
+                            for pos in pos_generator:
+                                if move.pos_to == pos:
+                                    is_legal = True
+                                    break
+                    new_move = copy(move) if not mark else copy(move).set(is_legal=is_legal)
+                    if mark is not None:
+                        new_move.unmark('n').mark(mark)
+                    yield new_move
+
+    def __copy_args__(self):
+        return self.board, {
+            key: (unpack(value[0]), unpack(value[1]), unpack(value[2])) for key, value in self.movement_dict.items()
+        }
 
 
 class BaseAreaMovement(BaseChoiceMovement):
@@ -1300,6 +1419,48 @@ class TagMovement(BaseChoiceMovement):
                 for movement in self.movement_dict[key]:
                     for move in movement.moves(pos_from, piece, theoretical):
                         yield copy(move).set(tag=key or None)
+
+
+class ImitatorMovement(BaseMovement):
+    def __init__(self, board: Board, lookup_offsets: Unpacked[int] = 1, track_promotion: int = 1, track_drops: int = 0):
+        super().__init__(board)
+        self.lookup_offsets = repack(lookup_offsets, list)
+        self.track_promotion = track_promotion
+        self.track_drops = track_drops
+
+    def moves(self, pos_from: Position, piece: Piece, theoretical: bool = False):
+        movements = []
+        abs_offsets, rel_offsets = set(), set()
+        for offset in self.lookup_offsets:
+            if not offset:
+                continue
+            (abs_offsets if offset < 0 else rel_offsets).add(abs(offset))
+        for offsets, history in (
+            (abs_offsets, self.board.move_history),
+            (rel_offsets, self.board.move_history[::-1])
+        ):
+            offset, min_offset, max_offset = 0, min(offsets), max(offsets)
+            for move in history:
+                if not move:
+                    offset += 1
+                elif not move.is_edit:
+                    offset += 1
+                    if offset < min_offset or offset > max_offset:
+                        continue
+                    if issubclass(move.movement_type or type, DropMovement):
+                        if self.track_drops and move.promotion:
+                            movements.append(self.board.get_piece(move.pos_to).movement)
+                    elif move.promotion:
+                        promotion_flags = self.track_promotion + 1
+                        if promotion_flags & 1 and move.piece:
+                            movements.append(move.piece.movement)
+                        if promotion_flags & 2 and move.promotion:
+                            movements.append(self.board.get_piece(move.pos_to).movement)
+                    elif move.piece:
+                        movements.append(move.piece.movement)
+        for movement in movements:
+            if isinstance(movement, BaseMovement):
+                yield from movement.moves(pos_from, piece, theoretical)
 
 
 # Movements that do not move the piece, instead interacting with the game in other, more mysterious ways. Intrigued yet?
