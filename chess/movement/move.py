@@ -29,7 +29,7 @@ class Move(object):
         is_edit: int = 0,
         is_legal: bool = True
     ):
-        if isinstance(captured, Piece):
+        if captured and not isinstance(captured, list):
             captured = [captured]
         self.pos_from = pos_from
         self.pos_to = pos_to
@@ -77,7 +77,7 @@ class Move(object):
         self.piece = piece or self.piece
         self.movement_type = movement_type or self.movement_type
         if captured is not None:
-            if isinstance(captured, Piece):
+            if not isinstance(captured, list):
                 captured = [captured, *self.captured]
             self.captured = sorted(captured or [], key=lambda x: x.board_pos or ())
         self.swapped_piece = swapped_piece or self.swapped_piece

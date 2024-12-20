@@ -990,7 +990,7 @@ class MultiMovement(BaseMultiMovement):
                     chained_move = move
                     while chained_move:
                         is_legal = True
-                        captures = chained_move.captures or [self.board.get_piece(chained_move.pos_to)]
+                        captures = chained_move.captured or [self.board.get_piece(chained_move.pos_to)]
                         for capture in captures:
                             if piece.captures(capture) and piece != capture:
                                 is_legal = False
@@ -1005,7 +1005,7 @@ class MultiMovement(BaseMultiMovement):
                     chained_move = move
                     while chained_move:
                         is_legal = False
-                        captures = chained_move.captures or [self.board.get_piece(chained_move.pos_to)]
+                        captures = chained_move.captured or [self.board.get_piece(chained_move.pos_to)]
                         for capture in captures:
                             if piece.captures(capture):
                                 is_legal = True
