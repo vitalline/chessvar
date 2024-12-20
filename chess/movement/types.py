@@ -1240,7 +1240,8 @@ class RelayMovement(BaseChoiceMovement):
         self, board: Board,
         movements: dict[str,
             tuple[Unpacked[BaseMovement]] | tuple[Unpacked[BaseMovement], Unpacked[BaseMovement]]
-        ] | None = None
+        ] | None = None,
+        check_enemy: int = 0
     ):
         if movements is None:
             movements = {}
@@ -1252,6 +1253,7 @@ class RelayMovement(BaseChoiceMovement):
         }
         super().__init__(board, {key: list(chain.from_iterable(value)) for key, value in movement_dict.items()})
         self.movement_dict = movement_dict
+        self.check_enemy = check_enemy
 
     def moves(self, pos_from: Position, piece: Piece, theoretical: bool = False):
         relay_target_dict = self.board.relay_targets.get(piece.side, {})
@@ -1277,11 +1279,8 @@ class RelayMovement(BaseChoiceMovement):
                 if key in relay_target_dict and pos_from in relay_target_dict[key]:
                     for pos in relay_target_dict[key][pos_from]:
                         relay_piece = self.board.get_piece(pos)
-                        if value.isdigit() and (int(value) == relay_piece.side.value):
+                        if (piece.friendly_to(relay_piece) != self.check_enemy) and self.board.fits(value, relay_piece):
                             is_relayed = True
-                        elif piece.friendly_to(relay_piece) and self.board.fits(value, relay_piece):
-                            is_relayed = True
-                        if is_relayed:
                             break
             if not theoretical and is_relayed == invert:
                 continue
@@ -1338,9 +1337,7 @@ class CoordinateMovement(BaseChoiceMovement):
                 if key in relay_target_dict and pos_from in relay_target_dict[key]:
                     for pos in relay_target_dict[key][pos_from]:
                         partner = self.board.get_piece(pos)
-                        if value.isdigit() and (int(value) == partner.side.value):
-                            partners.append(partner)
-                        elif piece.friendly_to(partner) and self.board.fits(value, partner):
+                        if piece.friendly_to(partner) and self.board.fits(value, partner):
                             partners.append(partner)
             if not theoretical and bool(partners) == invert:
                 continue
@@ -1436,11 +1433,11 @@ class TagMovement(BaseChoiceMovement):
 
 
 class ImitatorMovement(BaseMovement):
-    def __init__(self, board: Board, lookup_offsets: Unpacked[int] = 1, track_promotion: int = 1, track_drops: int = 0):
+    def __init__(self, board: Board, lookup_offsets: Unpacked[int] = 0, skip_promotion: int = 0, skip_drop: int = 0):
         super().__init__(board)
-        self.lookup_offsets = repack(lookup_offsets, list)
-        self.track_promotion = track_promotion
-        self.track_drops = track_drops
+        self.lookup_offsets = repack(lookup_offsets or 1, list)
+        self.skip_promotion = skip_promotion  # 0: promotion only (default), 1: piece only, 2: both
+        self.skip_drop = skip_drop
 
     def moves(self, pos_from: Position, piece: Piece, theoretical: bool = False):
         movements = []
@@ -1462,19 +1459,22 @@ class ImitatorMovement(BaseMovement):
                     if offset < min_offset or offset > max_offset:
                         continue
                     if issubclass(move.movement_type or type, DropMovement):
-                        if self.track_drops and move.promotion:
+                        if not self.skip_drop and move.promotion:
                             movements.append(self.board.get_piece(move.pos_to).movement)
                     elif move.promotion:
-                        promotion_flags = self.track_promotion + 1
-                        if promotion_flags & 1 and move.piece:
-                            movements.append(move.piece.movement)
-                        if promotion_flags & 2 and move.promotion:
+                        promotion_flags = self.skip_promotion + 1
+                        if promotion_flags & 1 and move.promotion:
                             movements.append(self.board.get_piece(move.pos_to).movement)
+                        if promotion_flags & 2 and move.piece:
+                            movements.append(move.piece.movement)
                     elif move.piece:
                         movements.append(move.piece.movement)
         for movement in movements:
             if isinstance(movement, BaseMovement):
                 yield from movement.moves(pos_from, piece, theoretical)
+
+    def __copy_args__(self):
+        return self.board, unpack(self.lookup_offsets), self.skip_promotion, self.skip_drop
 
 
 # Movements that do not move the piece, instead interacting with the game in other, more mysterious ways. Intrigued yet?
