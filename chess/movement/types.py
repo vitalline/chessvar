@@ -1448,7 +1448,8 @@ class CoordinateMovement(BaseChoiceMovement):
             for move in movement.moves(pos_from, piece, theoretical):
                 if not theoretical:
                     move = copy(move).set(captured=[
-                        self.board.get_piece(x) for x in self.coordinate_captures(move.pos_to, piece, theoretical)
+                        capture for x in self.coordinate_captures(move.pos_to, piece, theoretical)
+                        if piece.captures((capture := self.board.get_piece(x)))
                     ]).unmark('n').mark('q')
                 yield move
 
