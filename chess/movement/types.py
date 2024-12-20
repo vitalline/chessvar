@@ -1230,7 +1230,7 @@ class ChoiceMovement(BaseChoiceMovement):
                         if not value:
                             if (piece == to_piece or not to_piece.side) != invert:
                                 legal = True
-                        elif self.board.fits(value, to_piece) != invert:
+                        elif (piece.captures(to_piece) and self.board.fits(value, to_piece)) != invert:
                             legal = True
                         yield copy(move).set(is_legal=legal).unmark('n').mark(mark)
 
@@ -1377,9 +1377,9 @@ class CoordinateMovement(BaseChoiceMovement):
         for movement in self.base_movements:
             for move in movement.moves(pos_from, piece, theoretical):
                 if not theoretical:
-                    move = copy(move).set(
-                        captured=self.coordinate_captures(move.pos_to, piece, theoretical)
-                    ).unmark('n').mark('q')
+                    move = copy(move).set(captured=[
+                        self.board.get_piece(x) for x in self.coordinate_captures(move.pos_to, piece, theoretical)
+                    ]).unmark('n').mark('q')
                 yield move
 
     def __copy_args__(self):

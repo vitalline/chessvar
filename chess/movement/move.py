@@ -36,7 +36,7 @@ class Move(object):
         self.pos_to = pos_to
         self.movement_type = movement_type
         self.piece = piece
-        self.captured = sorted(captured or [], key=lambda x: x.board_pos or ())
+        self.captured = sorted(captured or [], key=lambda x: (x.board_pos or ()))
         self.swapped_piece = swapped_piece
         self.placed_piece = placed_piece
         self.promotion = promotion
@@ -80,7 +80,7 @@ class Move(object):
         if captured is not None:
             if not isinstance(captured, Collection):
                 captured = [captured, *self.captured]
-            self.captured = sorted(captured or [], key=lambda x: x.board_pos or ())
+            self.captured = sorted(captured or [], key=lambda x: (x.board_pos or ()))
         self.swapped_piece = swapped_piece or self.swapped_piece
         self.placed_piece = placed_piece or self.placed_piece
         self.promotion = (
