@@ -32,8 +32,8 @@ from chess.debug import debug_info, save_piece_data, save_piece_sets, save_piece
 from chess.movement.base import BaseMovement
 from chess.movement.move import Move
 from chess.movement.types import AutoCaptureMovement, AutoRangedAutoCaptureRiderMovement, BaseMultiMovement
-from chess.movement.types import CastlingMovement, CastlingPartnerMovement, ChangingMovement
-from chess.movement.types import CloneMovement, DropMovement, ProbabilisticMovement
+from chess.movement.types import CastlingMovement, CastlingPartnerMovement, ChangingMovement, CloneMovement
+from chess.movement.types import CoordinateMovement, DropMovement, ProbabilisticMovement, RelayMovement
 from chess.movement.types import is_active
 from chess.movement.util import Position, GenericPosition, ANY, LAST, NONE
 from chess.movement.util import add, to_alpha as b26, resolve as res
@@ -2076,7 +2076,7 @@ class Board(Window):
         if self.edit_mode:
             return
         opponent = side.opponent()
-        self.load_theoretical_moves(opponent)
+        self.load_theoretical_moves(opponent, False)
         threat_dict = self.threats.get(opponent, {})
         if not threat_dict:
             return
@@ -2290,10 +2290,12 @@ class Board(Window):
                     self.win_side, self.end_group, self.end_value = loss_side.opponent(), loss_group, loss_value
                 return
 
-    def load_theoretical_moves(self, side: Side | None = None) -> None:
+    def load_theoretical_moves(self, side: Side | None = None, update: bool = True) -> None:
         def is_changing(movement: BaseMovement) -> bool:
             if isinstance(movement, ChangingMovement):
                 return True
+            elif isinstance(movement, (CoordinateMovement, RelayMovement)):
+                return update
             elif isinstance(movement, BaseMultiMovement):
                 return any(is_changing(m) for m in movement.movements)
             return False
@@ -2302,8 +2304,11 @@ class Board(Window):
         if side not in self.threats:
             self.threats[side] = {}
         for piece in self.movable_pieces[side][:]:
-            if piece.board_pos in self.theoretical_moves[side] and not is_changing(piece.movement):
-                continue
+            if piece.board_pos in self.theoretical_moves[side]:
+                if is_changing(piece.movement):
+                    self.clear_theoretical_moves(side, piece.board_pos)
+                else:
+                    continue
             for move in piece.moves(theoretical=True):
                 pos_from, pos_to = move.pos_from, move.pos_to or move.pos_from
                 self.theoretical_moves[side].setdefault(pos_from, {}).setdefault(pos_to, []).append(move)
@@ -3079,7 +3084,7 @@ class Board(Window):
                             for chained in move_chain[::-1]:
                                 self.undo(chained, False)
                                 self.revert_auto_capture_markers(chained)
-                            self.load_theoretical_moves(turn_side)
+                            self.load_theoretical_moves(turn_side, False)
                             self.en_passant_targets = deepcopy(en_passant_targets)
                             self.en_passant_markers = deepcopy(en_passant_markers)
                             self.royal_ep_targets = deepcopy(royal_ep_targets)
@@ -3651,29 +3656,13 @@ class Board(Window):
     def update_relay_markers(self, move: Move | None = None):
         while move:
             if move.piece and move.pos_from != move.pos_to:
-                sources = self.relay_sources.get(move.piece.side, {}).pop(move.pos_from or move.pos_to, set())
-                targets = self.relay_targets.get(move.piece.side, {})
-                for group, pos in sources:
-                    if group in targets and pos in targets[group]:
-                        targets[group].pop(pos, None)
+                self.clear_relay_markers_for(move.piece, move.pos_from or move.pos_to)
             if move.promotion:
-                sources = self.relay_sources.get(move.promotion.side, {}).pop(move.pos_to, set())
-                targets = self.relay_targets.get(move.promotion.side, {})
-                for group, pos in sources:
-                    if group in targets and pos in targets[group]:
-                        targets[group].pop(pos, None)
+                self.clear_relay_markers_for(move.promotion, move.pos_to)
             for capture in move.captured:
-                sources = self.relay_sources.get(capture.side, {}).pop(capture.board_pos, set())
-                targets = self.relay_targets.get(capture.side, {})
-                for group, pos in sources:
-                    if group in targets and pos in targets[group]:
-                        targets[group].pop(pos, None)
+                self.clear_relay_markers_for(capture, capture.board_pos)
             if move.swapped_piece:
-                sources = self.relay_sources.get(move.swapped_piece.side, {}).pop(move.pos_to, set())
-                targets = self.relay_targets.get(move.swapped_piece.side, {})
-                for group, pos in sources:
-                    if group in targets and pos in targets[group]:
-                        targets[group].pop(pos, None)
+                self.clear_relay_markers_for(move.swapped_piece, move.pos_to)
             move = move.chained_move
 
     def revert_relay_markers(self, move: Move | None = None):
@@ -3684,34 +3673,28 @@ class Board(Window):
         for move in move_chain[::-1]:
             if move.piece and move.pos_from != move.pos_to:
                 piece = move.promotion or move.piece
-                sources = self.relay_sources.get(piece.side, {}).pop(move.pos_to or move.pos_from, set())
-                targets = self.relay_targets.get(piece.side, {})
-                for group, pos in sources:
-                    if group in targets and pos in targets[group]:
-                        targets[group].pop(pos, None)
+                self.clear_relay_markers_for(piece, move.pos_to or move.pos_from)
             if move.promotion:
-                sources = self.relay_sources.get(move.promotion.side, {}).pop(move.pos_to, set())
-                targets = self.relay_targets.get(move.promotion.side, {})
-                for group, pos in sources:
-                    if group in targets and pos in targets[group]:
-                        targets[group].pop(pos, None)
+                self.clear_relay_markers_for(move.promotion, move.pos_to)
             for capture in move.captured:
-                sources = self.relay_sources.get(capture.side, {}).pop(capture.board_pos, set())
-                targets = self.relay_targets.get(capture.side, {})
-                for group, pos in sources:
-                    if group in targets and pos in targets[group]:
-                        targets[group].pop(pos, None)
+                self.clear_relay_markers_for(capture, capture.board_pos)
             if move.swapped_piece:
-                sources = self.relay_sources.get(move.swapped_piece.side, {}).pop(move.pos_from, set())
-                targets = self.relay_targets.get(move.swapped_piece.side, {})
-                for group, pos in sources:
-                    if group in targets and pos in targets[group]:
-                        targets[group].pop(pos, None)
+                self.clear_relay_markers_for(move.swapped_piece, move.pos_to)
 
     def clear_relay_markers(self) -> None:
-        for relay_dict in (self.relay_targets, self.relay_sources):
+        for relay_dict in (self.relay_sources, self.relay_targets):
             for side in relay_dict:
                 relay_dict[side].clear()
+
+    def clear_relay_markers_for(self, piece: AbstractPiece, pos: Position):
+        sources = self.relay_sources.get(piece.side, {})
+        targets = self.relay_targets.get(piece.side, {})
+        for piece_type in sources:
+            type_sources = sources.get(piece_type, {}).get(type(piece), {})
+            type_targets = targets.get(piece_type, {}).get(type(piece), {})
+            for group, source_pos in type_sources.pop(pos, set()):
+                if group in type_targets and pos in type_targets[group]:
+                    type_targets[group].pop(pos, None)
 
     def update_end_data(self, move: Move | None = None) -> None:
         if self.edit_mode or (move and move.is_edit):

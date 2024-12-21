@@ -1310,8 +1310,8 @@ class RelayMovement(BaseChoiceMovement):
         self.check_enemy = check_enemy
 
     def moves(self, pos_from: Position, piece: Piece, theoretical: bool = False):
-        relay_target_dict = self.board.relay_targets.get(piece.side, {})
-        relay_source_dict = self.board.relay_sources.get(piece.side, {})
+        relay_target_dict = self.board.relay_targets.get(piece.side, {}).setdefault(type(piece), {})
+        relay_source_dict = self.board.relay_sources.get(piece.side, {}).setdefault(type(piece), {})
         tester = copy(piece)
         tester.blocked_by = lambda p: False
         tester.captures = lambda p: p.side
@@ -1364,7 +1364,7 @@ class RelayMovement(BaseChoiceMovement):
         )
 
 
-class CoordinateMovement(BaseChoiceMovement, ChangingMovement):
+class CoordinateMovement(BaseChoiceMovement):
     def __init__(
         self, board: Board,
         movement: Unpacked[BaseMovement] | None = None,
@@ -1391,8 +1391,8 @@ class CoordinateMovement(BaseChoiceMovement, ChangingMovement):
         self.lookup = lookup
 
     def coordinate(self, pos_from: Position, piece: Piece, theoretical: bool = False):
-        relay_target_dict = self.board.relay_targets.get(piece.side, {})
-        relay_source_dict = self.board.relay_sources.get(piece.side, {})
+        relay_target_dict = self.board.relay_targets.get(piece.side, {}).setdefault(type(piece), {})
+        relay_source_dict = self.board.relay_sources.get(piece.side, {}).setdefault(type(piece), {})
         tester = copy(piece)
         tester.blocked_by = lambda p: False
         tester.captures = lambda p: p.side
@@ -1404,7 +1404,7 @@ class CoordinateMovement(BaseChoiceMovement, ChangingMovement):
                 if lookup_result is None:
                     relay_target_dict.setdefault(key, {})[pos_from] = set()
                     for lookup in self.lookup:
-                        for move in lookup.moves(pos_from, tester, True):
+                        for move in lookup.moves(pos_from, tester, theoretical):
                             relay_target_dict[key][pos_from].add(move.pos_to)
                             relay_source_dict.setdefault(move.pos_to, set()).add((key, pos_from))
                     lookup_result = relay_target_dict[key][pos_from]
@@ -1412,6 +1412,7 @@ class CoordinateMovement(BaseChoiceMovement, ChangingMovement):
                     relay_target_dict.setdefault(key, {})[pos_from] = copy(lookup_result)
                     for pos_to in lookup_result:
                         relay_source_dict.setdefault(pos_to, set()).add((key, pos_from))
+        tester.captures = lambda p: False
         coordinate_poss = set()
         for key in self.movement_dict:
             if key in '!':
@@ -1427,18 +1428,18 @@ class CoordinateMovement(BaseChoiceMovement, ChangingMovement):
                         partners.append(partner)
             if not theoretical and bool(partners) == invert:
                 continue
-            partner_poss = set()
             for movements in self.movement_dict[key]:
+                partner_poss = set()
                 def partner_moves():
                     for new_partner in partners:
                         partner_tester = copy(new_partner)
                         partner_tester.blocked_by = lambda p: False
-                        partner_tester.captures = lambda p: p.side
-                        for partner_move in movements[1].moves(new_partner.board_pos, partner_tester, True):
+                        partner_tester.captures = lambda p: False
+                        for partner_move in movements[1].moves(new_partner.board_pos, partner_tester, theoretical):
                             partner_poss.add(partner_move.pos_to)
                             yield partner_move.pos_to
                 pos_generator = partner_moves()
-                for move in movements[0].moves(pos_from, tester, True):
+                for move in movements[0].moves(pos_from, tester, theoretical):
                     if move.pos_to in partner_poss:
                         is_legal = True
                     else:
