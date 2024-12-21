@@ -47,7 +47,7 @@ class RiderMovement(BaseMovement):
 
     def moves(self, pos_from: Position, piece: Piece, theoretical: bool = False):
         if self.board.not_on_board(pos_from):
-            return ()
+            return
         board_size = self.board.board_height, self.board.board_width
         board_offset = self.board.notation_offset[1], self.board.notation_offset[0]
         board_bounds = [[x + board_offset[i] for x in (0, board_size[i])] for i in range(2)]
@@ -736,7 +736,7 @@ class PlyMovement(IndexMovement):
                 index += 1
                 count = self.board.get_turn_index(index, 0)
                 if count == start_count:
-                    return ()
+                    return
             index -= 1
         yield from super().moves(pos_from, piece, theoretical, index)
 
@@ -766,7 +766,7 @@ class RepeatBentMovement(BaseMultiMovement):
         if index == 0:
             self.dir_indexes = [-1] * len(self.dir_indexes)
         if self.step_count and index >= self.step_count:
-            return ()
+            return
         true_index = index
         if index >= len(self.dir_indexes):
             if self.cycle_mode > 0:
@@ -776,7 +776,7 @@ class RepeatBentMovement(BaseMultiMovement):
                 if index >= len(self.dir_indexes):
                     index = 2 * (len(self.dir_indexes) - 1) - index
             else:
-                return ()
+                return
         movement = copy(self.movements[index])  # copy movement because changing it inside the loop will likely break it
         if isinstance(movement, RiderMovement):
             if self.path_split:
@@ -818,7 +818,7 @@ class RepeatBentMovement(BaseMultiMovement):
                         yield copy(bent_move).set(pos_from=pos_from, captured=move.captured + bent_move.captured)
                         self.dir_indexes = dir_indexes  # you can probably guess what this does by now, moving on
         else:
-            return ()
+            return
 
     def __copy_args__(self):
         return (
@@ -965,12 +965,12 @@ class StageMovement(BaseMultiMovement):
 class ChainMovement(BaseMultiMovement):
     def moves(self, pos_from: Position, piece: Piece, theoretical: bool = False, index: int = 0):
         if index >= len(self.movements):
-            return ()
+            return
         if index == len(self.movements) - 1:
             for move in self.movements[index].moves(pos_from, piece, theoretical):
                 self.board.update_move(move)
                 yield move
-            return ()
+            return
         if theoretical:
             for move in self.movements[index].moves(pos_from, piece, theoretical):
                 yield copy(move)
@@ -1364,7 +1364,7 @@ class RelayMovement(BaseChoiceMovement):
         )
 
 
-class CoordinateMovement(BaseChoiceMovement):
+class CoordinateMovement(BaseChoiceMovement, ChangingMovement):
     def __init__(
         self, board: Board,
         movement: Unpacked[BaseMovement] | None = None,
@@ -1390,7 +1390,7 @@ class CoordinateMovement(BaseChoiceMovement):
         self.movement = movement
         self.lookup = lookup
 
-    def coordinate_captures(self, pos_from: Position, piece: Piece, theoretical: bool = False):
+    def coordinate(self, pos_from: Position, piece: Piece, theoretical: bool = False):
         relay_target_dict = self.board.relay_targets.get(piece.side, {})
         relay_source_dict = self.board.relay_sources.get(piece.side, {})
         tester = copy(piece)
@@ -1428,17 +1428,17 @@ class CoordinateMovement(BaseChoiceMovement):
             if not theoretical and bool(partners) == invert:
                 continue
             partner_poss = set()
-            for movement, partner_movement in self.movement_dict[key]:
+            for movements in self.movement_dict[key]:
                 def partner_moves():
                     for new_partner in partners:
                         partner_tester = copy(new_partner)
                         partner_tester.blocked_by = lambda p: False
                         partner_tester.captures = lambda p: p.side
-                        for partner_move in partner_movement.moves(new_partner.board_pos, partner_tester, True):
+                        for partner_move in movements[1].moves(new_partner.board_pos, partner_tester, True):
                             partner_poss.add(partner_move.pos_to)
                             yield partner_move.pos_to
                 pos_generator = partner_moves()
-                for move in movement.moves(pos_from, tester, True):
+                for move in movements[0].moves(pos_from, tester, True):
                     if move.pos_to in partner_poss:
                         is_legal = True
                     else:
@@ -1457,7 +1457,7 @@ class CoordinateMovement(BaseChoiceMovement):
                 move = copy(move).unmark('n').mark('q')
                 if not theoretical:
                     move.set(captured=[
-                        capture for x in self.coordinate_captures(move.pos_to, piece, theoretical)
+                        capture for x in self.coordinate(move.pos_to, piece, theoretical)
                         if piece.captures((capture := self.board.get_piece(x)))
                     ])
                 yield move
@@ -1532,7 +1532,7 @@ class TagMovement(BaseChoiceMovement):
                         yield copy(move).set(tag=key or None)
 
 
-class ImitatorMovement(BaseMovement):
+class ImitatorMovement(ChangingMovement):
     def __init__(self, board: Board, lookup_offsets: Unpacked[int] = 0, skip_promotion: int = 0, skip_drop: int = 0):
         super().__init__(board)
         self.lookup_offsets = repack(lookup_offsets or 1, list)

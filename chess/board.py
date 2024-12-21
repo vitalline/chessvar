@@ -31,7 +31,7 @@ from chess.data import expand_types as ext, prefix_chars as pch, prefix_types, t
 from chess.debug import debug_info, save_piece_data, save_piece_sets, save_piece_types
 from chess.movement.base import BaseMovement
 from chess.movement.move import Move
-from chess.movement.types import AutoCaptureMovement, AutoRangedAutoCaptureRiderMovement
+from chess.movement.types import AutoCaptureMovement, AutoRangedAutoCaptureRiderMovement, BaseMultiMovement
 from chess.movement.types import CastlingMovement, CastlingPartnerMovement, ChangingMovement
 from chess.movement.types import CloneMovement, DropMovement, ProbabilisticMovement
 from chess.movement.types import is_active
@@ -2291,12 +2291,18 @@ class Board(Window):
                 return
 
     def load_theoretical_moves(self, side: Side | None = None) -> None:
+        def is_changing(movement: BaseMovement) -> bool:
+            if isinstance(movement, ChangingMovement):
+                return True
+            elif isinstance(movement, BaseMultiMovement):
+                return any(is_changing(m) for m in movement.movements)
+            return False
         if side not in self.theoretical_moves:
             self.theoretical_moves[side] = {}
         if side not in self.threats:
             self.threats[side] = {}
         for piece in self.movable_pieces[side][:]:
-            if piece.board_pos in self.theoretical_moves[side] and not isinstance(piece.movement, ChangingMovement):
+            if piece.board_pos in self.theoretical_moves[side] and not is_changing(piece.movement):
                 continue
             for move in piece.moves(theoretical=True):
                 pos_from, pos_to = move.pos_from, move.pos_to or move.pos_from

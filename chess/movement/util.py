@@ -37,9 +37,9 @@ def idiv(pos: Direction, factor: int) -> Direction:
 def ddiv(pos: Direction, qpos: Direction) -> int:
     if qpos[0] == 0 and qpos[1] == 0:
         return 0
-    if qpos[0] == 0 and qpos[1] != 0 and pos[1] % qpos[1] == 0:
+    if qpos[0] == pos[0] == 0 and qpos[1] != 0 and pos[1] % qpos[1] == 0:
         return pos[1] // qpos[1]
-    if qpos[1] == 0 and qpos[0] != 0 and pos[0] % qpos[0] == 0:
+    if qpos[1] == pos[1] == 0 and qpos[0] != 0 and pos[0] % qpos[0] == 0:
         return pos[0] // qpos[0]
     if (
         qpos[0] != 0 and qpos[1] != 0 and
