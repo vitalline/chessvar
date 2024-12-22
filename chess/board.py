@@ -3702,8 +3702,8 @@ class Board(Window):
             type_sources = sources.get(piece_type, {}).get(type(piece), {})
             type_targets = targets.get(piece_type, {}).get(type(piece), {})
             for group, source_pos in type_sources.pop(pos, set()):
-                if group in type_targets and pos in type_targets[group]:
-                    type_targets[group].pop(pos, None)
+                if group in type_targets and source_pos in type_targets[group]:
+                    type_targets[group].pop(source_pos, None)
 
     def update_end_data(self, move: Move | None = None) -> None:
         if self.edit_mode or (move and move.is_edit):
