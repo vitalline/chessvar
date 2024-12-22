@@ -9,7 +9,7 @@ from chess.movement.base import BaseMovement
 from chess.movement.move import Move
 from chess.movement.util import ANY, AnyDirection, Direction, Position
 from chess.movement.util import add, sub, mul, ddiv, is_algebraic, from_algebraic_map
-from chess.pieces.types import Immune, Slow, Delayed, Delayed1
+from chess.pieces.types import Covered, Delayed, Delayed1, Immune, Slow
 from chess.util import Unpacked, Unset, sign, repack, unpack
 
 if TYPE_CHECKING:
@@ -109,13 +109,12 @@ class RiderMovement(BaseMovement):
 
     def chain(self, move: Move, piece: Piece, theoretical: bool = False):
         if not theoretical:
-            royal_ep_markers = self.board.royal_ep_markers.get(piece.side.opponent(), {})
-            if move.pos_to in royal_ep_markers:
+            if royal_ep_targets := self.board.royal_ep_markers.get(piece.side.opponent(), {}).get(move.pos_to, set()):
                 for chained_move in (
                     Move(
-                        pos_from=move.pos_to, pos_to=royal_ep_markers[move.pos_to],
+                        pos_from=move.pos_to, pos_to=move.pos_to,
                         movement_type=RoyalEnPassantMovement, piece=piece,
-                        captured=self.board.get_piece(royal_ep_markers[move.pos_to]),
+                        captured=[self.board.get_piece(pos) for pos in royal_ep_targets],
                     ).mark(self.default_mark),
                     Move(
                         pos_from=move.pos_to, pos_to=move.pos_to,
@@ -527,17 +526,21 @@ class CastlingMovement(BaseMovement):
                 for gap_offset in self.en_passant_gap:
                     positions.append(add(move.pos_from, gap_offset))
                 if positions:
-                    marker_set = set(positions)
+                    data_set = set()
+                    if isinstance(piece, Covered):
+                        data_set.add(Covered)
                     if isinstance(piece, Delayed):
-                        marker_set.add(Delayed)
+                        data_set.add(Delayed)
                     elif isinstance(piece, Delayed1):
-                        marker_set.add(Delayed1)
+                        data_set.add(Delayed1)
                     if isinstance(piece, Slow):
-                        marker_set.add(Slow)
-                    marker_set.add(type(self))
-                    self.board.royal_ep_targets.get(piece.side, {})[move.pos_to] = marker_set
+                        data_set.add(Slow)
+                    data_set.add(type(self))
+                    self.board.royal_ep_targets.get(piece.side, {})[move.pos_to] = {
+                        pos: data_set.copy() for pos in positions
+                    }
                     for pos in positions:
-                        self.board.royal_ep_markers.get(piece.side, {})[pos] = move.pos_to
+                        self.board.royal_ep_markers.get(piece.side, {}).setdefault(pos, set()).add(move.pos_to)
         super().update(move, piece)
 
     def __copy_args__(self):
@@ -575,16 +578,20 @@ class EnPassantTargetRiderMovement(RiderMovement):
                     continue
                 positions = [add(move.pos_from, mul(direction[:2], i)) for i in range(1, steps)]
                 if positions:
-                    marker_set = set(positions)
+                    data_set = set()
+                    if isinstance(piece, Covered):
+                        data_set.add(Covered)
                     if isinstance(piece, Delayed):
-                        marker_set.add(Delayed)
+                        data_set.add(Delayed)
                     elif isinstance(piece, Delayed1):
-                        marker_set.add(Delayed1)
+                        data_set.add(Delayed1)
                     if isinstance(piece, Slow):
-                        marker_set.add(Slow)
-                    self.board.en_passant_targets.get(piece.side, {})[move.pos_to] = marker_set
+                        data_set.add(Slow)
+                    self.board.en_passant_targets.get(piece.side, {})[move.pos_to] = {
+                        pos: data_set.copy() for pos in positions
+                    }
                     for pos in positions:
-                        self.board.en_passant_markers.get(piece.side, {})[pos] = move.pos_to
+                        self.board.en_passant_markers.get(piece.side, {}).setdefault(pos, set()).add(move.pos_to)
         super().update(move, piece)
 
 
@@ -593,10 +600,9 @@ class EnPassantRiderMovement(RiderMovement):
         for move in super().moves(pos_from, piece, theoretical):
             move.movement_type = RiderMovement
             if not theoretical:
-                marker_dict = self.board.en_passant_markers.get(piece.side.opponent(), {})
-                if move.pos_to in marker_dict:
+                if ep_targets := self.board.en_passant_markers.get(piece.side.opponent(), {}).get(move.pos_to, set()):
                     move.set(
-                        captured=self.board.get_piece(marker_dict[move.pos_to]),
+                        captured=move.captured + [self.board.get_piece(pos) for pos in ep_targets],
                         movement_type=type(self),
                     )
                     move.mark('f')

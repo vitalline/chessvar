@@ -43,7 +43,7 @@ from chess.pieces.groups.classic import Pawn, King
 from chess.pieces.groups.colorbound import King as CBKing
 from chess.pieces.piece import AbstractPiece, Piece
 from chess.pieces.side import Side
-from chess.pieces.types import Delayed, Delayed1, Slow, Shared
+from chess.pieces.types import Covered, Delayed, Delayed1, Shared, Slow
 from chess.pieces.util import NoPiece, Obstacle, Block, Border, Shield, Void, Wall
 from chess.save import condense, expand, condense_algebraic as cnd_alg, expand_algebraic as exp_alg, substitute
 from chess.save import load_move, load_piece, load_rng, load_piece_type, load_custom_type, load_movement_type
@@ -3537,57 +3537,65 @@ class Board(Window):
                 is_final_turn = current_side != next_side
                 for side in {current_side, current_side.opponent()}:
                     side_target_dict, side_marker_dict = target_dict.get(side, {}), marker_dict.get(side, {})
-                    for pos in list(side_marker_dict):
-                        pos_target_set = side_target_dict.get(side_marker_dict[pos], set())
-                        if {Delayed, Delayed1}.intersection(pos_target_set):
-                            if not (side == current_side and is_final_turn and chain_end):
+                    for marker_pos in list(side_marker_dict):
+                        pos_marker_set = side_marker_dict[marker_pos]
+                        for target_pos in list(pos_marker_set):
+                            pos_target_dict = side_target_dict.get(target_pos, {})
+                            pos_target_set = pos_target_dict.get(marker_pos, set())
+                            if {Delayed, Delayed1}.intersection(pos_target_set):
+                                if not (side == current_side and is_final_turn and chain_end):
+                                    continue
+                            if CastlingMovement in pos_target_set:
                                 continue
-                        if CastlingMovement in pos_target_set:
+                            if target_pos == marker_pos:
+                                continue
+                            if Covered not in pos_target_set or isinstance(self.get_piece(marker_pos), NoPiece):
+                                continue
+                            pos_target_dict.pop(marker_pos, None)
+                            pos_marker_set.discard(target_pos)
+                    for target_pos in list(side_target_dict):
+                        if move and target_pos == move.pos_to:
                             continue
-                        if side_marker_dict[pos] == pos or isinstance(self.get_piece(pos), NoPiece):
-                            continue
-                        side_marker_dict.pop(pos, None)
-                        pos_target_set.discard(pos)
-                    for pos in list(side_target_dict):
-                        if move and pos == move.pos_to:
-                            continue
-                        pos_target_set = side_target_dict.get(pos, set())
-                        if Delayed in pos_target_set and not (side == next_side and is_final_turn and chain_end):
-                            continue
-                        if Delayed1 in pos_target_set and not (side == last_side and is_first_turn):
-                            continue
-                        if Slow in pos_target_set:
-                            if chain_end:
-                                pos_target_set.discard(Slow)
-                            continue
-                        if CastlingMovement in pos_target_set:
-                            if chain_end:
-                                pos_target_set.discard(CastlingMovement)
-                            continue
-                        markers = side_target_dict.pop(pos, ())
-                        for marker in markers:
-                            side_marker_dict.pop(marker, None)
+                        pos_target_dict = side_target_dict[target_pos]
+                        for marker_pos in list(pos_target_dict):
+                            pos_marker_set = side_marker_dict.get(marker_pos, set())
+                            pos_target_set = pos_target_dict.get(marker_pos, set())
+                            if Delayed in pos_target_set and not (side == next_side and is_final_turn and chain_end):
+                                continue
+                            if Delayed1 in pos_target_set and not (side == last_side and is_first_turn):
+                                continue
+                            if Slow in pos_target_set:
+                                if chain_end:
+                                    pos_target_set.discard(Slow)
+                                continue
+                            if CastlingMovement in pos_target_set:
+                                if chain_end:
+                                    pos_target_set.discard(CastlingMovement)
+                                continue
+                            pos_target_dict.pop(marker_pos, None)
+                            pos_marker_set.discard(target_pos)
             if move:
                 for capture in move.captured:
-                    for pos in target_dict.get(capture.side, {}).pop(capture.board_pos, ()):
-                        marker_dict.get(capture.side, {}).pop(pos, None)
+                    side = capture.side
+                    side_target_dict, side_marker_dict = target_dict.get(side, {}), marker_dict.get(side, {})
+                    for marker_pos in side_target_dict.pop(capture.board_pos, {}):
+                        side_marker_dict.get(marker_pos, set()).discard(capture.board_pos)
                 for piece, old_pos in ((move.piece, move.pos_from), (move.swapped_piece, move.pos_to)):
                     if piece is None:
                         continue
                     pos_from, pos_to = old_pos, piece.board_pos
                     if pos_from == pos_to:
                         continue
+                    side = piece.side
+                    side_target_dict, side_marker_dict = target_dict.get(side, {}), marker_dict.get(side, {})
                     if move.is_edit or not issubclass(type(piece), Slow):
-                        for pos in target_dict.get(piece.side, {}).pop(pos_from, ()):
-                            marker_dict.get(piece.side, {}).pop(pos, None)
-                    else:
-                        from_markers = target_dict.get(piece.side, {}).pop(pos_from, ())
-                        if from_markers:
-                            target_dict.get(piece.side, {}).setdefault(pos_to, set()).update(from_markers)
-                            if piece.side in marker_dict:
-                                side_marker_dict = marker_dict[piece.side]
-                                for pos in from_markers:
-                                    side_marker_dict[pos] = pos_to
+                        for marker_pos in side_target_dict.pop(pos_from, {}):
+                            side_marker_dict.get(marker_pos, set()).discard(pos_from)
+                    elif piece.side in target_dict:
+                        from_markers = side_target_dict.pop(pos_from, {})
+                        for marker_pos, marker_set in from_markers.items():
+                            side_target_dict.setdefault(pos_to, {})[marker_pos] = marker_set
+                            side_marker_dict.setdefault(marker_pos, set()).add(pos_to)
 
     def reload_en_passant_markers(self) -> None:
         self.clear_en_passant_markers()

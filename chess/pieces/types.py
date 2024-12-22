@@ -33,3 +33,7 @@ class Delayed(object):
 class Delayed1(object):
     # Same as above, but only on the opponent's first move after the piece's last move
     pass
+
+class Covered(object):
+    # Can only be captured en passant if the square moved to is unoccupied
+    pass

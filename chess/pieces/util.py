@@ -73,7 +73,7 @@ class Void(BackgroundPiece, Empty, Immune):
     default_side = Side.NEUTRAL
 
 
-class NoSidePiece(UtilityPiece, Empty):
+class NoSidePiece(UtilityPiece):
     name = '(No-Side Piece)'
 
     def __init__(self, board, **kwargs):
