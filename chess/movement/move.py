@@ -242,11 +242,20 @@ class Move(object):
                 string = f"{self.piece} {string}"
         else:
             string = f"Piece {string}"
-        for capture in self.captured:
-            string += f"{comma} takes {capture}"
-            if capture.board_pos != self.pos_to:
-                string += f" on {toa(capture.board_pos)}"
-            comma = ','
+        if self.captured:
+            string += f"{comma} takes"
+            comma = ''
+            for i in range(min(len(self.captured), 2)):
+                add_end = len(self.captured) == 1 or not i
+                add_side = len(self.captured) == 1 or i
+                for capture in self.captured:
+                    is_end = capture.board_pos == self.pos_to
+                    if is_end and not add_end or not is_end and not add_side:
+                        continue
+                    string += f"{comma} {capture}"
+                    if not is_end:
+                        string += f" on {toa(capture.board_pos)}"
+                    comma = ','
         if self.swapped_piece:
             if self.is_edit == 1:
                 string += f"{comma} is swapped"
