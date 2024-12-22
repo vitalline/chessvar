@@ -1664,10 +1664,11 @@ class Board(Window):
                 for field in ('last', 'next'):
                     rule[field] = [copy(sub_rule) for sub_rule in rule[field]]
                     for sub_rule in rule[field]:
-                        for sub_field in default_sub_rules.get(field, {}):
+                        sub_rules = default_sub_rules.get(field, {})
+                        for sub_field in sub_rules:
                             if sub_field not in sub_rule:
-                                sub_rule[sub_field] = default_sub_rules[sub_field]
-                            elif not isinstance(default_sub_rules[sub_field], list):
+                                sub_rule[sub_field] = sub_rules[sub_field]
+                            elif not isinstance(sub_rules[sub_field], list):
                                 sub_rule[sub_field] = unpack(sub_rule[sub_field])
                         sub_rule['move'] = [to_move(s) for s in sub_rule['move']]
                         sub_rule['type'] = [to_type(s) for s in sub_rule['type']]
