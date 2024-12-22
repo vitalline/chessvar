@@ -3,7 +3,7 @@ from __future__ import annotations
 from copy import copy
 from itertools import chain
 from math import ceil, floor
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 from chess.movement.base import BaseMovement
 from chess.movement.move import Move
@@ -471,7 +471,34 @@ class DropMovement(BaseMovement):
     pass
 
 
-class CastlingMovement(BaseMovement):
+class TargetMovement(BaseMovement):
+    # ABC used to simplify marking squares where en passant captures are possible
+
+    def add_markers(
+        self, piece: Piece, target_pos: Position, marker_poss: list[Position],
+        is_royal: bool = False, flags: Unpacked[Any] = ()
+    ):
+        if not marker_poss:
+            return
+        target_dict, marker_dict = tuple(data_dict.get(piece.side, {}) for data_dict in {
+            True: (self.board.royal_ep_targets, self.board.royal_ep_markers),
+        }.get(is_royal, (self.board.en_passant_targets, self.board.en_passant_markers)))
+        data_set = set(repack(flags))
+        if isinstance(piece, Covered):
+            data_set.add(Covered)
+        if isinstance(piece, Delayed):
+            data_set.add(Delayed)
+        elif isinstance(piece, Delayed1):
+            data_set.add(Delayed1)
+        if isinstance(piece, Slow):
+            data_set.add(Slow)
+        data_set.add(type(self))
+        target_dict[target_pos] = {pos: data_set.copy() for pos in marker_poss}
+        for pos in marker_poss:
+            marker_dict.setdefault(pos, set()).add(target_pos)
+
+
+class CastlingMovement(TargetMovement):
     def __init__(
         self,
         board: Board,
@@ -518,29 +545,13 @@ class CastlingMovement(BaseMovement):
         return self_move.set(chained_move=other_move),
 
     def update(self, move: Move, piece: Piece):
-        if issubclass(move.movement_type or type, type(self)):
-            direction = piece.side.direction(self.direction)
-            offset = sub(move.pos_to, move.pos_from)
-            if offset == direction:
-                positions = []
-                for gap_offset in self.en_passant_gap:
-                    positions.append(add(move.pos_from, gap_offset))
-                if positions:
-                    data_set = set()
-                    if isinstance(piece, Covered):
-                        data_set.add(Covered)
-                    if isinstance(piece, Delayed):
-                        data_set.add(Delayed)
-                    elif isinstance(piece, Delayed1):
-                        data_set.add(Delayed1)
-                    if isinstance(piece, Slow):
-                        data_set.add(Slow)
-                    data_set.add(type(self))
-                    self.board.royal_ep_targets.get(piece.side, {})[move.pos_to] = {
-                        pos: data_set.copy() for pos in positions
-                    }
-                    for pos in positions:
-                        self.board.royal_ep_markers.get(piece.side, {}).setdefault(pos, set()).add(move.pos_to)
+        direction = piece.side.direction(self.direction)
+        offset = sub(move.pos_to, move.pos_from)
+        if offset == direction:
+            positions = []
+            for gap_offset in self.en_passant_gap:
+                positions.append(add(move.pos_from, gap_offset))
+            self.add_markers(piece, move.pos_to, positions, is_royal=True, flags=type(self))
         super().update(move, piece)
 
     def __copy_args__(self):
@@ -560,38 +571,23 @@ class RoyalEnPassantMovement(BaseMovement):
     pass
 
 
-class EnPassantTargetRiderMovement(RiderMovement):
+class EnPassantTargetRiderMovement(RiderMovement, TargetMovement):
     def moves(self, pos_from: Position, piece: Piece, theoretical: bool = False):
         for move in super().moves(pos_from, piece, theoretical):
-            move.movement_type = type(self) if self.steps > 1 else RiderMovement
+            move.movement_type = RiderMovement
             yield move
 
     def update(self, move: Move, piece: Piece):
-        if issubclass(move.movement_type or type, type(self)):
-            for direction in self.directions:
-                direction = piece.side.direction(direction)
-                offset = sub(move.pos_to, move.pos_from)
-                steps = ddiv(offset, direction[:2])
-                if len(direction) > 2 and direction[2] > 0:
-                    steps = min(steps, direction[2])
-                if steps < 2:
-                    continue
-                positions = [add(move.pos_from, mul(direction[:2], i)) for i in range(1, steps)]
-                if positions:
-                    data_set = set()
-                    if isinstance(piece, Covered):
-                        data_set.add(Covered)
-                    if isinstance(piece, Delayed):
-                        data_set.add(Delayed)
-                    elif isinstance(piece, Delayed1):
-                        data_set.add(Delayed1)
-                    if isinstance(piece, Slow):
-                        data_set.add(Slow)
-                    self.board.en_passant_targets.get(piece.side, {})[move.pos_to] = {
-                        pos: data_set.copy() for pos in positions
-                    }
-                    for pos in positions:
-                        self.board.en_passant_markers.get(piece.side, {}).setdefault(pos, set()).add(move.pos_to)
+        for direction in self.directions:
+            direction = piece.side.direction(direction)
+            offset = sub(move.pos_to, move.pos_from)
+            steps = ddiv(offset, direction[:2])
+            if steps < 2:
+                continue
+            if len(direction) > 2 and steps > direction[2]:
+                continue
+            positions = [add(move.pos_from, mul(direction[:2], i)) for i in range(1, steps)]
+            self.add_markers(piece, move.pos_to, positions)
         super().update(move, piece)
 
 
@@ -1092,6 +1088,41 @@ class RangedMultiMovement(MultiMovement):
                         movement_type=RangedMovement,
                     ).unmark('n').mark('g')
             yield move
+
+
+class MultiEnPassantTargetMovement(BaseMultiMovement, TargetMovement):
+    def __init__(
+        self, board: Board, movement_pairs: Unpacked[tuple[BaseMovement, BaseMovement]] | None = None
+    ):
+        movement_pairs = [tuple(x) for x in repack(movement_pairs or [], list)]
+        super().__init__(board, list(chain.from_iterable(movement_pairs)))
+        self.movement_pairs = movement_pairs
+
+    def moves(self, pos_from: Position, piece: Piece, theoretical: bool = False):
+        for movement, _ in self.movement_pairs:
+            yield from movement.moves(pos_from, piece, theoretical)
+
+    def update(self, move: Move, piece: Piece):
+        tester = copy(piece)
+        tester.blocked_by = lambda p: False
+        tester.captures = lambda p: p.side
+        move_found = False
+        for movement, target_movement in self.movement_pairs:
+            for tester_move in movement.moves(move.pos_from, tester, False):
+                if move.pos_to != tester_move.pos_to:
+                    continue
+                positions = []
+                for target_move in target_movement.moves(move.pos_from, tester, False):
+                    positions.append(target_move.pos_to)
+                self.add_markers(piece, move.pos_to, positions)
+                move_found = True
+                break
+            if move_found:
+                break
+        super().update(move, piece)
+
+    def __copy_args__(self):
+        return self.board, unpack(self.movement_pairs)
 
 
 class InverseMovement(BaseMultiMovement):

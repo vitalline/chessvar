@@ -19,8 +19,9 @@ from chess.pieces.piece import AbstractPiece, Piece
 from chess.pieces.side import Side
 from chess.pieces.types import Neutral
 from chess.pieces.util import UtilityPiece, NoPiece
-from chess.util import CUSTOM_PREFIX, MOVEMENT_SUFFIXES, UNSET_STRING, Unset, AnyJson, AnyJsonType, IntIndex, TypeOr, \
-    unpack, repack
+from chess.util import CUSTOM_PREFIX, MOVEMENT_SUFFIXES, UNSET_STRING
+from chess.util import Unset, AnyJson, AnyJsonType, IntIndex, TypeOr
+from chess.util import unpack, repack
 
 if TYPE_CHECKING:
     from chess.board import Board

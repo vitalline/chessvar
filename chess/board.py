@@ -4031,16 +4031,15 @@ class Board(Window):
             )
             if update and isinstance(self.pieces[abs_from[0]][abs_from[1]], Piece):
                 self.piece_sprite_list.append(self.pieces[abs_from[0]][abs_from[1]].sprite)
-        if update:
-            for capture in move.captured:
-                if not isinstance(capture, Piece) or capture.board_pos == move.pos_to:
-                    continue
-                # piece was captured on a different square than the one the capturing piece moved to (e.g. en passant)
-                # create a blank piece on the square it was captured on
-                capture_pos = self.get_absolute(capture.board_pos)
-                self.pieces[capture_pos[0]][capture_pos[1]] = NoPiece(self, board_pos=capture.board_pos)
-                if update and isinstance(self.pieces[capture_pos[0]][capture_pos[1]], Piece):
-                    self.piece_sprite_list.append(self.pieces[capture_pos[0]][capture_pos[1]].sprite)
+        for capture in move.captured:
+            if not isinstance(capture, Piece) or capture.board_pos == move.pos_to:
+                continue
+            # piece was captured on a different square than the one the capturing piece moved to (e.g. en passant)
+            # create a blank piece on the square it was captured on
+            capture_pos = self.get_absolute(capture.board_pos)
+            self.pieces[capture_pos[0]][capture_pos[1]] = NoPiece(self, board_pos=capture.board_pos)
+            if update and isinstance(self.pieces[capture_pos[0]][capture_pos[1]], Piece):
+                self.piece_sprite_list.append(self.pieces[capture_pos[0]][capture_pos[1]].sprite)
         if update and isinstance(move.piece, Piece) and move.pos_from is None:
             # piece was added to the board, update it and add it to the sprite list
             self.update_piece(move.piece)
