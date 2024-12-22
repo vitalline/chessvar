@@ -2131,7 +2131,7 @@ class Board(Window):
             marker_poss = [royal_pos]
             for target_dict in self.en_passant_targets, self.royal_ep_targets:
                 marker_poss.extend(target_dict.get(side, {}).get(royal_pos, ()))
-            for piece_pos in chain.from_iterable(threat_dict.get(marker_pos, ()) for marker_pos in marker_poss):
+            for piece_pos in chain.from_iterable(threat_dict.get(marker_pos, []).copy() for marker_pos in marker_poss):
                 piece = self.get_piece(piece_pos)
                 if isinstance(piece.movement, ProbabilisticMovement):
                     continue
@@ -2777,7 +2777,7 @@ class Board(Window):
                             continue
                         base_dict['move'] = base_dict['move'] and not base_move.captured
                         base_dict['capture'] = base_dict['capture'] or bool(base_move.captured)
-                        for move in self.get_promotions(base_move):
+                        for move in ([base_move] if self.chain_start else self.get_promotions(base_move)):
                             move_rules = deepcopy(base_rules)
                             type_dict = copy(base_dict)
                             type_dict['promotion'] = type_dict['promotion'] or bool(move.promotion)
