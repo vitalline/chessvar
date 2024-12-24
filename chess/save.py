@@ -282,9 +282,6 @@ def save_custom_movement_type(movement: type[BaseMovement]) -> list[str]:
 def load_custom_movement_type(bases: dict[str, type[BaseMovement]]) -> type[BaseMovement]:
     if len(bases) == 1:
         return list(bases.values())[0]
-    # Here's the issue: moves have a movement_type attribute, which is used for direct comparisons. If we want to load a
-    # multiclass movement type, it will not be equal to the original movement type, even if it is functionally the same.
-    # A name-based comparison is used as a workaround when directly comparing moves, but who knows what else will break?
     name = CUSTOM_PREFIX + '_'.join(bases)
     bases = list(v for k, v in bases.items())
     return type(name, (*bases, BaseMovement), {})  # type: ignore

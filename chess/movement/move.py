@@ -102,9 +102,7 @@ class Move(object):
             not not other
             and self.pos_from == other.pos_from
             and self.pos_to == other.pos_to
-            # NB: "self.movement_type == other.movement_type" does not work for multiclass types loaded from a save file
-            and (self.movement_type is None) == (other.movement_type is None)
-            and (self.movement_type is None or self.movement_type.__name__ == other.movement_type.__name__)
+            and self.movement_type == other.movement_type
             and type(self.piece) is type(other.piece)
             and (not self.piece or self.piece.matches(other.piece))
             and (not self.captured) == (not other.captured)

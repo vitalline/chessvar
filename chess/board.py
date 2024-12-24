@@ -32,8 +32,8 @@ from chess.debug import debug_info, save_piece_data, save_piece_sets, save_piece
 from chess.movement.base import BaseMovement
 from chess.movement.move import Move
 from chess.movement.types import AutoCaptureMovement, AutoRangedAutoCaptureRiderMovement, BaseMultiMovement
-from chess.movement.types import CastlingMovement, CastlingPartnerMovement, ChangingMovement, CloneMovement
-from chess.movement.types import CoordinateMovement, DropMovement, ProbabilisticMovement, RelayMovement
+from chess.movement.types import CastlingMovement, CastlingPartnerMovement, ChangingLegalMovement, ChangingMovement
+from chess.movement.types import CloneMovement, DropMovement, ProbabilisticMovement
 from chess.movement.types import is_active
 from chess.movement.util import Position, GenericPosition, ANY, LAST, NONE
 from chess.movement.util import add, to_alpha as b26, resolve as res
@@ -2295,7 +2295,7 @@ class Board(Window):
         def is_changing(movement: BaseMovement) -> bool:
             if isinstance(movement, ChangingMovement):
                 return True
-            elif isinstance(movement, (CoordinateMovement, RelayMovement)):
+            elif isinstance(movement, ChangingLegalMovement):
                 return update
             elif isinstance(movement, BaseMultiMovement):
                 return any(is_changing(m) for m in movement.movements)
@@ -3838,7 +3838,14 @@ class Board(Window):
                     finished = False
                     break
             else:
-                move = self.find_move(next_move.pos_from, next_move.pos_to)
+                move = None
+                if next_move.pos_from != next_move.pos_to:
+                    move = self.find_move(next_move.pos_from, next_move.pos_to)
+                else:
+                    for capture in next_move.captured:
+                        move = self.find_move(next_move.pos_from, capture.board_pos)
+                        if move is not None:
+                            break
                 if move is None:
                     finished = False
                     break

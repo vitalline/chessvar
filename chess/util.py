@@ -388,14 +388,14 @@ def dynamic_super(obj):
     return MROCache()
 
 
-# Metaclass used for overriding the __str__ and/or __repr__ methods of a class.
+# Metaclass used for overriding the __str__ and/or __repr__ methods for class instances.
 class FormatOverride(type):
     def __new__(mcs, name, bases, namespace, *, str_method=None, repr_method=None):
-        cls = super().__new__(mcs, name, bases, namespace)
         if str_method is not None:
             mcs.__str__ = str_method
         if repr_method is not None:
             mcs.__repr__ = repr_method
+        cls = super().__new__(mcs, name, bases, namespace)
         return cls
 
 

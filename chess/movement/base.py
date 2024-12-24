@@ -12,7 +12,21 @@ if TYPE_CHECKING:
     from chess.pieces.piece import AbstractPiece as Piece
 
 
-class BaseMovement(object):
+class MovementMeta(type):
+    def __new__(mcs, name, bases, attrs):
+        cls = super().__new__(mcs, name, bases, attrs)
+        cls.__eq__ = cls.is_equal
+        return cls
+
+    def is_equal(cls, other):
+        if cls is other:
+            return True
+        if hasattr(cls, 'type_str') and hasattr(other, 'type_str'):
+            return cls.type_str() == other.type_str()
+        return False
+
+
+class BaseMovement(object, metaclass=MovementMeta):
     def __init__(self, board: Board):
         self.board = board
         self.total_moves = 0

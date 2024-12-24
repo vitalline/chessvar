@@ -636,9 +636,16 @@ class FreeMovement(AbsoluteMovement):
         return self.board, self.stay
 
 
-class ChangingMovement(BaseMovement):
-    # ABC for movements that may change their behavior based on certain conditions. Does not return any moves by itself.
-    # NB: Movement classes that return all theoretical moves, regardless of conditions, needn't inherit from this class.
+class ChangingLegalMovement(BaseMovement):
+    # ABC for movements that change their behavior based on certain conditions, but always return all theoretical moves.
+    # NB: This is only needed for movements that toggle theoretical legality based on board state (modulo moving piece).
+    # If a given piece in a given position will have the same theoretical moves, its movement needn't inherit from this.
+    pass
+
+
+class ChangingMovement(ChangingLegalMovement):
+    # ABC for movements that change their behavior based on certain conditions, and do not return all theoretical moves.
+    # NB: Movement classes that return all theoretical moves, regardless of conditions, mustn't inherit from this class.
     pass
 
 
@@ -1331,7 +1338,7 @@ class ChoiceMovement(BaseChoiceMovement):
                         yield copy(move).set(is_legal=legal).unmark('n').mark(mark)
 
 
-class RelayMovement(BaseChoiceMovement):
+class RelayMovement(BaseChoiceMovement, ChangingLegalMovement):
     def __init__(
         self, board: Board,
         lookup: Unpacked[BaseMovement] | None = None,
