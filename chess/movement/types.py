@@ -1357,27 +1357,20 @@ class RelayMovement(BaseChoiceMovement, ChangingLegalMovement):
         self.check_enemy = check_enemy
 
     def moves(self, pos_from: Position, piece: Piece, theoretical: bool = False):
-        relay_target_dict = self.board.relay_targets.get(piece.side, {}).setdefault(type(piece), {})
-        relay_source_dict = self.board.relay_sources.get(piece.side, {}).setdefault(type(piece), {})
+        relay_target_dict = self.board.relay_targets.get(piece.side, {})
+        relay_source_dict = self.board.relay_sources.get(piece.side, {})
         tester = copy(piece)
         tester.blocked_by = lambda p: False
         tester.captures = lambda p: p.side
-        lookup_result = None
-        for key in self.movement_dict:
-            if key in '!':
-                continue
-            if key not in relay_target_dict or pos_from not in relay_target_dict[key]:
-                if lookup_result is None:
-                    relay_target_dict.setdefault(key, {})[pos_from] = set()
-                    for lookup in self.lookup:
-                        for move in lookup.moves(pos_from, tester, theoretical):
-                            relay_target_dict[key][pos_from].add(move.pos_to)
-                            relay_source_dict.setdefault(move.pos_to, set()).add((key, pos_from))
-                    lookup_result = relay_target_dict[key][pos_from]
-                else:
-                    relay_target_dict.setdefault(key, {})[pos_from] = copy(lookup_result)
-                    for pos_to in lookup_result:
-                        relay_source_dict.setdefault(pos_to, set()).add((key, pos_from))
+        lookup_result = set()
+        for lookup in self.lookup:
+            lookup_dict = relay_target_dict.setdefault(lookup, {})
+            if pos_from not in lookup_dict:
+                lookup_dict[pos_from] = set()
+                for move in lookup.moves(pos_from, tester, theoretical):
+                    lookup_dict[pos_from].add(move.pos_to)
+                    relay_source_dict.setdefault(move.pos_to, {}).setdefault(lookup, set()).add(pos_from)
+            lookup_result.update(lookup_dict[pos_from])
         for key in self.movement_dict:
             if key == '!':
                 continue
@@ -1389,12 +1382,11 @@ class RelayMovement(BaseChoiceMovement, ChangingLegalMovement):
                 is_relayed = True
             else:
                 mark = 'r!' if invert else 'r'
-                if key in relay_target_dict and pos_from in relay_target_dict[key]:
-                    for pos in relay_target_dict[key][pos_from]:
-                        relay_piece = self.board.get_piece(pos)
-                        if (piece.friendly_to(relay_piece) != self.check_enemy) and self.board.fits(value, relay_piece):
-                            is_relayed = True
-                            break
+                for pos in lookup_result:
+                    relay_piece = self.board.get_piece(pos)
+                    if (piece.friendly_to(relay_piece) != self.check_enemy) and self.board.fits(value, relay_piece):
+                        is_relayed = True
+                        break
             is_legal = is_relayed != invert
             if not theoretical and not is_legal:
                 continue
@@ -1438,27 +1430,22 @@ class CoordinateMovement(BaseChoiceMovement):
         self.lookup = lookup
 
     def coordinate(self, pos_from: Position, piece: Piece, theoretical: bool = False):
-        relay_target_dict = self.board.relay_targets.get(piece.side, {}).setdefault(type(piece), {})
-        relay_source_dict = self.board.relay_sources.get(piece.side, {}).setdefault(type(piece), {})
+        relay_target_dict = self.board.relay_targets.get(piece.side, {})
+        relay_source_dict = self.board.relay_sources.get(piece.side, {})
+        coord_target_dict = self.board.coordinate_targets.get(piece.side, {})
+        coord_source_dict = self.board.coordinate_sources.get(piece.side, {})
         tester = copy(piece)
         tester.blocked_by = lambda p: False
         tester.captures = lambda p: p.side
-        lookup_result = None
-        for key in self.movement_dict:
-            if key in '!':
-                continue
-            if key not in relay_target_dict or pos_from not in relay_target_dict[key]:
-                if lookup_result is None:
-                    relay_target_dict.setdefault(key, {})[pos_from] = set()
-                    for lookup in self.lookup:
-                        for move in lookup.moves(pos_from, tester, theoretical):
-                            relay_target_dict[key][pos_from].add(move.pos_to)
-                            relay_source_dict.setdefault(move.pos_to, set()).add((key, pos_from))
-                    lookup_result = relay_target_dict[key][pos_from]
-                else:
-                    relay_target_dict.setdefault(key, {})[pos_from] = copy(lookup_result)
-                    for pos_to in lookup_result:
-                        relay_source_dict.setdefault(pos_to, set()).add((key, pos_from))
+        lookup_result = set()
+        for lookup in self.lookup:
+            lookup_dict = relay_target_dict.setdefault(lookup, {})
+            if pos_from not in lookup_dict:
+                lookup_dict[pos_from] = set()
+                for move in lookup.moves(pos_from, tester, theoretical):
+                    lookup_dict[pos_from].add(move.pos_to)
+                    relay_source_dict.setdefault(move.pos_to, {}).setdefault(lookup, set()).add(pos_from)
+            lookup_result.update(lookup_dict[pos_from])
         tester.captures = lambda p: False
         coordinate_poss = set()
         for key in self.movement_dict:
@@ -1466,28 +1453,36 @@ class CoordinateMovement(BaseChoiceMovement):
                 continue
             value, invert = (key[1:], True) if key.startswith('!') else (key, False)
             partners = []
-            if key in relay_target_dict and pos_from in relay_target_dict[key]:
-                for pos in relay_target_dict[key][pos_from]:
-                    partner = self.board.get_piece(pos)
-                    if piece == partner or not partner.side:
-                        continue
-                    if piece.friendly_to(partner) and self.board.fits(value, partner):
-                        partners.append(partner)
+            for pos in lookup_result:
+                partner = self.board.get_piece(pos)
+                if piece == partner or not partner.side:
+                    continue
+                if piece.friendly_to(partner) and self.board.fits(value, partner):
+                    partners.append(partner)
+                    if invert:
+                        break
             if not theoretical and bool(partners) == invert:
                 continue
             for movements in self.movement_dict[key]:
-                partner_poss = set()
+                partner_dict = coord_source_dict.setdefault(movements[1], {})
                 def partner_moves():
                     for new_partner in partners:
+                        partner_pos = new_partner.board_pos
+                        if partner_pos in partner_dict:
+                            yield from partner_dict[partner_pos]
+                            continue
+                        partner_dict[partner_pos] = set()
                         partner_tester = copy(new_partner)
                         partner_tester.blocked_by = lambda p: False
                         partner_tester.captures = lambda p: False
-                        for partner_move in movements[1].moves(new_partner.board_pos, partner_tester, theoretical):
-                            partner_poss.add(partner_move.pos_to)
-                            yield partner_move.pos_to
+                        for partner_move in movements[1].moves(partner_pos, partner_tester, theoretical):
+                            pos_to = partner_move.pos_to
+                            partner_dict[partner_pos].add(pos_to)
+                            coord_target_dict.setdefault(pos_to, {}).setdefault(movements[1], set()).add(partner_pos)
+                            yield pos_to
                 pos_generator = partner_moves()
                 for move in movements[0].moves(pos_from, tester, theoretical):
-                    if move.pos_to in partner_poss:
+                    if movements[1] in coord_target_dict.get(move.pos_to, {}):
                         is_legal = True
                     else:
                         is_legal = False
@@ -1497,6 +1492,9 @@ class CoordinateMovement(BaseChoiceMovement):
                                 break
                     if is_legal:
                         coordinate_poss.add(move.pos_to)
+                # finish generating partner moves
+                for _ in pos_generator:
+                    pass
         return coordinate_poss
 
     def moves(self, pos_from: Position, piece: Piece, theoretical: bool = False):

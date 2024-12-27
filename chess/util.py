@@ -146,6 +146,15 @@ def repack(l: Unpacked[T], bound: type = Sequence) -> Sequence[T]:
     return l if isinstance(l, bound) and not isinstance(l, str) else [l]
 
 
+# Function to make an arbitrary JSON object hashable. Converts dicts to tuples of key-value pairs and lists to tuples.
+def make_hashable(thing: AnyJson) -> tuple | AnyJsonType:
+    if isinstance(thing, dict):
+        return tuple((k, make_hashable(thing[k])) for k in thing)
+    if isinstance(thing, (list, tuple, set)):
+        return tuple(make_hashable(x) for x in thing)
+    return thing
+
+
 # Function to traverse any data object using sequences of keys or indices. Returns the values at the specified location.
 def find(data: Index[T], *fields: Key) -> Collection[T] | None:
     if not fields:

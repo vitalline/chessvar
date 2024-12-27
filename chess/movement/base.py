@@ -3,7 +3,7 @@ from __future__ import annotations
 from copy import deepcopy
 from typing import TYPE_CHECKING
 
-from chess.util import MOVEMENT_SUFFIXES
+from chess.util import MOVEMENT_SUFFIXES, make_hashable
 
 if TYPE_CHECKING:
     from chess.board import Board
@@ -13,17 +13,11 @@ if TYPE_CHECKING:
 
 
 class MovementMeta(type):
-    def __new__(mcs, name, bases, attrs):
-        cls = super().__new__(mcs, name, bases, attrs)
-        cls.__eq__ = cls.is_equal
-        return cls
+    def __eq__(cls, other):
+        return cls is other or isinstance(other, type) and cls.__bases__ == other.__bases__
 
-    def is_equal(cls, other):
-        if cls is other:
-            return True
-        if hasattr(cls, 'type_str') and hasattr(other, 'type_str'):
-            return cls.type_str() == other.type_str()
-        return False
+    def __hash__(cls):
+        return hash((cls.__name__, cls.__bases__))
 
 
 class BaseMovement(object, metaclass=MovementMeta):
@@ -67,3 +61,9 @@ class BaseMovement(object, metaclass=MovementMeta):
         clone = self.__class__(*(deepcopy(x, memo) for x in self.__copy_args__()))
         clone.total_moves = self.total_moves
         return clone
+
+    def __eq__(self, other):
+        return self.__class__ == other.__class__ and self.__copy_args__() == other.__copy_args__()
+
+    def __hash__(self):
+        return hash((self.__class__, *make_hashable(self.__copy_args__()[1:])))

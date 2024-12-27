@@ -20,8 +20,8 @@ from chess.pieces.side import Side
 from chess.pieces.types import Neutral
 from chess.pieces.util import UtilityPiece, NoPiece
 from chess.util import CUSTOM_PREFIX, MOVEMENT_SUFFIXES, UNSET_STRING
-from chess.util import Unset, AnyJson, AnyJsonType, IntIndex, TypeOr
-from chess.util import unpack, repack
+from chess.util import AnyJson, AnyJsonType, IntIndex, TypeOr, Unset
+from chess.util import make_hashable, repack, unpack
 
 if TYPE_CHECKING:
     from chess.board import Board
@@ -34,29 +34,21 @@ TYPE_CONFLICTS = {
 }
 
 
-def make_tuple(thing: AnyJson) -> tuple | AnyJsonType:
-    if isinstance(thing, dict):
-        return tuple((k, make_tuple(thing[k])) for k in thing)
-    if isinstance(thing, list):
-        return tuple(make_tuple(x) for x in thing)
-    return thing
-
-
 def condense(data: AnyJson, alias_dict: dict, recursive: bool = False) -> AnyJson:
-    tuple_dict = {make_tuple(v): k for k, v in alias_dict.items()}
+    hash_dict = {make_hashable(v): k for k, v in alias_dict.items()}
 
-    def find_alias(thing: AnyJson, tuple_thing: tuple | AnyJsonType) -> AnyJson:
-        if tuple_thing in tuple_dict:
-            return tuple_dict[tuple_thing]
-        if isinstance(thing, dict):
-            return {tuple_dict.get(k, k): find_alias(thing[k], v) for k, v in tuple_thing}
-        if isinstance(thing, list):
-            return [find_alias(x, tx) for x, tx in zip(thing, tuple_thing)]
-        return thing
+    def find_alias(obj: AnyJson, hashable_obj: tuple | AnyJsonType) -> AnyJson:
+        if hashable_obj in hash_dict:
+            return hash_dict[hashable_obj]
+        if isinstance(obj, dict):
+            return {hash_dict.get(k, k): find_alias(obj[k], v) for k, v in hashable_obj}
+        if isinstance(obj, list):
+            return [find_alias(x, tx) for x, tx in zip(obj, hashable_obj)]
+        return obj
 
     old_data = None
     while old_data != data:
-        old_data, data = data, find_alias(data, make_tuple(data))
+        old_data, data = data, find_alias(data, make_hashable(data))
         if not recursive:
             break
     return data
@@ -87,7 +79,7 @@ def condense_algebraic(
 ) -> dict[str, AnyJson]:
     data_groups = {}
     for key, value in data.items():
-        data_groups.setdefault(make_tuple(value), set()).add(key)
+        data_groups.setdefault(make_hashable(value), set()).add(key)
     result = {}
     for group in data_groups.values():
         mapping = tom(list(group), width, height, x_offset, y_offset, areas)

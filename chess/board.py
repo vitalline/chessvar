@@ -183,6 +183,8 @@ class Board(Window):
         self.royal_ep_markers = {Side.WHITE: {}, Side.BLACK: {}}  # where the side's royals can be captured e.p.
         self.relay_targets = {Side.WHITE: {}, Side.BLACK: {}}  # pieces that can get powers relayed from friendly pieces
         self.relay_sources = {Side.WHITE: {}, Side.BLACK: {}}  # pieces that relay powers to the side's pieces
+        self.coordinate_targets = {Side.WHITE: {}, Side.BLACK: {}}  # squares that are targeted by coordination partners
+        self.coordinate_sources = {Side.WHITE: {}, Side.BLACK: {}}  # pieces that can act as coordination partners
         self.auto_ranged_pieces = {Side.WHITE: [], Side.BLACK: []}  # pieces that auto-capture anywhere they can move to
         self.auto_capture_markers = {Side.WHITE: {}, Side.BLACK: {}}  # squares where the side's pieces can auto-capture
         self.probabilistic_pieces = {Side.WHITE: [], Side.BLACK: []}  # pieces that can move probabilistically
@@ -3690,19 +3692,21 @@ class Board(Window):
                 self.clear_relay_markers_for(move.swapped_piece, move.pos_to)
 
     def clear_relay_markers(self) -> None:
-        for relay_dict in (self.relay_sources, self.relay_targets):
+        for relay_dict in (self.relay_sources, self.relay_targets, self.coordinate_sources, self.coordinate_targets):
             for side in relay_dict:
                 relay_dict[side].clear()
 
     def clear_relay_markers_for(self, piece: AbstractPiece, pos: Position):
-        sources = self.relay_sources.get(piece.side, {})
-        targets = self.relay_targets.get(piece.side, {})
-        for piece_type in sources:
-            type_sources = sources.get(piece_type, {}).get(type(piece), {})
-            type_targets = targets.get(piece_type, {}).get(type(piece), {})
-            for group, source_pos in type_sources.pop(pos, set()):
-                if group in type_targets and source_pos in type_targets[group]:
-                    type_targets[group].pop(source_pos, None)
+        for source_dict, target_dict in (
+            (self.relay_sources, self.relay_targets),
+            (self.coordinate_targets, self.coordinate_sources),  # NB: order intentionally reversed!
+        ):
+            sources = source_dict.get(piece.side, {})
+            targets = target_dict.get(piece.side, {})
+            for movement, movement_sources in sources.pop(pos, {}).items():
+                movement_targets = targets.get(movement, {})
+                for source_pos in movement_sources:
+                    movement_targets.pop(source_pos, None)
 
     def update_end_data(self, move: Move | None = None) -> None:
         if self.edit_mode or (move and move.is_edit):
