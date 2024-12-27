@@ -2051,12 +2051,11 @@ class Board(Window):
                     royal_group, royal_type, royal_value = self.get_royal_state(move.piece, side, conditions)
                     if is_royal_loss(royal_group, royal_type, royal_value):
                         (piece_loss if royal_type > 0 else piece_gain).add(royal_group)
-            if move.promotion:
-                if move.promotion and move.promotion.side == side:
-                    royal_group, royal_type, royal_value = self.get_royal_state(move.promotion, side, conditions)
-                    if is_royal_loss(royal_group, royal_type, royal_value):
-                        (piece_loss if royal_type < 0 else piece_gain).add(royal_group)  # NB: sign matters!
-                if move.promotion and move.placed_piece:
+            if move.promotion and move.promotion.side == side:
+                royal_group, royal_type, royal_value = self.get_royal_state(move.promotion, side, conditions)
+                if is_royal_loss(royal_group, royal_type, royal_value):
+                    (piece_loss if royal_type < 0 else piece_gain).add(royal_group)  # NB: sign matters!
+                if move.placed_piece:
                     royal_group, royal_type, royal_value = self.get_royal_state(move.placed_piece, side, conditions)
                     if is_royal_loss(royal_group, royal_type, royal_value):
                         (piece_loss if royal_type > 0 else piece_gain).add(royal_group)

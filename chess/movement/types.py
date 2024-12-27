@@ -1087,11 +1087,14 @@ class RangedMultiMovement(MultiMovement):
         for move in super().moves(pos_from, piece, theoretical):
             move = copy(move)
             if not theoretical:
+                captured = copy(move.captured)
                 captured_piece = self.board.get_piece(move.pos_to)
                 if captured_piece.side:
+                    captured.append(captured_piece)
+                if captured:
                     move.set(
                         pos_to=pos_from,
-                        captured=captured_piece,
+                        captured=captured,
                         movement_type=RangedMovement,
                     ).unmark('n').mark('g')
             yield move
