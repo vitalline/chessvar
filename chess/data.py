@@ -60,6 +60,7 @@ type_prefixes = set(prefix_types.keys()) - generic_prefixes
 default_rules = {
     'order': 0,
     'state': 0,
+    'at': [],
     'last': [],
     'next': [],
     'piece': ["*"],

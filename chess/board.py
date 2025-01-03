@@ -1664,17 +1664,18 @@ class Board(Window):
                         rule[field] = unpack(rule[field])
                 rule['move'] = [to_move(s) for s in rule['move']]
                 rule['type'] = [to_type(s) for s in rule['type']]
-                for field in ('last', 'next'):
+                for field in default_sub_rules:
                     rule[field] = [copy(sub_rule) for sub_rule in rule[field]]
                     for sub_rule in rule[field]:
-                        sub_rules = default_sub_rules.get(field, {})
+                        sub_rules = default_sub_rules[field]
                         for sub_field in sub_rules:
                             if sub_field not in sub_rule:
                                 sub_rule[sub_field] = sub_rules[sub_field]
                             elif not isinstance(sub_rules[sub_field], list):
                                 sub_rule[sub_field] = unpack(sub_rule[sub_field])
-                        sub_rule['move'] = [to_move(s) for s in sub_rule['move']]
-                        sub_rule['type'] = [to_type(s) for s in sub_rule['type']]
+                        if sub_rule in ('last', 'next'):
+                            sub_rule['move'] = [to_move(s) for s in sub_rule['move']]
+                            sub_rule['type'] = [to_type(s) for s in sub_rule['type']]
             (loop_turns if start_ended else start_turns).append((side, rules))
         if start_turns and not loop_turns and not start_ended:
             start_turns, loop_turns = loop_turns, start_turns
@@ -2458,7 +2459,7 @@ class Board(Window):
                 area_rules = []
                 defaults = default_sub_rules.get('at')
                 for order_rule in order_rules:
-                    if 'at' in order_rule:
+                    if order_rule.get('at'):
                         match = None
                         if not pieces_loaded:
                             self.load_pieces()
@@ -2479,7 +2480,7 @@ class Board(Window):
                             for side in sides:
                                 for area in get_default('at'):
                                     for piece in get_default('piece'):
-                                        total += len(self.area_groups.get(side).get(area, {}).get(piece) or ())
+                                        total += len(self.area_groups.get(side, {}).get(area, {}).get(piece) or ())
                                         # NB: count could be negative! in this case, the rule is treated as its inverse,
                                         # maintaining consistency with the end conditions, where negative goal is a loss
                                         # is this less intuitive than adding an inverse flag to the condition? perchance
