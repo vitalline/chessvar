@@ -4035,8 +4035,8 @@ class Board(Window):
                 last_move = last_move.chained_move
             last_move.chained_move = move
         self.unload_end_data()
-        self.load_pieces()
         if move.chained_move is Unset and not self.promotion_piece:
+            self.load_pieces()
             self.load_moves()
             if update:
                 self.show_moves(False)
@@ -4050,7 +4050,9 @@ class Board(Window):
                 self.try_auto(update)
         else:
             self.chain_start = None
-            if self.promotion_piece is None:
+            if self.promotion_piece:
+                self.load_pieces()
+            else:
                 self.shift_ply(+1)
                 self.load_pieces()
                 self.load_check()
@@ -4458,14 +4460,15 @@ class Board(Window):
         ):
             self.chain_start = None
             self.unload_end_data()
-            self.load_pieces()
             if self.promotion_piece is None:
                 offset = last_move is None or not last_move.is_edit
                 if offset:
                     self.shift_ply(+1)
+                    self.load_pieces()
                     self.load_check()
                     self.update_end_data(last_move)
                 else:
+                    self.load_pieces()
                     self.load_check()
                     self.update_end_data()
                 self.load_moves()
@@ -5753,12 +5756,13 @@ class Board(Window):
                             self.update_auto_capture_markers(chained_move)
                             chained_move.set(piece=copy(chained_move.piece))
                     self.unload_end_data()
-                    self.load_pieces()
                     if not current_move.is_edit:
                         self.shift_ply(+1)
+                        self.load_pieces()
                         self.load_check()
                         self.update_end_data(self.move_history[-1])
                     else:
+                        self.load_pieces()
                         self.load_check()
                         self.update_end_data()
                     self.load_moves()
@@ -5993,12 +5997,13 @@ class Board(Window):
                             self.update_auto_capture_markers(chained_move)
                             chained_move.set(piece=copy(chained_move.piece))
                     self.unload_end_data()
-                    self.load_pieces()
                     if not move.is_edit:
                         self.shift_ply(+1)
+                        self.load_pieces()
                         self.load_check()
                         self.update_end_data(self.move_history[-1])
                     else:
+                        self.load_pieces()
                         self.load_check()
                         self.update_end_data()
                     self.load_moves()
@@ -6070,8 +6075,8 @@ class Board(Window):
                         last_move = last_move.chained_move
                     last_move.chained_move = deepcopy(move)
                 self.unload_end_data()
-                self.load_pieces()
                 if not is_final and not self.promotion_piece:
+                    self.load_pieces()
                     self.load_moves()
                     self.show_moves(False)
                     self.draw(0)
@@ -6082,8 +6087,11 @@ class Board(Window):
                         self.try_auto()
                 else:
                     self.chain_start = None
-                    if self.promotion_piece is None:
+                    if self.promotion_piece:
+                        self.load_pieces()
+                    else:
                         self.shift_ply(+1)
+                        self.load_pieces()
                         self.load_check()
                         self.update_end_data(self.move_history[-1])
                         self.load_moves()
