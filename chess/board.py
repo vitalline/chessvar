@@ -209,6 +209,7 @@ class Board(Window):
         self.chain_start = None  # move that started the current chain (if any)
         self.theoretical_moves = {Side.WHITE: {}, Side.BLACK: {}}  # dictionary of theoretical moves from any square
         self.threats = {}  # inverted version of the above dictionary that only stores positions
+        self.move_tags = set()  # set of currently legal move tags (NB: only used during TagMovement move generation)
         self.moves_queried = {Side.WHITE: False, Side.BLACK: False}  # whether moves have been queried for each side
         self.display_moves = {Side.WHITE: False, Side.BLACK: False}  # whether to display moves for each side
         self.display_theoretical_moves = {Side.WHITE: False, Side.BLACK: False}  # same for theoretical moves
@@ -2691,6 +2692,8 @@ class Board(Window):
                                 pos_drop_dict = drop_dict.setdefault(pos, {})
                                 pos_drop_dict[piece_type] = drop_types
                 for piece in movable_pieces[turn_side] if chain_moves is None else [last_chain_move.piece]:
+                    self.move_tags = set()
+                    all_tags = False
                     piece_type = type(piece)
                     if piece_type not in piece_rule_dict:
                         piece_rule_dict[piece_type] = self.filter(
@@ -2708,11 +2711,57 @@ class Board(Window):
                         rule['match'].setdefault('pos', [])
                     piece_pos = piece.board_pos
                     piece_rules = self.filter(piece_rules, 'from', [(turn_side, piece_pos)], ('match', 'pos'))
+                    if not piece_rules:
+                        continue
                     for rule in piece_rules:
                         rule['match'].setdefault('pos', []).append(piece_pos)
                         rule['match'].setdefault('from', []).append(piece_pos)
-                    if not piece_rules:
-                        continue
+                        if all_tags:
+                            continue
+                        add_last = set()
+                        for full_move_tag in rule.get('move', ()):
+                            move_tag = full_move_tag
+                            invert = move_tag.startswith(pch['not'])
+                            move_tag = move_tag[len(pch['not']):] if invert else move_tag
+                            if move_tag.startswith(pch['type']):
+                                continue
+                            if move_tag.startswith(pch['tag']):
+                                move_tag = move_tag[len(pch['tag']):]
+                            if move_tag == pch['any']:
+                                all_tags = True
+                                break
+                            if move_tag in pch['last']:
+                                if not invert in add_last:
+                                    all_tags = True
+                                    break
+                                add_last.add(invert)
+                                continue
+                            if invert:
+                                if move_tag in self.move_tags:
+                                    all_tags = True
+                                    break
+                                move_tag = pch['not'] + move_tag
+                            elif pch['not'] + move_tag in self.move_tags:
+                                all_tags = True
+                                break
+                            self.move_tags.add(move_tag)
+                        if all_tags:
+                            add_last = set()
+                        if add_last:
+                            for last_move in rule.get('match', {}).get('move', ()):
+                                if last_move.tag:
+                                    if False in add_last:
+                                        if last_move.tag in self.move_tags:
+                                            all_tags = True
+                                            break
+                                        self.move_tags.add(pch['not'] + last_move.tag)
+                                    if True in add_last:
+                                        if pch['not'] + last_move.tag in self.move_tags:
+                                            all_tags = True
+                                            break
+                                        self.move_tags.add(last_move.tag)
+                        if all_tags:
+                            self.move_tags = {pch['any']}
                     if not self.chain_start and not self.moves[turn_side].get('pass'):
                         pass_rules = deepcopy(piece_rules)
                         pass_rules = self.filter(pass_rules, 'type', ['pass'], ('match', 'type'), False)
@@ -2742,12 +2791,12 @@ class Board(Window):
                                 self.check_side = old_check_side
                     move_rule_dict = {}
                     for base_move in piece.moves() if chain_moves is None else chain_moves:
-                        move_type = base_move.tag, base_move.type_str()
-                        if move_type not in move_rule_dict:
-                            move_rule_dict[move_type] = self.filter(piece_rules, 'move', [base_move], ('match', 'move'))
-                        if not move_rule_dict[move_type]:
+                        move_tag = tuple(self.keys(base_move))
+                        if move_tag not in move_rule_dict:
+                            move_rule_dict[move_tag] = self.filter(piece_rules, 'move', [base_move], ('match', 'move'))
+                        if not move_rule_dict[move_tag]:
                             continue
-                        base_rules = deepcopy(move_rule_dict[move_type])
+                        base_rules = deepcopy(move_rule_dict[move_tag])
                         for rule in base_rules:
                             rule['match'].setdefault('move', []).append(base_move)
                         self.update_move(base_move)
@@ -3098,6 +3147,7 @@ class Board(Window):
                     break
             else:
                 self.moves_queried[turn_side] = True
+        self.move_tags = set()
         if not self.theoretical_move_markers:
             theoretical_moves_for = Side.NONE
         if theoretical_moves_for is None:

@@ -10,7 +10,7 @@ from chess.movement.move import Move
 from chess.movement.util import ANY, AnyDirection, Direction, Position
 from chess.movement.util import add, sub, mul, ddiv, is_algebraic, from_algebraic_map
 from chess.pieces.types import Covered, Delayed, Delayed1, Immune, Slow
-from chess.util import Unpacked, Unset, sign, repack, unpack
+from chess.util import Unpacked, Unset, fits, sign, repack, unpack
 
 if TYPE_CHECKING:
     from chess.board import Board
@@ -1566,16 +1566,23 @@ class BoundMovement(BaseAreaMovement, BaseChoiceMovement):
 
 
 class TagMovement(BaseChoiceMovement):
+    @staticmethod
+    def fits(template: str, tag: str) -> bool:
+        template, invert = (template[1:], True) if template.startswith('!') else (template, False)
+        return fits(template, tag) != invert
+
     def moves(self, pos_from: Position, piece: Piece, theoretical: bool = False):
         if theoretical:
             for movement in self.movements:
                 for move in movement.moves(pos_from, piece, theoretical):
                     yield copy(move)
         else:
-            for key in self.movement_dict:
-                for movement in self.movement_dict[key]:
+            for tag in self.movement_dict:
+                if not any(self.fits(template, tag or None) for template in self.board.move_tags):
+                    continue
+                for movement in self.movement_dict[tag]:
                     for move in movement.moves(pos_from, piece, theoretical):
-                        yield copy(move).set(tag=key or None)
+                        yield copy(move).set(tag=tag or None)
 
 
 class ImitatorMovement(ChangingMovement):
