@@ -2465,6 +2465,7 @@ class Board(Window):
                             self.load_pieces()
                             pieces_loaded = True
                         for condition in order_rule['at']:
+                            match = None
                             get_default = lambda x: condition.get(x, defaults.get(x))
                             count = get_default('count')
                             total = 0
@@ -2493,7 +2494,7 @@ class Board(Window):
                                         break
                                 if match is not None:
                                     break
-                            if match is not None:
+                            if not match:
                                 break
                         if not match:  # if the condition is not met, skip the rule
                             continue
