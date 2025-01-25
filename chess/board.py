@@ -451,8 +451,10 @@ class Board(Window):
                 yield pch['type'] + data.type_str()
         elif isinstance(data, AbstractPiece):
             if data.side:
-                yield from (pch['side'] + data.side.name.lower(), pch['side'] + str(data.side.value))
+                yield from self.keys(data.side)
             yield from self.keys(type(data))
+        elif isinstance(data, Side):
+            yield from (pch['side'] + data.name.lower(), pch['side'] + str(data.value))
         elif isinstance(data, type):
             if issubclass(data, AbstractPiece):
                 if data.group_str():
@@ -1673,7 +1675,7 @@ class Board(Window):
                                 sub_rule[sub_field] = sub_rules[sub_field]
                             elif not isinstance(sub_rules[sub_field], list):
                                 sub_rule[sub_field] = unpack(sub_rule[sub_field])
-                        if sub_rule in ('last', 'next'):
+                        if field in ('last', 'next'):
                             sub_rule['move'] = [to_move(s) for s in sub_rule['move']]
                             sub_rule['type'] = [to_type(s) for s in sub_rule['type']]
             (loop_turns if start_ended else start_turns).append((side, rules))
@@ -2558,7 +2560,7 @@ class Board(Window):
                             else:
                                 last_history_rules.append(rule)
                         if not last_history_move:
-                            history_rules += self.filter(
+                            history_rules = self.filter(
                                 history_rules, ('last', 'type'), ['pass'], ('match', 'type'), False
                             )
                             for rule in history_rules:

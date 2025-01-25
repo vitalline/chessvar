@@ -3,7 +3,7 @@ from __future__ import annotations
 from copy import deepcopy
 from typing import TYPE_CHECKING
 
-from chess.util import MOVEMENT_SUFFIXES, make_hashable
+from chess.util import CUSTOM_PREFIX, MOVEMENT_SUFFIXES, make_hashable
 
 if TYPE_CHECKING:
     from chess.board import Board
@@ -14,7 +14,12 @@ if TYPE_CHECKING:
 
 class MovementMeta(type):
     def __eq__(cls, other):
-        return cls is other or isinstance(other, type) and cls.__bases__ == other.__bases__
+        return cls is other or (
+            isinstance(other, type)
+            and other.__name__.startswith(CUSTOM_PREFIX)
+            and cls.__name__.startswith(CUSTOM_PREFIX)
+            and cls.__bases__ == other.__bases__
+        )
 
     def __hash__(cls):
         return hash((cls.__name__, cls.__bases__))
