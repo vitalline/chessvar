@@ -2462,12 +2462,12 @@ class Board(Window):
                 defaults = default_sub_rules.get('at')
                 for order_rule in order_rules:
                     if order_rule.get('at'):
-                        match = None
+                        match = False
                         if not pieces_loaded:
                             self.load_pieces()
                             pieces_loaded = True
                         for condition in order_rule['at']:
-                            match = None
+                            match = False
                             get_default = lambda x: condition.get(x, defaults.get(x))
                             count = get_default('count')
                             total = 0
@@ -2489,16 +2489,16 @@ class Board(Window):
                                         # is this less intuitive than adding an inverse flag to the condition? perchance
                                         # the only real upside is that a minus sign is less verbose than a separate flag
                                         # you'd think this would be enough to define an actually sensible implementation
-                                        if total >= abs(count):  # unfortunately, you'd be completely wrong
-                                            match = count > 0
+                                        if total * sign(count) >= count:  # and unfortunately, you'd be completely wrong
+                                            match = True
                                             break
-                                    if match is not None:
+                                    if match:
                                         break
-                                if match is not None:
+                                if match:
                                     break
-                            if not match:
+                            if not match:  # if the condition is not met, stop checking
                                 break
-                        if not match:  # if the condition is not met, skip the rule
+                        if not match:  # if a condition is not met, skip the rule
                             continue
                     area_rules.append(order_rule)
                 state_groups = {}
