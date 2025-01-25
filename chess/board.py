@@ -2631,7 +2631,7 @@ class Board(Window):
                                 for rule in history_rules:
                                     rule['match'].setdefault('piece', set()).add(type(promotion))
                             else:
-                                history_rules = self.filter(history_rules, 'new', last=('match', 'piece'))
+                                history_rules = self.filter(history_rules, ('last', 'new'), last=('match', 'piece'))
                             last_history_rules += history_rules
                             last_history_move = last_history_move.chained_move
                         i -= 1
@@ -2998,7 +2998,9 @@ class Board(Window):
                                                 if new_limit_hits[p_type]:
                                                     legal = False
                                         else:
-                                            future_rules = self.filter(future_rules, 'new', last=('match', 'piece'))
+                                            future_rules = self.filter(
+                                                future_rules, ('next', 'new'), last=('match', 'piece')
+                                            )
                                     next_future_rules += future_rules
                                 if legal:
                                     self.move(chained_move, False)
