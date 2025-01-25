@@ -4864,7 +4864,7 @@ class Board(Window):
             return
         has_promotion = False
         promotions = []
-        for promotion_move in self.moves.get(move.piece.side, {}).get(move.pos_from, {}).get(move.pos_to, []):
+        for promotion_move in self.moves.get(self.turn_side, {}).get(move.pos_from, {}).get(move.pos_to, []):
             if promotion_move.promotion:
                 promotions.append(promotion_move.promotion)
                 has_promotion = True
