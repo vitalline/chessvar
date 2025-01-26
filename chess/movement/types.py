@@ -545,13 +545,14 @@ class CastlingMovement(TargetMovement):
         return self_move.set(chained_move=other_move),
 
     def update(self, move: Move, piece: Piece):
-        direction = piece.side.direction(self.direction)
-        offset = sub(move.pos_to, move.pos_from)
-        if offset == direction:
-            positions = []
-            for gap_offset in self.en_passant_gap:
-                positions.append(add(move.pos_from, gap_offset))
-            self.add_markers(piece, move.pos_to, positions, is_royal=True, flags=type(self))
+        if move.pos_from and move.pos_to:
+            direction = piece.side.direction(self.direction)
+            offset = sub(move.pos_to, move.pos_from)
+            if offset == direction:
+                positions = []
+                for gap_offset in self.en_passant_gap:
+                    positions.append(add(move.pos_from, gap_offset))
+                self.add_markers(piece, move.pos_to, positions, is_royal=True, flags=type(self))
         super().update(move, piece)
 
     def __copy_args__(self):
@@ -578,16 +579,17 @@ class EnPassantTargetRiderMovement(RiderMovement, TargetMovement):
             yield move
 
     def update(self, move: Move, piece: Piece):
-        for direction in self.directions:
-            direction = piece.side.direction(direction)
-            offset = sub(move.pos_to, move.pos_from)
-            steps = ddiv(offset, direction[:2])
-            if steps < 2:
-                continue
-            if len(direction) > 2 and steps > direction[2]:
-                continue
-            positions = [add(move.pos_from, mul(direction[:2], i)) for i in range(1, steps)]
-            self.add_markers(piece, move.pos_to, positions)
+        if move.pos_from and move.pos_to:
+            for direction in self.directions:
+                direction = piece.side.direction(direction)
+                offset = sub(move.pos_to, move.pos_from)
+                steps = ddiv(offset, direction[:2])
+                if steps < 2:
+                    continue
+                if len(direction) > 2 and steps > direction[2]:
+                    continue
+                positions = [add(move.pos_from, mul(direction[:2], i)) for i in range(1, steps)]
+                self.add_markers(piece, move.pos_to, positions)
         super().update(move, piece)
 
 
