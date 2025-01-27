@@ -3910,7 +3910,7 @@ class Board(Window):
                     break
             else:
                 move = None
-                if next_move.pos_from != next_move.pos_to:
+                if next_move.pos_from != next_move.pos_to or not next_move.captured:
                     move = self.find_move(next_move.pos_from, next_move.pos_to)
                 else:
                     for capture in next_move.captured:
@@ -4582,7 +4582,6 @@ class Board(Window):
             self.update_caption()  # updating the caption to reflect the edit that was just made
             return  # let's not advance the turn while editing the board to hopefully make things easier for everyone
         self.update_status()
-        self.draw(0)
         if self.auto_moves and not self.game_over:
             if self.board_config['fast_sequences'] or self.board_config['fast_turn_pass']:
                 if 'pass' in self.moves[self.turn_side] and len(self.moves[self.turn_side]) == 1:
@@ -5099,6 +5098,11 @@ class Board(Window):
         if type(new_piece) == self.past_custom_pieces.get(new_type := save_piece_type(type(new_piece))):
             self.custom_pieces[new_type] = self.past_custom_pieces[new_type]
             del self.past_custom_pieces[new_type]
+        if update:
+            self.highlight.color = (0, 0, 0, 0)
+            self.hide_moves()
+            self.draw(0)
+            self.highlight.color = self.color_scheme['highlight_color']
 
     def color_pieces(self, side: Side = Side.ANY, color: tuple[int, int, int] | None = None) -> None:
         for piece in self.movable_pieces.get(side, sum(self.movable_pieces.values(), [])):

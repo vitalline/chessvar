@@ -243,10 +243,14 @@ class HopperRiderMovement(CannonRiderMovement):
                 self.data['capture'] = capture
 
     def stop_condition(self, move: Move, direction: AnyDirection, piece: Piece, theoretical: bool = False) -> bool:
-        if self.data['jump'] >= 0 and not theoretical:
+        if not theoretical:
             next_pos_to = self.transform(add(move.pos_from, mul(direction[:2], self.steps + 1)))
-            if not (self.loop and move.pos_from == next_pos_to) and not self.board.not_a_piece(next_pos_to):
-                return True
+            if not (self.loop and move.pos_from == next_pos_to):
+                next_piece = self.board.get_piece(next_pos_to)
+                if self.data['jump'] < 0 and next_piece.side and not piece.captures(next_piece):
+                    return True
+                elif self.data['jump'] >= 0 and next_piece.side:
+                    return True
         return super().stop_condition(move, direction, piece, theoretical)
 
     def moves(self, pos_from: Position, piece: Piece, theoretical: bool = False):
