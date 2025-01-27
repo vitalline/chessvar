@@ -596,6 +596,7 @@ class Board(Window):
     def reset_board(self, update: bool | None = True, log: bool = True) -> None:
         self.save_interval = 0
 
+        self.hovered_square = None
         self.deselect_piece()
         self.clear_relay_markers()
         self.clear_en_passant_markers()
@@ -730,6 +731,8 @@ class Board(Window):
                     )
                 self.pieces[row][col].sprite.scale = self.square_size / self.pieces[row][col].sprite.texture.width
                 self.piece_sprite_list.append(self.pieces[row][col].sprite)
+
+        self.draw(0)
 
         self.clear_theoretical_moves()
         self.unload_end_data()
@@ -916,6 +919,7 @@ class Board(Window):
         self.save_loaded = False
         success = True
 
+        self.hovered_square = None
         self.deselect_piece()
         self.clear_relay_markers()
         self.clear_en_passant_markers()
@@ -1236,6 +1240,8 @@ class Board(Window):
                 self.pieces[row][col].sprite.scale = self.square_size / self.pieces[row][col].sprite.texture.width
                 self.piece_sprite_list.append(self.pieces[row][col].sprite)
 
+        self.draw(0)
+
         self.promotion_piece = load_piece(self, data.get('promotion'), c)
 
         self.load_pieces()
@@ -1336,6 +1342,7 @@ class Board(Window):
     def empty_board(self) -> None:
         self.save_interval = 0
 
+        self.hovered_square = None
         self.deselect_piece()
         self.clear_relay_markers()
         self.clear_en_passant_markers()
@@ -1397,6 +1404,8 @@ class Board(Window):
             if isinstance(self.pieces[row][col], Piece):  # should always be False, but just in case
                 self.pieces[row][col].sprite.scale = self.square_size / self.pieces[row][col].sprite.texture.width
                 self.piece_sprite_list.append(self.pieces[row][col].sprite)
+
+        self.draw(0)
 
         self.clear_theoretical_moves()
         self.unload_end_data()
@@ -2358,6 +2367,7 @@ class Board(Window):
             self.chain_moves = {side: {} for side in self.chain_moves}
             self.theoretical_moves = {side: {} for side in self.theoretical_moves}
             return
+        self.update_caption(string="Loading moves...", force=True)
         if force_reload:
             self.game_over = False
             self.end_value = 0
@@ -3256,13 +3266,12 @@ class Board(Window):
                         return copy(to_moves[0]).set(captured=sum((move.captured for move in to_moves), []))
         return None
 
-    def show_moves(self, with_markers: bool = True) -> None:
+    def show_moves(self, with_markers: bool | None = None, with_move: bool | None = None) -> None:
         self.hide_moves()
         self.update_caption()
         move_sprites = dict()
-        with_move = True
-        if self.hide_move_markers:
-            with_markers = False
+        if with_markers is None:
+            with_markers = not self.hide_move_markers
         pos = self.selected_square or self.hovered_square
         if not pos and self.is_active:
             pos = self.highlight_square
@@ -3358,7 +3367,10 @@ class Board(Window):
                             mark.alpha = type_marker_alpha
                             self.type_sprite_list.append(mark)
                             move_sprites[pos_to].append(mark)
-                        with_move = False
+                        if with_move is None:
+                            with_move = False
+        if with_move is None:
+            with_move = True
         if with_move and self.move_history and not self.edit_mode:
             history_moves = []
             draw_for = self.get_turn_side(-1)
@@ -4044,7 +4056,7 @@ class Board(Window):
             self.load_pieces()
             self.load_moves()
             if update:
-                self.show_moves(False)
+                self.show_moves(with_markers=False)
                 self.draw(0)
                 self.select_piece(move.pos_to)
             else:
@@ -4148,8 +4160,14 @@ class Board(Window):
             self.update_en_passant_markers(move)
             # as well as for relay moves
             self.update_relay_markers(move)
+        if update:
+            self.highlight.color = (0, 0, 0, 0)
+            self.hide_moves()
+            self.draw(0)
+            self.highlight.color = self.color_scheme['highlight_color']
 
     def undo(self, move: Move, update: bool = True) -> None:
+        self.skip_caption_update = True
         abs_from, abs_to = self.get_absolute(move.pos_from), self.get_absolute(move.pos_to)
         if move.pos_from != move.pos_to or move.promotion is not None:
             # piece was added, moved, removed, or promoted
@@ -4230,6 +4248,11 @@ class Board(Window):
         if not self.ply_simulation:
             # revert markers for relay moves
             self.revert_relay_markers(move)
+        if update:
+            self.highlight.color = (0, 0, 0, 0)
+            self.hide_moves()
+            self.draw(0)
+            self.highlight.color = self.color_scheme['highlight_color']
 
     def undo_last_move(self) -> None:
         self.deselect_piece()
@@ -4617,8 +4640,8 @@ class Board(Window):
             self.log(f"Info: {status_string}")
         self.color_all_pieces()
 
-    def update_caption(self) -> None:
-        if self.skip_caption_update:
+    def update_caption(self, string: str | None = None, force: bool = False) -> None:
+        if self.skip_caption_update and not force:
             return
         if self.board_config['status_string'] is None:
             self.set_caption(self.custom_variant or ("???" if self.hide_pieces else self.variant))
@@ -4646,6 +4669,9 @@ class Board(Window):
             return
         if prefix:
             prefix = f"[{prefix}]"
+        if string is not None:
+            self.set_caption(f"{prefix} {string}")
+            return
         selected_square = self.selected_square
         hovered_square = None
         if self.is_active:
@@ -6083,7 +6109,7 @@ class Board(Window):
                 if not is_final and not self.promotion_piece:
                     self.load_pieces()
                     self.load_moves()
-                    self.show_moves(False)
+                    self.show_moves(with_markers=False)
                     self.draw(0)
                     self.select_piece(move.pos_to)
                     if self.auto_moves and (
