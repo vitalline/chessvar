@@ -2489,8 +2489,8 @@ class Board(Window):
                                         # is this less intuitive than adding an inverse flag to the condition? perchance
                                         # the only real upside is that a minus sign is less verbose than a separate flag
                                         # you'd think this would be enough to define an actually sensible implementation
-                                        if total * sign(count) >= count:  # and unfortunately, you'd be completely wrong
-                                            match = True
+                                        match = (total < -count) if count < 0 else (total >= count) # and you'd be wrong
+                                        if match:
                                             break
                                     if match:
                                         break
