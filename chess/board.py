@@ -2134,7 +2134,7 @@ class Board(Window):
         insert = lambda group, pos: anti_royal_checks.setdefault(group, set()).add(pos)
         threat_moves = {}
         self.ply_simulation += 1
-        for royal_pos in self.royal_markers[side]:
+        for royal_pos in self.royal_markers[side] | self.anti_royal_markers[side]:
             royal = self.get_piece(royal_pos)
             group = royal_group(royal)
             if group not in safe_royal_groups and group not in safe_anti_royal_groups:
@@ -2160,7 +2160,6 @@ class Board(Window):
                             if chained_move.pos_to == royal_pos:
                                 if group in safe_royal_groups:
                                     safe_royal_groups.discard(group)
-                            elif chained_move.pos_to == royal_pos:
                                 if group in safe_anti_royal_groups:
                                     insert(group, chained_move.pos_to)
                                     if len(anti_royal_checks[group]) == len(self.royal_groups[side].get(group, ())):
