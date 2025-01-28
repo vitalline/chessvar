@@ -136,12 +136,18 @@ class RiderMovement(BaseMovement):
             return True
         return False
 
-    def stop_condition(self, move: Move, direction: AnyDirection, piece: Piece, theoretical: bool = False) -> bool:
-        next_pos_to = self.transform(add(move.pos_from, mul(direction[:2], self.steps + 1)))
+    def bound_stop_condition(self, move: Move, direction: AnyDirection, next_pos_to: Position) -> bool:
+        # Helper function for the stop_condition() method that checks if the next position is out of bounds
         return (
             not self.in_bounds(next_pos_to)
             or ((move.pos_from == move.pos_to and self.steps) if self.loop else (move.pos_from == next_pos_to))
             or len(direction) > 2 and direction[2] and self.steps >= direction[2]
+        )
+
+    def stop_condition(self, move: Move, direction: AnyDirection, piece: Piece, theoretical: bool = False) -> bool:
+        next_pos_to = self.transform(add(move.pos_from, mul(direction[:2], self.steps + 1)))
+        return (
+            self.bound_stop_condition(move, direction, next_pos_to)
             or ((
                 isinstance((next_piece := self.board.get_piece(next_pos_to)), Immune)
                 and not piece.skips(next_piece) and next_piece.movement is None
@@ -212,16 +218,19 @@ class CannonRiderMovement(RiderMovement):
         return super().skip_condition(move, direction, piece, theoretical) if self.data['jump'] > 0 else not theoretical
 
     def stop_condition(self, move: Move, direction: AnyDirection, piece: Piece, theoretical: bool = False) -> bool:
+        next_pos_to = self.transform(add(move.pos_from, mul(direction[:2], self.steps + 1)))
         if self.data['jump'] < 0:
-            next_pos_to = self.transform(add(move.pos_from, mul(direction[:2], self.steps + 1)))
             if not (self.loop and move.pos_from == next_pos_to) and piece.blocked_by(self.board.get_piece(next_pos_to)):
-                return False
+                return self.bound_stop_condition(move, direction, next_pos_to)
         elif self.data['jump'] == 0 and not theoretical:
-            next_pos_to = self.transform(add(move.pos_from, mul(direction[:2], self.steps + 1)))
             if not (self.loop and move.pos_from == next_pos_to) and piece.blocked_by(self.board.get_piece(next_pos_to)):
                 return True
         elif self.distance and self.data['jump'] >= self.distance:
             return True
+        elif theoretical:
+            next_piece = self.board.get_piece(next_pos_to)
+            if not piece.skips(next_piece) and isinstance(next_piece, Immune) and next_piece.movement is None:
+                return self.bound_stop_condition(move, direction, next_pos_to)
         return super().stop_condition(move, direction, piece, theoretical or not self.data['jump'] > 0)
 
     def __copy_args__(self):
@@ -243,14 +252,16 @@ class HopperRiderMovement(CannonRiderMovement):
                 self.data['capture'] = capture
 
     def stop_condition(self, move: Move, direction: AnyDirection, piece: Piece, theoretical: bool = False) -> bool:
-        if not theoretical:
-            next_pos_to = self.transform(add(move.pos_from, mul(direction[:2], self.steps + 1)))
-            if not (self.loop and move.pos_from == next_pos_to):
-                next_piece = self.board.get_piece(next_pos_to)
+        next_pos_to = self.transform(add(move.pos_from, mul(direction[:2], self.steps + 1)))
+        if not (self.loop and move.pos_from == next_pos_to):
+            next_piece = self.board.get_piece(next_pos_to)
+            if not theoretical:
                 if self.data['jump'] < 0 and next_piece.side and not piece.captures(next_piece):
                     return True
                 elif self.data['jump'] >= 0 and next_piece.side:
                     return True
+            elif not piece.skips(next_piece) and isinstance(next_piece, Immune) and next_piece.movement is None:
+                return True
         return super().stop_condition(move, direction, piece, theoretical)
 
     def moves(self, pos_from: Position, piece: Piece, theoretical: bool = False):
