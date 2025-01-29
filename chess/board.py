@@ -5681,9 +5681,9 @@ class Board(Window):
             self.selection.draw()
         self.move_sprite_list.draw()
         self.piece_sprite_list.draw()
+        self.type_sprite_list.draw()
         if self.active_piece:
             self.active_piece.sprite.draw()
-        self.type_sprite_list.draw()
         self.promotion_area_sprite_list.draw()
         if self.promotion_area:
             self.highlight.draw()
