@@ -1837,6 +1837,7 @@ class Board(Window):
             return self.get_random_set(side, asymmetrical)
         if self.chaos_mode in {3, 4}:
             return self.get_extremely_random_set(side, asymmetrical)
+        return [NoPiece] * default_board_width, '-'  # ideally should never happen
 
     def load_chaos_sets(self, mode: int, same: bool) -> None:
         chaotic = 'chaotic'
@@ -3150,6 +3151,9 @@ class Board(Window):
                             for chained in move_chain[::-1]:
                                 self.undo(chained, False)
                                 self.revert_auto_capture_markers(chained)
+                            if not pieces_loaded:
+                                self.load_pieces()
+                                pieces_loaded = True
                             self.load_theoretical_moves(turn_side, False)
                             self.en_passant_targets = deepcopy(en_passant_targets)
                             self.en_passant_markers = deepcopy(en_passant_markers)
@@ -3162,6 +3166,9 @@ class Board(Window):
                     break
             else:
                 self.moves_queried[turn_side] = True
+        if not pieces_loaded:
+            self.load_pieces()
+            pieces_loaded = True
         self.move_tags = set()
         if not self.theoretical_move_markers:
             theoretical_moves_for = Side.NONE
@@ -4622,8 +4629,6 @@ class Board(Window):
             return string
         elif self.check_side:
             return f"{self.check_side} is in check!"
-        else:
-            return
 
     def update_status(self) -> None:
         self.load_end_conditions()

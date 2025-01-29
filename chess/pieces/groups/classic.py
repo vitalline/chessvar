@@ -95,8 +95,8 @@ class Pawn(Piece):
                     types.AreaMovement(
                         board,
                         {
-                            self.name: [types.EnPassantTargetRiderMovement(board, [(1, 0, 2)])],
-                            '!' + self.name: [types.RiderMovement(board, [(1, 0, 1)])],
+                            '*': [types.RiderMovement(board, [(1, 0, 1)])],
+                            self.name: [types.EnPassantTargetRiderMovement(board, [(1, 0, 2, 2)])],
                         }
                     )
                 ],
