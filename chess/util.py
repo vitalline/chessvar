@@ -221,8 +221,10 @@ def get_file_name(name: str, ext: str, ts: datetime | None = None, ts_format: st
 
 
 # Function to generate a default path for saving or loading files.
-def get_file_path(name: str, ext: str, path: str = '') -> str:
-    return normalize(os.path.join(base_dir, path, get_file_name(name, ext)))
+def get_file_path(
+    name: str, ext: str, path: str = '', ts: datetime | None = None, ts_format: str = "%Y-%m-%d_%H-%M-%S"
+) -> str:
+    return normalize(os.path.join(base_dir, path, get_file_name(name, ext, ts, ts_format)))
 
 
 # Function to select a file to open. Returns the path of the selected file.

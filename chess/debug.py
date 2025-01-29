@@ -16,7 +16,7 @@ from chess.pieces.piece import AbstractPiece, Piece
 from chess.pieces.side import Side
 from chess.pieces.util import UtilityPiece, NoPiece, Block, Border, Shield, Void, Wall
 from chess.save import save_piece_type, save_custom_type
-from chess.util import TypeOr, dumps, get_file_name, pluralize, spell, spell_ordinal, sign
+from chess.util import TypeOr, dumps, get_file_path, pluralize, spell, spell_ordinal, sign
 
 if TYPE_CHECKING:
     from chess.board import Board
@@ -95,27 +95,27 @@ def print_piece_sets(fp: TextIO = sys.stdout) -> None:
 
 def print_piece_types(fp: TextIO = sys.stdout, side: Side = Side.WHITE) -> None:
     for name, path, file in sorted(
-        (n, save_piece_type(t), (t.file_name if isinstance(t, Piece) else '')) for t, n in get_piece_types(side).items()
+        (n, save_piece_type(t), (t.file_name if issubclass(t, Piece) else '')) for t, n in get_piece_types(side).items()
     ):
         fp.write(f"{name}: {path}, {file}\n")
 
 
 def save_piece_data(board: Board, file_path: str = None) -> str:
-    file_path = file_path or get_file_name('debug_piece_data', 'json', ts_format='')
+    file_path = file_path or get_file_path('debug_piece_data', 'json', ts_format='')
     with open(file_path, mode='w', encoding='utf-8') as fp:
         print_piece_data(board, fp)
     return file_path
 
 
 def save_piece_sets(file_path: str = None) -> str:
-    file_path = file_path or get_file_name('debug_piece_sets', 'log', ts_format='')
+    file_path = file_path or get_file_path('debug_piece_sets', 'log', ts_format='')
     with open(file_path, mode='w', encoding='utf-8') as fp:
         print_piece_sets(fp)
     return file_path
 
 
 def save_piece_types(file_path: str = None, side: Side = Side.WHITE) -> str:
-    file_path = file_path or get_file_name('debug_piece_types', 'log', ts_format='')
+    file_path = file_path or get_file_path('debug_piece_types', 'log', ts_format='')
     with open(file_path, mode='w', encoding='utf-8') as fp:
         print_piece_types(fp, side)
     return file_path
