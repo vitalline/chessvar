@@ -3402,12 +3402,16 @@ class Board(Window):
                 if move is not None:
                     if move.is_edit:
                         break
-                    if self.show_history or not issubclass(move.movement_type or type, DropMovement):
+                    if self.show_history:
                         history_moves.append(move)
-                    if self.get_turn_side(index - 1) != draw_for and not history_moves:
-                        history_moves.append(move)
-                    if history_moves and not self.show_history:
-                        break
+                    elif history_moves and issubclass(history_moves[-1].movement_type or type, DropMovement):
+                        if not issubclass(move.movement_type or type, DropMovement):
+                            history_moves = [move]
+                            break
+                    else:
+                        history_moves = [move]
+                        if self.get_turn_side(index - 1) != draw_for:
+                            break
                 index -= 1
                 if index < -len(self.move_history) or self.get_turn_side(index) != draw_for:
                     break
