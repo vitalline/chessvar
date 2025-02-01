@@ -22,6 +22,9 @@ Unset = frozenset()
 # String used to represent Unset values in JSON files.
 UNSET_STRING = '*'
 
+# Suffix for alternate piece sprites.
+ALTERNATE_SUFFIX = "'"
+
 # Prefix for custom piece and/or movement classes.
 CUSTOM_PREFIX = '_custom_'
 

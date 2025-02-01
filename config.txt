@@ -13,6 +13,14 @@ INIT:  Initialize game state with predefined settings
     - "custom":  use custom pieces
     - "wall":  use obstacle pieces
   - edit_mode (False):  start in edit mode
+  - flip_board (False):  whether to flip the board
+  - alter_pieces (0):  when to use alternate sprites for pieces
+    - 0:  only in promotion/drop UI
+    - 1:  only for white
+    - 2:  only for black
+    - -1:  always
+    - -2:  never
+  - alter_swap (False):  whether to swap the side for which alternate sprites are used after a move
   - hide_pieces (0):  piece hiding mode
     - 0:  show all pieces
     - 1:  only show presence (pieceblind mode)

@@ -13,6 +13,8 @@ DEFAULT_CONFIG = {
         'edit_id': '',
         'edit_mode': False,
         'flip_board': False,
+        'alter_pieces': 0,
+        'alter_swap': False,
         'hide_pieces': 0,
         'hide_moves': '',
         'use_drops': False,

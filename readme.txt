@@ -43,6 +43,11 @@ Ctrl + Shift + F: reload move history
 Ctrl + H: hide pieces (Penultima mode)
 Shift + H: hide pieces (pieceblind mode)
 Ctrl + Shift + H: show pieces
+Ctrl + J: show alternate piece sprites
+Shift + J: hide alternate piece sprites
+Ctrl + Shift + J: show alternate piece sprites in promotion/drop UI, hide otherwise
+Alt + J: show alternate piece sprites for moving player (twice: and don't change side)
+Alt + Shift + J: show alternate piece sprites for non-moving player (twice: and don't change side)
 Ctrl + M: show move markers
 Shift + M: hide move markers
 Ctrl + Shift + M: show move markers if pieces are shown, hide otherwise

@@ -10,7 +10,7 @@ from chess.movement.base import BaseMovement
 from chess.movement.util import Position, to_algebraic
 from chess.pieces.side import Side
 from chess.pieces.types import Double, Enemy, Empty, Immune, Neutral
-from chess.util import CUSTOM_PREFIX, FormatOverride, Default, get_texture_path, normalize
+from chess.util import ALTERNATE_SUFFIX, CUSTOM_PREFIX, FormatOverride, Default, get_texture_path, normalize
 
 if TYPE_CHECKING:
     from chess.board import Board
@@ -226,6 +226,7 @@ class Piece(AbstractPiece):
         self.texture_folder = self.asset_folder
         self.texture_name = self.file_name
         self.texture_side = Side.NEUTRAL if isinstance(self, Neutral) else side if side is not None else Side.NONE
+        self.alternate = False
         self.sprite = Sprite(
             normalize(self.texture_path()),
             flipped_horizontally=self.flipped_horizontally,
@@ -249,8 +250,12 @@ class Piece(AbstractPiece):
         return clone
 
     def texture_path(self, base_dir: str = 'assets') -> str:
-        path = join(self.texture_folder, self.texture_side.file_prefix() + self.texture_name + '.png')
-        return get_texture_path(*(join(root, path) for root in (base_dir, self.board.board_config['asset_path'])))
+        texture_basename = self.texture_side.file_prefix() + self.texture_name
+        roots = [self.board.board_config['asset_path'], base_dir]
+        paths = [join(self.texture_folder, texture_basename + '.png')]
+        if self.alternate:
+            paths = [join(self.texture_folder, texture_basename + ALTERNATE_SUFFIX + '.png')] + paths
+        return get_texture_path(*(join(root, path) for root in roots for path in paths))
 
     def reload(
         self,
@@ -261,6 +266,7 @@ class Piece(AbstractPiece):
         should_hide: bool = None,
         flipped_horizontally: bool = None,
         flipped_vertically: bool = None,
+        alternate: bool = False,
     ):
         if should_hide is not None:
             self.should_hide = None if should_hide is Default else should_hide
@@ -272,6 +278,7 @@ class Piece(AbstractPiece):
         self.texture_folder = asset_folder or self.texture_folder
         self.texture_side = side or self.texture_side
         self.texture_name = file_name or self.texture_name
+        self.alternate = alternate
         texture_path = normalize(self.texture_path())
         if flipped_horizontally is None:
             flipped_horizontally = self.flipped_horizontally

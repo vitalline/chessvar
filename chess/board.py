@@ -147,6 +147,8 @@ class Board(Window):
         self.use_drops = self.board_config['use_drops']  # whether pieces can be dropped
         self.hide_pieces = self.board_config['hide_pieces'] % 3  # 0: don't hide, 1: hide all, 2: penultima mode
         self.hide_move_markers = self.board_config['hide_moves']  # whether to hide the move markers; None uses above
+        self.alternate_pieces = self.board_config['alter_pieces']  # 0: promote, 1/2: white/black, -1/-2: show/hide
+        self.alternate_swap = self.board_config['alter_swap']  # whether to swap the side showing alternate pieces
         self.hide_edit_pieces = False  # whether to mark pieces placed in edit mode as hidden
         self.auto_moves = True  # whether to skip move animations if allowed
         self.flip_mode = self.board_config['flip_board']  # whether the board is flipped
@@ -603,6 +605,8 @@ class Board(Window):
         self.clear_auto_capture_markers()
         self.reset_captures()
 
+        old_turn_side = self.turn_side
+
         self.end_data = {
             side: {
                 condition: {
@@ -741,6 +745,8 @@ class Board(Window):
         self.update_end_data()
         self.load_moves()
         self.reload_end_data()
+        if old_turn_side != self.turn_side:
+            self.update_alternate_sprites(old_turn_side)
         self.update_status()
 
     def dump_board(self, trim: bool = False) -> str:
@@ -865,6 +871,8 @@ class Board(Window):
             },
             'edit': self.edit_mode,
             'edit_promotion': self.edit_piece_set_id,
+            'alter_pieces': self.alternate_pieces,
+            'alter_swap': self.alternate_swap,
             'hide_pieces': self.hide_pieces,
             'hide_moves': self.hide_move_markers,
             'use_drops': self.use_drops,
@@ -1032,6 +1040,8 @@ class Board(Window):
         self.board_config['block_ids'] = data.get('set_blocklist', self.board_config['block_ids'])
         self.board_config['block_ids_chaos'] = data.get('chaos_blocklist', self.board_config['block_ids_chaos'])
 
+        self.alternate_pieces = data.get('alter_pieces', self.alternate_pieces)
+        self.alternate_swap = data.get('alter_swap', self.alternate_swap)
         self.hide_pieces = data.get('hide_pieces', self.hide_pieces)
         self.hide_move_markers = data.get('hide_moves', self.hide_move_markers)
         self.use_drops = data.get('use_drops', self.use_drops)
@@ -1312,6 +1322,7 @@ class Board(Window):
         if self.promotion_piece:
             piece = self.promotion_piece
             self.end_promotion()
+            self.update_alternate_sprites()
             if self.move_history and self.move_history[-1]:
                 if self.move_history[-1].is_edit == 1:
                     self.start_promotion(piece, self.edit_promotions[self.get_promotion_side(piece)])
@@ -1328,6 +1339,7 @@ class Board(Window):
                 self.load_check()
                 self.load_moves()
                 self.reload_end_data()
+                self.update_alternate_sprites()
                 self.update_status()
             selection = data.get('selection')
             if selection:
@@ -1348,6 +1360,8 @@ class Board(Window):
         self.clear_en_passant_markers()
         self.clear_auto_capture_markers()
         self.reset_captures()
+
+        old_turn_side = self.turn_side
 
         self.end_data = {
             side: {
@@ -1414,6 +1428,8 @@ class Board(Window):
         self.update_end_data()
         self.load_moves()
         self.reload_end_data()
+        if old_turn_side != self.turn_side:
+            self.update_alternate_sprites(old_turn_side)
         self.update_status()
 
     def reset_custom_data(self, rollback: bool = False) -> None:
@@ -3880,6 +3896,7 @@ class Board(Window):
         finished = False
         next_move = future_move_history.pop()
         while True:
+            old_turn_side = self.turn_side
             chained = False
             if next_move is None:
                 log_pass = self.board_config['log_pass']
@@ -3986,6 +4003,8 @@ class Board(Window):
                 self.update_end_data(self.move_history[-1])
                 self.load_moves()
                 self.reload_end_data()
+                if old_turn_side != self.turn_side:
+                    self.update_alternate_sprites(old_turn_side)
                 self.advance_turn()
             else:
                 if next_move:
@@ -4076,12 +4095,15 @@ class Board(Window):
             if self.promotion_piece:
                 self.load_pieces()
             else:
+                old_turn_side = self.turn_side
                 self.shift_ply(+1)
                 self.load_pieces()
                 self.load_check()
                 self.update_end_data(self.move_history[-1])
                 self.load_moves()
                 self.reload_end_data()
+                if old_turn_side != self.turn_side:
+                    self.update_alternate_sprites(old_turn_side)
                 self.compare_history()
             self.advance_turn()
 
@@ -4264,6 +4286,7 @@ class Board(Window):
         self.deselect_piece()
         if not self.move_history:
             return
+        old_turn_side = self.turn_side
         in_promotion = self.promotion_piece is not None
         partial_move = self.chain_start is not None or in_promotion
         if in_promotion:
@@ -4340,6 +4363,8 @@ class Board(Window):
         self.load_check()
         self.load_moves()
         self.reload_end_data()
+        if old_turn_side != self.turn_side:
+            self.update_alternate_sprites(old_turn_side)
         self.advance_turn()
         self.future_move_history = future_move_history
         if partial_move and self.future_move_history:
@@ -4495,6 +4520,7 @@ class Board(Window):
             self.chain_start = None
             self.unload_end_data()
             if self.promotion_piece is None:
+                old_turn_side = self.turn_side
                 offset = last_move is None or not last_move.is_edit
                 if offset:
                     self.shift_ply(+1)
@@ -4507,6 +4533,8 @@ class Board(Window):
                     self.update_end_data()
                 self.load_moves()
                 self.reload_end_data()
+                if old_turn_side != self.turn_side:
+                    self.update_alternate_sprites(old_turn_side)
                 self.compare_history()
             self.advance_turn()
         elif last_chain_move.chained_move is Unset:
@@ -4554,6 +4582,7 @@ class Board(Window):
             turn_side = self.get_turn_side(+1)
             if log_pass:
                 self.log(f"Pass: {turn_side} to move")
+            old_turn_side = self.turn_side
             self.update_en_passant_markers()
             self.move_history.append(None)
             self.shift_ply(+1)
@@ -4563,6 +4592,8 @@ class Board(Window):
             self.update_end_data()
             self.load_moves()
             self.reload_end_data()
+            if old_turn_side != self.turn_side:
+                self.update_alternate_sprites(old_turn_side)
             self.compare_history()
             self.advance_turn()
 
@@ -5030,14 +5061,15 @@ class Board(Window):
                     promoted_from = promoted_from or type(piece)
                 if type(promotion_piece) != promoted_from:
                     promotion_piece.promoted_from = promoted_from
+            alternate_sprites = True if self.alternate_pieces == 0 else None
             if isinstance(promotion_piece, Piece):
                 if issubclass(promotion, (King, CBKing)) and promotion not in self.piece_sets[side]:
                     self.update_piece(promotion_piece, asset_folder='other')
                 elif self.edit_mode and self.edit_piece_set_id is not None and not isinstance(piece, Obstacle):
                     promotion_piece.should_hide = self.hide_edit_pieces
-                    self.update_piece(promotion_piece, penultima_hide=False)
+                    self.update_piece(promotion_piece, penultima_hide=False, alternate_sprite=alternate_sprites)
                 else:
-                    self.update_piece(promotion_piece, penultima_flip=True)
+                    self.update_piece(promotion_piece, penultima_flip=True, alternate_sprite=alternate_sprites)
                 promotion_piece.sprite.scale = self.square_size / promotion_piece.sprite.texture.width
                 if isinstance(promotion_piece, (Border, Wall, Void)):
                     promotion_piece.sprite.scale *= 0.8
@@ -5220,8 +5252,9 @@ class Board(Window):
         piece: Piece,
         asset_folder: str | None = None,
         file_name: str | None = None,
-        penultima_flip: bool = None,
-        penultima_hide: bool = None,
+        penultima_flip: bool | None = None,
+        penultima_hide: bool | None = None,
+        alternate_sprite: bool | None = None,
     ) -> None:
         if piece.side not in self.piece_set_ids:
             return
@@ -5252,22 +5285,34 @@ class Board(Window):
         else:
             is_hidden = bool(self.hide_pieces) or Default
         file_name, flip = (file_name[:-1], penultima_flip) if file_name[-1] == '|' else (file_name, False)
-        piece.reload(is_hidden=is_hidden, asset_folder=asset_folder, file_name=file_name, flipped_horizontally=flip)
+        if alternate_sprite is None:
+            if self.alternate_pieces > 0:
+                alternate_sprite = self.alternate_pieces == piece.side.value
+            else:
+                alternate_sprite = self.alternate_pieces == -1
+        piece.reload(
+            is_hidden=is_hidden,
+            asset_folder=asset_folder,
+            file_name=file_name,
+            alternate=alternate_sprite,
+            flipped_horizontally=flip,
+        )
         piece.sprite.scale = self.square_size / piece.sprite.texture.width
 
     def update_pieces(self) -> None:
         for piece in sum(self.movable_pieces.values(), []):
             if isinstance(piece, Piece):
                 self.update_piece(piece)
+        alternate_sprites = True if self.alternate_pieces == 0 else None
         for piece in self.promotion_piece_sprite_list:
             if isinstance(piece, Piece):
                 if isinstance(piece, (King, CBKing)) and type(piece) not in self.piece_sets[piece.side]:
                     self.update_piece(piece, asset_folder='other')
                 elif self.edit_mode and self.edit_piece_set_id is not None and not isinstance(piece, Obstacle):
                     piece.should_hide = self.hide_edit_pieces
-                    self.update_piece(piece, penultima_hide=False)
+                    self.update_piece(piece, penultima_hide=False, alternate_sprite=alternate_sprites)
                 else:
-                    self.update_piece(piece, penultima_flip=True)
+                    self.update_piece(piece, penultima_flip=True, alternate_sprite=alternate_sprites)
 
     def update_sprite(
         self,
@@ -5335,6 +5380,15 @@ class Board(Window):
             self.update_highlight(self.get_board_position(self.highlight.position, *args))
         if self.skip_mouse_move == 2:
             self.skip_mouse_move = 1
+
+    def update_alternate_sprites(self, from_side: Side = Side.NONE) -> None:
+        if from_side == Side.NONE:
+            self.update_pieces()
+        elif self.alternate_swap and self.alternate_pieces > 0:
+            new_side = self.turn_side if self.alternate_pieces == from_side.value else self.turn_side.opponent()
+            if self.alternate_pieces != new_side.value:
+                self.alternate_pieces = new_side.value
+                self.update_pieces()
 
     def flip_board(self) -> None:
         self.flip_mode = not self.flip_mode
@@ -5795,6 +5849,7 @@ class Board(Window):
                             self.update_auto_capture_markers(chained_move)
                             chained_move.set(piece=copy(chained_move.piece))
                     self.unload_end_data()
+                    old_turn_side = self.turn_side
                     if not current_move.is_edit:
                         self.shift_ply(+1)
                         self.load_pieces()
@@ -5806,6 +5861,8 @@ class Board(Window):
                         self.update_end_data()
                     self.load_moves()
                     self.reload_end_data()
+                    if old_turn_side != self.turn_side:
+                        self.update_alternate_sprites(old_turn_side)
                     self.compare_history()
                     self.advance_turn()
                 return
@@ -6036,6 +6093,7 @@ class Board(Window):
                             self.update_auto_capture_markers(chained_move)
                             chained_move.set(piece=copy(chained_move.piece))
                     self.unload_end_data()
+                    old_turn_side = self.turn_side
                     if not move.is_edit:
                         self.shift_ply(+1)
                         self.load_pieces()
@@ -6047,6 +6105,8 @@ class Board(Window):
                         self.update_end_data()
                     self.load_moves()
                     self.reload_end_data()
+                    if old_turn_side != self.turn_side:
+                        self.update_alternate_sprites(old_turn_side)
                     self.compare_history()
                     self.advance_turn()
                 return
@@ -6129,12 +6189,15 @@ class Board(Window):
                     if self.promotion_piece:
                         self.load_pieces()
                     else:
+                        old_turn_side = self.turn_side
                         self.shift_ply(+1)
                         self.load_pieces()
                         self.load_check()
                         self.update_end_data(self.move_history[-1])
                         self.load_moves()
                         self.reload_end_data()
+                        if old_turn_side != self.turn_side:
+                            self.update_alternate_sprites(old_turn_side)
                         self.compare_history()
                     self.advance_turn()
             else:
@@ -6677,6 +6740,34 @@ class Board(Window):
                     self.hide_pieces = old_hide_pieces
                 self.update_pieces()
                 self.show_moves()
+        if symbol == key.J:  # Alternate piece sprites (J was chosen due to closeness with other "hiding" hotkeys)
+            old_alternate_pieces, old_alternate_swap = self.alternate_pieces, self.alternate_swap
+            if modifiers & key.MOD_ALT:  # Alternate piece sprites for moving player (non-moving if Shift)
+                self.alternate_swap = not self.alternate_pieces > 0 or not self.alternate_swap
+                new_side = self.turn_side.opponent() if modifiers & key.MOD_SHIFT else self.turn_side
+                self.alternate_pieces = new_side.value
+            else:
+                self.alternate_swap = False
+                if modifiers & key.MOD_ACCEL and modifiers & key.MOD_SHIFT:  # Default (promotion/drop UI only)
+                    self.alternate_pieces = 0
+                elif modifiers & key.MOD_ACCEL:  # Show
+                    self.alternate_pieces = -1
+                elif modifiers & key.MOD_SHIFT:  # Hide
+                    self.alternate_pieces = -2
+            if old_alternate_pieces != self.alternate_pieces or old_alternate_swap != self.alternate_swap:
+                if self.alternate_pieces == -2:
+                    self.log("Info: Alternate piece sprites hidden")
+                elif self.alternate_pieces == -1:
+                    self.log("Info: Alternate piece sprites shown")
+                elif self.alternate_pieces > 0:
+                    if self.alternate_swap:
+                        player = f"{'' if self.turn_side == Side(self.alternate_pieces) else 'non-'}moving player"
+                        self.log(f"Info: Alternate piece sprites shown for {player}")
+                    else:
+                        self.log(f"Info: Alternate piece sprites shown for {Side(self.alternate_pieces)}")
+                else:
+                    self.log("Info: Alternate piece sprites shown in promotion")
+                self.update_pieces()
         if symbol == key.M:  # Moves
             if modifiers & key.MOD_ALT and not partial_move:  # Clear future move history
                 self.log("Info: Future move history cleared", False)
@@ -6943,6 +7034,16 @@ class Board(Window):
         self.log(f"Game: {'???' if self.hide_pieces else self.variant}")
 
     def log_special_modes(self):
+        if self.alternate_pieces == -2:
+            self.log("Info: Alternate piece sprites hidden")
+        elif self.alternate_pieces == -1:
+            self.log("Info: Alternate piece sprites shown")
+        elif self.alternate_pieces > 0:
+            if self.alternate_swap:
+                player = f"{'' if self.turn_side == Side(self.alternate_pieces) else 'non-'}moving player"
+                self.log(f"Info: Alternate piece sprites shown for {player}")
+            else:
+                self.log(f"Info: Alternate piece sprites shown for {Side(self.alternate_pieces)}")
         if self.hide_pieces == 1:
             self.log("Info: Pieces hidden")
         if self.hide_pieces == 2:
@@ -7004,6 +7105,10 @@ class Board(Window):
         config['white_id'] = self.piece_set_ids[Side.WHITE]
         config['black_id'] = self.piece_set_ids[Side.BLACK]
         config['edit_id'] = self.edit_piece_set_id
+        config['edit_mode'] = self.edit_mode
+        config['flip_board'] = self.flip_mode
+        config['alter_pieces'] = self.alternate_pieces
+        config['alter_swap'] = self.alternate_swap
         config['hide_pieces'] = self.hide_pieces
         config['hide_moves'] = self.hide_move_markers
         config['use_drops'] = self.use_drops
