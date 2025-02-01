@@ -625,11 +625,11 @@ def debug_info(board: Board) -> list[str]:
             debug_log.append(f"End conditions for {side}:")
         else:
             debug_log.append("Conflict resolution rules:")
-        for rule in board.end_rules[side]:
-            invert, rule = (True, rule[1:]) if rule[:1] == prefix_chars['not'] else (False, rule)
+        for condition in board.end_rules[side]:
+            invert, rule = (True, condition[1:]) if condition[:1] == prefix_chars['not'] else (False, condition)
             if rule in standard_conditions:
                 rule_start = rule.capitalize()
-                end_data = board.end_data.get(side, {}).get(rule, {})
+                end_data = board.end_data.get(side, {}).get(condition, {})
             else:
                 if side in board.areas and rule in board.areas[side]:
                     rule_start = f"Reach {rule} with"
@@ -646,11 +646,11 @@ def debug_info(board: Board) -> list[str]:
                             rule_start = f"Reach {toa(pos)} with"
                     except ValueError:
                         rule_start = f"Reach {rule} with"
-                end_data = board.area_groups.get(side, {}).get(rule, {})
-            if isinstance(board.end_rules[side][rule], dict):
-                end_rules = board.end_rules[side][rule]
+                end_data = board.area_groups.get(side, {}).get(condition, {})
+            if isinstance(board.end_rules[side][condition], dict):
+                end_rules = board.end_rules[side][condition]
             else:
-                end_rules = {'': board.end_rules[side][rule]}
+                end_rules = {'': board.end_rules[side][condition]}
                 end_data = {'': end_data}
             for group in end_rules:
                 rule_string = rule_start
