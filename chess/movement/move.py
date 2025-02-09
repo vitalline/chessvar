@@ -1,12 +1,12 @@
 from __future__ import annotations
 
-from collections.abc import Collection
+from collections.abc import Callable, Collection
 from itertools import zip_longest
 from typing import TYPE_CHECKING
 
 from chess.movement.util import Position, to_algebraic as toa
 from chess.pieces.side import Side
-from chess.util import Default, Unset
+from chess.util import Default, TypeOr, Unset
 
 if TYPE_CHECKING:
     from chess.movement.base import BaseMovement
@@ -193,7 +193,13 @@ class Move(object):
             string += f" ${self.type_str()}"
         return string
 
-    def __str__(self) -> str:
+    def __str__(self):
+        return self.to_string()
+
+    def to_string(self, piece_name_func: Callable[[TypeOr[Piece]], str] | None = None) -> str:
+        if piece_name_func is None:
+            piece_name_func = lambda x: str(x)
+        name = piece_name_func
         moved = self.pos_from != self.pos_to
         comma = ','
         if self.pos_from is not None and self.pos_to is not None and moved and not self.swapped_piece:
@@ -219,7 +225,7 @@ class Move(object):
                 string = f"is taken from {toa(self.pos_from)}"
         elif not moved or self.swapped_piece:
             promoted = self.promotion is Unset or self.promotion and (
-                self.piece.name != self.promotion.name
+                name(type(self.piece)) != name(type(self.promotion))
                 or self.promotion.side not in {self.piece.side, Side.NONE}
             )
             if not self.captured and self.swapped_piece is None and not promoted:
@@ -235,9 +241,9 @@ class Move(object):
                 side = board.get_promotion_side(self.piece) if self.is_edit == 1 else board.turn_side
                 string = f"{side} {string}"
             elif self.piece.side is Side.NONE:
-                string = f"{self.promotion} {string}"
+                string = f"{name(self.promotion)} {string}"
             else:
-                string = f"{self.piece} {string}"
+                string = f"{name(self.piece)} {string}"
         else:
             string = f"Piece {string}"
         if self.captured:
@@ -250,7 +256,7 @@ class Move(object):
                     is_end = capture.board_pos == self.pos_to
                     if is_end and not add_end or not is_end and not add_side:
                         continue
-                    string += f"{comma} {capture}"
+                    string += f"{comma} {name(capture)}"
                     if not is_end:
                         string += f" on {toa(capture.board_pos)}"
                     comma = ','
@@ -259,7 +265,7 @@ class Move(object):
                 string += f"{comma} is swapped"
             else:
                 string += f"{comma} swaps"
-            string = f"{string} with {self.swapped_piece} on {toa(self.pos_to)}"
+            string = f"{string} with {name(self.swapped_piece)} on {toa(self.pos_to)}"
             comma = ','
         if self.pos_from is not None and self.piece and not (self.piece.side is Side.NONE and not moved):
             if self.promotion is Unset:
@@ -268,7 +274,7 @@ class Move(object):
                 else:
                     string += f"{comma} tries to promote"
             elif self.promotion and (
-                self.piece.name != self.promotion.name
+                name(type(self.piece)) != name(type(self.promotion))
                 or self.promotion.side not in {self.piece.side, Side.NONE}
             ):
                 if self.is_edit == 1:
@@ -278,7 +284,7 @@ class Move(object):
                 if self.promotion.is_hidden:
                     string += f"{comma} {promotes} to ???"
                 elif self.promotion and self.promotion.side not in {self.piece.side, Side.NONE}:
-                    string += f"{comma} {promotes} to {self.promotion}"
+                    string += f"{comma} {promotes} to {name(self.promotion)}"
                 else:
-                    string += f"{comma} {promotes} to {self.promotion.name}"
+                    string += f"{comma} {promotes} to {name(type(self.promotion))}"
         return string

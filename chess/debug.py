@@ -7,6 +7,7 @@ from typing import TYPE_CHECKING, TextIO
 
 from chess.data import get_piece_types, get_set_data, get_set_name, piece_groups
 from chess.data import action_types, end_types, prefix_chars, prefix_types, type_prefixes
+from chess.movement.move import Move
 from chess.movement.types import DropMovement
 from chess.movement.util import ANY, to_alpha as b26
 from chess.movement.util import to_algebraic as toa, from_algebraic as fra
@@ -14,6 +15,7 @@ from chess.movement.util import to_algebraic_map as tom, from_algebraic_map as f
 from chess.pieces.groups.classic import Pawn
 from chess.pieces.piece import AbstractPiece, Piece
 from chess.pieces.side import Side
+from chess.pieces.types import Neutral
 from chess.pieces.util import UtilityPiece, NoPiece, Block, Border, Shield, Void, Wall
 from chess.save import save_piece_type, save_custom_type
 from chess.util import TypeOr, dumps, get_file_path, pluralize, spell, spell_ordinal, sign
@@ -125,12 +127,12 @@ def debug_info(board: Board) -> list[str]:
     pad = ''
     s26 = lambda x: b26(x + (0 if x < 0 else 1))
     offset_x, offset_y = board.notation_offset
-    piece_mapping = {side: get_piece_mapping(board, side) for side in (Side.WHITE, Side.BLACK, Side.NONE)}
+    mapping = {side: get_piece_mapping(board, side) for side in (Side.WHITE, Side.BLACK, Side.NONE)}
     piece_side = lambda piece: piece.side if isinstance(piece, AbstractPiece) else Side.NONE
-    def name(piece, side=Side.NONE):
-        if not piece or isinstance(piece, NoPiece):
+    def name(piece: TypeOr[AbstractPiece], side: Side = Side.NONE):
+        if not piece or isinstance(piece, NoPiece) or isinstance(piece, type) and issubclass(piece, NoPiece):
             return 'None'
-        return get_piece_name(piece, piece_mapping.get(piece_side(piece) or side, piece_mapping[side]))
+        return get_piece_name(piece, mapping.get(piece_side(piece) or side, mapping.get(side, mapping[Side.NONE])))
     debug_log = []  # noqa
     debug_log.append(f"Board size: {board.board_width}x{board.board_height}")
     if offset_x or offset_y:
@@ -285,10 +287,10 @@ def debug_info(board: Board) -> list[str]:
                         list(base_data.get(str(side.value), {}).get(save_piece_type(piece), {})),
                         board.board_width, board.board_height, offset_x, offset_y, side_areas
                     )
-                    mapping = {}
+                    to_mapping = {}
                     for pos, value in from_mapping.items():
-                        if value not in mapping:
-                            mapping[value] = pos
+                        if value not in to_mapping:
+                            to_mapping[value] = pos
                 else:
                     rows = set()
                     for pos in section_rules[piece]:
@@ -303,8 +305,8 @@ def debug_info(board: Board) -> list[str]:
                             break
                     if all_rows:
                         rows = {ANY}
-                    mapping = {toa((row, ANY)): (0 if row == ANY else row, 0) for row in rows}
-                for string, pos in mapping.items():
+                    to_mapping = {toa((row, ANY)): (0 if row == ANY else row, 0) for row in rows}
+                for string, pos in to_mapping.items():
                     piece_list = []
                     for to_piece in section_rules[piece][pos]:
                         suffixes = []
@@ -410,11 +412,11 @@ def debug_info(board: Board) -> list[str]:
     base_data = (board.load_dict or {}).get(f"layout") or {}
     neutral_areas = {k: v for k, v in board.custom_areas.items() if isinstance(v, set)}
     from_mapping = frm(base_data, board.board_width, board.board_height, offset_x, offset_y, neutral_areas)
-    mapping = {}
+    to_mapping = {}
     for pos, value in from_mapping.items():
-        if value not in mapping:
-            mapping[value] = pos
-    for string, pos in mapping.items():
+        if value not in to_mapping:
+            to_mapping[value] = pos
+    for string, pos in to_mapping.items():
         piece = board.custom_layout.get(pos)
         if not piece or isinstance(piece, NoPiece):
             continue
@@ -732,23 +734,37 @@ def debug_info(board: Board) -> list[str]:
     debug_log.append(f"Unique moves: {sum(len(i) for i in board.unique_moves()[board.turn_side].values())}")
     debug_log.append(f"Check side: {board.check_side if board.check_side else 'None'}")
     debug_log.append(f"Game over: {board.game_over}")
+    def clear_hidden(m: Move):
+        for piece in (m.piece, m.promotion, m.placed_piece, m.swapped_piece, *m.captured):
+            if isinstance(piece, AbstractPiece):
+                piece.is_hidden = None
+    def side_name(piece: TypeOr[AbstractPiece]):
+        if isinstance(piece, AbstractPiece):
+            return f"{piece.side if not isinstance(piece, Neutral) else ''} {name(piece)}".strip()
+        elif isinstance(piece, type) and issubclass(piece, AbstractPiece):
+            return name(piece)
+        else:
+            return 'None'
     start_count = 0
     for section_type, section_data in (
         ("Action", board.move_history),
         ("Future action", board.future_move_history[::-1]),
     ):
+        section_data = deepcopy(section_data)
         debug_log.append(f"{section_type} history ({len(section_data)}):")
         for i, move in enumerate(section_data, start_count):
             if not move:
                 debug_log.append(f"{pad:2}{i + 1}: (Pass) None")
             else:
+                clear_hidden(move)
                 move_type = 'Edit' if move.is_edit else 'Drop' if move.movement_type == DropMovement else 'Move'
-                debug_log.append(f"{pad:2}{i + 1}: ({move_type}) {move}")
+                debug_log.append(f"{pad:2}{i + 1}: ({move_type}) {move.to_string(side_name)}")
                 j = 0
                 while move.chained_move:
                     move = move.chained_move
+                    clear_hidden(move)
                     move_type = 'Edit' if move.is_edit else 'Drop' if move.movement_type == DropMovement else 'Move'
-                    debug_log.append(f"{pad:2}{i + 1}.{j + 1}: ({move_type}) {move}")
+                    debug_log.append(f"{pad:2}{i + 1}.{j + 1}: ({move_type}) {move.to_string(side_name)}")
                     j += 1
         if not board.move_history:
             debug_log[-1] += " None"

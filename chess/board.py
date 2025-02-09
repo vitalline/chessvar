@@ -1170,15 +1170,15 @@ class Board(Window):
             side = Side(int(s))
             if side not in self.end_data:
                 continue
-            for c in end_data[s]:
-                condition = end_types.get(c, c)
-                if condition not in self.end_data[side]:
+            for k in end_data[s]:
+                keyword = end_types.get(k, k)
+                if keyword not in self.end_data[side]:
                     continue
-                for g in end_data[s][c]:
+                for g in end_data[s][k]:
                     group = g
-                    if group not in self.end_data[side][condition]:
+                    if group not in self.end_data[side][keyword]:
                         continue
-                    self.end_data[side][condition][group] = end_data[s][c][g]
+                    self.end_data[side][keyword][group] = end_data[s][k][g]
 
         self.reset_drops()
         self.reset_promotions()
@@ -3931,6 +3931,7 @@ class Board(Window):
                         finished = True
                         break
                     else:
+                        self.log(f"Drop: {next_move}")
                         self.shift_ply(+1)
                 else:
                     finished = False
