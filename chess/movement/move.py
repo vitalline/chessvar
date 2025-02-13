@@ -94,7 +94,8 @@ class Move(object):
         self.marks = marks or self.marks
         self.tag = tag or self.tag
         self.is_edit = is_edit if is_edit is not None else self.is_edit
-        self.is_legal = is_legal if is_legal is not None else self.is_legal
+        if is_legal is not None:
+            self.is_legal = is_legal and (self.is_legal or self.is_legal is None)
         return self
 
     def matches(self, other: Move) -> bool:
