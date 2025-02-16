@@ -271,6 +271,50 @@ def debug_info(board: Board) -> list[str]:
                 debug_log.append(f"{pad:2}{toa(pos)} {pos}: (From {len(piece_poss)}) {poss_string or 'None'}")
             if not side_section_data:
                 debug_log[-1] += " None"
+    promotion_side = Side.NONE
+    if isinstance(board.promotion_piece, AbstractPiece):
+        promotion_pos = board.promotion_piece.board_pos
+        if isinstance(board.promotion_piece, NoPiece):
+            debug_log.append(f"Promotion target: {toa(promotion_pos)} {promotion_pos}")
+        else:
+            debug_log.append(f"Promotion target: {name(board.promotion_piece)} on {toa(promotion_pos)} {promotion_pos}")
+        if board.move_history:
+            last_move = board.move_history[-1]
+            if last_move.is_edit and last_move.movement_type != DropMovement:
+                promotion_side = board.get_promotion_side(last_move.piece)
+            else:
+                promotion_side = last_move.piece.side or board.turn_side
+    else:
+        debug_log.append(f"Promotion target: None")
+    if board.promotion_area:
+        debug_log.append(f"Promotion options ({len(board.promotion_area)}):")
+        for pos in sorted(board.promotion_area):
+            to_piece = board.promotion_area[pos]
+            if pos in board.promotion_area_drops:
+                drop_piece = board.promotion_area_drops[pos]
+                if drop_piece is None:
+                    debug_log.append(f"{pad:2}{toa(pos)} {pos}: No promotion")
+                    continue
+            else:
+                drop_piece = None
+            suffixes = []
+            if isinstance(to_piece, AbstractPiece):
+                if to_piece.side not in {promotion_side, Side.NONE}:
+                    suffixes.append(f"Side: {to_piece.side}")
+                if to_piece.movement and to_piece.movement.total_moves:
+                    suffixes.append(f"Moves: {to_piece.movement.total_moves}")
+                if to_piece.promoted_from:
+                    suffixes.append(f"Promoted from: {name(to_piece.promoted_from, promotion_side)}")
+                if to_piece.should_hide is not None and not isinstance(to_piece, UtilityPiece):
+                    suffixes.append("Always hide" if to_piece.should_hide else "Never hide")
+                if to_piece.should_hide is not False and isinstance(to_piece, UtilityPiece):
+                    suffixes.append("Always hide" if to_piece.should_hide else "Can be hidden")
+            suffix = f" ({', '.join(suffixes)})" if suffixes else ''
+            if drop_piece:
+                suffix += f" (Drop: {name(drop_piece, promotion_side)})"
+            debug_log.append(f"{pad:2}{toa(pos)} {pos}: {name(to_piece, promotion_side)}{suffix}")
+    else:
+        debug_log.append(f"Promotion options (0): None")
     for section, section_data, custom_data in (
         ('promotion', board.promotions, board.custom_promotions),
         ('drop', board.drops, board.custom_drops),

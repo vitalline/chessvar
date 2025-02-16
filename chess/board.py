@@ -4854,11 +4854,13 @@ class Board(Window):
                 return
             if not self.captured_pieces[self.turn_side]:
                 return
-            if not self.use_drops and not self.edit_mode:
-                return
-            valid_drops = self.moves[self.turn_side].get('drop', {}).get(move.piece.board_pos, {})
-            if not valid_drops:
-                return
+            valid_drops = {}
+            if not self.edit_mode:
+                if not self.use_drops:
+                    return
+                valid_drops = self.moves[self.turn_side].get('drop', {}).get(move.piece.board_pos, {})
+                if not valid_drops:
+                    return
             side_drops = self.drops[self.turn_side]
             drop_list = []
             drop_type_list = []
@@ -4866,18 +4868,20 @@ class Board(Window):
             for piece_type in sorted(self.captured_pieces[self.turn_side], key=lambda x: drop_indexes.get(x, 0)):
                 if piece_type not in side_drops:
                     continue
-                if piece_type not in valid_drops:
-                    continue
-                if not valid_drops[piece_type]:
-                    continue
-                piece_drops = valid_drops[piece_type]
+                piece_drops = set()
+                if not self.edit_mode:
+                    if piece_type not in valid_drops:
+                        continue
+                    if not valid_drops[piece_type]:
+                        continue
+                    piece_drops = valid_drops[piece_type]
                 drop_squares = side_drops[piece_type]
                 if move.piece.board_pos not in drop_squares:
                     continue
                 drops = []
                 for drop in drop_squares[move.piece.board_pos]:
                     drop_type = type(drop) if isinstance(drop, AbstractPiece) else drop
-                    if drop_type not in piece_drops:
+                    if not self.edit_mode and drop_type not in piece_drops:
                         continue
                     drops.append(drop)
                 drop_list.extend(drops)
@@ -5050,7 +5054,9 @@ class Board(Window):
             self.promotion_area_sprite_list.append(background_sprite)
             if total > area:
                 continue
+            no_promotion = False
             if promotion is None:
+                no_promotion = True
                 promotion_piece = piece.on(pos)
                 promotion = type(promotion)
             elif not promotion:
@@ -5089,7 +5095,7 @@ class Board(Window):
                 )
                 self.promotion_piece_sprite_list.append(promotion_piece.sprite)
             self.promotion_area[pos] = promotion_piece
-            if promotion is None:
+            if no_promotion:
                 self.promotion_area_drops[pos] = None
             elif drop is not None:
                 self.promotion_area_drops[pos] = drop
