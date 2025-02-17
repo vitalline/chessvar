@@ -1610,11 +1610,15 @@ class Board(Window):
 
     def reset_penultima_pieces(self, piece_sets: dict[Side, list[type[AbstractPiece]]] | None = None) -> None:
         if piece_sets is None:
-            piece_sets = self.piece_sets
+            piece_sets = {
+                side: self.piece_sets[side]
+                for side in self.piece_sets
+                if self.piece_set_ids[side] is not None
+            }
         self.penultima_pieces = {side: {} for side in self.penultima_pieces}
         for player_side in self.penultima_pieces:
             for piece_side in (player_side, player_side.opponent()):
-                if not piece_sets[piece_side]:
+                if not piece_sets.get(piece_side):
                     continue
                 trimmed_set = piece_sets[piece_side].copy()
                 while issubclass(trimmed_set[0], NoPiece):
