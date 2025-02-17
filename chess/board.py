@@ -595,6 +595,75 @@ class Board(Window):
         self.selected_square = None
         self.show_moves()
 
+    def reset_pieces(self, pieces: dict | None = None) -> None:
+        self.pieces = []
+
+        empty_row = [NoPiece] * self.board_width
+        piece_row = ['piece'] * self.board_width
+        pawn_row = ['pawn'] * self.board_width
+
+        white_row = [Side.WHITE] * self.board_width
+        black_row = [Side.BLACK] * self.board_width
+        neutral_row = [Side.NONE] * self.board_width
+
+        types = [piece_row, pawn_row] + [empty_row] * (self.board_height - 4) + [pawn_row, piece_row]
+        sides = [white_row, white_row] + [neutral_row] * (self.board_height - 4) + [black_row, black_row]
+
+        for row in range(self.board_height):
+            self.pieces += [[]]
+
+        for row, col in product(range(self.board_height), range(self.board_width)):
+            pos = self.get_relative((row, col))
+            if pieces is not None:
+                piece_data = pieces.get(pos)
+                self.pieces[row].append(
+                    NoPiece(self, board_pos=pos) if piece_data is None
+                    else load_piece(self, piece_data, self.custom_pieces).on(pos)
+                )
+            elif self.custom_layout:
+                self.pieces[row].append(
+                    copy(self.custom_layout[pos])
+                    if pos in self.custom_layout
+                    else NoPiece(self, board_pos=pos)
+                )
+            else:
+                piece_type = types[row][col]
+                piece_side = sides[row][col]
+                if piece_type == 'piece':
+                    if col < len(self.piece_sets[piece_side]):
+                        piece_type = self.piece_sets[piece_side][col] or NoPiece
+                    else:
+                        piece_type = NoPiece
+                elif piece_type == 'pawn':
+                    custom_pawns = (
+                        self.custom_pawns.get(piece_side)
+                        if isinstance(self.custom_pawns, dict)
+                        else self.custom_pawns
+                    )
+                    if custom_pawns is None:
+                        piece_type = Pawn
+                    elif len(custom_pawns) == 1:
+                        piece_type = custom_pawns[0]
+                    else:
+                        piece_type = NoPiece
+                elif isinstance(piece_type, str):
+                    piece_type = NoPiece  # just in case.
+                self.pieces[row].append(
+                    piece_type(board=self, board_pos=pos, side=piece_side)
+                )
+            if isinstance(self.pieces[row][col], Piece):
+                if not isinstance(self.pieces[row][col], (NoPiece, Obstacle)):
+                    self.update_piece(self.pieces[row][col])
+                    self.pieces[row][col].set_color(
+                        self.color_scheme.get(
+                            f"{self.pieces[row][col].side.key()}piece_color",
+                            self.color_scheme['piece_color']
+                        ),
+                        self.color_scheme['colored_pieces']
+                    )
+                self.pieces[row][col].sprite.scale = self.square_size / self.pieces[row][col].sprite.texture.width
+                self.piece_sprite_list.append(self.pieces[row][col].sprite)
+
     def reset_board(self, update: bool | None = True, log: bool = True) -> None:
         self.save_interval = 0
 
@@ -674,67 +743,7 @@ class Board(Window):
 
         self.move_history = []
 
-        self.pieces = []
-
-        empty_row = [NoPiece] * self.board_width
-        piece_row = ['piece'] * self.board_width
-        pawn_row = ['pawn'] * self.board_width
-
-        white_row = [Side.WHITE] * self.board_width
-        black_row = [Side.BLACK] * self.board_width
-        neutral_row = [Side.NONE] * self.board_width
-
-        types = [piece_row, pawn_row] + [empty_row] * (self.board_height - 4) + [pawn_row, piece_row]
-        sides = [white_row, white_row] + [neutral_row] * (self.board_height - 4) + [black_row, black_row]
-
-        for row in range(self.board_height):
-            self.pieces += [[]]
-
-        for row, col in product(range(self.board_height), range(self.board_width)):
-            pos = self.get_relative((row, col))
-            if self.custom_layout:
-                self.pieces[row].append(
-                    copy(self.custom_layout[pos])
-                    if pos in self.custom_layout
-                    else NoPiece(self, board_pos=pos)
-                )
-            else:
-                piece_type = types[row][col]
-                piece_side = sides[row][col]
-                if piece_type == 'piece':
-                    if col < len(self.piece_sets[piece_side]):
-                        piece_type = self.piece_sets[piece_side][col] or NoPiece
-                    else:
-                        piece_type = NoPiece
-                elif piece_type == 'pawn':
-                    custom_pawns = (
-                        self.custom_pawns.get(piece_side)
-                        if isinstance(self.custom_pawns, dict)
-                        else self.custom_pawns
-                    )
-                    if custom_pawns is None:
-                        piece_type = Pawn
-                    elif len(custom_pawns) == 1:
-                        piece_type = custom_pawns[0]
-                    else:
-                        piece_type = NoPiece
-                elif isinstance(piece_type, str):
-                    piece_type = NoPiece  # just in case.
-                self.pieces[row].append(
-                    piece_type(board=self, board_pos=pos, side=piece_side)
-                )
-            if isinstance(self.pieces[row][col], Piece):
-                if not isinstance(self.pieces[row][col], (NoPiece, Obstacle)):
-                    self.update_piece(self.pieces[row][col])
-                    self.pieces[row][col].set_color(
-                        self.color_scheme.get(
-                            f"{self.pieces[row][col].side.key()}piece_color",
-                            self.color_scheme['piece_color']
-                        ),
-                        self.color_scheme['colored_pieces']
-                    )
-                self.pieces[row][col].sprite.scale = self.square_size / self.pieces[row][col].sprite.texture.width
-                self.piece_sprite_list.append(self.pieces[row][col].sprite)
+        self.reset_pieces()
 
         self.draw(0)
 
@@ -1227,8 +1236,10 @@ class Board(Window):
 
         if 'pieces' in data:
             pieces = exp_alg(data['pieces'], *whc)
-        else:
+        elif old_pieces:
             pieces = old_pieces
+        else:
+            pieces = None
 
         for sprite_list in (
             self.piece_sprite_list,
@@ -1237,21 +1248,7 @@ class Board(Window):
         ):
             sprite_list.clear()
 
-        self.pieces = []
-
-        for row in range(self.board_height):
-            self.pieces += [[]]
-
-        for row, col in product(range(self.board_height), range(self.board_width)):
-            pos = self.get_relative((row, col))
-            piece_data = pieces.get(pos)
-            self.pieces[row].append(
-                NoPiece(self, board_pos=pos) if piece_data is None
-                else load_piece(self, piece_data, c).on(pos)
-            )
-            if isinstance(self.pieces[row][col], Piece):
-                self.pieces[row][col].sprite.scale = self.square_size / self.pieces[row][col].sprite.texture.width
-                self.piece_sprite_list.append(self.pieces[row][col].sprite)
+        self.reset_pieces(pieces)
 
         self.draw(0)
 
@@ -1410,17 +1407,7 @@ class Board(Window):
 
         self.move_history = []
 
-        self.pieces = []
-
-        for row in range(self.board_height):
-            self.pieces += [[]]
-
-        for row, col in product(range(self.board_height), range(self.board_width)):
-            pos = self.get_relative((row, col))
-            self.pieces[row].append(NoPiece(self, board_pos=pos))
-            if isinstance(self.pieces[row][col], Piece):  # should always be False, but just in case
-                self.pieces[row][col].sprite.scale = self.square_size / self.pieces[row][col].sprite.texture.width
-                self.piece_sprite_list.append(self.pieces[row][col].sprite)
+        self.reset_pieces({})
 
         self.draw(0)
 
