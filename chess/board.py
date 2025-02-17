@@ -1145,10 +1145,13 @@ class Board(Window):
 
         self.custom_layout = {p: load_piece(self, v, c).on(p) for p, v in exp_alg(data.get('layout', {}), *whc).items()}
 
-        ply_count = data.get('ply', self.ply_count)
-        if ply_count <= 0:
-            self.log(f"Error: Invalid ply count ({ply_count})")
-            ply_count = 1
+        if 'ply' in data:
+            ply_count = data['ply']
+            if ply_count <= 0:
+                self.log(f"Error: Invalid ply count ({ply_count})")
+                ply_count = 1
+        else:
+            ply_count = self.ply_count
         self.custom_turn_order = [
             (Side(int(side[0])), [{mk: [
                 {lk: repack(lv) for lk in default_sub_rules.get(mk, {}) if (lv := ld.get(lk))}
@@ -1298,7 +1301,7 @@ class Board(Window):
                 self.turn_side = turn_data[1]
         self.log_armies()
         self.log_info()
-        if with_history:
+        if with_history or self.ply_count == 0:
             self.shift_ply(+1)
         self.log_special_modes()
         if with_history:
