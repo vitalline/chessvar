@@ -178,8 +178,8 @@ class HalflingRiderMovement(RiderMovement):
 
     def steps_to_edge(self, position: int, direction: int, start: int, stop: int) -> int:
         if direction == 0:
-            return stop - start
-        return (((stop - 1 - position) if direction > 0 else position - start) - self.shift) // abs(direction)
+            return max(self.bounds[i][1] - self.bounds[i][0] for i in range(2))
+        return (((stop - 1 - position) if direction > 0 else (position - start)) - self.shift) // abs(direction)
 
     def initialize_direction(self, direction: AnyDirection, pos_from: Position, piece: Piece) -> None:
         self.data['max_steps'] = min(
