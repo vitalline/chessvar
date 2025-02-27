@@ -3410,21 +3410,20 @@ class Board(Window):
                 if index < -len(self.move_history) or self.get_turn_side(index) != draw_for:
                     break
             for move in history_moves[::-1]:
-                pos_from, pos_to = move.pos_from, move.pos_to
+                pos_from, pos_to, piece = move.pos_from, move.pos_to, move.piece
                 last_move = move
                 captures = []
                 while last_move.chained_move:
                     for capture in last_move.captured:
                         captures.append(capture.board_pos)
                     if last_move.pos_from == pos_to:
-                        pos_to = last_move.pos_to
+                        pos_to, piece = last_move.pos_to, last_move.piece
                     last_move = last_move.chained_move
                 if last_move.pos_from == pos_to:
-                    pos_to = last_move.pos_to
-                pos_to = pos_to
+                    pos_to, piece = last_move.pos_to, last_move.piece
                 for capture in last_move.captured:
                     captures.append(capture.board_pos)
-                pos = move.piece.board_pos
+                pos = piece.board_pos
                 if pos_from is not None and pos_from != pos_to:
                     if pos_from in move_sprites and not self.not_a_piece(pos_from):
                         move_sprites[pos_from].color = self.color_scheme['selection_color']
