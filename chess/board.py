@@ -4030,6 +4030,17 @@ class Board(Window):
             if isinstance(pos_from, str):
                 if only_move is None:
                     only_move = pos_from
+                    if only_move == 'drop':
+                        if len(moves[pos_from]) != 1:
+                            break
+                        drop_pos = list(moves[pos_from])[0]
+                        if len(moves[pos_from][drop_pos]) != 1:
+                            break  # NB: moves[pos_from][drop_pos] here is a set[type[AbstractPiece]]
+                        # Note that it is technically possible to have legal drops of the same piece to the same square,
+                        # but with the dropped pieces having distinct metadata. The type-based check above is not enough
+                        # to unambiguously resolve such cases, but it very likely won't matter for most custom variants.
+                        only_move = Move(pos_from=None, pos_to=drop_pos, movement_type=DropMovement, promotion=Unset)
+                        self.update_move(only_move)
                     continue
                 else:
                     only_move = False
@@ -4064,7 +4075,12 @@ class Board(Window):
             self.update_auto_capture_markers(chained_move)
             chained_move.set(piece=copy(chained_move.piece))
             if self.promotion_piece is None:
-                self.log(f"Move: {chained_move}")
+                move_type = (
+                    'Edit' if chained_move.is_edit
+                    else 'Drop' if chained_move.movement_type == DropMovement
+                    else 'Move'
+                )
+                self.log(f"{move_type}: {chained_move}")
             chained_move = chained_move.chained_move
         if self.chain_start is None:
             self.chain_start = move
@@ -4881,7 +4897,22 @@ class Board(Window):
                 drop_type_list.extend(piece_type for _ in drops)
             if not drop_list:
                 return
-            if self.auto_moves and self.board_config['fast_drops'] and len(drop_list) == 1:
+            auto_drop = False
+            if self.auto_moves and self.board_config['fast_drops']:
+                if len(drop_list) == 1:
+                    auto_drop = True
+                elif len(set(drop_type_list)) == 1:
+                    auto_drop = True
+                    for drop in drop_list[1:]:
+                        if isinstance(drop, AbstractPiece) != isinstance(drop_list[0], AbstractPiece):
+                            auto_drop = False
+                        elif isinstance(drop, AbstractPiece):
+                            auto_drop = drop.matches(drop_list[0])
+                        else:
+                            auto_drop = drop == drop_list[0]
+                        if not auto_drop:
+                            break
+            if auto_drop:
                 promotion_piece = self.promotion_piece
                 self.promotion_piece = True
                 drop = drop_list[0]
