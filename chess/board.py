@@ -1612,6 +1612,8 @@ class Board(Window):
             }
         self.penultima_pieces = {side: {} for side in self.penultima_pieces}
         for player_side in self.penultima_pieces:
+            if not piece_sets.get(player_side):
+                continue
             for piece_side in (player_side, player_side.opponent()):
                 if not piece_sets.get(piece_side):
                     continue
