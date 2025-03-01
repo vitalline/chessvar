@@ -2333,6 +2333,8 @@ class Board(Window):
             for move in piece.moves(theoretical=True):
                 pos_from, pos_to = move.pos_from, move.pos_to or move.pos_from
                 self.theoretical_moves[side].setdefault(pos_from, {}).setdefault(pos_to, []).append(move)
+                if 'a' in move.marks:
+                    continue
                 self.threats[side].setdefault(pos_to, set()).add(pos_from)
 
     def clear_theoretical_moves(self, side: Side | None = None, poss: Unpacked[Position] | None = None) -> None:
@@ -2811,6 +2813,8 @@ class Board(Window):
                                 self.check_side = old_check_side
                     move_rule_dict = {}
                     for base_move in piece.moves() if chain_moves is None else chain_moves:
+                        if not base_move.is_legal:
+                            continue
                         move_tag = tuple(self.keys(base_move))
                         if move_tag not in move_rule_dict:
                             move_rule_dict[move_tag] = self.filter(piece_rules, 'move', [base_move], ('match', 'move'))

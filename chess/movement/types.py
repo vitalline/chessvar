@@ -829,7 +829,7 @@ class RepeatBentMovement(BaseMultiMovement):
                         dir_indexes = self.dir_indexes[:]  # oh hey, remember when this very thing was in RiderMovement?
                         if self.start_index <= index and self.skip_count <= true_index:
                             yield copy(move)
-                        else:
+                        elif theoretical:
                             yield copy(move).set(is_legal=False).unmark('n').mark('a')
                         self.dir_indexes = dir_indexes  # yeah, that's still a thing.
                     if stop:
