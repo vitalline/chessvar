@@ -830,7 +830,7 @@ def debug_info(board: Board) -> list[str]:
             empty = False
             turn_side = board.get_turn_side(i, 0)
             debug_log.append(f"{pad:2}Ply {i + 1}:")
-            for pos, piece in sorted(pieces.items(), key=lambda x: x[0]):
+            for pos, piece in sorted(pieces, key=lambda x: x[0]):
                 debug_log.append(f"{pad:4}{toa(pos)} {pos}: {name(piece, turn_side)}")
     if empty:
         debug_log[-1] += " None"
