@@ -1504,7 +1504,6 @@ class Board(Window):
                         royal_value = self.get_royal_value(piece_type, drop_side)
                         if royal_value and royal_value not in {'+', '-'}:
                             continue
-                        has_moved = i in {0, len(trimmed_set) - 1}
                         drops[piece_type] = {pos: [piece_type] for pos in drop_squares}
             self.drops[drop_side] = drops
 
