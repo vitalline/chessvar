@@ -4918,7 +4918,7 @@ class Board(Window):
                 else:
                     drop = drop(board=self, board_pos=move.piece.board_pos, side=self.turn_side)
                     if drop.movement is not None:
-                        drop.movement.set_moves(mv.total_moves if (mv := move.piece.movement) else 1)
+                        drop.movement.set_moves((mv.total_moves if (mv := move.piece.movement) else 0) + 1)
                 move.set(promotion=drop, placed_piece=drop_type_list[0])
                 for i, piece in enumerate(self.captured_pieces[self.turn_side][::-1]):
                     if piece == move.placed_piece:
@@ -4977,7 +4977,7 @@ class Board(Window):
             elif isinstance(promotion, type) and issubclass(promotion, AbstractPiece):
                 promotion = promotion(board=self, board_pos=move.pos_to, side=move.piece.side)
                 if promotion.movement is not None:
-                    promotion.movement.set_moves(mv.total_moves if (mv := move.piece.movement) else 1)
+                    promotion.movement.set_moves((mv.total_moves if (mv := move.piece.movement) else 0) + 1)
             promoted_from = promotion.promoted_from or move.piece.promoted_from
             if not isinstance(move.piece, NoPiece):
                 promoted_from = promoted_from or type(move.piece)
@@ -5023,7 +5023,7 @@ class Board(Window):
             else:
                 piece = piece(board=self, side=move.piece.side)
                 if piece.movement:
-                    piece.movement.set_moves(mv.total_moves if (mv := move.piece.movement) else 1)
+                    piece.movement.set_moves((mv.total_moves if (mv := move.piece.movement) else 0) + 1)
             promoted_from = piece.promoted_from or move.piece.promoted_from
             if not isinstance(move.piece, NoPiece):
                 promoted_from = promoted_from or type(move.piece)
@@ -5094,7 +5094,7 @@ class Board(Window):
             else:
                 promotion_piece = promotion(board=self, board_pos=pos, side=side)
                 if promotion_piece.movement:
-                    promotion_piece.movement.set_moves(mv.total_moves if (mv := piece.movement) else 1)
+                    promotion_piece.movement.set_moves((mv.total_moves if (mv := piece.movement) else 0) + 1)
             if not self.edit_mode or (self.move_history and ((m := self.move_history[-1]) and m.is_edit != 1)):
                 promoted_from = promotion_piece.promoted_from or piece.promoted_from
                 if not isinstance(piece, NoPiece):
@@ -6037,7 +6037,7 @@ class Board(Window):
                             else:
                                 piece = piece(board=self, board_pos=move.pos_to, side=side)
                                 if piece.movement:
-                                    piece.movement.set_moves(mv.total_moves if (mv := move.piece.movement) else 1)
+                                    piece.movement.set_moves((mv.total_moves if (mv := move.piece.movement) else 0) + 1)
                             promoted_from = piece.promoted_from or move.piece.promoted_from
                             if not isinstance(move.piece, NoPiece):
                                 promoted_from = promoted_from or type(move.piece)
