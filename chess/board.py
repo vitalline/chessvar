@@ -4203,10 +4203,11 @@ class Board(Window):
             # as well as for relay moves
             self.update_relay_markers(move)
         if update:
+            old_color = self.highlight.color
             self.highlight.color = (0, 0, 0, 0)
             self.hide_moves()
             self.draw(0)
-            self.highlight.color = self.color_scheme['highlight_color']
+            self.highlight.color = old_color
 
     def undo(self, move: Move, update: bool = True) -> None:
         self.skip_caption_update = True
@@ -4291,10 +4292,11 @@ class Board(Window):
             # revert markers for relay moves
             self.revert_relay_markers(move)
         if update:
+            old_color = self.highlight.color
             self.highlight.color = (0, 0, 0, 0)
             self.hide_moves()
             self.draw(0)
-            self.highlight.color = self.color_scheme['highlight_color']
+            self.highlight.color = old_color
 
     def undo_last_move(self) -> None:
         self.deselect_piece()
@@ -5178,10 +5180,11 @@ class Board(Window):
             self.custom_pieces[new_type] = self.past_custom_pieces[new_type]
             del self.past_custom_pieces[new_type]
         if update:
+            old_color = self.highlight.color
             self.highlight.color = (0, 0, 0, 0)
             self.hide_moves()
             self.draw(0)
-            self.highlight.color = self.color_scheme['highlight_color']
+            self.highlight.color = old_color
 
     def color_pieces(self, side: Side = Side.ANY, color: tuple[int, int, int] | None = None) -> None:
         for piece in self.movable_pieces.get(side, sum(self.movable_pieces.values(), [])):
