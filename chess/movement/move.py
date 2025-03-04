@@ -182,7 +182,7 @@ class Move(object):
             if self.promotion:
                 if self.promotion.side and not (self.piece and self.promotion.side == self.piece.side):
                     string += f" {self.promotion.side}"
-                if self.piece.name != self.promotion.name:
+                if not (self.piece and self.piece.name == self.promotion.name):
                     string += f" {self.promotion.name}"
             else:
                 string += ' ?'

@@ -6208,7 +6208,8 @@ class Board(Window):
                 self.update_auto_captures(move, self.turn_side.opponent())
                 chained_move = move
                 while chained_move:
-                    chained_move.promotion = Unset  # do not auto-promote because we're selecting the promotion manually
+                    if not issubclass(chained_move.movement_type or type, CloneMovement):
+                        chained_move.promotion = Unset  # do not auto-promote because we're selecting promotion manually
                     self.move(chained_move)
                     chained_move.set(piece=copy(chained_move.piece))
                     if self.promotion_piece is None:
