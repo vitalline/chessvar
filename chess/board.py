@@ -4278,10 +4278,15 @@ class Board(Window):
                 if update and isinstance(old_piece, Piece):
                     self.update_piece(old_piece)  # update the piece to reflect current piece hiding mode
                     self.piece_sprite_list.append(old_piece.sprite)
-        for pos in (move.pos_from, move.pos_to):
-            if pos is None:
+        for piece, pos in (
+            (move.promotion or move.piece, move.pos_to),
+            (move.swapped_piece, move.pos_from),
+        ):
+            if piece is None:
                 continue
-            self.clear_theoretical_moves(self.get_side(pos), pos)
+            if pos is None:
+                pos = piece.board_pos
+            self.clear_theoretical_moves(piece.side, pos)
         if (
             move.is_edit != 1 and move.movement_type and move.piece.movement
             and not issubclass(move.movement_type or type, (CloneMovement, DropMovement))
