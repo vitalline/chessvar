@@ -810,7 +810,7 @@ def debug_info(board: Board) -> list[str]:
                     move_type = 'Edit' if move.is_edit else 'Drop' if move.movement_type == DropMovement else 'Move'
                     debug_log.append(f"{pad:2}{i + 1}.{j + 1}: ({move_type}) {move.to_string(side_name)}")
                     j += 1
-        if not board.move_history:
+        if not section_data:
             debug_log[-1] += " None"
         start_count += len(section_data)
     empty = True
