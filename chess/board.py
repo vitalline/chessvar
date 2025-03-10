@@ -3932,11 +3932,12 @@ class Board(Window):
                     break
             else:
                 move = None
-                if next_move.pos_from != next_move.pos_to or not next_move.captured:
-                    move = self.find_move(next_move.pos_from, next_move.pos_to)
+                pos_from, pos_to = next_move.pos_from, next_move.pos_to or next_move.pos_from
+                if pos_from != pos_to or not next_move.captured:
+                    move = self.find_move(pos_from, pos_to)
                 else:
                     for capture in next_move.captured:
-                        move = self.find_move(next_move.pos_from, capture.board_pos)
+                        move = self.find_move(pos_from, capture.board_pos)
                         if move is not None:
                             break
                 if move is None:
