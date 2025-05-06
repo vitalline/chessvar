@@ -127,7 +127,7 @@ def debug_info(board: Board) -> list[str]:
     pad = ''
     s26 = lambda x: b26(x + (0 if x < 0 else 1))
     offset_x, offset_y = board.notation_offset
-    mapping = {side: get_piece_mapping(board, side) for side in (Side.WHITE, Side.BLACK, Side.NONE)}
+    mapping = {side: get_piece_mapping(board, side) for side in {Side.WHITE, Side.BLACK, Side.NONE}}
     piece_side = lambda piece: piece.side if isinstance(piece, AbstractPiece) else Side.NONE
     def name(piece: TypeOr[AbstractPiece], side: Side = Side.NONE):
         if not piece or isinstance(piece, NoPiece) or isinstance(piece, type) and issubclass(piece, NoPiece):
@@ -266,7 +266,7 @@ def debug_info(board: Board) -> list[str]:
             side_section_data = section_data.get(side) or {}
             debug_log.append(f"{side} {section_type} ({len(side_section_data)}):")
             for pos in sorted(side_section_data):
-                piece_poss = {p for p in side_section_data[pos] if not isinstance(p, (type, str))}
+                piece_poss = {p for p in side_section_data[pos] if p is None or isinstance(p, tuple)}
                 poss_string = ', '.join(f'{toa(xy)} {xy}' for xy in sorted(piece_poss))
                 debug_log.append(f"{pad:2}{toa(pos)} {pos}: (From {len(piece_poss)}) {poss_string or 'None'}")
             if not side_section_data:

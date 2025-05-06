@@ -8,7 +8,7 @@ from datetime import datetime
 from itertools import chain
 from json import dumps as json_dumps
 from tkinter import filedialog
-from typing import Any, TypeAlias, TypeVar
+from typing import Any, TypeAlias, TypeVar, Union
 
 # Lambda function to return the sign of a number. Returns +1 for positive numbers, -1 for negative numbers, and 0 for 0.
 sign = lambda x: (x > 0) - (x < 0)
@@ -124,14 +124,52 @@ def pluralize(number: int | str, singular: str | None = None, plural: str | None
 
 
 T = TypeVar('T')
-TypeOr: TypeAlias = type[T] | T
-Unpacked: TypeAlias = Sequence[T] | T
+TypeOr: TypeAlias = Union[type[T], T]
+Unpacked: TypeAlias = Union[Sequence[T], T]
 StringIndex: TypeAlias = Mapping[str, T]
-IntIndex: TypeAlias = Sequence[T] | Mapping[int, T]
-Index: TypeAlias = IntIndex[T] | StringIndex[T]
+IntIndex: TypeAlias = Union[Sequence[T], Mapping[int, T]]
+Index: TypeAlias = Union[IntIndex[T], StringIndex[T]]
 Key: TypeAlias = str | int
-AnyJsonType = str | int | float | bool | None
-AnyJson = dict | list | AnyJsonType
+AnyJsonType: TypeAlias = str | int | float | bool | None
+AnyJson: TypeAlias = dict | list | AnyJsonType
+
+
+# Function to check if the value `l` is a Sequence containing at least `length` elements.
+def bound_check(l: Sequence[T], length: int) -> None:
+    if not isinstance(l, Sequence) or isinstance(l, str):
+        raise TypeError(f"Expected to truncate a non-string sequence, got {type(l)}")
+    if length < 0:
+        raise ValueError(f"Cannot truncate a sequence to a negative length ({length})")
+    elements = len(l)
+    if length > elements:
+        need_elements = f"{length} {pluralize(length, 'element')}"
+        have_elements = f"{elements} {pluralize(elements, 'element')}"
+        raise ValueError(f"Cannot truncate to the first {need_elements} of a sequence with only {have_elements}")
+    return
+
+
+# Several functions to truncate a sequence to the first few elements.
+# These exist primarily to prevent static type checkers from throwing an error after converting to (or slicing) a tuple.
+
+
+def single(l: Sequence[T]) -> tuple[T]:
+    bound_check(l, 1)
+    return l[0],
+
+
+def double(l: Sequence[T]) -> tuple[T, T]:
+    bound_check(l, 2)
+    return l[0], l[1]
+
+
+def triple(l: Sequence[T]) -> tuple[T, T, T]:
+    bound_check(l, 3)
+    return l[0], l[1], l[2]
+
+
+def quad(l: Sequence[T]) -> tuple[T, T, T, T]:
+    bound_check(l, 4)
+    return l[0], l[1], l[2], l[3]
 
 
 # Function to remove duplicate entries from a list while preserving order.
@@ -141,7 +179,7 @@ def deduplicate(l: list[T]) -> list[T]:
 
 # Function to turn a sequence into its single element if it has exactly one element. If not, returns the Sequence as is.
 def unpack(l: Sequence[T], bound: type = Sequence) -> Unpacked[T]:
-    return l[0] if isinstance(l, bound) and not isinstance(l, str) and len(l) == 1 else l
+    return l[0] if isinstance(l, bound) and isinstance(l, Sequence) and not isinstance(l, str) and len(l) == 1 else l
 
 
 # Function to turn any non-sequence object into a one-element sequence containing the object or return a Sequence as is.

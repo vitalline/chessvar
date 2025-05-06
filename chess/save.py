@@ -251,7 +251,7 @@ def load_piece(
     piece_type = load_piece_type(data.get('cls'), from_dict, last) or NoPiece
     piece = piece_type(
         board=board,
-        board_pos=fra(data['pos']) if 'pos' in data else None,  # type: ignore
+        board_pos=fra(data['pos']) if 'pos' in data else None,
         side=side,
     )
     piece.promoted_from = load_piece_type(data.get('from'), from_dict, last)

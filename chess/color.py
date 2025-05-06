@@ -3,51 +3,53 @@ from colorsys import hls_to_rgb, hsv_to_rgb, rgb_to_hls, rgb_to_hsv
 from PIL.ImageColor import getrgb
 from arcade import Color
 
+from chess.util import triple
+
 
 def bound_float(x: float) -> float:
     return min(1.0, max(0.0, x))
 
 
 def bound_color(color: Color) -> Color:
-    return tuple(min(255, max(0, x)) for x in color)  # type: ignore
+    return triple([min(255, max(0, x)) for x in color])
 
 
 def to_float(color: Color) -> tuple[float, float, float]:
-    return tuple(x / 255 for x in color[:3])  # type: ignore
+    return triple([x / 255 for x in color[:3]])
 
 
 def to_color(color: tuple[float, float, float] | Color) -> Color:
-    return bound_color(tuple(round(x * 255) for x in color))  # type: ignore
+    return bound_color(triple([round(x * 255) for x in color]))
 
 
 def average(color1: Color, color2: Color) -> Color:
-    return bound_color(tuple(round((x1 + x2) / 2) for x1, x2 in zip(color1, color2)))  # type: ignore
+    return bound_color(triple([round((x1 + x2) / 2) for x1, x2 in zip(color1, color2)]))
 
 
 def multiply(color: Color, amount: float) -> Color:
-    return bound_color(tuple(round(x * amount) for x in color[:3])) + color[3:]  # type: ignore
+    return bound_color(triple([round(x * amount) for x in color[:3]])) + color[3:]
 
 
 def lighten(color: Color, amount: float) -> Color:
     h, l, s = rgb_to_hls(*to_float(color))
-    return to_color(hls_to_rgb(h, bound_float(l + amount), s)) + color[3:]  # type: ignore
+    return to_color(hls_to_rgb(h, bound_float(l + amount), s)) + color[3:]
 
 
 def darken(color: Color, amount: float) -> Color:
-    return lighten(color, -amount)  # type: ignore
+    return lighten(color, -amount)
 
 
 def lighten_or_darken(color: Color, amount: float) -> Color:
-    return lighten(color, amount if rgb_to_hls(*to_float(color))[1] < 0.5 else -amount)  # type: ignore
+    return lighten(color, amount if rgb_to_hls(*to_float(color))[1] < 0.5 else -amount)
 
 
 def saturate(color: Color, amount: float) -> Color:
     h, l, s = rgb_to_hls(*to_float(color))
-    return to_color(hls_to_rgb(h, l, bound_float(s + amount))) + color[3:]  # type: ignore
+    return to_color(hls_to_rgb(h, l, bound_float(s + amount))) + color[3:]
 
 
 def desaturate(color: Color, amount: float) -> Color:
-    return saturate(color, -amount)  # type: ignore
+    return saturate(color, -amount)
 
 
 # defaults for colors that are not defined in the color schemes

@@ -1,13 +1,14 @@
 from collections.abc import Collection, Sequence
 from enum import Enum
 from itertools import zip_longest
+from typing import TypeAlias
 
-Direction = tuple[int, int]
-RepeatDirection = tuple[int, int, int]
-RepeatFromDirection = tuple[int, int, int, int]
-AnyDirection = Direction | RepeatDirection | RepeatFromDirection
-Position = Direction
-GenericPosition = tuple[int | str, int | str]
+Direction: TypeAlias = tuple[int, int]
+RepeatDirection: TypeAlias = tuple[int, int, int]
+RepeatFromDirection: TypeAlias = tuple[int, int, int, int]
+AnyDirection: TypeAlias = Direction | RepeatDirection | RepeatFromDirection
+Position: TypeAlias = Direction
+GenericPosition: TypeAlias = tuple[int | str, int | str]
 
 
 class ClashResolution(Enum):
@@ -191,6 +192,10 @@ def to_algebraic_map(
     y_offset: int,
     areas: dict[str, Collection[Position]],
 ) -> dict[str, Sequence[Position]]:
+    result = {}
+    # Helper function used to condense a list of positions by grouping filled areas, ranks and files together as strings
+    def make_map() -> dict[str, Sequence[Position]]:  # Generate a mapping from area groups to lists of position tuples
+        return {k if isinstance(k, str) else to_algebraic(k): sorted(result[k]) for k in sorted(result, key=sort_key)}
     # Step 1: Check if the position sequence contains every position on the board
     rows, cols = set(y + y_offset for y in range(height)), set(x + x_offset for x in range(width))
     remain = set(poss)
@@ -199,9 +204,7 @@ def to_algebraic_map(
         # use '*' (ANY) to represent all possible positions
         return {ANY: sorted(poss)}
     # Step 2: Check if there exists a group of areas that, when combined, covers all positions in the sequence
-    result = {}
-    # find all areas listed for each position
-    by_area = {area: set() for area in areas}
+    by_area = {area: set() for area in areas}  # find all areas listed for each position
     for pos in poss:
         for area in areas:
             if pos in areas[area]:
@@ -227,9 +230,7 @@ def to_algebraic_map(
             result[(row, ANY)] = row_poss
             remain.difference_update(row_poss)
         if not remain:  # if all listed positions were discarded, return the result
-            return {
-                k if isinstance(k, str) else to_algebraic(k): sorted(result[k]) for k in sorted(result, key=sort_key)
-            }
+            return make_map()
     # b) find all ranks listed for each file
     by_col = {col: set() for _, col in poss}
     for pos in poss:
@@ -241,14 +242,10 @@ def to_algebraic_map(
             result[(ANY, col)] = col_poss
             remain.difference_update(col_poss)
         if not remain:  # if all listed positions were discarded, return the result
-            return {
-                k if isinstance(k, str) else to_algebraic(k): sorted(result[k]) for k in sorted(result, key=sort_key)
-            }
+            return make_map()
     # Step 4: Add the remaining positions to the result
     result |= {pos: [pos] for pos in remain}
-    return {
-        k if isinstance(k, str) else to_algebraic(k): sorted(result[k]) for k in sorted(result, key=sort_key)
-    }
+    return make_map()
 
 
 def from_algebraic_map(

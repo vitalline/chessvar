@@ -10,7 +10,7 @@ from chess.movement.move import Move
 from chess.movement.util import ANY, AnyDirection, Direction, Position
 from chess.movement.util import add, sub, mul, ddiv, is_algebraic, from_algebraic_map
 from chess.pieces.types import Covered, Delayed, Delayed1, Immune, Slow
-from chess.util import Unpacked, Unset, fits, sign, repack, unpack
+from chess.util import Unpacked, Unset, double, fits, sign, repack, unpack
 
 if TYPE_CHECKING:
     from chess.board import Board
@@ -145,7 +145,7 @@ class RiderMovement(BaseMovement):
         )
 
     def stop_condition(self, move: Move, direction: AnyDirection, piece: Piece, theoretical: bool = False) -> bool:
-        next_pos_to = self.transform(add(move.pos_from, mul(direction[:2], self.steps + 1)))
+        next_pos_to = self.transform(add(move.pos_from, mul(double(direction), self.steps + 1)))
         return (
             self.bound_stop_condition(move, direction, next_pos_to)
             or ((
@@ -218,7 +218,7 @@ class CannonRiderMovement(RiderMovement):
         return super().skip_condition(move, direction, piece, theoretical) if self.data['jump'] > 0 else not theoretical
 
     def stop_condition(self, move: Move, direction: AnyDirection, piece: Piece, theoretical: bool = False) -> bool:
-        next_pos_to = self.transform(add(move.pos_from, mul(direction[:2], self.steps + 1)))
+        next_pos_to = self.transform(add(move.pos_from, mul(double(direction), self.steps + 1)))
         if self.data['jump'] < 0:
             if not (self.loop and move.pos_from == next_pos_to) and piece.blocked_by(self.board.get_piece(next_pos_to)):
                 return self.bound_stop_condition(move, direction, next_pos_to)
@@ -229,7 +229,10 @@ class CannonRiderMovement(RiderMovement):
             return True
         elif theoretical:
             next_piece = self.board.get_piece(next_pos_to)
-            if not piece.skips(next_piece) and isinstance(next_piece, Immune) and next_piece.movement is None:
+            if (
+                not piece.skips(next_piece) and isinstance(next_piece, Immune)
+                and isinstance(next_piece, self.board.piece_abc) and next_piece.movement is None
+            ):
                 return self.bound_stop_condition(move, direction, next_pos_to)
         return super().stop_condition(move, direction, piece, theoretical or not self.data['jump'] > 0)
 
@@ -252,7 +255,7 @@ class HopperRiderMovement(CannonRiderMovement):
                 self.data['capture'] = capture
 
     def stop_condition(self, move: Move, direction: AnyDirection, piece: Piece, theoretical: bool = False) -> bool:
-        next_pos_to = self.transform(add(move.pos_from, mul(direction[:2], self.steps + 1)))
+        next_pos_to = self.transform(add(move.pos_from, mul(double(direction), self.steps + 1)))
         if not (self.loop and move.pos_from == next_pos_to):
             next_piece = self.board.get_piece(next_pos_to)
             if not theoretical:
@@ -260,7 +263,10 @@ class HopperRiderMovement(CannonRiderMovement):
                     return True
                 elif self.data['jump'] >= 0 and next_piece.side:
                     return True
-            elif not piece.skips(next_piece) and isinstance(next_piece, Immune) and next_piece.movement is None:
+            elif (
+                not piece.skips(next_piece) and isinstance(next_piece, Immune)
+                and isinstance(next_piece, self.board.piece_abc) and next_piece.movement is None
+            ):
                 return True
         return super().stop_condition(move, direction, piece, theoretical)
 
@@ -285,21 +291,21 @@ class ProximityRiderMovement(RiderMovement):
     def initialize_direction(self, direction: AnyDirection, pos_from: Position, piece: Piece) -> None:
         self.data['capture'] = None
         if self.distance < 0:
-            capture_pos = self.transform(add(pos_from, mul(direction[:2], self.distance)))
+            capture_pos = self.transform(add(pos_from, mul(double(direction), self.distance)))
             capture = self.board.get_piece(capture_pos)
             if piece.captures(capture):
                 self.data['capture'] = capture
 
     def advance_direction(self, move: Move, direction: AnyDirection, pos_from: Position, piece: Piece) -> None:
         if self.distance > 0:
-            capture_pos = self.transform(add(move.pos_to, mul(direction[:2], self.distance)))
+            capture_pos = self.transform(add(move.pos_to, mul(double(direction), self.distance)))
             capture = self.board.get_piece(capture_pos)
             if piece.captures(capture):
                 self.data['capture'] = capture
 
     def stop_condition(self, move: Move, direction: AnyDirection, piece: Piece, theoretical: bool = False) -> bool:
         if not theoretical:
-            next_pos_to = self.transform(add(move.pos_from, mul(direction[:2], self.steps + 1)))
+            next_pos_to = self.transform(add(move.pos_from, mul(double(direction), self.steps + 1)))
             if not (self.loop and move.pos_from == next_pos_to) and not self.board.not_a_piece(next_pos_to):
                 return True
         return super().stop_condition(move, direction, piece, theoretical)
@@ -324,7 +330,7 @@ class SpaciousRiderMovement(RiderMovement):
     def skip_condition(self, move: Move, direction: AnyDirection, piece: Piece, theoretical: bool = False) -> bool:
         if theoretical:
             return super().skip_condition(move, direction, piece, theoretical)
-        next_pos_to = self.transform(add(move.pos_from, mul(direction[:2], self.steps + 1)))
+        next_pos_to = self.transform(add(move.pos_from, mul(double(direction), self.steps + 1)))
         check_space = self.spacious_transform(next_pos_to)
         check_state = check_space == self.spacious_transform(move.pos_from) or self.board.not_a_piece(check_space)
         return not check_state or super().skip_condition(move, direction, piece, theoretical)
@@ -416,7 +422,7 @@ class RangedCaptureRiderMovement(RangedMovement, RiderMovement):
 
     def skip_condition(self, move: Move, direction: AnyDirection, piece: Piece, theoretical: bool = False) -> bool:
         if move.captured:
-            move.pos_to = self.transform(add(move.pos_from, mul(direction[:2], self.steps)))
+            move.pos_to = self.transform(add(move.pos_from, mul(double(direction), self.steps)))
             result = super().skip_condition(move, direction, piece, theoretical)
             move.pos_to = move.pos_from
             return result
@@ -424,7 +430,7 @@ class RangedCaptureRiderMovement(RangedMovement, RiderMovement):
 
     def stop_condition(self, move: Move, direction: AnyDirection, piece: Piece, theoretical: bool = False) -> bool:
         if move.captured:
-            move.pos_to = self.transform(add(move.pos_from, mul(direction[:2], self.steps)))
+            move.pos_to = self.transform(add(move.pos_from, mul(double(direction), self.steps)))
             result = super().stop_condition(move, direction, piece, theoretical)
             move.pos_to = move.pos_from
             return result
@@ -821,7 +827,7 @@ class RepeatBentMovement(BaseMultiMovement):
                     if any(direction[:2]):
                         pos_to = move.pos_to
                         if issubclass(move.movement_type, RangedMovement) and move.captured:
-                            pos_to = movement.transform(add(move.pos_from, mul(direction[:2], movement.steps)))
+                            pos_to = movement.transform(add(move.pos_from, mul(double(direction), movement.steps)))
                         if pos_to == pos_from:
                             stop = True
                     move.movement_type = type(self)
@@ -836,7 +842,7 @@ class RepeatBentMovement(BaseMultiMovement):
                         break
                 if (
                     not stop and move is not None and (len(direction) < 3 or direction[2] and
-                    move.pos_to == add(pos_from, piece.side.direction(mul(direction[:2], direction[2]))))
+                    move.pos_to == add(pos_from, piece.side.direction(mul(double(direction), direction[2]))))
                     and (theoretical or not self.board.get_piece(move.pos_to).side)
                 ):
                     for bent_move in self.moves(move.pos_to, piece, theoretical, true_index + 1):
@@ -955,12 +961,12 @@ class StageMovement(BaseMultiMovement):
 
     def moves(self, pos_from: Position, piece: Piece, theoretical: bool = False, index: int = 0):
         if index >= len(self.movements):
-            return ()
+            return
         if index == len(self.movements) - 1:
             for move in self.movements[index].moves(pos_from, piece, theoretical):
                 self.board.update_move(move)
                 yield move
-            return ()
+            return
         if theoretical:
             for movement in self.movements:
                 yield from movement.moves(pos_from, piece, theoretical)

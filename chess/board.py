@@ -12,7 +12,7 @@ from os.path import dirname, getsize, isfile, join, relpath, split
 from random import Random
 from sys import argv
 from traceback import print_exc
-from typing import Any
+from typing import Any, Callable, TypeVar
 
 from PIL.ImageColor import getrgb
 from arcade import key, MOUSE_BUTTON_LEFT, MOUSE_BUTTON_RIGHT, Text
@@ -77,12 +77,20 @@ class Board(Window):
             visible=False,
         )
 
+        # piece base classes. when you need to check if something is a piece but you don't know what a piece is just yet
+        self.piece_abc = AbstractPiece  # piece abstract base class
+        self.piece_cbc = Piece          # piece concrete base class (now with sprites!)
+
+        # basic window parameters used for resizing
         self.origin = self.width / 2, self.height / 2
         self.set_minimum_size(round(min_width), round(min_height))
 
+        # window parameters when reverting to windowed mode
+        # these are written to save data in fullscreen mode
         self.windowed_size = self.width, self.height
         self.windowed_square_size = self.square_size
 
+        # truncate color scheme id to the total number of color schemes
         if self.board_config['color_id'] < 0 or self.board_config['color_id'] >= len(colors):
             self.board_config['color_id'] %= len(colors)
 
@@ -1006,7 +1014,7 @@ class Board(Window):
         }
         self.reset_areas()
         whc = *wh, {k: v for k, v in self.custom_areas.items() if isinstance(v, set)}
-        wha = defaultdict(lambda: whn, {side: (*wh, self.areas.get(side) or {}) for side in (Side.WHITE, Side.BLACK)})
+        wha = defaultdict(lambda: whn, {side: (*wh, self.areas.get(side) or {}) for side in [Side.WHITE, Side.BLACK]})
 
         window_size = data.get('window_size')
         square_size = data.get('square_size')
@@ -1664,10 +1672,14 @@ class Board(Window):
     def reset_turn_order(self) -> None:
         start_turns, loop_turns = [], []
         start_ended = False
-        to_pure_type = lambda s: action_types.get(s, s)
-        to_pure_move = lambda s: t.type_str() if isinstance((t := load_movement_type(s) or s), type) else t
-        to_type = lambda s: pch['not'] + to_pure_type(s[1:]) if s[0:1] == pch['not'] else to_pure_type(s)
-        to_move = lambda s: pch['not'] + to_pure_move(s[1:]) if s[0:1] == pch['not'] else to_pure_move(s)
+        def to_move(s: str) -> type[BaseMovement] | str:
+            t = load_movement_type(s) or s
+            return t.type_str() if isinstance(t, type) else t
+        def to_type(s: str) -> type[AbstractPiece] | str:
+            return action_types.get(s, s)
+        t1 = TypeVar('t1')
+        def notify(f: Callable[[str], type[t1] | str], s: str) -> type[t1] | str:
+            return pch['not'] + f(s[1:]) if s[0:1] == pch['not'] else f(s)
         for i, turn in enumerate(self.custom_turn_order or [(Side.WHITE, [{}]), (Side.BLACK, [{}])]):
             side, rules = turn
             if side == Side.NONE:
@@ -1680,8 +1692,8 @@ class Board(Window):
                         rule[field] = default_rules[field]
                     elif not isinstance(default_rules[field], list):
                         rule[field] = unpack(rule[field])
-                rule['move'] = [to_move(s) for s in rule['move']]
-                rule['type'] = [to_type(s) for s in rule['type']]
+                rule['move'] = [notify(to_move, s) for s in rule['move']]
+                rule['type'] = [notify(to_type, s) for s in rule['type']]
                 for field in default_sub_rules:
                     rule[field] = [copy(sub_rule) for sub_rule in rule[field]]
                     for sub_rule in rule[field]:
@@ -1692,8 +1704,8 @@ class Board(Window):
                             elif not isinstance(sub_rules[sub_field], list):
                                 sub_rule[sub_field] = unpack(sub_rule[sub_field])
                         if field in ('last', 'next'):
-                            sub_rule['move'] = [to_move(s) for s in sub_rule['move']]
-                            sub_rule['type'] = [to_type(s) for s in sub_rule['type']]
+                            sub_rule['move'] = [notify(to_move, s) for s in sub_rule['move']]
+                            sub_rule['type'] = [notify(to_type, s) for s in sub_rule['type']]
             (loop_turns if start_ended else start_turns).append((side, rules))
         if start_turns and not loop_turns and not start_ended:
             start_turns, loop_turns = loop_turns, start_turns
@@ -2088,12 +2100,11 @@ class Board(Window):
         piece_loss.difference_update(piece_gain)
         return piece_loss
 
-    def load_check(self, side: Side | None = None):
+    def load_check(self, for_side: Side | None = None):
         # Can any of the side's royal pieces be captured by the opponent,
         # and are any of the side's anti-royal pieces safe from captures?
         # When side is not specified, checks for the side that moves now.
-        if side is None:
-            side = self.turn_side
+        side = for_side if isinstance(for_side, Side) else self.turn_side
         self.check_side = Side.NONE
         self.check_groups = set()
         if self.edit_mode:
@@ -2535,7 +2546,7 @@ class Board(Window):
                                 check_sides[opponent] = True
                     self.check_side = old_check_side
                 state_rules = list(chain.from_iterable(state_groups.get(k, ()) for k in (
-                    0, *(side.value * (-1 if check_sides.get(side, False) else 1) for side in (Side.WHITE, Side.BLACK))
+                    0, *(side.value * (-1 if check_sides.get(side, False) else 1) for side in [Side.WHITE, Side.BLACK])
                 )))  # 0: any state, +side: side not in check, -side: side in check
                 if not state_rules:
                     continue
@@ -3179,7 +3190,7 @@ class Board(Window):
                 self.moves_queried[turn_side] = True
         if not pieces_loaded:
             self.load_pieces()
-            pieces_loaded = True
+            # pieces_loaded = True
         self.move_tags = set()
         if not self.theoretical_move_markers:
             theoretical_moves_for = Side.NONE
@@ -3459,8 +3470,8 @@ class Board(Window):
         self.move_sprite_list.clear()
         self.type_sprite_list.clear()
 
-    def can_pass(self, side: Side = None) -> bool:
-        return not self.game_over and self.moves.get(side or self.turn_side, {}).get('pass')
+    def can_pass(self, side: Side | None = None) -> bool:
+        return not self.game_over and self.moves.get(side if isinstance(side, Side) else self.turn_side, {}).get('pass')
 
     def update_highlight(self, pos: Position | None) -> None:
         if self.clicked_square != pos:
@@ -4424,29 +4435,36 @@ class Board(Window):
             if self.move_history and self.future_move_history:
                 past, future = self.move_history[-1], self.future_move_history[-1]
                 opt = lambda x: x or self.no_piece
-                while (
-                    past and future and past.pos_from == future.pos_from and past.pos_to == future.pos_to
-                    and (opt(past.swapped_piece).board_pos == opt(future.swapped_piece).board_pos) and all(
-                        opt(x).board_pos == opt(y).board_pos for x, y in zip_longest(past.captured, future.captured)
-                    )
-                ):
-                    if past.promotion is Unset:
-                        if future.promotion is Unset:
-                            return
-                        past.promotion = future.promotion
-                        if future.promotion is not None:
-                            if future.placed_piece is not None:
-                                past.placed_piece = future.placed_piece
-                                for i, piece in enumerate(self.captured_pieces[self.turn_side][::-1]):
-                                    if piece == future.placed_piece:
-                                        self.captured_pieces[self.turn_side].pop(-(i + 1))
-                                        break
-                            self.replace(self.promotion_piece, future.promotion)
-                        self.update_promotion_auto_captures(self.move_history[-1])
-                        self.end_promotion()
-                        piece_was_moved = True
-                        break
-                    past, future = past.chained_move, future.chained_move
+                while past and future:
+                    if (
+                        past.pos_from == future.pos_from and past.pos_to == future.pos_to and
+                        (opt(past.swapped_piece).board_pos == opt(future.swapped_piece).board_pos) and all(
+                            opt(x).board_pos == opt(y).board_pos for x, y in zip_longest(past.captured, future.captured)
+                        )
+                    ):
+                        if past.promotion is Unset:
+                            if future.promotion is Unset:
+                                return
+                            past.promotion = future.promotion
+                            if future.promotion is not None:
+                                if future.placed_piece is not None:
+                                    past.placed_piece = future.placed_piece
+                                    for i, piece in enumerate(self.captured_pieces[self.turn_side][::-1]):
+                                        if piece == future.placed_piece:
+                                            self.captured_pieces[self.turn_side].pop(-(i + 1))
+                                            break
+                                self.replace(self.promotion_piece, future.promotion)
+                            self.update_promotion_auto_captures(self.move_history[-1])
+                            self.end_promotion()
+                            # The following two lines are a workaround for the fact that PyCharm insisted that
+                            # "piece_was_moved = True" here was useless, despite the variable being used later
+                            # (I explicitly checked if removing it introduces side effects, and yes, it does).
+                            while not piece_was_moved:
+                                piece_was_moved = True
+                            break
+                        past, future = past.chained_move, future.chained_move
+                    else:
+                        return
             else:
                 return
         if not self.future_move_history:
@@ -4683,6 +4701,7 @@ class Board(Window):
             return string
         elif self.check_side:
             return f"{self.check_side} is in check!"
+        return None
 
     def update_status(self) -> None:
         self.load_end_conditions()
@@ -6393,12 +6412,12 @@ class Board(Window):
                 self.reset_board(update=None)  # Clear redoing if and only if no moves were made yet, i.e. double Ctrl+R
         if symbol == key.C:
             if modifiers & (key.MOD_SHIFT | key.MOD_ALT):  # Chaos mode
-                self.load_chaos_sets(1 + bool(modifiers & key.MOD_ALT), modifiers & key.MOD_ACCEL)
+                self.load_chaos_sets(1 + bool(modifiers & key.MOD_ALT), bool(modifiers & key.MOD_ACCEL))
             elif modifiers & key.MOD_ACCEL:  # Config
                 self.save_config()
         if symbol == key.X:
             if modifiers & (key.MOD_SHIFT | key.MOD_ALT):  # Extreme chaos mode
-                self.load_chaos_sets(3 + bool(modifiers & key.MOD_ALT), modifiers & key.MOD_ACCEL)
+                self.load_chaos_sets(3 + bool(modifiers & key.MOD_ALT), bool(modifiers & key.MOD_ACCEL))
             elif modifiers & key.MOD_ACCEL and not partial_move:  # Extra roll (update probabilistic pieces)
                 if self.selected_square:  # Only update selected piece (if it is probabilistic)
                     piece = self.get_piece(self.selected_square)
@@ -6917,7 +6936,7 @@ class Board(Window):
                 else:
                     load_path = load_menu(self.load_path, self.load_name or None)
                 if load_path:
-                    self.load(load_path, with_history=modifiers & key.MOD_SHIFT)
+                    self.load(load_path, with_history=bool(modifiers & key.MOD_SHIFT))
                     if not self.save_loaded:
                         self.reset_custom_data(True)
                         self.reset_board()
@@ -7115,6 +7134,7 @@ class Board(Window):
             with open(save_path, mode='w', encoding='utf-8') as log_file:
                 log_file.write('\n'.join(log_data))
             return str(save_path)
+        return None
 
     def save_debug_data(self) -> None:
         self.log("Info: Saving debug listings", False)
