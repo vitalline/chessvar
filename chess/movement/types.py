@@ -537,7 +537,7 @@ class CastlingMovement(TargetMovement):
         self.en_passant_gap = repack(en_passant_gap or [], list)
 
     def moves(self, pos_from: Position, piece: Piece, theoretical: bool = False):
-        if self.total_moves:
+        if piece.total_moves:
             return ()
         pos_to = add(pos_from, piece.side.direction(self.direction))
         if self.board.not_on_board(pos_to):
@@ -549,9 +549,9 @@ class CastlingMovement(TargetMovement):
         if self.board.not_on_board(other_piece_pos_to):
             return ()
         other_piece = self.board.get_piece(other_piece_pos)
-        if other_piece.side != piece.side:
+        if not other_piece.side:
             return ()
-        if other_piece.movement.total_moves:
+        if other_piece.total_moves:
             return ()
         if not theoretical:
             for gap_offset in self.movement_gap:
@@ -724,7 +724,7 @@ class IndexMovement(BaseMultiMovement, ChangingMovement):
     def moves(self, pos_from: Position, piece: Piece, theoretical: bool = False, index: int | None = None):
         mark = '#'
         if index is None:
-            index = self.total_moves
+            index = max(0, self.total_moves)
         index = max(0, index - self.iteration_sub) // (self.iteration_div or 1)
         if index >= len(self.movement_index):
             if self.cycle_mode > 0:

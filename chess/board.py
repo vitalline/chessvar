@@ -46,8 +46,8 @@ from chess.pieces.side import Side
 from chess.pieces.types import Covered, Delayed, Delayed1, Shared, Slow
 from chess.pieces.util import NoPiece, Obstacle, Block, Border, Shield, Void, Wall
 from chess.save import condense, expand, condense_algebraic as cnd_alg, expand_algebraic as exp_alg, substitute
-from chess.save import load_move, load_piece, load_rng, load_piece_type, load_custom_type, load_movement_type
-from chess.save import save_move, save_piece, save_rng, save_piece_type, save_custom_type
+from chess.save import load_rng, load_move, load_piece, load_piece_type, load_custom_type, load_movement_type
+from chess.save import save_rng, save_move, save_piece, save_piece_type, save_custom_type
 from chess.util import base_dir, config_path, get_file_name, get_file_path, load_menu, save_menu
 from chess.util import Default, Unset, Key, Index, TypeOr, Unpacked, unpack, repack, sign, spell
 from chess.util import deduplicate, dumps, find, find_string, fits, normalize, pluralize
@@ -822,7 +822,7 @@ class Board(Window):
                 side.value: {
                     save_piece_type(f): cnd_alg({
                         p: unpack([
-                            (save_piece if isinstance(t, AbstractPiece) else save_piece_type)(t, f) for t in l
+                            save_piece(t, f, True) if isinstance(t, AbstractPiece) else save_piece_type(t, f) for t in l
                         ]) for p, l in s.items()
                     }, *wha[side]) for f, s in d.items()
                 } for side, d in self.custom_promotions.items()
@@ -831,7 +831,7 @@ class Board(Window):
                 side.value: {
                     save_piece_type(f): cnd_alg({
                         p: unpack([
-                            (save_piece if isinstance(t, AbstractPiece) else save_piece_type)(t, f) for t in l
+                            save_piece(t, f, True) if isinstance(t, AbstractPiece) else save_piece_type(t, f) for t in l
                         ]) for p, l in s.items()
                     }, *wha[side]) for f, s in d.items()
                 } for side, d in self.custom_drops.items()
@@ -1103,7 +1103,7 @@ class Board(Window):
             Side(int(v)): {
                 load_piece_type(f, c): {
                     p: [
-                        (load_piece_type(t, c, f) if isinstance(t, str) else load_piece(self, t, c, f))
+                        (load_piece_type(t, c, f) if isinstance(t, str) else load_piece(self, t, c, f, True))
                         for t in repack(l)
                     ] for p, l in exp_alg(s, *wha[Side(int(v))]).items()
                 } for f, s in d.items()
@@ -1113,7 +1113,7 @@ class Board(Window):
             Side(int(v)): {
                 load_piece_type(f, c): {
                     p: [
-                        (load_piece_type(t, c, f) if isinstance(t, str) else load_piece(self, t, c, f))
+                        (load_piece_type(t, c, f) if isinstance(t, str) else load_piece(self, t, c, f, True))
                         for t in repack(l)
                     ] for p, l in exp_alg(s, *wha[Side(int(v))]).items()
                 } for f, s in d.items()
@@ -2644,7 +2644,7 @@ class Board(Window):
                                 rule['match'].setdefault('pos', []).append(pos_to)
                                 rule['match'].setdefault('to', []).append(pos_to)
                             history_rules = self.filter(
-                                history_rules, ('last', 'old'), [piece.movement.total_moves], ('match', 'old'), False
+                                history_rules, ('last', 'old'), [piece.total_moves], ('match', 'old'), False
                             )
                             if captured := last_history_move.captured:
                                 capture_type = 'take' if piece.side == turn_side else 'lose'
@@ -2738,7 +2738,7 @@ class Board(Window):
                     piece_rules = deepcopy(piece_rule_dict[piece_type])
                     for rule in piece_rules:
                         rule['match'].setdefault('piece', set()).add(piece_type)
-                    piece_rules = self.filter(piece_rules, 'old', [piece.movement.total_moves], ('match', 'old'), False)
+                    piece_rules = self.filter(piece_rules, 'old', [piece.total_moves], ('match', 'old'), False)
                     if not piece_rules:
                         continue
                     for rule in piece_rules:
@@ -2973,7 +2973,7 @@ class Board(Window):
                                     if chained_move.piece and chained_move.piece.movement:
                                         future_rules = self.filter(
                                             future_rules, ('next', 'old'),
-                                            [chained_move.piece.movement.total_moves],
+                                            [chained_move.piece.total_moves],
                                             ('match', 'old'), False
                                         )
                                     if loss := chained_move.captured:
@@ -4948,8 +4948,7 @@ class Board(Window):
                     drop = drop.of(drop.side or self.turn_side).on(move.pos_to)
                 else:
                     drop = drop(board=self, board_pos=move.piece.board_pos, side=self.turn_side)
-                    if drop.movement is not None:
-                        drop.movement.set_moves((mv.total_moves if (mv := move.piece.movement) else 0) + 1)
+                drop.set_moves(move.piece, 1)
                 move.set(promotion=drop, placed_piece=drop_type_list[0])
                 for i, piece in enumerate(self.captured_pieces[self.turn_side][::-1]):
                     if piece == move.placed_piece:
@@ -5007,8 +5006,7 @@ class Board(Window):
                 promotion = promotion.of(promotion.side or move.piece.side).on(move.pos_to)
             elif isinstance(promotion, type) and issubclass(promotion, AbstractPiece):
                 promotion = promotion(board=self, board_pos=move.pos_to, side=move.piece.side)
-                if promotion.movement is not None:
-                    promotion.movement.set_moves((mv.total_moves if (mv := move.piece.movement) else 0) + 1)
+            promotion.set_moves(move.piece, 1)
             promoted_from = promotion.promoted_from or move.piece.promoted_from
             if not isinstance(move.piece, NoPiece):
                 promoted_from = promoted_from or type(move.piece)
@@ -5053,8 +5051,7 @@ class Board(Window):
                 piece = piece.of(piece.side or move.piece.side)
             else:
                 piece = piece(board=self, side=move.piece.side)
-                if piece.movement:
-                    piece.movement.set_moves((mv.total_moves if (mv := move.piece.movement) else 0) + 1)
+            piece.set_moves(move.piece, 1)
             promoted_from = piece.promoted_from or move.piece.promoted_from
             if not isinstance(move.piece, NoPiece):
                 promoted_from = promoted_from or type(move.piece)
@@ -5124,8 +5121,7 @@ class Board(Window):
                 promotion = type(promotion)
             else:
                 promotion_piece = promotion(board=self, board_pos=pos, side=side)
-                if promotion_piece.movement:
-                    promotion_piece.movement.set_moves((mv.total_moves if (mv := piece.movement) else 0) + 1)
+            promotion_piece.set_moves(piece, 1)
             if not self.edit_mode or (self.move_history and ((m := self.move_history[-1]) and m.is_edit != 1)):
                 promoted_from = promotion_piece.promoted_from or piece.promoted_from
                 if not isinstance(piece, NoPiece):
@@ -6068,8 +6064,7 @@ class Board(Window):
                                 piece = piece.of(piece.side or side).on(pos)
                             else:
                                 piece = piece(board=self, board_pos=move.pos_to, side=side)
-                                if piece.movement:
-                                    piece.movement.set_moves((mv.total_moves if (mv := move.piece.movement) else 0) + 1)
+                            piece.set_moves(move.piece, 1)
                             promoted_from = piece.promoted_from or move.piece.promoted_from
                             if not isinstance(move.piece, NoPiece):
                                 promoted_from = promoted_from or type(move.piece)

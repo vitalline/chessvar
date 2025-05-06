@@ -34,10 +34,12 @@ class BaseMovement(object, metaclass=MovementMeta):
         return ()
 
     def update(self, move: Move, piece: Piece):
-        self.total_moves += 1
+        if self.total_moves >= 0:
+            self.total_moves += 1
 
     def undo(self, move: Move, piece: Piece):
-        self.total_moves -= 1
+        if self.total_moves > 0:
+            self.total_moves -= 1
 
     def reload(self, move: Move, piece: Piece):
         self.undo(move, piece)

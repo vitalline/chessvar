@@ -61,9 +61,7 @@ class AbstractPiece(object, metaclass=PieceMeta):
         string = f"{self.side} {self.name}"
         if self.board_pos:
             string = f"{self.board.get_absolute(self.board_pos)} {string} at {to_algebraic(self.board_pos)}"
-        suffixes = []
-        if self.movement and self.movement.total_moves:
-            suffixes.append(f"Moves: {self.movement.total_moves}")
+        suffixes = [f"Moves: {moves if (moves := self.total_moves) is not None else 'None'}"]
         if self.promoted_from:
             suffixes.append(f"From: {self.promoted_from}")
         if self.should_hide is not None:
@@ -95,14 +93,36 @@ class AbstractPiece(object, metaclass=PieceMeta):
         clone.board_pos = board_pos
         return clone
 
+    @property
+    def total_moves(self) -> int | None:
+        if self.movement:
+            if self.movement.total_moves >= 0:
+                return self.movement.total_moves
+            return None
+        return 0
+
+    def set_moves(self, count: AbstractPiece | int | None, offset: int | None = None, force: bool = False):
+        if self.movement is not None and (force or self.total_moves is None):
+            if not (count is None or isinstance(count, int)):
+                count = count.total_moves
+            if count is None or count < 0:
+                count = -1
+            if offset is not None:
+                if offset < 0:
+                    count = max(0, count + offset)
+                else:
+                    count = max(0, count) + offset
+            self.movement.set_moves(count)
+
     def matches(self, other: AbstractPiece) -> bool:
         return (
             type(self) is type(other)
             and self.side == other.side
             and bool(self.should_hide) == bool(other.should_hide)
+            and self.movement == other.movement
             and (
-                self.movement == other.movement and self.movement is None
-                or other.movement is not None and self.movement.total_moves == other.movement.total_moves
+                (self_moves := self.total_moves) == (other_moves := other.total_moves)
+                or self_moves is None or other_moves is None
             )
         )
 

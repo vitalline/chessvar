@@ -301,8 +301,8 @@ def debug_info(board: Board) -> list[str]:
             if isinstance(to_piece, AbstractPiece):
                 if to_piece.side not in {promotion_side, Side.NONE}:
                     suffixes.append(f"Side: {to_piece.side}")
-                if to_piece.movement and to_piece.movement.total_moves:
-                    suffixes.append(f"Moves: {to_piece.movement.total_moves}")
+                if to_piece.total_moves is not None:
+                    suffixes.append(f"Moves: {to_piece.total_moves}")
                 if to_piece.promoted_from:
                     suffixes.append(f"Promoted from: {name(to_piece.promoted_from, promotion_side)}")
                 if to_piece.should_hide is not None and not isinstance(to_piece, UtilityPiece):
@@ -357,8 +357,8 @@ def debug_info(board: Board) -> list[str]:
                         if isinstance(to_piece, AbstractPiece):
                             if to_piece.side not in {side, Side.NONE}:
                                 suffixes.append(f"Side: {to_piece.side}")
-                            if to_piece.movement and to_piece.movement.total_moves:
-                                suffixes.append(f"Moves: {to_piece.movement.total_moves}")
+                            if to_piece.total_moves is not None:
+                                suffixes.append(f"Moves: {to_piece.total_moves}")
                             if to_piece.promoted_from:
                                 suffixes.append(f"Promoted from: {name(to_piece.promoted_from, side)}")
                             if to_piece.should_hide is not None and not isinstance(to_piece, UtilityPiece):
@@ -468,8 +468,9 @@ def debug_info(board: Board) -> list[str]:
         if piece.side is not (piece.default_side if isinstance(piece, UtilityPiece) else Side.NONE):
             piece_name = f"{piece.side} {piece_name}"
         suffixes = []
-        if piece.movement and piece.movement.total_moves:
-            suffixes.append(f"Moves: {piece.movement.total_moves}")
+        total_moves = piece.total_moves
+        if total_moves != 0:
+            suffixes.append(f"Moves: {total_moves if total_moves is not None else 'None'}")
         if piece.promoted_from:
             suffixes.append(f"Promoted from: {name(piece.promoted_from, piece.side)}")
         if piece.should_hide is not None and not isinstance(piece, UtilityPiece):

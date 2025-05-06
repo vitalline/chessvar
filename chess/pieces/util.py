@@ -30,9 +30,7 @@ class UtilityPiece(AbstractPiece):
         string = f"{self.side} {self.name}" if self.side != self.default_side else self.name
         if self.board_pos:
             string = f"{self.board.get_absolute(self.board_pos)} {string} at {to_algebraic(self.board_pos)}"
-        suffixes = []
-        if self.movement and self.movement.total_moves:
-            suffixes.append(f"Moves: {self.movement.total_moves}")
+        suffixes = [f"Moves: {moves if (moves := self.total_moves) is not None else 'None'}"]
         if self.promoted_from:
             suffixes.append(f"From: {self.promoted_from}")
         if self.should_hide is not False:

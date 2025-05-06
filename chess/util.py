@@ -188,7 +188,7 @@ def repack(l: Unpacked[T], bound: type = Sequence) -> Sequence[T]:
 
 
 # Function to make an arbitrary JSON object hashable. Converts dicts to tuples of key-value pairs and lists to tuples.
-def make_hashable(thing: AnyJson) -> tuple | AnyJsonType:
+def make_hashable(thing: tuple | AnyJson) -> tuple | AnyJsonType:
     if isinstance(thing, dict):
         return tuple((k, make_hashable(thing[k])) for k in thing)
     if isinstance(thing, (list, tuple, set)):

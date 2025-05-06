@@ -215,6 +215,7 @@ def load_movement_type(data: list | str | None) -> type[BaseMovement] | frozense
 def save_piece(
     piece: AbstractPiece | frozenset | None,
     last: type[AbstractPiece] | None = None,
+    is_promotion: bool = False,
 ) -> dict | str | None:
     if piece is None:
         return None
@@ -230,9 +231,9 @@ def save_piece(
             and not (isinstance(piece, UtilityPiece) and piece.side == piece.default_side) else None
         ),
         'from': save_piece_type(piece.promoted_from, last) if piece.promoted_from else None,
-        'moves': piece.movement.total_moves if piece.movement else None,
+        'moves': piece.total_moves,
         'show': None if isinstance(piece, UtilityPiece) or piece.should_hide is None else not piece.should_hide,
-    }.items() if v or (k == 'show' and v is False)}
+    }.items() if v or (k == 'show' and v is False) or (k == 'moves' and (is_promotion == (v is not None)))}
 
 
 def load_piece(
@@ -240,6 +241,7 @@ def load_piece(
     data: dict | str | None,
     from_dict: dict | None = None,
     last: str | None = None,
+    is_promotion: bool = False,
 ) -> AbstractPiece | frozenset | None:
     if not data:
         return None
@@ -255,8 +257,7 @@ def load_piece(
         side=side,
     )
     piece.promoted_from = load_piece_type(data.get('from'), from_dict, last)
-    if piece.movement:
-        piece.movement.set_moves(data.get('moves', 0))
+    piece.set_moves(data.get('moves', None if is_promotion else 0), force=True)
     if isinstance(piece, Piece):
         show_piece = data.get('show')
         if show_piece is not None:
@@ -418,7 +419,7 @@ def save_move(move: Move | frozenset | None) -> dict | str | None:
         'captured': unpack([save_piece(x) for x in captured]),
         'swapped': save_piece(swapped),
         'drop': save_piece_type(move.placed_piece),
-        'promotion': save_piece(promotion),
+        'promotion': save_piece(promotion, type(piece) if piece else None),
         'chain': save_move(move.chained_move),
         'edit': move.is_edit,
         'tag': move.tag,
@@ -455,7 +456,7 @@ def load_move(board: Board, data: dict | str | None, from_dict: dict | None) -> 
         captured=captured,
         swapped_piece=swapped,
         placed_piece=load_piece_type(data.get('drop'), from_dict),
-        promotion=load_piece(board, data.get('promotion'), from_dict),
+        promotion=load_piece(board, data.get('promotion'), from_dict, data.get('piece')),
         chained_move=load_move(board, data.get('chain'), from_dict),
         is_edit=data.get('edit', 0),
         tag=data.get('tag', None),
