@@ -1211,12 +1211,12 @@ class Board(Window):
         rolls = data.get('rolls', {})
         self.roll_history = [
             ({fra(s): v for s, v in rolls[str(n)].items()} if str(n) in rolls else {})
-            for n in range(ply_count - 1)
+            for n in range(ply_count)
         ]
         rph = data.get('roll_piece_history', {})
         self.probabilistic_piece_history = [
             ({(fra(k), load_piece_type(v, c)) for k, v in rph[str(n)].items()} if str(n) in rph else set())
-            for n in range(ply_count - 1)
+            for n in range(ply_count)
         ]
 
         self.chain_start = load_move(self, data.get('chain_start'), c)
