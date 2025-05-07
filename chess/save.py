@@ -456,7 +456,7 @@ def load_move(board: Board, data: dict | str | None, from_dict: dict | None) -> 
         captured=captured,
         swapped_piece=swapped,
         placed_piece=load_piece_type(data.get('drop'), from_dict),
-        promotion=load_piece(board, data.get('promotion'), from_dict, data.get('piece')),
+        promotion=load_piece(board, data.get('promotion'), from_dict, piece.type_str()),
         chained_move=load_move(board, data.get('chain'), from_dict),
         is_edit=data.get('edit', 0),
         tag=data.get('tag', None),
