@@ -3410,9 +3410,12 @@ class Board(Window):
                         break
                     if self.show_history:
                         history_moves.append(move)
-                    elif history_moves and issubclass(history_moves[-1].movement_type or type, DropMovement):
-                        if not issubclass(move.movement_type or type, DropMovement):
-                            history_moves = [move]
+                    elif history_moves:
+                        if issubclass(history_moves[-1].movement_type or type, DropMovement):
+                            if not issubclass(move.movement_type or type, DropMovement):
+                                history_moves = [move]
+                                break
+                        else:
                             break
                     else:
                         history_moves = [move]
@@ -5430,12 +5433,14 @@ class Board(Window):
         for label in self.row_label_list:
             position = label.position
             label.font_size = self.square_size / 2
+            label.width = round(self.square_size / 2 * len(label.text))
             label.x, label.y = self.get_screen_position(
                 self.get_board_position(position, *args, between_cols=True), between_cols=True
             )
         for label in self.col_label_list:
             position = label.position
             label.font_size = self.square_size / 2
+            label.width = round(self.square_size / 2 * len(label.text))
             label.x, label.y = self.get_screen_position(
                 self.get_board_position(position, *args, between_rows=True), between_rows=True
             )
