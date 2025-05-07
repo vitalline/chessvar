@@ -6930,7 +6930,7 @@ class Board(Window):
             if modifiers & key.MOD_ALT:  # Load save data
                 self.deactivate()
                 self.draw(0)
-                self.log("Info: Selecting a file to load from", False)
+                self.log(f"Info: Selecting a file to {'reload' if modifiers & key.MOD_SHIFT else 'load from'}", False)
                 if not self.load_name and self.save_name:
                     load_path = load_menu(self.save_path, self.save_name)
                 else:
