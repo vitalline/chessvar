@@ -4,13 +4,13 @@ from copy import copy
 from os.path import join
 from typing import TYPE_CHECKING
 
-from arcade import Color, Sprite, load_texture
+from arcade import Sprite, load_texture
 
 from chess.movement.base import BaseMovement
 from chess.movement.util import Position, to_algebraic
 from chess.pieces.side import Side
 from chess.pieces.types import Double, Enemy, Empty, Immune, Neutral
-from chess.util import ALTERNATE_SUFFIX, CUSTOM_PREFIX, FormatOverride, Default, get_texture_path, normalize
+from chess.util import ALTERNATE_SUFFIX, CUSTOM_PREFIX, Color, FormatOverride, Default, get_texture_path, normalize
 
 if TYPE_CHECKING:
     from chess.board import Board
@@ -247,11 +247,7 @@ class Piece(AbstractPiece):
         self.texture_name = self.file_name
         self.texture_side = Side.NEUTRAL if isinstance(self, Neutral) else side if side is not None else Side.NONE
         self.alternate = False
-        self.sprite = Sprite(
-            normalize(self.texture_path()),
-            flipped_horizontally=self.flipped_horizontally,
-            flipped_vertically=self.flipped_vertically,
-        )
+        self.sprite = Sprite(normalize(self.texture_path()))
         if self.board_pos is not None:
             self.sprite.position = self.board.get_screen_position(self.board_pos)
 
@@ -300,23 +296,25 @@ class Piece(AbstractPiece):
         self.texture_name = file_name or self.texture_name
         self.alternate = alternate
         texture_path = normalize(self.texture_path())
-        if flipped_horizontally is None:
-            flipped_horizontally = self.flipped_horizontally
-        else:
+        if flipped_horizontally is not None:
             self.flipped_horizontally = flipped_horizontally
-        if flipped_vertically is None:
-            flipped_vertically = self.flipped_vertically
-        else:
+        if flipped_vertically is not None:
             self.flipped_vertically = flipped_vertically
-        if self.sprite.texture.name != texture_path:
+        if self.sprite.texture.file_path.resolve() != texture_path:
             color = self.sprite.color
-            new_texture = load_texture(
-                texture_path,
-                flipped_horizontally=flipped_horizontally,
-                flipped_vertically=flipped_vertically,
-            )
+            new_texture = load_texture(texture_path)
             self.sprite.texture = new_texture
             self.sprite.color = color
+            self.set_size(new_texture.width)
+
+    def set_size(self, size: float):
+        if size <= 0:
+            return
+        self.sprite.scale = size / self.sprite.texture.width
+        if self.flipped_horizontally:
+            self.sprite.scale_x *= -1
+        if self.flipped_vertically:
+            self.sprite.scale_y *= -1
 
     def set_color(self, color: Color, force_color: bool = False):
         if not self.name:

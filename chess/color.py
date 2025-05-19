@@ -1,9 +1,8 @@
 from colorsys import hls_to_rgb, hsv_to_rgb, rgb_to_hls, rgb_to_hsv
 
 from PIL.ImageColor import getrgb
-from arcade import Color
 
-from chess.util import triple
+from chess.util import Color, color as color_type, triple
 
 
 def bound_float(x: float) -> float:
@@ -27,12 +26,12 @@ def average(color1: Color, color2: Color) -> Color:
 
 
 def multiply(color: Color, amount: float) -> Color:
-    return bound_color(triple([round(x * amount) for x in color[:3]])) + color[3:]
+    return color_type(bound_color(triple([round(x * amount) for x in color[:3]])) + color[3:])
 
 
 def lighten(color: Color, amount: float) -> Color:
     h, l, s = rgb_to_hls(*to_float(color))
-    return to_color(hls_to_rgb(h, bound_float(l + amount), s)) + color[3:]
+    return color_type(to_color(hls_to_rgb(h, bound_float(l + amount), s)) + color[3:])
 
 
 def darken(color: Color, amount: float) -> Color:
@@ -45,7 +44,7 @@ def lighten_or_darken(color: Color, amount: float) -> Color:
 
 def saturate(color: Color, amount: float) -> Color:
     h, l, s = rgb_to_hls(*to_float(color))
-    return to_color(hls_to_rgb(h, l, bound_float(s + amount))) + color[3:]
+    return color_type(to_color(hls_to_rgb(h, l, bound_float(s + amount))) + color[3:])
 
 
 def desaturate(color: Color, amount: float) -> Color:

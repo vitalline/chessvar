@@ -7,7 +7,7 @@ from copy import copy
 from datetime import datetime
 from itertools import chain
 from json import dumps as json_dumps
-from tkinter import filedialog
+from tkinter import Tk, filedialog
 from typing import Any, TypeAlias, TypeVar, Union
 
 # Lambda function to return the sign of a number. Returns +1 for positive numbers, -1 for negative numbers, and 0 for 0.
@@ -132,6 +132,7 @@ Index: TypeAlias = Union[IntIndex[T], StringIndex[T]]
 Key: TypeAlias = str | int
 AnyJsonType: TypeAlias = str | int | float | bool | None
 AnyJson: TypeAlias = dict | list | AnyJsonType
+Color: TypeAlias = tuple[int, int, int] | tuple[int, int, int, int]
 
 
 # Function to check if the value `l` is a Sequence containing at least `length` elements.
@@ -169,6 +170,13 @@ def triple(l: Sequence[T]) -> tuple[T, T, T]:
 
 def quad(l: Sequence[T]) -> tuple[T, T, T, T]:
     bound_check(l, 4)
+    return l[0], l[1], l[2], l[3]
+
+
+def color(l: Sequence[int]) -> Color:
+    bound_check(l, 3)
+    if len(l) == 3:
+        return l[0], l[1], l[2]
     return l[0], l[1], l[2], l[3]
 
 
@@ -270,21 +278,25 @@ def get_file_path(
 
 # Function to select a file to open. Returns the path of the selected file.
 def load_menu(path: str = base_dir, file: str = None) -> str:
-    return filedialog.askopenfilename(
-        initialdir=path,
-        initialfile=file,
-        filetypes=[("JSON file", "*.json")],
-    )
+    with topmost() as root:
+        return filedialog.askopenfilename(
+            parent=root,
+            initialdir=path,
+            initialfile=file,
+            filetypes=[("JSON file", "*.json")],
+        )
 
 
 # Function to select a file to save. Returns the path of the selected file.
 def save_menu(path: str = base_dir, file: str = None) -> str:
-    return filedialog.asksaveasfilename(
-        initialdir=path,
-        initialfile=file,
-        filetypes=[("JSON file", "*.json")],
-        defaultextension='.json',
-    )
+    with topmost() as root:
+        return filedialog.asksaveasfilename(
+            parent=root,
+            initialdir=path,
+            initialfile=file,
+            filetypes=[("JSON file", "*.json")],
+            defaultextension='.json',
+        )
 
 
 # Function to convert a path to an absolute path and change all path separators to the one provided (os.sep by default).
@@ -460,3 +472,15 @@ class no_print:
     def __exit__(self, exc_type, exc_val, exc_tb):
         sys.stdout.close()
         sys.stdout = self._original_stdout
+
+
+# Context manager for creating a base-level topmost invisible window. Used to keep file pickers on top of other windows.
+class topmost:
+    def __enter__(self):
+        self.root = Tk()
+        self.root.withdraw()
+        self.root.attributes('-topmost', True)
+        return self.root
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        self.root.destroy()

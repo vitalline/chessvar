@@ -16,8 +16,8 @@ from typing import Any, Callable, TypeVar
 
 from PIL.ImageColor import getrgb
 from arcade import key, MOUSE_BUTTON_LEFT, MOUSE_BUTTON_RIGHT, Text
-from arcade import Sprite, SpriteList, Window
-from arcade import get_screens, start_render
+from arcade import Sprite, SpriteList, View, Window
+from arcade import draw_sprite, get_screens
 
 from chess.color import colors, default_colors, trickster_colors
 from chess.color import average, darken, desaturate, lighten, saturate
@@ -669,7 +669,7 @@ class Board(Window):
                         ),
                         self.color_scheme['colored_pieces']
                     )
-                self.pieces[row][col].sprite.scale = self.square_size / self.pieces[row][col].sprite.texture.width
+                self.pieces[row][col].set_size(self.square_size)
                 self.piece_sprite_list.append(self.pieces[row][col].sprite)
 
     def reset_board(self, update: bool | None = True, log: bool = True) -> None:
@@ -5140,11 +5140,12 @@ class Board(Window):
                     self.update_piece(promotion_piece, penultima_hide=False, alternate_sprite=alternate_sprites)
                 else:
                     self.update_piece(promotion_piece, penultima_flip=True, alternate_sprite=alternate_sprites)
-                promotion_piece.sprite.scale = self.square_size / promotion_piece.sprite.texture.width
+                promotion_piece_size = self.square_size
                 if isinstance(promotion_piece, (Border, Wall, Void)):
-                    promotion_piece.sprite.scale *= 0.8
+                    promotion_piece_size *= 0.8
                 if isinstance(promotion_piece, Shield):
-                    promotion_piece.sprite.scale *= 0.9
+                    promotion_piece_size *= 0.9
+                promotion_piece.set_size(promotion_piece_size)
                 promotion_piece.set_color(
                     self.color_scheme.get(
                         f"{promotion_piece.side.key()}piece_color",
@@ -5199,7 +5200,7 @@ class Board(Window):
                     ),
                     self.color_scheme['colored_pieces']
                 )
-            new_piece.sprite.scale = self.square_size / new_piece.sprite.texture.width
+            new_piece.set_size(self.square_size)
             self.piece_sprite_list.append(new_piece.sprite)
         if type(new_piece) == self.past_custom_pieces.get(new_type := save_piece_type(type(new_piece))):
             self.custom_pieces[new_type] = self.past_custom_pieces[new_type]
@@ -5368,14 +5369,14 @@ class Board(Window):
             alternate=alternate_sprite,
             flipped_horizontally=flip,
         )
-        piece.sprite.scale = self.square_size / piece.sprite.texture.width
+        piece.set_size(self.square_size)
 
     def update_pieces(self) -> None:
         for piece in sum(self.movable_pieces.values(), []):
             if isinstance(piece, Piece):
                 self.update_piece(piece)
         alternate_sprites = True if self.alternate_pieces == 0 else None
-        for piece in self.promotion_piece_sprite_list:
+        for piece in self.promotion_area.values():
             if isinstance(piece, Piece):
                 if isinstance(piece, (King, CBKing)) and type(piece) not in self.piece_sets[piece.side]:
                     self.update_piece(piece, asset_folder='other')
@@ -5387,7 +5388,7 @@ class Board(Window):
 
     def update_sprite(
         self,
-        sprite: Sprite,
+        sprite: Sprite | AbstractPiece,
         from_size: float,
         from_origin: tuple[float, float],
         from_width: int,
@@ -5397,8 +5398,14 @@ class Board(Window):
         from_offset: tuple[int, int],
         from_flip_mode: bool
     ) -> None:
+        if isinstance(sprite, AbstractPiece):
+            if not isinstance(sprite, Piece):
+                return
+            sprite.set_size(self.square_size)
+            sprite = sprite.sprite
+        else:
+            sprite.scale = self.square_size / sprite.texture.width
         old_position = sprite.position
-        sprite.scale = self.square_size / sprite.texture.width
         sprite.position = self.get_screen_position(self.get_board_position(
             old_position, from_size, from_origin, from_width, from_height,
             from_cols, from_rows, from_offset, from_flip_mode
@@ -5420,13 +5427,14 @@ class Board(Window):
         self.update_sprite(self.highlight, *args)
         self.update_sprite(self.selection, *args)
         if self.active_piece is not None:
-            self.update_sprite(self.active_piece.sprite, *args)
+            self.update_sprite(self.active_piece, *args)
         for sprite_list in (
             self.board_sprite_list,
             self.move_sprite_list,
-            self.piece_sprite_list,
+            *self.movable_pieces.values(),
+            self.promotion_area.values(),
             self.promotion_area_sprite_list,
-            self.promotion_piece_sprite_list,
+            self.obstacles,
         ):
             for sprite in sprite_list:
                 self.update_sprite(sprite, *args)
@@ -5753,15 +5761,15 @@ class Board(Window):
             )
         self.set_visible(True)
 
-    def toggle_fullscreen(self) -> None:
-        if self.fullscreen:
-            self.log("Info: Fullscreen disabled", False)
-            self.set_fullscreen(False)
-            if self.size != self.windowed_size:
-                self.resize(*self.windowed_size)
-            else:
-                self.log(f"Info: Resized to {self.width}x{self.height}", False)
-            return
+    def to_windowed(self) -> None:
+        self.log("Info: Fullscreen disabled", False)
+        self.set_fullscreen(False)
+        if self.size != self.windowed_size:
+            self.resize(*self.windowed_size)
+        else:
+            self.log(f"Info: Resized to {self.width}x{self.height}", False)
+
+    def to_fullscreen(self) -> None:
         screens = get_screens()
         if len(screens) == 1:
             self.log("Info: Fullscreen enabled", False)
@@ -5798,22 +5806,22 @@ class Board(Window):
 
     def on_draw(self) -> None:
         self.update_trickster_mode()
-        start_render()
+        self.clear()
         for label_list in (self.row_label_list, self.col_label_list):
             for label in label_list:
                 label.draw()
         self.board_sprite_list.draw()
         if not self.promotion_area:
-            self.highlight.draw()
-            self.selection.draw()
+            draw_sprite(self.highlight)
+            draw_sprite(self.selection)
         self.move_sprite_list.draw()
         self.piece_sprite_list.draw()
         self.type_sprite_list.draw()
         if self.active_piece:
-            self.active_piece.sprite.draw()
+            draw_sprite(self.active_piece.sprite)
         self.promotion_area_sprite_list.draw()
         if self.promotion_area:
-            self.highlight.draw()
+            draw_sprite(self.highlight)
         self.promotion_piece_sprite_list.draw()
 
     def on_update(self, delta_time: float) -> None:
@@ -5825,9 +5833,8 @@ class Board(Window):
             self.save_interval %= self.board_config['autosave_time']
             self.auto_save()
 
-    def on_resize(self, width: float, height: float) -> None:
+    def on_resize(self, width: int, height: int) -> None:
         self.skip_mouse_move = 2
-        super().on_resize(width, height)
         square_size, origin = self.square_size, self.origin
         self.square_size = min(
             self.width / (self.visual_board_width + 2),
@@ -5843,6 +5850,7 @@ class Board(Window):
             self.notation_offset,
             self.flip_mode,
         )
+        self.draw(0)
 
     def on_activate(self) -> None:
         if not self.is_active:
@@ -6354,6 +6362,8 @@ class Board(Window):
             elif modifiers & key.MOD_ACCEL and not modifiers & key.MOD_SHIFT:  # Save
                 self.quick_save()
             elif modifiers & key.MOD_ACCEL and modifiers & key.MOD_SHIFT:  # Save as
+                if self.fullscreen:
+                    self.to_windowed()
                 self.deactivate()
                 self.draw(0)
                 self.log("Info: Selecting a file to save to", False)
@@ -6465,7 +6475,7 @@ class Board(Window):
             else:  # Reset board size
                 self.resize_board(default_board_width, default_board_height, [], [], 0, 0)
         if symbol == key.F11:  # Full screen (toggle)
-            self.toggle_fullscreen()
+            self.to_windowed() if self.fullscreen else self.to_fullscreen()
         if symbol == key.MINUS and not self.fullscreen:  # (-) Decrease window size
             if modifiers & key.MOD_ACCEL and modifiers & key.MOD_SHIFT:
                 self.resize(
@@ -6928,6 +6938,8 @@ class Board(Window):
                 self.log_info()
         if symbol == key.L:
             if modifiers & key.MOD_ALT:  # Load save data
+                if self.fullscreen:
+                    self.to_windowed()
                 self.deactivate()
                 self.draw(0)
                 self.log(f"Info: Selecting a file to {'reload' if modifiers & key.MOD_SHIFT else 'load from'}", False)
@@ -7031,8 +7043,7 @@ class Board(Window):
         except Exception:
             self.log(f"Error: Failed to load data from \"{path}\"")
             print_exc()
-        finally:
-            return load_attempted
+        return load_attempted
 
     def save(self, path: str | None, auto: bool = False) -> None:
         if not path:
@@ -7203,7 +7214,7 @@ class Board(Window):
         config.save(save_path)
         self.log(f"Info: Configuration saved to \"{save_path}\"", False)
 
-    def run(self):
+    def run(self, view: View | None = None) -> None:
         if self.board_config['update_mode'] < 0 and self.load_data is not None:
             self.close()
         else:
