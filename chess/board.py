@@ -235,6 +235,7 @@ class Board(Window):
         self.active_piece = None  # piece that is currently being moved
         self.is_active = True  # whether the window is active or not
         self.is_focused = True  # whether the mouse cursor is over the window
+        self.is_started = False  # whether a game has been initialized and started
         self.extra_labels = False  # whether to show additional labels on border rows/columns
         self.show_history = False  # whether to show all moves made during the opponent's turn
         self.row_label_list = []  # labels for the rows
@@ -674,6 +675,7 @@ class Board(Window):
 
     def reset_board(self, update: bool | None = True, log: bool = True) -> None:
         self.save_interval = 0
+        self.is_started = False
 
         self.hovered_square = None
         self.deselect_piece()
@@ -765,6 +767,8 @@ class Board(Window):
         if old_turn_side != self.turn_side:
             self.update_alternate_sprites(old_turn_side)
         self.update_status()
+
+        self.is_started = True
 
     def dump_board(self, trim: bool = False) -> str:
         wh = self.board_width, self.board_height, *self.notation_offset
@@ -942,6 +946,7 @@ class Board(Window):
 
         self.save_interval = 0
         self.save_loaded = False
+        self.is_started = False
         success = True
 
         self.hovered_square = None
@@ -1356,12 +1361,14 @@ class Board(Window):
 
         self.load_data = dump
         self.load_dict = data
+        self.is_started = True
         self.save_loaded = True
 
         return success
 
     def empty_board(self) -> None:
         self.save_interval = 0
+        self.is_started = False
 
         self.hovered_square = None
         self.deselect_piece()
@@ -1430,6 +1437,8 @@ class Board(Window):
         if old_turn_side != self.turn_side:
             self.update_alternate_sprites(old_turn_side)
         self.update_status()
+
+        self.is_started = True
 
     def reset_custom_data(self, rollback: bool = False) -> None:
         if rollback:
@@ -5850,7 +5859,8 @@ class Board(Window):
             self.notation_offset,
             self.flip_mode,
         )
-        self.draw(0)
+        if self.is_started:
+            self.draw(0)
 
     def on_activate(self) -> None:
         if not self.is_active:
