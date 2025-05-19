@@ -1,6 +1,11 @@
 import os
 import sys
 
+from chess.util import no_print
+
+with no_print():
+    from arcade import version  # noqa
+
 from chess.board import Board
 
 if __name__ == '__main__':

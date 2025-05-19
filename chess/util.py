@@ -465,13 +465,22 @@ class FormatOverride(type):
 
 # Context manager for temporarily disabling print statements. Anything in a "with no_print()" block will not be printed.
 class no_print:
-    def __enter__(self):
-        self._original_stdout = sys.stdout
-        sys.stdout = open(os.devnull, 'w')
+    def __enter__(self, stdout: bool = True, stderr: bool = True):
+        self.stdout, self.stderr = stdout, stderr
+        if self.stdout:
+            self._original_stdout = sys.stdout
+            sys.stdout = open(os.devnull, 'w')
+        if self.stderr:
+            self._original_stderr = sys.stderr
+            sys.stderr = open(os.devnull, 'w')
 
     def __exit__(self, exc_type, exc_val, exc_tb):
-        sys.stdout.close()
-        sys.stdout = self._original_stdout
+        if self.stdout:
+            sys.stdout.close()
+            sys.stdout = self._original_stdout
+        if self.stderr:
+            sys.stderr.close()
+            sys.stderr = self._original_stderr
 
 
 # Context manager for creating a base-level topmost invisible window. Used to keep file pickers on top of other windows.
