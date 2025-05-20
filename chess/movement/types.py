@@ -1590,7 +1590,7 @@ class BoundMovement(BaseAreaMovement, BaseChoiceMovement):
 
 class TagMovement(BaseChoiceMovement):
     @staticmethod
-    def fits(template: str, tag: str | None) -> bool:
+    def fits(template: str, tag: str) -> bool:
         template, invert = (template[1:], True) if template.startswith('!') else (template, False)
         return fits(template, tag) != invert
 
@@ -1601,7 +1601,7 @@ class TagMovement(BaseChoiceMovement):
                     yield copy(move)
         else:
             for tag in self.movement_dict:
-                if not any(self.fits(template, tag or None) for template in self.board.move_tags):
+                if not any(self.fits(template, tag or "") for template in self.board.move_tags):
                     continue
                 for movement in self.movement_dict[tag]:
                     for move in movement.moves(pos_from, piece, theoretical):
