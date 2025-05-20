@@ -2432,6 +2432,7 @@ class Board(Window):
         opponent = self.turn_side.opponent()
         check_side = self.check_side
         check_sides = {check_side: True if check_side and check_side is not Side.NONE else False}
+        check_groups = copy(self.check_groups)
         last_chain_move = self.chain_start
         if last_chain_move:
             chained_move = last_chain_move
@@ -2545,6 +2546,7 @@ class Board(Window):
                     state_groups.setdefault(area_rule['state'], []).append(area_rule)
                 if set(ext(('check', 'checkmate'))).intersection(self.end_rules[turn_side]):
                     old_check_side = self.check_side
+                    old_check_groups = copy(self.check_groups)
                     if opponent not in check_sides:
                         if {-opponent.value, opponent.value}.intersection(state_groups):
                             if not pieces_loaded:
@@ -2554,6 +2556,7 @@ class Board(Window):
                             if self.check_side == opponent:
                                 check_sides[opponent] = True
                     self.check_side = old_check_side
+                    self.check_groups = old_check_groups
                 state_rules = list(chain.from_iterable(state_groups.get(k, ()) for k in (
                     0, *(side.value * (-1 if check_sides.get(side, False) else 1) for side in [Side.WHITE, Side.BLACK])
                 )))  # 0: any state, +side: side not in check, -side: side in check
@@ -2821,6 +2824,7 @@ class Board(Window):
                                 self.moves[turn_side]['pass'] = True
                             else:
                                 old_check_side = self.check_side
+                                old_check_groups = copy(self.check_groups)
                                 if opponent not in check_sides:
                                     if not pieces_loaded:
                                         self.load_pieces()
@@ -2832,6 +2836,7 @@ class Board(Window):
                                 if self.fits_any(pass_rules, 'check', check_requirements, fit=False):
                                     self.moves[turn_side]['pass'] = True
                                 self.check_side = old_check_side
+                                self.check_groups = old_check_groups
                     move_rule_dict = {}
                     for base_move in piece.moves() if chain_moves is None else chain_moves:
                         if not base_move.is_legal:
@@ -3145,6 +3150,7 @@ class Board(Window):
                                 move_fits = self.fits_any(move_rules, 'check', [0], fit=False)
                                 if move_rules and not move_fits:
                                     old_check_side = self.check_side
+                                    old_check_groups = copy(self.check_groups)
                                     pieces_loaded = False
                                     self.load_pieces()
                                     self.load_check(opponent)
@@ -3152,6 +3158,7 @@ class Board(Window):
                                     if self.fits_any(move_rules, 'check', check_requirements, fit=False):
                                         move_fits = True
                                     self.check_side = old_check_side
+                                    self.check_groups = old_check_groups
                                 if move_fits:
                                     p_from, p_to = move.pos_from, move.pos_to or move.pos_from
                                     if p_from == p_to and move.captured:
@@ -3192,6 +3199,7 @@ class Board(Window):
                             self.royal_ep_markers = deepcopy(royal_ep_markers)
                             self.end_data = deepcopy(end_data)
                             self.check_side = check_side
+                            self.check_groups = copy(check_groups)
                 if self.moves[turn_side]:
                     self.moves_queried[turn_side] = True
                     break
@@ -3236,6 +3244,7 @@ class Board(Window):
         self.royal_ep_targets = royal_ep_targets
         self.royal_ep_markers = royal_ep_markers
         self.check_side = check_side
+        self.check_groups = copy(check_groups)
         self.end_data = end_data
 
     def unique_moves(self, side: Side | None = None) -> dict[Side, dict[Position, list[Move]]]:

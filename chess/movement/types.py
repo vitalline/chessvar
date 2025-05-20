@@ -1601,7 +1601,10 @@ class TagMovement(BaseChoiceMovement):
                     yield copy(move)
         else:
             for tag in self.movement_dict:
-                if not any(self.fits(template, tag or "") for template in self.board.move_tags):
+                if (
+                    not self.board.ply_simulation and
+                    not any(self.fits(template, tag or "") for template in self.board.move_tags)
+                ):
                     continue
                 for movement in self.movement_dict[tag]:
                     for move in movement.moves(pos_from, piece, theoretical):
