@@ -982,6 +982,38 @@ class SpinMovement(RepeatBentMovement):
         return self.board, unpack(self.movement_cycle), self.reverse, self.start_index, self.step_count, self.loop
 
 
+class SplitMovement(RepeatBentMovement):
+    def __init__(
+        self,
+        board: Board,
+        movements: Unpacked[RiderMovement] | None = None,
+        step_count: int = 0,
+        skip_count: int = 0,
+        loop: int = 0,
+    ):
+        super().__init__(
+            board, movements,
+            step_count=step_count,
+            skip_count=skip_count,
+            loop=loop,
+            cycle_mode=1,
+            path_split=1,
+        )
+        self.movement_list = copy(self.movements)
+        self.dir_indexes = [-1]
+
+    def moves(self, pos_from: Position, piece: Piece, theoretical: bool = False, index: int = 0):
+        for true_index in range(len(self.movement_list)):
+            self.movements = [self.movement_list[true_index]]
+            for move in super().moves(pos_from, piece, theoretical, index):
+                movements = self.movements[:]
+                yield move
+                self.movements = movements
+
+    def __copy_args__(self):
+        return self.board, unpack(self.movement_list), self.step_count, self.skip_count, self.loop
+
+
 class StageMovement(BaseMultiMovement):
     def raise_pieces(self, pieces: list[Piece]):
         for piece in pieces:
