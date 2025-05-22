@@ -17,6 +17,19 @@ if TYPE_CHECKING:
     from chess.pieces.piece import AbstractPiece as Piece
 
 
+class ChangingLegalMovement(BaseMovement):
+    # ABC for movements that change their behavior based on certain conditions, but always return all theoretical moves.
+    # NB: This is only needed for movements that toggle theoretical legality based on board state (modulo moving piece).
+    # If a given piece in a given position will have the same theoretical moves, its movement needn't inherit from this.
+    pass
+
+
+class ChangingMovement(ChangingLegalMovement):
+    # ABC for movements that change their behavior based on certain conditions, and do not return all theoretical moves.
+    # NB: Movement classes that return all theoretical moves, regardless of conditions, mustn't inherit from this class.
+    pass
+
+
 class RiderMovement(BaseMovement):
     default_mark = 'n'
 
@@ -193,39 +206,69 @@ class HalflingRiderMovement(RiderMovement):
         return self.board, unpack(self.directions), self.shift, self.boundless, self.loop
 
 
-class CannonRiderMovement(RiderMovement):
+class CannonRiderMovement(RiderMovement, ChangingMovement):
     default_mark = 'p'
 
     def __init__(
         self, board: Board,
         directions: Unpacked[AnyDirection] | None = None,
-        distance: int = 0, boundless: int = 0, loop: int = 0
+        distance: int = 0, skip_pieces: int = 0,
+        boundless: int = 0, loop: int = 0
     ):
         super().__init__(board, directions, boundless, loop)
-        self.distance = distance
+        self.distance = distance  # max distance that can be travelled after jumping over pieces
+        self.skip_pieces = skip_pieces
+        self.skip_pieces_max = (0 if skip_pieces < 0 else skip_pieces) + 1
+        self.skip_pieces_min = 0 if skip_pieces > 0 else -skip_pieces
+        # the above logic makes it so that:
+        # if skip_pieces < 0, at least -skip_pieces pieces in a row must be jumped over
+        # otherwise, at most skip_pieces + 1 pieces in a row can be jumped over
+        # this means that by default, exactly one piece can be jumped over, which is how cannon pieces work normally
+        # NB: currently it is impossible to define jumping over some but not all pieces in a row. this may change later.
 
     def initialize_direction(self, direction: AnyDirection, pos_from: Position, piece: Piece) -> None:
         self.data['jump'] = -1
+        self.data['move'] = 0
 
     def advance_direction(self, move: Move, direction: AnyDirection, pos_from: Position, piece: Piece) -> None:
-        if self.data['jump'] < 0:
+        jump_started = self.data['jump'] >= 0
+        jump_ended = False
+        if self.data['jump'] < abs(self.skip_pieces):
             if not self.board.not_a_piece(self.transform(move.pos_to)):
-                self.data['jump'] = 0
+                self.data['jump'] += 1
+                return
+            if not jump_started:
+                return
+            jump_ended = True
+            if not self.skip_pieces_min:
+                self.data['jump'] = self.skip_pieces_max - 1  # NB: the -1 comes from the increment immediately later on
+        self.data['jump'] += 1
+        if self.skip_pieces_min:
+            jump_ended |= jump_started and self.board.not_a_piece(self.transform(move.pos_to))
         else:
-            self.data['jump'] += 1
+            jump_ended |= self.data['jump'] >= self.skip_pieces_max
+        if jump_ended:
+            self.data['move'] += 1
 
     def skip_condition(self, move: Move, direction: AnyDirection, piece: Piece, theoretical: bool = False) -> bool:
-        return super().skip_condition(move, direction, piece, theoretical) if self.data['jump'] > 0 else not theoretical
+        if (self.data['jump'] >= max(self.skip_pieces_min, 1)) if theoretical else (self.data['move'] > 0):
+            return super().skip_condition(move, direction, piece, theoretical)
+        return True
 
     def stop_condition(self, move: Move, direction: AnyDirection, piece: Piece, theoretical: bool = False) -> bool:
         next_pos_to = self.transform(add(move.pos_from, mul(double(direction), self.steps + 1)))
         if self.data['jump'] < 0:
             if not (self.loop and move.pos_from == next_pos_to) and piece.blocked_by(self.board.get_piece(next_pos_to)):
                 return self.bound_stop_condition(move, direction, next_pos_to)
-        elif self.data['jump'] == 0 and not theoretical:
+        elif self.data['jump'] < self.skip_pieces_min - 1 and not theoretical:
+            if not (self.loop and move.pos_from == next_pos_to):
+                if not self.board.not_a_piece(next_pos_to):
+                    return self.bound_stop_condition(move, direction, next_pos_to)
+                return True
+        elif self.data['jump'] == self.skip_pieces_max - 1 and not self.skip_pieces_min and not theoretical:
             if not (self.loop and move.pos_from == next_pos_to) and piece.blocked_by(self.board.get_piece(next_pos_to)):
                 return True
-        elif self.distance and self.data['jump'] >= self.distance:
+        elif self.distance and self.data['move'] >= self.distance and not theoretical:
             return True
         elif theoretical:
             next_piece = self.board.get_piece(next_pos_to)
@@ -234,10 +277,10 @@ class CannonRiderMovement(RiderMovement):
                 and isinstance(next_piece, self.board.piece_abc) and next_piece.movement is None
             ):
                 return self.bound_stop_condition(move, direction, next_pos_to)
-        return super().stop_condition(move, direction, piece, theoretical or not self.data['jump'] > 0)
+        return super().stop_condition(move, direction, piece, theoretical or not self.data['move'])
 
     def __copy_args__(self):
-        return self.board, unpack(self.directions), self.distance, self.boundless, self.loop
+        return self.board, unpack(self.directions), self.distance, self.skip_pieces, self.boundless, self.loop
 
 
 class HopperRiderMovement(CannonRiderMovement):
@@ -245,24 +288,29 @@ class HopperRiderMovement(CannonRiderMovement):
 
     def initialize_direction(self, direction: AnyDirection, pos_from: Position, piece: Piece) -> None:
         super().initialize_direction(direction, pos_from, piece)
-        self.data['capture'] = None
+        self.data['captured'] = []
 
     def advance_direction(self, move: Move, direction: AnyDirection, pos_from: Position, piece: Piece) -> None:
         super().advance_direction(move, direction, pos_from, piece)
-        if self.data['jump'] == 0:
-            capture = self.board.get_piece(move.pos_to)
-            if piece.captures(capture):
-                self.data['capture'] = capture
+        if self.data['jump'] >= 0 and not self.data['move']:
+            captured = self.board.get_piece(move.pos_to)
+            if piece.captures(captured):
+                self.data['captured'].append(captured)
 
     def stop_condition(self, move: Move, direction: AnyDirection, piece: Piece, theoretical: bool = False) -> bool:
         next_pos_to = self.transform(add(move.pos_from, mul(double(direction), self.steps + 1)))
         if not (self.loop and move.pos_from == next_pos_to):
             next_piece = self.board.get_piece(next_pos_to)
             if not theoretical:
-                if self.data['jump'] < 0 and next_piece.side and not piece.captures(next_piece):
-                    return True
-                elif self.data['jump'] >= 0 and next_piece.side:
-                    return True
+                if self.skip_pieces_min and not self.data['move']:
+                    if next_piece.side and not piece.captures(next_piece):
+                        return True
+                elif self.data['jump'] < self.skip_pieces_max - 1:
+                    if next_piece.side and not piece.captures(next_piece):
+                        return True
+                else:
+                    if next_piece.side:
+                        return True
             elif (
                 not piece.skips(next_piece) and isinstance(next_piece, Immune)
                 and isinstance(next_piece, self.board.piece_abc) and next_piece.movement is None
@@ -272,8 +320,8 @@ class HopperRiderMovement(CannonRiderMovement):
 
     def moves(self, pos_from: Position, piece: Piece, theoretical: bool = False):
         for move in super().moves(pos_from, piece, theoretical):
-            if not theoretical and self.data['capture']:
-                move.set(captured=self.data['capture'])
+            if not theoretical and self.data['captured']:
+                move.set(captured=self.data['captured'])
             yield move
 
 
@@ -657,19 +705,6 @@ class FreeMovement(AbsoluteMovement):
 
     def __copy_args__(self):
         return self.board, self.stay
-
-
-class ChangingLegalMovement(BaseMovement):
-    # ABC for movements that change their behavior based on certain conditions, but always return all theoretical moves.
-    # NB: This is only needed for movements that toggle theoretical legality based on board state (modulo moving piece).
-    # If a given piece in a given position will have the same theoretical moves, its movement needn't inherit from this.
-    pass
-
-
-class ChangingMovement(ChangingLegalMovement):
-    # ABC for movements that change their behavior based on certain conditions, and do not return all theoretical moves.
-    # NB: Movement classes that return all theoretical moves, regardless of conditions, mustn't inherit from this class.
-    pass
 
 
 class BaseMultiMovement(BaseMovement):
