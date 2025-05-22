@@ -3890,7 +3890,7 @@ class Board(Window):
     def unload_end_data(self, _: Move | None = None) -> None:
         conditions = {x: {x, pch['not'] + x} for x in {'check', 'checkmate', 'stalemate', 'capture'}}
         for side in {self.turn_side, self.turn_side.opponent()}:
-            for keyword in ('checkmate', 'capture'):
+            for keyword in ('checkmate', 'stalemate'):
                 if conditions[keyword].intersection(self.end_rules[side]):
                     for condition in conditions[keyword].intersection(self.end_data[side]):
                         self.end_data[side][condition][''] = 0
