@@ -604,7 +604,7 @@ class CastlingMovement(TargetMovement):
         if not theoretical:
             for gap_offset in self.movement_gap:
                 pos = add(pos_from, gap_offset)
-                if not self.board.not_a_piece(pos):
+                if not piece.skips(self.board.get_piece(pos)):
                     return ()
         self_move = Move(pos_from=pos_from, pos_to=pos_to, movement_type=type(self)).mark('0')
         other_move = Move(
@@ -1245,10 +1245,10 @@ class CloneMovement(BaseMultiMovement):
         capture: int = 0
     ):
         super().__init__(board, movements)
-        double = move and capture
-        if double and (move > 0) is (capture > 0):
+        both = move and capture
+        if both and (move > 0) is (capture > 0):
             move = capture = 0
-        if not double and (move < 0 or capture < 0):
+        if not both and (move < 0 or capture < 0):
             move, capture = -capture, -move
         self.move = sign(max(move, 0))
         self.capture = sign(max(capture, 0))
