@@ -543,16 +543,13 @@ class DropMovement(BaseMovement):
 class TargetMovement(BaseMovement):
     # ABC used to simplify marking squares where en passant captures are possible
 
-    def add_markers(
-        self, piece: Piece, target_pos: Position, marker_poss: list[Position],
-        is_royal: bool = False, flags: Unpacked[Any] = ()
-    ):
+    def add_markers(self, piece: Piece, target_pos: Position, marker_poss: list[Position], royal: Unpacked[Any] = ()):
         if not marker_poss:
             return
         target_dict, marker_dict = tuple(data_dict.get(piece.side, {}) for data_dict in {
             True: (self.board.royal_ep_targets, self.board.royal_ep_markers),
-        }.get(is_royal, (self.board.en_passant_targets, self.board.en_passant_markers)))
-        data_set = set(repack(flags))
+        }.get(bool(royal), (self.board.en_passant_targets, self.board.en_passant_markers)))
+        data_set = set(repack(royal))
         if isinstance(piece, Covered):
             data_set.add(Covered)
         if isinstance(piece, Delayed):
@@ -561,7 +558,6 @@ class TargetMovement(BaseMovement):
             data_set.add(Delayed1)
         if isinstance(piece, Slow):
             data_set.add(Slow)
-        data_set.add(type(self))
         target_dict[target_pos] = {pos: data_set.copy() for pos in marker_poss}
         for pos in marker_poss:
             marker_dict.setdefault(pos, set()).add(target_pos)
@@ -576,6 +572,8 @@ class CastlingMovement(TargetMovement):
         other_direction: Direction,
         movement_gap: Unpacked[Direction] | None = None,
         en_passant_gap: Unpacked[Direction] | None = None,
+        other_movement_gap: Unpacked[Direction] | None = None,
+        other_en_passant_gap: Unpacked[Direction] | None = None,
     ):
         super().__init__(board)
         self.direction = direction
@@ -583,6 +581,8 @@ class CastlingMovement(TargetMovement):
         self.other_direction = other_direction
         self.movement_gap = repack(movement_gap or [], list)
         self.en_passant_gap = repack(en_passant_gap or [], list)
+        self.other_movement_gap = repack(other_movement_gap or [], list)
+        self.other_en_passant_gap = repack(other_en_passant_gap or [], list)
 
     def moves(self, pos_from: Position, piece: Piece, theoretical: bool = False):
         if piece.total_moves:
@@ -603,8 +603,12 @@ class CastlingMovement(TargetMovement):
             return ()
         if not theoretical:
             for gap_offset in self.movement_gap:
-                pos = add(pos_from, gap_offset)
+                pos = add(pos_from, piece.side.direction(gap_offset))
                 if not piece.skips(self.board.get_piece(pos)):
+                    return ()
+            for gap_offset in self.other_movement_gap:
+                pos = add(other_piece_pos, piece.side.direction(gap_offset))
+                if not other_piece.skips(self.board.get_piece(pos)):
                     return ()
         self_move = Move(pos_from=pos_from, pos_to=pos_to, movement_type=type(self)).mark('0')
         other_move = Move(
@@ -621,13 +625,22 @@ class CastlingMovement(TargetMovement):
                 positions = []
                 for gap_offset in self.en_passant_gap:
                     positions.append(add(move.pos_from, gap_offset))
-                self.add_markers(piece, move.pos_to, positions, is_royal=True, flags=type(self))
+                self.add_markers(piece, move.pos_to, positions, royal=type(self))
+                if move.chained_move:
+                    other_direction = piece.side.direction(self.other_direction)
+                    other_offset = sub(move.chained_move.pos_to, move.chained_move.pos_from)
+                    if other_offset == other_direction:
+                        positions = []
+                        for gap_offset in self.other_en_passant_gap:
+                            positions.append(add(move.chained_move.pos_from, gap_offset))
+                        self.add_markers(move.chained_move.piece, move.chained_move.pos_to, positions, royal=type(self))
         super().update(move, piece)
 
     def __copy_args__(self):
         return (
             self.board, self.direction, self.other_piece, self.other_direction,
-            unpack(self.movement_gap), unpack(self.en_passant_gap)
+            unpack(self.movement_gap), unpack(self.en_passant_gap),
+            unpack(self.other_movement_gap), unpack(self.other_en_passant_gap),
         )
 
 

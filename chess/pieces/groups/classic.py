@@ -69,11 +69,15 @@ class King(Piece):
                     types.RiderMovement(board, rot([(1, 0, 1), (1, 1, 1)])),
                     types.CastlingMovement(
                         board, (0, 2), (0, 3), (0, -2),
-                        movement_gap=[(0, 1), (0, 2)], en_passant_gap=[(0, 0), (0, 1)]
+                        movement_gap=[(0, 1), (0, 2)],
+                        en_passant_gap=[(0, 0), (0, 1)],
+                        other_movement_gap=[(0, -1), (0, -2)],
                     ),
                     types.CastlingMovement(
                         board, (0, -2), (0, -4), (0, 3),
-                        movement_gap=[(0, -1), (0, -2), (0, -3)], en_passant_gap=[(0, 0), (0, -1)],
+                        movement_gap=[(0, -1), (0, -2)],
+                        en_passant_gap=[(0, 0), (0, -1)],
+                        other_movement_gap=[(0, 1), (0, 2), (0, 3)],
                     )
                 ]
             ),
