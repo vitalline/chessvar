@@ -1323,8 +1323,9 @@ class Board(Window):
             if self.move_history:
                 last_move = self.move_history[-1]
                 if last_move and last_move.is_edit != 1 and last_move.movement_type != DropMovement:
-                    last_move.piece.movement.reload(last_move, last_move.piece)
-            self.reload_en_passant_markers()
+                    if last_move.piece and last_move.piece.movement:
+                        last_move.piece.movement.reload(last_move, last_move.piece)
+                self.reload_en_passant_markers()
             self.log(f"Info: {self.turn_side} to move", False)
         if self.edit_mode:
             self.log("Mode: EDIT", False)
@@ -3709,10 +3710,10 @@ class Board(Window):
                         continue
                     side = piece.side
                     side_target_dict, side_marker_dict = target_dict.get(side, {}), marker_dict.get(side, {})
-                    if move.is_edit or not issubclass(type(piece), Slow):
+                    if move.is_edit or not issubclass(type(move.piece), Slow):
                         for marker_pos in side_target_dict.pop(pos_from, {}):
                             side_marker_dict.get(marker_pos, set()).discard(pos_from)
-                    elif piece.side in target_dict:
+                    elif piece.side in target_dict and not move.swapped_piece:
                         from_markers = side_target_dict.pop(pos_from, {})
                         for marker_pos, marker_set in from_markers.items():
                             side_target_dict.setdefault(pos_to, {})[marker_pos] = marker_set
@@ -3733,10 +3734,12 @@ class Board(Window):
                     move_chain.append(move_chain[-1].chained_move)
                 for chained_move in move_chain[::-1]:
                     if (
-                        chained_move.is_edit != 1 and chained_move.movement_type and chained_move.piece.movement
-                        and not issubclass(chained_move.movement_type or type, (CloneMovement, DropMovement))
+                        chained_move.is_edit != 1 and not issubclass(
+                            chained_move.movement_type or type, (CloneMovement, DropMovement)
+                        )
                     ):
-                        chained_move.piece.movement.undo(chained_move, chained_move.piece)
+                        if chained_move.piece and chained_move.piece.movement:
+                            chained_move.piece.movement.undo(chained_move, chained_move.piece)
                 if move.is_edit:
                     last_moves.append(move)
                     continue
@@ -3749,19 +3752,21 @@ class Board(Window):
                 last_side = self.turn_side
         for move in last_moves[::-1]:
             if (
-                move and move.is_edit != 1 and move.movement_type and move.piece.movement
+                move and move.is_edit != 1 and move.movement_type
                 and not issubclass(move.movement_type or type, (CloneMovement, DropMovement))
             ):
-                move.piece.movement.update(move, move.piece)
+                if move.piece and move.piece.movement:
+                    move.piece.movement.update(move, move.piece)
             self.update_en_passant_markers(move)
             if move:
                 chained_move = move.chained_move
                 while chained_move:
                     if (
-                        chained_move.is_edit != 1 and chained_move.movement_type and chained_move.piece.movement
+                        chained_move.is_edit != 1 and chained_move.movement_type
                         and not issubclass(chained_move.movement_type or type, (CloneMovement, DropMovement))
                     ):
-                        chained_move.piece.movement.update(chained_move, chained_move.piece)
+                        if chained_move.piece and chained_move.piece.movement:
+                            chained_move.piece.movement.update(chained_move, chained_move.piece)
                     self.update_en_passant_markers(chained_move)
                     chained_move = chained_move.chained_move
                 if move.is_edit:
@@ -4004,6 +4009,8 @@ class Board(Window):
                     self.move(chained_move)
                     self.update_auto_capture_markers(chained_move)
                     chained_move.set(piece=copy(chained_move.piece))
+                    if chained_move.swapped_piece:
+                        chained_move.set(swapped_piece=copy(chained_move.swapped_piece))
                     if self.promotion_piece is None:
                         self.log(f"Move: {chained_move}")
                     chained_move = chained_move.chained_move
@@ -4108,6 +4115,8 @@ class Board(Window):
             self.move(chained_move, update)
             self.update_auto_capture_markers(chained_move)
             chained_move.set(piece=copy(chained_move.piece))
+            if chained_move.swapped_piece:
+                chained_move.set(swapped_piece=copy(chained_move.swapped_piece))
             if self.promotion_piece is None:
                 move_type = (
                     'Edit' if chained_move.is_edit
@@ -4219,11 +4228,12 @@ class Board(Window):
                 pos = piece.board_pos
             self.clear_theoretical_moves(piece.side, pos)
         if (
-            move.is_edit != 1 and move.movement_type and move.piece.movement
+            move.is_edit != 1 and move.movement_type
             and not issubclass(move.movement_type or type, (CloneMovement, DropMovement))
         ):
             # call movement.update() to update movement state after the move (e.g. pawn double move, castling rights)
-            move.piece.movement.update(move, move.piece)
+            if move.piece and move.piece.movement:
+                move.piece.movement.update(move, move.piece)
         if move.is_edit != 1:
             if not move.piece or isinstance(move.piece, NoPiece):
                 # check if a piece can be dropped
@@ -4321,12 +4331,10 @@ class Board(Window):
             if pos is None:
                 pos = piece.board_pos
             self.clear_theoretical_moves(piece.side, pos)
-        if (
-            move.is_edit != 1 and move.movement_type and move.piece.movement
-            and not issubclass(move.movement_type or type, (CloneMovement, DropMovement))
-        ):
+        if move.is_edit != 1 and not issubclass(move.movement_type or type, (CloneMovement, DropMovement)):
             # call movement.undo() to restore movement state before the move (e.g. pawn double move, castling rights)
-            move.piece.movement.undo(move, move.piece)
+            if move.piece and move.piece.movement:
+                move.piece.movement.undo(move, move.piece)
         if not self.ply_simulation:
             # revert markers for relay moves
             self.revert_relay_markers(move)
@@ -4410,7 +4418,8 @@ class Board(Window):
         if self.move_history:
             move = self.move_history[-1]
             if move is not None and move.is_edit != 1 and move.movement_type != DropMovement:
-                move.piece.movement.reload(move, move.piece)
+                if move.piece and move.piece.movement:
+                    move.piece.movement.reload(move, move.piece)
         self.reload_en_passant_markers()
         future_move_history = self.future_move_history.copy()
         self.unload_end_data()
@@ -4540,6 +4549,8 @@ class Board(Window):
                     self.move(chained_move)
                     self.update_auto_capture_markers(chained_move)
                     chained_move.set(piece=copy(chained_move.piece))
+                    if chained_move.swapped_piece:
+                        chained_move.set(swapped_piece=copy(chained_move.swapped_piece))
         else:
             if last_move.pos_from is not None:
                 self.update_move(last_move)
@@ -4550,6 +4561,8 @@ class Board(Window):
                 self.move(chained_move)
                 self.update_auto_capture_markers(chained_move)
                 chained_move.set(piece=copy(chained_move.piece))
+                if chained_move.swapped_piece:
+                    chained_move.set(swapped_piece=copy(chained_move.swapped_piece))
                 move_type = (
                     'Edit' if chained_move.is_edit
                     else 'Drop' if chained_move.movement_type == DropMovement
@@ -5944,6 +5957,8 @@ class Board(Window):
                             self.move(chained_move)
                             self.update_auto_capture_markers(chained_move)
                             chained_move.set(piece=copy(chained_move.piece))
+                            if chained_move.swapped_piece:
+                                chained_move.set(swapped_piece=copy(chained_move.swapped_piece))
                     self.unload_end_data()
                     old_turn_side = self.turn_side
                     if not current_move.is_edit:
@@ -5975,6 +5990,7 @@ class Board(Window):
                     self.deselect_piece()
             if (
                 pos != self.selected_square
+                and pos not in self.moves.get(self.turn_side, {}).get(self.selected_square, {})
                 and not self.not_a_piece(pos)
                 and (
                     (piece := self.get_piece(pos)).side == self.turn_side
@@ -6177,6 +6193,8 @@ class Board(Window):
                         self.move(chained_move)
                         self.update_auto_capture_markers(chained_move)
                         chained_move.set(piece=copy(chained_move.piece))
+                        if chained_move.swapped_piece:
+                            chained_move.set(swapped_piece=copy(chained_move.swapped_piece))
                     while chained_move:
                         move_type = (
                             'Edit' if chained_move.is_edit
@@ -6189,6 +6207,8 @@ class Board(Window):
                             self.move(chained_move)
                             self.update_auto_capture_markers(chained_move)
                             chained_move.set(piece=copy(chained_move.piece))
+                            if chained_move.swapped_piece:
+                                chained_move.set(swapped_piece=copy(chained_move.swapped_piece))
                     self.unload_end_data()
                     old_turn_side = self.turn_side
                     if not move.is_edit:
@@ -6256,6 +6276,8 @@ class Board(Window):
                         chained_move.promotion = Unset  # do not auto-promote because we're selecting promotion manually
                     self.move(chained_move)
                     chained_move.set(piece=copy(chained_move.piece))
+                    if chained_move.swapped_piece:
+                        chained_move.set(swapped_piece=copy(chained_move.swapped_piece))
                     if self.promotion_piece is None:
                         if chained_move.promotion is Unset:
                             chained_move.set(promotion=Default)

@@ -611,9 +611,12 @@ class CastlingMovement(TargetMovement):
                 if not other_piece.skips(self.board.get_piece(pos)):
                     return ()
         self_move = Move(pos_from=pos_from, pos_to=pos_to, movement_type=type(self)).mark('0')
+        if pos_to == other_piece_pos:
+            self_move.set(swapped_piece=other_piece)
+            other_piece_pos = pos_from
         other_move = Move(
-            pos_from=other_piece_pos, pos_to=other_piece_pos_to,
-            movement_type=CastlingPartnerMovement, piece=other_piece
+            pos_from=other_piece_pos, pos_to=other_piece_pos_to, movement_type=CastlingPartnerMovement,
+            piece=other_piece if not self_move.swapped_piece else other_piece.on(other_piece_pos),
         ).mark('c0')  # marking the chained move too, just in case
         return self_move.set(chained_move=other_move),
 
@@ -626,13 +629,20 @@ class CastlingMovement(TargetMovement):
                 for gap_offset in self.en_passant_gap:
                     positions.append(add(move.pos_from, gap_offset))
                 self.add_markers(piece, move.pos_to, positions, royal=type(self))
-                if move.chained_move:
+                other_pos_from = add(move.pos_from, piece.side.direction(self.other_piece))
+                other_piece_pos = other_pos_from
+                if move.pos_to == other_pos_from:
+                    other_piece_pos = move.pos_from
+                if (
+                    move.chained_move and move.chained_move.pos_from and move.chained_move.pos_to
+                    and move.chained_move.pos_from == other_piece_pos and move.chained_move.pos_to != other_pos_from
+                ):
                     other_direction = piece.side.direction(self.other_direction)
-                    other_offset = sub(move.chained_move.pos_to, move.chained_move.pos_from)
+                    other_offset = sub(move.chained_move.pos_to, other_pos_from)
                     if other_offset == other_direction:
                         positions = []
                         for gap_offset in self.other_en_passant_gap:
-                            positions.append(add(move.chained_move.pos_from, gap_offset))
+                            positions.append(add(other_pos_from, gap_offset))
                         self.add_markers(move.chained_move.piece, move.chained_move.pos_to, positions, royal=type(self))
         super().update(move, piece)
 

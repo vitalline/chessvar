@@ -172,9 +172,7 @@ class Move(object):
             if capture.board_pos:
                 string += f" @ {toa(capture.board_pos)}"
         if self.swapped_piece:
-            string += f" <-> {self.swapped_piece}"
-            if self.swapped_piece.board_pos:
-                string += f" @ {toa(self.swapped_piece.board_pos)}"
+            string += f" <-> {self.swapped_piece} @ {toa(self.pos_to)}"
         if self.placed_piece:
             string += f" v {self.placed_piece}"
         if self.promotion is not None:
