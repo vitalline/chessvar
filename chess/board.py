@@ -3595,16 +3595,24 @@ class Board(Window):
 
     def update_promotion_auto_actions(self, move: Move) -> None:
         piece = self.get_piece(move.pos_to)
-        last_move = move
-        while (
-            last_move.chained_move and not issubclass(last_move.chained_move.movement_type or type, AutoActMovement)
+        first_move = move
+        opp = piece.side.opponent()
+        while move.chained_move and not (
+            (mtype := move.chained_move.movement_type) and issubclass(mtype, AutoActMovement) and (
+            issubclass(mtype, AutoCaptureMovement) and ((piece := move.chained_move.piece) and (piece.side == opp)) or
+            issubclass(mtype, ConvertMovement) and ((promo := move.chained_move.promotion) and (promo.side == opp))
+        )):
+            move = move.chained_move
+        move.chained_move = None
+        if (
+            not issubclass(first_move.movement_type or type, ConvertMovement)
+            and isinstance(piece.movement, AutoActMovement)
         ):
-            last_move = last_move.chained_move
-        last_move.chained_move = None
-        if isinstance(piece.movement, AutoActMovement):
-            piece.movement.generate(last_move, piece)
-        self.update_auto_markers(move, True)
-        self.update_auto_actions(move, piece.side.opponent())
+            piece.movement.generate(move, piece)
+            self.update_auto_markers(first_move, True)
+            self.update_auto_actions(first_move, piece.side.opponent())
+        else:
+            self.update_auto_markers(first_move, True)
 
     def load_auto_markers(self, side: Side = Side.ANY) -> None:
         for side in self.auto_pieces if side is Side.ANY else (side,):
