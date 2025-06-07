@@ -2438,9 +2438,8 @@ class Board(Window):
         if last_chain_move:
             chained_move = last_chain_move
             while chained_move.chained_move:
-                if not (
-                    isinstance((chained_move.piece or self.no_piece).movement, AutoActMovement) or
-                    issubclass(chained_move.movement_type or type, (CastlingPartnerMovement, CloneMovement))
+                if not issubclass(
+                    chained_move.movement_type or type, (CastlingPartnerMovement, CloneMovement, AutoActMovement)
                 ):
                     last_chain_move = chained_move
                 chained_move = chained_move.chained_move
@@ -3174,17 +3173,20 @@ class Board(Window):
                                         chained = chained.chained_move
                                     chained = move
                                     while chained and chained.chained_move and (
-                                        issubclass(chained.movement_type or type, CastlingMovement) or
-                                        issubclass(chained.chained_move.movement_type or type, CloneMovement) or
-                                        isinstance((chained.piece or self.no_piece).movement, AutoActMovement)
+                                        issubclass(chained.movement_type or type, CastlingMovement) or issubclass(
+                                            chained.chained_move.movement_type or type, (CloneMovement, AutoActMovement)
+                                        )
                                     ):
                                         poss.extend((chained.pos_from, chained.pos_to))
                                         chained = chained.chained_move
                                     poss.extend((chained.pos_from, chained.pos_to))
                                     chained = chained.chained_move
-                                    if chained and not (
-                                        (chained.piece or self.no_piece).side == turn_side.opponent()
-                                        and issubclass(chained.movement_type or type, AutoActMovement)
+                                    if chained and (movement_type := chained.movement_type) and not (
+                                        issubclass(movement_type, AutoCaptureMovement) and (
+                                            (piece := chained.piece) and (piece.side == turn_side.opponent())
+                                        ) or issubclass(movement_type, ConvertMovement) and (
+                                            (promo := chained.promotion) and (promo.side == turn_side.opponent())
+                                        )
                                     ):
                                         self.chain_moves[turn_side].setdefault(tuple(poss), []).append(chained)
                             for chained in move_chain[::-1]:
@@ -3291,15 +3293,18 @@ class Board(Window):
                     chained_move = move
                     while chained_move and chained_move.chained_move and (
                         issubclass(chained_move.movement_type or type, CastlingMovement) or
-                        issubclass(chained_move.chained_move.movement_type or type, CloneMovement) or
-                        isinstance((chained_move.piece or self.no_piece).movement, AutoActMovement)
+                        issubclass(chained_move.chained_move.movement_type or type, (CloneMovement, AutoActMovement))
                     ):
                         poss.extend((chained_move.pos_from, chained_move.pos_to))
                         chained_move = chained_move.chained_move
                     poss.extend((chained_move.pos_from, chained_move.pos_to))
-                    if chained_move.chained_move and not (
-                        (chained_move.chained_move.piece or self.no_piece).side == self.turn_side.opponent() and
-                        issubclass(chained_move.chained_move.movement_type or type, AutoActMovement)
+                    next_chained = chained_move.chained_move
+                    if next_chained and (movement_type := next_chained.movement_type) and not (
+                        issubclass(movement_type, AutoCaptureMovement) and (
+                            (piece := next_chained.piece) and (piece.side == self.turn_side.opponent())
+                        ) or issubclass(movement_type, ConvertMovement) and (
+                            (promo := next_chained.promotion) and (promo.side == self.turn_side.opponent())
+                        )
                     ) or self.chain_moves.get(self.turn_side, {}).get(tuple(poss)):
                         chained_move.chained_move = Unset  # do not chain moves, we are only counting one-move sequences
                     moves[turn_side].setdefault(move.pos_from, []).append(move)
@@ -4005,15 +4010,18 @@ class Board(Window):
                 chained_move = move
                 while chained_move and chained_move.chained_move and (
                     issubclass(chained_move.movement_type or type, CastlingMovement) or
-                    issubclass(chained_move.chained_move.movement_type or type, CloneMovement) or
-                    isinstance((chained_move.piece or self.no_piece).movement, AutoActMovement)
+                    issubclass(chained_move.chained_move.movement_type or type, (CloneMovement, AutoActMovement))
                 ):
                     poss.extend((chained_move.pos_from, chained_move.pos_to))
                     chained_move = chained_move.chained_move
                 poss.extend((chained_move.pos_from, chained_move.pos_to))
-                if chained_move.chained_move and not (
-                    (chained_move.chained_move.piece or self.no_piece).side == self.turn_side.opponent() and
-                    issubclass(chained_move.chained_move.movement_type or type, AutoActMovement)
+                next_chained = chained_move.chained_move
+                if next_chained and (movement_type := next_chained.movement_type) and not (
+                    issubclass(movement_type, AutoCaptureMovement) and (
+                        (piece := next_chained.piece) and (piece.side == self.turn_side.opponent())
+                    ) or issubclass(movement_type, ConvertMovement) and (
+                        (promo := next_chained.promotion) and (promo.side == self.turn_side.opponent())
+                    )
                 ) or self.chain_moves.get(self.turn_side, {}).get(tuple(poss)):
                     chained_move.chained_move = Unset  # do not chain moves because we're updating every move separately
                 self.update_auto_markers(move, True)
@@ -4883,11 +4891,10 @@ class Board(Window):
                 chained_move = move
                 while chained_move and chained_move.chained_move and (
                     issubclass(chained_move.movement_type or type, CastlingMovement) or
-                    issubclass(chained_move.chained_move.movement_type or type, CloneMovement) or
-                    isinstance((chained_move.piece or self.no_piece).movement, AutoActMovement)
+                    issubclass(chained_move.chained_move.movement_type or type, (CloneMovement, AutoActMovement))
                 ):
                     # let's also not show all auto-actions because space in the caption is VERY limited
-                    if isinstance(chained_move.piece.movement, AutoActMovement):
+                    if issubclass(chained_move.chained_move.movement_type or type, AutoActMovement):
                         chained_move.chained_move = Unset
                         break
                     poss.extend((chained_move.pos_from, chained_move.pos_to))
@@ -6268,15 +6275,18 @@ class Board(Window):
                 chained_move = move
                 while chained_move and chained_move.chained_move and (
                     issubclass(chained_move.movement_type or type, CastlingMovement) or
-                    issubclass(chained_move.chained_move.movement_type or type, CloneMovement) or
-                    isinstance((chained_move.piece or self.no_piece).movement, AutoActMovement)
+                    issubclass(chained_move.chained_move.movement_type or type, (CloneMovement, AutoActMovement))
                 ):
                     poss.extend((chained_move.pos_from, chained_move.pos_to))
                     chained_move = chained_move.chained_move
                 poss.extend((chained_move.pos_from, chained_move.pos_to))
-                if chained_move.chained_move and not (
-                    (chained_move.chained_move.piece or self.no_piece).side == self.turn_side.opponent() and
-                    issubclass(chained_move.chained_move.movement_type or type, AutoActMovement)
+                next_chained = chained_move.chained_move
+                if next_chained and (movement_type := next_chained.movement_type) and not (
+                    issubclass(movement_type, AutoCaptureMovement) and (
+                        (piece := next_chained.piece) and (piece.side == self.turn_side.opponent())
+                    ) or issubclass(movement_type, ConvertMovement) and (
+                        (promo := next_chained.promotion) and (promo.side == self.turn_side.opponent())
+                    )
                 ) or self.chain_moves.get(self.turn_side, {}).get(tuple(poss)):
                     chained_move.chained_move = Unset  # do not chain moves since we are selecting chained move manually
                     is_final = False
@@ -6286,7 +6296,7 @@ class Board(Window):
                 self.update_auto_actions(move, self.turn_side.opponent())
                 chained_move = move
                 while chained_move:
-                    if not issubclass(chained_move.movement_type or type, CloneMovement):
+                    if not issubclass(chained_move.movement_type or type, (CloneMovement, ConvertMovement)):
                         chained_move.promotion = Unset  # do not auto-promote because we're selecting promotion manually
                     self.move(chained_move)
                     chained_move.set(piece=copy(chained_move.piece))
