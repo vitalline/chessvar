@@ -8,7 +8,7 @@ from typing import TYPE_CHECKING, TextIO
 from chess.data import get_piece_types, get_set_data, get_set_name, piece_groups
 from chess.data import action_types, end_types, prefix_chars, prefix_types, type_prefixes
 from chess.movement.move import Move
-from chess.movement.types import DropMovement
+from chess.movement.types import AutoCaptureMovement, ConvertMovement, DropMovement
 from chess.movement.util import ANY, to_alpha as b26
 from chess.movement.util import to_algebraic as toa, from_algebraic as fra
 from chess.movement.util import to_algebraic_map as tom, from_algebraic_map as frm
@@ -248,7 +248,7 @@ def debug_info(board: Board) -> list[str]:
         ('royal', board.royal_pieces),
         ('anti-royal', board.anti_royal_pieces),
         ('probabilistic', board.probabilistic_pieces),
-        ('auto-ranged', board.auto_ranged_pieces),
+        ('auto-acting', board.auto_pieces),
     ):
         for side in board.piece_set_ids:
             side_section_data = section_data.get(side) or {}
@@ -258,7 +258,26 @@ def debug_info(board: Board) -> list[str]:
             if not side_section_data:
                 debug_log[-1] += " None"
     for section_type, section_data in (
-        ('auto-capture squares', board.auto_capture_markers),
+        ('auto-action squares', board.auto_markers),
+    ):
+        for side in board.piece_set_ids:
+            side_section_data = section_data.get(side) or {}
+            debug_log.append(f"{side} {section_type} ({len(side_section_data)}):")
+            for pos in sorted(side_section_data):
+                debug_log.append(f"{pad:2}{toa(pos)} {pos}: ({len(side_section_data[pos])}):")
+                for act in sorted(side_section_data[pos]):
+                    act_str = {
+                        AutoCaptureMovement: 'Capture',
+                        ConvertMovement: 'Convert',
+                    }.get(act, str(act))
+                    piece_poss = {p for p in side_section_data[pos][act] if p is None or isinstance(p, tuple)}
+                    poss_string = ', '.join(f'{toa(xy)} {xy}' for xy in sorted(piece_poss))
+                    debug_log.append(f"{pad:4}{act_str}: (From {len(piece_poss)}) {poss_string or 'None'}")
+                if not side_section_data[pos]:
+                    debug_log[-1] += " None"
+            if not side_section_data:
+                debug_log[-1] += " None"
+    for section_type, section_data in (
         ('en passant targets', board.en_passant_targets),
         ('royal en passant targets', board.royal_ep_targets),
     ):

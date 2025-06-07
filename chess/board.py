@@ -31,9 +31,9 @@ from chess.data import expand_types as ext, prefix_chars as pch, prefix_types, t
 from chess.debug import debug_info, save_piece_data, save_piece_sets, save_piece_types
 from chess.movement.base import BaseMovement
 from chess.movement.move import Move
-from chess.movement.types import AutoCaptureMovement, AutoRangedAutoCaptureRiderMovement, BaseMultiMovement
+from chess.movement.types import AutoActMovement, AutoCaptureMovement, AutoMarkMovement, BaseMultiMovement
 from chess.movement.types import CastlingMovement, CastlingPartnerMovement, ChangingLegalMovement, ChangingMovement
-from chess.movement.types import CloneMovement, DropMovement, ProbabilisticMovement
+from chess.movement.types import CloneMovement, ConvertMovement, DropMovement, ProbabilisticMovement
 from chess.movement.types import is_active
 from chess.movement.util import Position, GenericPosition, ANY, LAST, NONE
 from chess.movement.util import add, to_alpha as b26, resolve as res
@@ -195,8 +195,8 @@ class Board(Window):
         self.relay_sources = {Side.WHITE: {}, Side.BLACK: {}}  # pieces that relay powers to the side's pieces
         self.coordinate_targets = {Side.WHITE: {}, Side.BLACK: {}}  # squares that are targeted by coordination partners
         self.coordinate_sources = {Side.WHITE: {}, Side.BLACK: {}}  # pieces that can act as coordination partners
-        self.auto_ranged_pieces = {Side.WHITE: [], Side.BLACK: []}  # pieces that auto-capture anywhere they can move to
-        self.auto_capture_markers = {Side.WHITE: {}, Side.BLACK: {}}  # squares where the side's pieces can auto-capture
+        self.auto_pieces = {Side.WHITE: [], Side.BLACK: []}  # pieces that automatically act anywhere they can move to
+        self.auto_markers = {Side.WHITE: {}, Side.BLACK: {}}  # squares where the side's pieces can automatically act
         self.probabilistic_pieces = {Side.WHITE: [], Side.BLACK: []}  # pieces that can move probabilistically
         self.probabilistic_piece_history = []  # list of probabilistic piece positions for every ply
         self.obstacles = []  # list of obstacles (neutral pieces that block movement and cannot move)
@@ -681,7 +681,7 @@ class Board(Window):
         self.deselect_piece()
         self.clear_relay_markers()
         self.clear_en_passant_markers()
-        self.clear_auto_capture_markers()
+        self.clear_auto_markers()
         self.reset_captures()
 
         old_turn_side = self.turn_side
@@ -953,7 +953,7 @@ class Board(Window):
         self.deselect_piece()
         self.clear_relay_markers()
         self.clear_en_passant_markers()
-        self.clear_auto_capture_markers()
+        self.clear_auto_markers()
         self.end_value = 0
         self.end_group = None
         self.end_condition = None
@@ -1271,9 +1271,9 @@ class Board(Window):
         self.load_pieces()
         self.update_pieces()
         self.update_colors()
-        for side in self.auto_ranged_pieces:
-            if self.auto_ranged_pieces[side]:
-                self.load_auto_capture_markers(side)
+        for side in self.auto_pieces:
+            if self.auto_pieces[side]:
+                self.load_auto_markers(side)
 
         starting = 'Starting new' if with_history else 'Resuming saved'
         if self.custom_variant:
@@ -1375,7 +1375,7 @@ class Board(Window):
         self.deselect_piece()
         self.clear_relay_markers()
         self.clear_en_passant_markers()
-        self.clear_auto_capture_markers()
+        self.clear_auto_markers()
         self.reset_captures()
 
         old_turn_side = self.turn_side
@@ -2030,7 +2030,7 @@ class Board(Window):
         self.anti_royal_pieces = {Side.WHITE: [], Side.BLACK: []}
         self.anti_royal_markers = {Side.WHITE: set(), Side.BLACK: set()}
         self.probabilistic_pieces = {Side.WHITE: [], Side.BLACK: []}
-        self.auto_ranged_pieces = {Side.WHITE: [], Side.BLACK: []}
+        self.auto_pieces = {Side.WHITE: [], Side.BLACK: []}
         self.obstacles = []
         royal_types = {Side.WHITE: {}, Side.BLACK: {}}
         royal_values = {Side.WHITE: {}, Side.BLACK: {}}
@@ -2058,8 +2058,8 @@ class Board(Window):
                         royal_values[side][royal_group] = royal_value
                     if isinstance(piece.movement, ProbabilisticMovement):
                         self.probabilistic_pieces[side].append(piece)
-                    if isinstance(piece.movement, AutoRangedAutoCaptureRiderMovement):
-                        self.auto_ranged_pieces[side].append(piece)
+                    if isinstance(piece.movement, AutoMarkMovement):
+                        self.auto_pieces[side].append(piece)
                 elif isinstance(piece, Obstacle):
                     self.obstacles.append(piece)
         for side, data in self.royal_groups.items():
@@ -2074,9 +2074,9 @@ class Board(Window):
             self.royal_markers[side] = {piece.board_pos for piece in self.royal_pieces[side]}
             self.anti_royal_markers[side] = {piece.board_pos for piece in self.anti_royal_pieces[side]}
         if self.ply_count == 1:
-            for side in self.auto_ranged_pieces:
-                if self.auto_ranged_pieces[side] and not self.auto_capture_markers[side]:
-                    self.load_auto_capture_markers(side)
+            for side in self.auto_pieces:
+                if self.auto_pieces[side] and not self.auto_markers[side]:
+                    self.load_auto_markers(side)
 
     def get_royal_loss(self, side: Side, move: Move, conditions: set) -> set:
         if not move or move.is_edit or not conditions:
@@ -2423,8 +2423,8 @@ class Board(Window):
         anti_royal_pieces = {side: self.anti_royal_pieces[side].copy() for side in self.anti_royal_pieces}
         anti_royal_markers = {side: self.anti_royal_markers[side].copy() for side in self.anti_royal_markers}
         probabilistic_pieces = {side: self.probabilistic_pieces[side].copy() for side in self.probabilistic_pieces}
-        auto_ranged_pieces = {side: self.auto_ranged_pieces[side].copy() for side in self.auto_ranged_pieces}
-        auto_capture_markers = deepcopy(self.auto_capture_markers)
+        auto_pieces = {side: self.auto_pieces[side].copy() for side in self.auto_pieces}
+        auto_markers = deepcopy(self.auto_markers)
         en_passant_targets = deepcopy(self.en_passant_targets)
         en_passant_markers = deepcopy(self.en_passant_markers)
         royal_ep_targets = deepcopy(self.royal_ep_targets)
@@ -2439,7 +2439,7 @@ class Board(Window):
             chained_move = last_chain_move
             while chained_move.chained_move:
                 if not (
-                    isinstance((chained_move.piece or self.no_piece).movement, AutoCaptureMovement) or
+                    isinstance((chained_move.piece or self.no_piece).movement, AutoActMovement) or
                     issubclass(chained_move.movement_type or type, (CastlingPartnerMovement, CloneMovement))
                 ):
                     last_chain_move = chained_move
@@ -2910,13 +2910,13 @@ class Board(Window):
                                 move_rules = self.filter(move_rules, 'new', last=('match', 'piece'))
                             if not move_rules:
                                 continue
-                            self.update_auto_capture_markers(move, True)
-                            self.update_auto_captures(move, turn_side.opponent())
+                            self.update_auto_markers(move, True)
+                            self.update_auto_actions(move, turn_side.opponent())
                             self.move(move, False)
                             if isinstance(move.promotion, AbstractPiece):
                                 self.promotion_piece = True
                                 self.replace(move.piece, move.promotion, False)
-                                self.update_promotion_auto_captures(move)
+                                self.update_promotion_auto_actions(move)
                                 self.promotion_piece = None
                             move_chain = [move]
                             chained_move = move.chained_move
@@ -3054,10 +3054,10 @@ class Board(Window):
                                     if isinstance(chained_move.promotion, AbstractPiece):
                                         self.promotion_piece = True
                                         self.replace(chained_move.piece, chained_move.promotion, False)
-                                        self.update_promotion_auto_captures(chained_move)
+                                        self.update_promotion_auto_actions(chained_move)
                                         self.promotion_piece = None
                                     else:
-                                        self.update_auto_capture_markers(chained_move)
+                                        self.update_auto_markers(chained_move)
                                     move_chain.append(chained_move)
                                     if (
                                         any_check_or_mate.intersection(self.end_rules[turn_side.opponent()])
@@ -3176,7 +3176,7 @@ class Board(Window):
                                     while chained and chained.chained_move and (
                                         issubclass(chained.movement_type or type, CastlingMovement) or
                                         issubclass(chained.chained_move.movement_type or type, CloneMovement) or
-                                        isinstance((chained.piece or self.no_piece).movement, AutoCaptureMovement)
+                                        isinstance((chained.piece or self.no_piece).movement, AutoActMovement)
                                     ):
                                         poss.extend((chained.pos_from, chained.pos_to))
                                         chained = chained.chained_move
@@ -3184,12 +3184,12 @@ class Board(Window):
                                     chained = chained.chained_move
                                     if chained and not (
                                         (chained.piece or self.no_piece).side == turn_side.opponent()
-                                        and issubclass(chained.movement_type or type, AutoCaptureMovement)
+                                        and issubclass(chained.movement_type or type, AutoActMovement)
                                     ):
                                         self.chain_moves[turn_side].setdefault(tuple(poss), []).append(chained)
                             for chained in move_chain[::-1]:
                                 self.undo(chained, False)
-                                self.revert_auto_capture_markers(chained)
+                                self.revert_auto_markers(chained)
                             if not pieces_loaded:
                                 self.load_pieces()
                                 pieces_loaded = True
@@ -3238,8 +3238,8 @@ class Board(Window):
         self.anti_royal_pieces = anti_royal_pieces
         self.anti_royal_markers = anti_royal_markers
         self.probabilistic_pieces = probabilistic_pieces
-        self.auto_ranged_pieces = auto_ranged_pieces
-        self.auto_capture_markers = auto_capture_markers
+        self.auto_pieces = auto_pieces
+        self.auto_markers = auto_markers
         self.en_passant_targets = en_passant_targets
         self.en_passant_markers = en_passant_markers
         self.royal_ep_targets = royal_ep_targets
@@ -3292,14 +3292,14 @@ class Board(Window):
                     while chained_move and chained_move.chained_move and (
                         issubclass(chained_move.movement_type or type, CastlingMovement) or
                         issubclass(chained_move.chained_move.movement_type or type, CloneMovement) or
-                        isinstance((chained_move.piece or self.no_piece).movement, AutoCaptureMovement)
+                        isinstance((chained_move.piece or self.no_piece).movement, AutoActMovement)
                     ):
                         poss.extend((chained_move.pos_from, chained_move.pos_to))
                         chained_move = chained_move.chained_move
                     poss.extend((chained_move.pos_from, chained_move.pos_to))
                     if chained_move.chained_move and not (
                         (chained_move.chained_move.piece or self.no_piece).side == self.turn_side.opponent() and
-                        issubclass(chained_move.chained_move.movement_type or type, AutoCaptureMovement)
+                        issubclass(chained_move.chained_move.movement_type or type, AutoActMovement)
                     ) or self.chain_moves.get(self.turn_side, {}).get(tuple(poss)):
                         chained_move.chained_move = Unset  # do not chain moves, we are only counting one-move sequences
                     moves[turn_side].setdefault(move.pos_from, []).append(move)
@@ -3548,79 +3548,93 @@ class Board(Window):
                 captured_pieces.append(new_piece)
         move.set(captured=captured_pieces)
 
-    def update_auto_captures(self, move: Move, side: Side) -> None:
+    def update_auto_actions(self, move: Move, side: Side) -> None:
         if move.is_edit:
             return
-        if side not in self.auto_capture_markers:
+        if side not in self.auto_markers:
             return
         while move.chained_move and not (
-            issubclass(move.chained_move.movement_type or type, AutoCaptureMovement)
-            and ((piece := move.chained_move.piece) and piece.side == side)
-        ):
+            (mtype := move.chained_move.movement_type) and issubclass(mtype, AutoActMovement) and (
+            issubclass(mtype, AutoCaptureMovement) and ((piece := move.chained_move.piece) and (piece.side == side)) or
+            issubclass(mtype, ConvertMovement) and ((promo := move.chained_move.promotion) and (promo.side == side))
+        )):
             move = move.chained_move
         if move.promotion is Unset:
             return  # and generate later
-        if move.pos_to in self.auto_capture_markers[side]:
-            piece_poss = self.auto_capture_markers[side][move.pos_to]
-            piece_pos = sorted(list(piece_poss))[0]
-            piece = self.get_piece(piece_pos)
-            moved = self.get_piece(move.pos_to) if isinstance(move.piece, NoPiece) or move.promotion else move.piece
-            if piece.side == side and piece.captures(moved):
-                move.chained_move = Move(
-                    piece=piece,
-                    movement_type=AutoCaptureMovement,
-                    pos_from=piece_pos,
-                    pos_to=piece_pos,
-                    captured=moved,
-                )
+        if move.pos_to in self.auto_markers[side]:
+            act_types = self.auto_markers[side][move.pos_to]
+            if ConvertMovement in act_types:
+                piece_poss = self.auto_markers[side][move.pos_to][ConvertMovement]
+                piece_pos = sorted(list(piece_poss))[0]
+                piece = self.get_piece(piece_pos)
+                moved = self.get_piece(move.pos_to) if isinstance(move.piece, NoPiece) or move.promotion else move.piece
+                if piece.side == side and piece.captures(moved):
+                    converted = moved.of(side)
+                    converted.set_moves(None)
+                    move.chained_move = Move(
+                        pos_from=move.pos_to, pos_to=move.pos_to,
+                        piece=moved, promotion=converted,
+                        movement_type=ConvertMovement,
+                    )
+            elif AutoCaptureMovement in act_types:
+                piece_poss = self.auto_markers[side][move.pos_to][AutoCaptureMovement]
+                piece_pos = sorted(list(piece_poss))[0]
+                piece = self.get_piece(piece_pos)
+                moved = self.get_piece(move.pos_to) if isinstance(move.piece, NoPiece) or move.promotion else move.piece
+                if piece.side == side and piece.captures(moved):
+                    move.chained_move = Move(
+                        pos_from=piece_pos, pos_to=piece_pos,
+                        piece=piece, captured=moved,
+                        movement_type=AutoCaptureMovement,
+                    )
 
-    def update_promotion_auto_captures(self, move: Move) -> None:
+    def update_promotion_auto_actions(self, move: Move) -> None:
         piece = self.get_piece(move.pos_to)
         last_move = move
         while (
-            last_move.chained_move and not issubclass(last_move.chained_move.movement_type or type, AutoCaptureMovement)
+            last_move.chained_move and not issubclass(last_move.chained_move.movement_type or type, AutoActMovement)
         ):
             last_move = last_move.chained_move
         last_move.chained_move = None
-        if isinstance(piece.movement, AutoCaptureMovement):
-            piece.movement.generate_captures(last_move, piece)
-        self.update_auto_capture_markers(move, True)
-        self.update_auto_captures(move, piece.side.opponent())
+        if isinstance(piece.movement, AutoActMovement):
+            piece.movement.generate(last_move, piece)
+        self.update_auto_markers(move, True)
+        self.update_auto_actions(move, piece.side.opponent())
 
-    def load_auto_capture_markers(self, side: Side = Side.ANY) -> None:
-        for side in self.auto_ranged_pieces if side is Side.ANY else (side,):
-            for piece in self.auto_ranged_pieces.get(side, []):
-                if isinstance(piece.movement, AutoRangedAutoCaptureRiderMovement):
+    def load_auto_markers(self, side: Side = Side.ANY) -> None:
+        for side in self.auto_pieces if side is Side.ANY else (side,):
+            for piece in self.auto_pieces.get(side, []):
+                if isinstance(piece.movement, AutoMarkMovement):
                     piece.movement.mark(piece.board_pos, piece)
 
-    def clear_auto_capture_markers(self, side: Side = Side.ANY) -> None:
-        for side in self.auto_capture_markers if side is Side.ANY else (side,):
-            self.auto_capture_markers.get(side, {}).clear()
+    def clear_auto_markers(self, side: Side = Side.ANY) -> None:
+        for side in self.auto_markers if side is Side.ANY else (side,):
+            self.auto_markers.get(side, {}).clear()
 
-    def update_auto_capture_markers(self, move: Move, recursive: bool = False) -> None:
+    def update_auto_markers(self, move: Move, recursive: bool = False) -> None:
         while move:
             moved_piece = move.piece
             if move.promotion:
-                if moved_piece and isinstance(moved_piece.movement, AutoRangedAutoCaptureRiderMovement):
+                if moved_piece and isinstance(moved_piece.movement, AutoMarkMovement):
                     moved_piece.movement.unmark(move.pos_to, moved_piece)
                 moved_piece = self.get_piece(move.pos_to)
-            if isinstance(moved_piece.movement, AutoRangedAutoCaptureRiderMovement):
+            if isinstance(moved_piece.movement, AutoMarkMovement):
                 if move.pos_to is None or move.is_edit:
                     moved_piece.movement.unmark(move.pos_from, moved_piece)
                 if move.pos_from is None or move.is_edit or move.promotion:
                     moved_piece.movement.mark(move.pos_to, moved_piece)
             for capture in move.captured:
-                if isinstance(capture.movement, AutoRangedAutoCaptureRiderMovement):
+                if isinstance(capture.movement, AutoMarkMovement):
                     capture.movement.unmark(capture.board_pos, capture)
             if move.swapped_piece is not None:
-                if isinstance(move.swapped_piece.movement, AutoRangedAutoCaptureRiderMovement):
+                if isinstance(move.swapped_piece.movement, AutoMarkMovement):
                     move.swapped_piece.movement.unmark(move.pos_to, move.swapped_piece)
                     move.swapped_piece.movement.mark(move.pos_from, move.swapped_piece)
             if not recursive:
                 return
             move = move.chained_move
 
-    def revert_auto_capture_markers(self, move: Move, recursive: bool = False) -> None:
+    def revert_auto_markers(self, move: Move, recursive: bool = False) -> None:
         move_list = []
         if recursive:
             while move:
@@ -3629,19 +3643,19 @@ class Board(Window):
         for move in (reversed(move_list) if recursive else [move]):
             if move.promotion:
                 moved_piece = self.get_piece(move.pos_to)
-                if isinstance(moved_piece.movement, AutoRangedAutoCaptureRiderMovement):
+                if isinstance(moved_piece.movement, AutoMarkMovement):
                     moved_piece.movement.unmark(move.pos_to, moved_piece)
             moved_piece = move.piece
-            if isinstance(moved_piece.movement, AutoRangedAutoCaptureRiderMovement):
+            if isinstance(moved_piece.movement, AutoMarkMovement):
                 if move.pos_from is None or move.is_edit:
                     moved_piece.movement.unmark(move.pos_to, moved_piece)
                 if move.pos_to is None or move.is_edit or move.promotion:
                     moved_piece.movement.mark(move.pos_from, moved_piece)
             for capture in move.captured:
-                if isinstance(capture.movement, AutoRangedAutoCaptureRiderMovement):
+                if isinstance(capture.movement, AutoMarkMovement):
                     capture.movement.mark(capture.board_pos, capture)
             if move.swapped_piece is not None:
-                if isinstance(move.swapped_piece.movement, AutoRangedAutoCaptureRiderMovement):
+                if isinstance(move.swapped_piece.movement, AutoMarkMovement):
                     move.swapped_piece.movement.unmark(move.pos_from, move.swapped_piece)
                     move.swapped_piece.movement.mark(move.pos_to, move.swapped_piece)
 
@@ -3945,7 +3959,7 @@ class Board(Window):
             elif next_move.is_edit:
                 self.update_move(next_move)
                 self.move(next_move)
-                self.update_auto_capture_markers(next_move)
+                self.update_auto_markers(next_move)
                 self.move_history.append(deepcopy(next_move))
                 self.apply_edit_promotion(next_move)
                 if next_move.promotion is Unset:
@@ -3992,22 +4006,22 @@ class Board(Window):
                 while chained_move and chained_move.chained_move and (
                     issubclass(chained_move.movement_type or type, CastlingMovement) or
                     issubclass(chained_move.chained_move.movement_type or type, CloneMovement) or
-                    isinstance((chained_move.piece or self.no_piece).movement, AutoCaptureMovement)
+                    isinstance((chained_move.piece or self.no_piece).movement, AutoActMovement)
                 ):
                     poss.extend((chained_move.pos_from, chained_move.pos_to))
                     chained_move = chained_move.chained_move
                 poss.extend((chained_move.pos_from, chained_move.pos_to))
                 if chained_move.chained_move and not (
                     (chained_move.chained_move.piece or self.no_piece).side == self.turn_side.opponent() and
-                    issubclass(chained_move.chained_move.movement_type or type, AutoCaptureMovement)
+                    issubclass(chained_move.chained_move.movement_type or type, AutoActMovement)
                 ) or self.chain_moves.get(self.turn_side, {}).get(tuple(poss)):
                     chained_move.chained_move = Unset  # do not chain moves because we're updating every move separately
-                self.update_auto_capture_markers(move, True)
-                self.update_auto_captures(move, self.turn_side.opponent())
+                self.update_auto_markers(move, True)
+                self.update_auto_actions(move, self.turn_side.opponent())
                 chained_move = move
                 while chained_move:
                     self.move(chained_move)
-                    self.update_auto_capture_markers(chained_move)
+                    self.update_auto_markers(chained_move)
                     chained_move.set(piece=copy(chained_move.piece))
                     if chained_move.swapped_piece:
                         chained_move.set(swapped_piece=copy(chained_move.swapped_piece))
@@ -4108,12 +4122,12 @@ class Board(Window):
         return False
 
     def auto(self, move: Move, update: bool = True) -> None:
-        self.update_auto_capture_markers(move, True)
-        self.update_auto_captures(move, self.turn_side.opponent())
+        self.update_auto_markers(move, True)
+        self.update_auto_actions(move, self.turn_side.opponent())
         chained_move = move
         while chained_move:
             self.move(chained_move, update)
-            self.update_auto_capture_markers(chained_move)
+            self.update_auto_markers(chained_move)
             chained_move.set(piece=copy(chained_move.piece))
             if chained_move.swapped_piece:
                 chained_move.set(swapped_piece=copy(chained_move.swapped_piece))
@@ -4388,7 +4402,7 @@ class Board(Window):
                 ):
                     chained_move.set(piece=self.get_piece(chained_move.pos_to))
                 self.undo(chained_move)
-                self.revert_auto_capture_markers(chained_move)
+                self.revert_auto_markers(chained_move)
                 if chained_move.promotion is not None:
                     if chained_move.placed_piece is not None:
                         turn_side = self.get_turn_side()
@@ -4484,7 +4498,7 @@ class Board(Window):
                                             self.captured_pieces[self.turn_side].pop(-(i + 1))
                                             break
                                 self.replace(self.promotion_piece, future.promotion)
-                            self.update_promotion_auto_captures(self.move_history[-1])
+                            self.update_promotion_auto_actions(self.move_history[-1])
                             self.end_promotion()
                             # The following two lines are a workaround for the fact that PyCharm insisted that
                             # "piece_was_moved = True" here was useless, despite the variable being used later
@@ -4547,19 +4561,19 @@ class Board(Window):
                 chained_move = chained_move.chained_move
                 if chained_move:
                     self.move(chained_move)
-                    self.update_auto_capture_markers(chained_move)
+                    self.update_auto_markers(chained_move)
                     chained_move.set(piece=copy(chained_move.piece))
                     if chained_move.swapped_piece:
                         chained_move.set(swapped_piece=copy(chained_move.swapped_piece))
         else:
             if last_move.pos_from is not None:
                 self.update_move(last_move)
-                self.update_auto_capture_markers(last_move, True)
-                self.update_auto_captures(last_move, self.turn_side.opponent())
+                self.update_auto_markers(last_move, True)
+                self.update_auto_actions(last_move, self.turn_side.opponent())
             chained_move = last_move
             while chained_move:
                 self.move(chained_move)
-                self.update_auto_capture_markers(chained_move)
+                self.update_auto_markers(chained_move)
                 chained_move.set(piece=copy(chained_move.piece))
                 if chained_move.swapped_piece:
                     chained_move.set(swapped_piece=copy(chained_move.swapped_piece))
@@ -4870,17 +4884,17 @@ class Board(Window):
                 while chained_move and chained_move.chained_move and (
                     issubclass(chained_move.movement_type or type, CastlingMovement) or
                     issubclass(chained_move.chained_move.movement_type or type, CloneMovement) or
-                    isinstance((chained_move.piece or self.no_piece).movement, AutoCaptureMovement)
+                    isinstance((chained_move.piece or self.no_piece).movement, AutoActMovement)
                 ):
-                    # let's also not show all auto-captures because space in the caption is VERY limited
-                    if isinstance(chained_move.piece.movement, AutoCaptureMovement):
+                    # let's also not show all auto-actions because space in the caption is VERY limited
+                    if isinstance(chained_move.piece.movement, AutoActMovement):
                         chained_move.chained_move = Unset
                         break
                     poss.extend((chained_move.pos_from, chained_move.pos_to))
                     chained_move = chained_move.chained_move
                 if chained_move.chained_move is not Unset:
                     poss.extend((chained_move.pos_from, chained_move.pos_to))
-                    # normally the check below would not mark auto-captures as Unset, but there is just not enough space
+                    # normally the check below would not mark auto-actions as Unset, but there is just not enough space.
                     if chained_move.chained_move or self.chain_moves.get(self.turn_side, {}).get(tuple(poss)):
                         chained_move.chained_move = Unset  # don't chain moves since we're only showing selectable moves
                 moves = []
@@ -4918,7 +4932,7 @@ class Board(Window):
             promotion_piece = self.promotion_piece
             self.promotion_piece = True
             self.replace(move.piece, move.promotion, update)
-            self.update_promotion_auto_captures(move)
+            self.update_promotion_auto_actions(move)
             self.promotion_piece = promotion_piece
         elif move.promotion is Unset:
             if self.turn_side not in self.drops:
@@ -4989,7 +5003,7 @@ class Board(Window):
                         self.captured_pieces[self.turn_side].pop(-(i + 1))
                         break
                 self.replace(move.piece, move.promotion, update)
-                self.update_promotion_auto_captures(move)
+                self.update_promotion_auto_actions(move)
                 self.promotion_piece = promotion_piece
             else:
                 self.start_promotion(self.get_piece(move.piece.board_pos), drop_list, drop_type_list)
@@ -5005,7 +5019,7 @@ class Board(Window):
             if type(move.promotion) != promoted_from:
                 move.promotion.promoted_from = promoted_from
             self.replace(move.piece, move.promotion, update)
-            self.update_promotion_auto_captures(move)
+            self.update_promotion_auto_actions(move)
             self.promotion_piece = promotion_piece
             return
         if move.promotion is not Unset:
@@ -5048,7 +5062,7 @@ class Board(Window):
                 promotion.promoted_from = promoted_from
             move.set(promotion=promotion)
             self.replace(move.piece, move.promotion, update)
-            self.update_promotion_auto_captures(move)
+            self.update_promotion_auto_actions(move)
             self.promotion_piece = promotion_piece
             return
         self.start_promotion(move.piece, promotions)
@@ -5203,7 +5217,7 @@ class Board(Window):
             else:
                 self.promotion_piece = True
                 self.replace(move.piece, move.promotion)
-                self.update_promotion_auto_captures(move)
+                self.update_promotion_auto_actions(move)
                 self.promotion_piece = None
 
     def end_promotion(self) -> None:
@@ -5942,7 +5956,7 @@ class Board(Window):
                         self.replace(self.promotion_piece, self.promotion_area[pos])
                     else:
                         chained_move.set(promotion=Default)
-                    self.update_promotion_auto_captures(chained_move)
+                    self.update_promotion_auto_actions(chained_move)
                     self.end_promotion()
                     current_move = chained_move
                     while chained_move:
@@ -5955,7 +5969,7 @@ class Board(Window):
                         chained_move = chained_move.chained_move
                         if chained_move:
                             self.move(chained_move)
-                            self.update_auto_capture_markers(chained_move)
+                            self.update_auto_markers(chained_move)
                             chained_move.set(piece=copy(chained_move.piece))
                             if chained_move.swapped_piece:
                                 chained_move.set(swapped_piece=copy(chained_move.swapped_piece))
@@ -6152,7 +6166,7 @@ class Board(Window):
             self.move(move)
             if move.promotion is Unset and move.movement_type == DropMovement and not self.promotion_piece:
                 return
-            self.update_auto_capture_markers(move)
+            self.update_auto_markers(move)
             self.move_history.append(deepcopy(move))
             self.apply_edit_promotion(move)
             if not self.promotion_piece:
@@ -6191,7 +6205,7 @@ class Board(Window):
                     chained_move = move.chained_move
                     if chained_move:
                         self.move(chained_move)
-                        self.update_auto_capture_markers(chained_move)
+                        self.update_auto_markers(chained_move)
                         chained_move.set(piece=copy(chained_move.piece))
                         if chained_move.swapped_piece:
                             chained_move.set(swapped_piece=copy(chained_move.swapped_piece))
@@ -6205,7 +6219,7 @@ class Board(Window):
                         chained_move = chained_move.chained_move
                         if chained_move:
                             self.move(chained_move)
-                            self.update_auto_capture_markers(chained_move)
+                            self.update_auto_markers(chained_move)
                             chained_move.set(piece=copy(chained_move.piece))
                             if chained_move.swapped_piece:
                                 chained_move.set(swapped_piece=copy(chained_move.swapped_piece))
@@ -6255,21 +6269,21 @@ class Board(Window):
                 while chained_move and chained_move.chained_move and (
                     issubclass(chained_move.movement_type or type, CastlingMovement) or
                     issubclass(chained_move.chained_move.movement_type or type, CloneMovement) or
-                    isinstance((chained_move.piece or self.no_piece).movement, AutoCaptureMovement)
+                    isinstance((chained_move.piece or self.no_piece).movement, AutoActMovement)
                 ):
                     poss.extend((chained_move.pos_from, chained_move.pos_to))
                     chained_move = chained_move.chained_move
                 poss.extend((chained_move.pos_from, chained_move.pos_to))
                 if chained_move.chained_move and not (
                     (chained_move.chained_move.piece or self.no_piece).side == self.turn_side.opponent() and
-                    issubclass(chained_move.chained_move.movement_type or type, AutoCaptureMovement)
+                    issubclass(chained_move.chained_move.movement_type or type, AutoActMovement)
                 ) or self.chain_moves.get(self.turn_side, {}).get(tuple(poss)):
                     chained_move.chained_move = Unset  # do not chain moves since we are selecting chained move manually
                     is_final = False
                 else:
                     is_final = True
-                self.update_auto_capture_markers(move, True)
-                self.update_auto_captures(move, self.turn_side.opponent())
+                self.update_auto_markers(move, True)
+                self.update_auto_actions(move, self.turn_side.opponent())
                 chained_move = move
                 while chained_move:
                     if not issubclass(chained_move.movement_type or type, CloneMovement):
@@ -6284,7 +6298,7 @@ class Board(Window):
                         self.log(f"Move: {chained_move}")
                     chained_move = chained_move.chained_move
                     if chained_move:
-                        self.update_auto_capture_markers(chained_move)
+                        self.update_auto_markers(chained_move)
                 if self.chain_start is None:
                     self.chain_start = deepcopy(move)
                     self.move_history.append(self.chain_start)

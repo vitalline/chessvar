@@ -337,19 +337,19 @@ class ProximityRiderMovement(RiderMovement):
         self.distance = distance
 
     def initialize_direction(self, direction: AnyDirection, pos_from: Position, piece: Piece) -> None:
-        self.data['capture'] = None
+        self.data['captured'] = None
         if self.distance < 0:
             capture_pos = self.transform(add(pos_from, mul(double(direction), self.distance)))
             capture = self.board.get_piece(capture_pos)
             if piece.captures(capture):
-                self.data['capture'] = capture
+                self.data['captured'] = capture
 
     def advance_direction(self, move: Move, direction: AnyDirection, pos_from: Position, piece: Piece) -> None:
         if self.distance > 0:
             capture_pos = self.transform(add(move.pos_to, mul(double(direction), self.distance)))
             capture = self.board.get_piece(capture_pos)
             if piece.captures(capture):
-                self.data['capture'] = capture
+                self.data['captured'] = capture
 
     def stop_condition(self, move: Move, direction: AnyDirection, piece: Piece, theoretical: bool = False) -> bool:
         if not theoretical:
@@ -360,8 +360,8 @@ class ProximityRiderMovement(RiderMovement):
 
     def moves(self, pos_from: Position, piece: Piece, theoretical: bool = False):
         for move in super().moves(pos_from, piece, theoretical):
-            if not theoretical and self.data['capture']:
-                move.set(captured=self.data['capture'])
+            if not theoretical and self.data['captured']:
+                move.set(captured=self.data['captured'])
             yield move
 
     def __copy_args__(self):
@@ -485,13 +485,62 @@ class RangedCaptureRiderMovement(RangedMovement, RiderMovement):
         return super().stop_condition(move, direction, piece, theoretical)
 
 
-class AutoCaptureMovement(BaseMovement):
+class AutoActMovement(BaseMovement):
+    # ABC for movements that can automatically act on the board
+
+    def generate(self, move: Move, piece: Piece) -> Move:
+        # This method should be overridden in subclasses to implement the specific action
+        return move
+
+
+class RangedAutoActMovement(AutoActMovement, RiderMovement):
+    # ABC for auto-acting movements that work in a given range
+
+    def moves(self, pos_from: Position, piece: Piece, theoretical: bool = False):
+        for move in super().moves(pos_from, piece, theoretical):
+            move.movement_type = RiderMovement
+            yield move if theoretical else self.generate(move, piece)
+
+
+class AutoMarkMovement(BaseMovement):
+    mark_type = None
+
+    def mark(self, pos: Position, piece: Piece):
+        for move in self.moves(pos, piece, True):
+            if move.pos_to not in self.board.auto_markers[piece.side]:
+                self.board.auto_markers[piece.side][move.pos_to] = {}
+            if self.mark_type not in self.board.auto_markers[piece.side][move.pos_to]:
+                self.board.auto_markers[piece.side][move.pos_to][self.mark_type] = set()
+            self.board.auto_markers[piece.side][move.pos_to][self.mark_type].add(pos)
+
+    def unmark(self, pos: Position, piece: Piece):
+        for move in self.moves(pos, piece, True):
+            if move.pos_to in self.board.auto_markers[piece.side]:
+                if self.mark_type in self.board.auto_markers[piece.side][move.pos_to]:
+                    self.board.auto_markers[piece.side][move.pos_to][self.mark_type].discard(pos)
+                    if not self.board.auto_markers[piece.side][move.pos_to][self.mark_type]:
+                        del self.board.auto_markers[piece.side][move.pos_to][self.mark_type]
+                if not self.board.auto_markers[piece.side][move.pos_to]:
+                    del self.board.auto_markers[piece.side][move.pos_to]
+
+    def update(self, move: Move, piece: Piece):
+        self.unmark(move.pos_from, piece)
+        self.mark(move.pos_to, piece)
+        super().update(move, piece)
+
+    def undo(self, move: Move, piece: Piece):
+        super().undo(move, piece)
+        self.unmark(move.pos_to, piece)
+        self.mark(move.pos_from, piece)
+
+
+class AutoCaptureMovement(AutoActMovement):
     # NB: The auto-capture implementation assumes that all pieces that utilize it can never be blocked by another piece.
     # This is true for the only army that utilizes this movement type, but it may not work correctly in other scenarios.
 
     default_mark = 't'
 
-    def generate_captures(self, move: Move, piece: Piece) -> Move:
+    def generate(self, move: Move, piece: Piece) -> Move:
         if not move.is_edit:
             for capture in super().moves(move.pos_to, piece):
                 captured_piece = self.board.get_piece(capture.pos_to)
@@ -503,36 +552,104 @@ class AutoCaptureMovement(BaseMovement):
         return move
 
 
-class RangedAutoCaptureRiderMovement(AutoCaptureMovement, RiderMovement):
+class RangedAutoCaptureRiderMovement(RangedAutoActMovement, AutoCaptureMovement):
+    pass
+
+
+class RangedAutoRiderMovement(RangedAutoCaptureRiderMovement):
+    pass  # Alias for RangedAutoCaptureRiderMovement
+
+
+class AutoRangedAutoCaptureRiderMovement(AutoMarkMovement, RangedAutoCaptureRiderMovement):
+    mark_type = AutoCaptureMovement
+
+
+class AutoRangedRiderMovement(AutoRangedAutoCaptureRiderMovement):
+    pass  # Alias for AutoRangedAutoCaptureRiderMovement
+
+
+class ConvertMovement(AutoActMovement):
+    default_mark = 'y'
+    partial_range = False  # whether the conversion is applied if only a part of the range is occupied
+
+    def generate(self, move: Move, piece: Piece) -> Move:
+        if not move.is_edit:
+            conversions = {}
+            for convert in super().moves(move.pos_to, piece):
+                converted_piece = self.board.get_piece(convert.pos_to)
+                if not converted_piece.side and not self.partial_range:
+                    conversions = {}
+                    break
+                if piece.captures(converted_piece):
+                    new_piece = converted_piece.of(piece.side)
+                    new_piece.set_moves(None)
+                    conversions[convert.pos_to] = Move(
+                        pos_from=convert.pos_to, pos_to=convert.pos_to,
+                        piece=converted_piece, promotion=new_piece,
+                        movement_type=ConvertMovement,
+                    )
+            if not conversions:
+                return move
+            last_chain_move = move
+            while last_chain_move.chained_move:
+                last_chain_move = last_chain_move.chained_move
+            for convert_pos_to in sorted(conversions):
+                last_chain_move.chained_move = conversions[convert_pos_to]
+                last_chain_move = last_chain_move.chained_move
+        return move
+
+
+class RangedConvertRiderMovement(RangedAutoActMovement, ConvertMovement):
+    def __init__(
+        self, board: Board,
+        directions: Unpacked[AnyDirection] | None = None,
+        partial_range: int = 0, boundless: int = 0, loop: int = 0
+    ):
+        super().__init__(board, directions, boundless, loop)
+        self.partial_range = bool(partial_range)
+
+    def __copy_args__(self):
+        return self.board, unpack(self.directions), int(self.partial_range), self.boundless, self.loop
+
+
+class RangeConvertRiderMovement(RangedConvertRiderMovement):
+    pass  # Alias for RangedConvertRiderMovement
+
+
+class AutoRangedConvertRiderMovement(AutoMarkMovement, RangedConvertRiderMovement):
+    def __init__(
+        self, board: Board,
+        directions: Unpacked[AnyDirection] | None = None,
+        # NB: non-partial range support for auto-conversion is not implemented yet
+        boundless: int = 0, loop: int = 0
+    ):
+        super().__init__(board, directions, 1, boundless, loop)
+        self.mark_type = ConvertMovement
+
+    def __copy_args__(self):
+        return self.board, unpack(self.directions), self.boundless, self.loop
+
+
+class AutoConvertRiderMovement(AutoRangedConvertRiderMovement):
+    pass  # Alias for AutoRangedConvertRiderMovement
+
+
+class SwapRiderMovement(RiderMovement):
+    default_mark = '-'
+
     def moves(self, pos_from: Position, piece: Piece, theoretical: bool = False):
         for move in super().moves(pos_from, piece, theoretical):
-            move.movement_type = RiderMovement
-            yield move if theoretical else self.generate_captures(move, piece)
+            if not theoretical:
+                swapped_piece = self.board.get_piece(move.pos_to)
+                if not (swapped_piece.side and swapped_piece.movement):
+                    continue
+                move.set(swapped_piece=swapped_piece.on(move.pos_to), captured=[])
+            yield move
 
-
-class AutoRangedAutoCaptureRiderMovement(RangedAutoCaptureRiderMovement, RiderMovement):
-    def mark(self, pos: Position, piece: Piece):
-        for move in self.moves(pos, piece, True):
-            if move.pos_to not in self.board.auto_capture_markers[piece.side]:
-                self.board.auto_capture_markers[piece.side][move.pos_to] = set()
-            self.board.auto_capture_markers[piece.side][move.pos_to].add(pos)
-
-    def unmark(self, pos: Position, piece: Piece):
-        for move in self.moves(pos, piece, True):
-            if move.pos_to in self.board.auto_capture_markers[piece.side]:
-                self.board.auto_capture_markers[piece.side][move.pos_to].discard(pos)
-                if not self.board.auto_capture_markers[piece.side][move.pos_to]:
-                    del self.board.auto_capture_markers[piece.side][move.pos_to]
-
-    def update(self, move: Move, piece: Piece):
-        self.unmark(move.pos_from, piece)
-        self.mark(move.pos_to, piece)
-        super().update(move, piece)
-
-    def undo(self, move: Move, piece: Piece):
-        super().undo(move, piece)
-        self.unmark(move.pos_to, piece)
-        self.mark(move.pos_from, piece)
+    def stop_condition(self, move: Move, direction: AnyDirection, piece: Piece, theoretical: bool = False) -> bool:
+        if not theoretical and not self.board.not_a_piece(move.pos_to):
+            return True
+        return super().stop_condition(move, direction, piece, theoretical)
 
 
 class DropMovement(BaseMovement):
@@ -724,7 +841,7 @@ class AbsoluteMovement(RiderMovement):
 
 class FreeMovement(AbsoluteMovement):
     def __init__(self, board: Board, stay: int = 0):
-        super().__init__(board, '*', stay)
+        super().__init__(board, ANY, stay)
 
     def __copy_args__(self):
         return self.board, self.stay
@@ -1497,7 +1614,10 @@ class RelayMovement(BaseChoiceMovement, ChangingLegalMovement):
                 mark = 'r!' if invert else 'r'
                 for pos in lookup_result:
                     relay_piece = self.board.get_piece(pos)
-                    if (piece.friendly_to(relay_piece) != self.check_enemy) and self.board.fits(value, relay_piece):
+                    if (
+                        (bool(piece.friendly_to(relay_piece)) != bool(self.check_enemy))
+                        and self.board.fits(value, relay_piece)
+                    ):
                         is_relayed = True
                         break
             is_legal = is_relayed != invert
@@ -1693,7 +1813,7 @@ class TagMovement(BaseChoiceMovement):
             for tag in self.movement_dict:
                 if (
                     not self.board.ply_simulation and
-                    not any(self.fits(template, tag or "") for template in self.board.move_tags)
+                    not any(self.fits(template, tag or '') for template in self.board.move_tags)
                 ):
                     continue
                 for movement in self.movement_dict[tag]:
@@ -1758,7 +1878,7 @@ passive_movements = (
     DropMovement,
     CloneMovement,
     RangedMovement,
-    AutoCaptureMovement,
+    AutoActMovement,
 )
 
 is_active = lambda move: (
