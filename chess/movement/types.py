@@ -542,13 +542,20 @@ class AutoCaptureMovement(AutoActMovement):
 
     def generate(self, move: Move, piece: Piece) -> Move:
         if not move.is_edit:
+            captured = []
             for capture in super().moves(move.pos_to, piece):
                 captured_piece = self.board.get_piece(capture.pos_to)
                 if piece.captures(captured_piece):
-                    move.set(
-                        captured=captured_piece,
-                        movement_type=AutoCaptureMovement
-                    )
+                    captured.append(captured_piece)
+            if captured:
+                last_chain_move = move
+                while last_chain_move.chained_move:
+                    last_chain_move = last_chain_move.chained_move
+                last_chain_move.set(chained_move=Move(
+                    pos_from=move.pos_to, pos_to=move.pos_to,
+                    piece=piece, captured=captured,
+                    movement_type=AutoCaptureMovement
+                ))
         return move
 
 
@@ -588,14 +595,13 @@ class ConvertMovement(AutoActMovement):
                         piece=converted_piece, promotion=new_piece,
                         movement_type=ConvertMovement,
                     )
-            if not conversions:
-                return move
-            last_chain_move = move
-            while last_chain_move.chained_move:
-                last_chain_move = last_chain_move.chained_move
-            for convert_pos_to in sorted(conversions):
-                last_chain_move.chained_move = conversions[convert_pos_to]
-                last_chain_move = last_chain_move.chained_move
+            if conversions:
+                last_chain_move = move
+                while last_chain_move.chained_move:
+                    last_chain_move = last_chain_move.chained_move
+                for convert_pos_to in sorted(conversions):
+                    last_chain_move.set(chained_move=conversions[convert_pos_to])
+                    last_chain_move = last_chain_move.chained_move
         return move
 
 
