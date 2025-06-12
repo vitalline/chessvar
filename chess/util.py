@@ -218,10 +218,10 @@ def find(data: Index[T], *fields: Key) -> Collection[T] | None:
 
 # Simple template matching function. Matches an object or a group thereof with a template, and treats '*' as a wildcard.
 def fits(template: str, data: Any) -> bool:
-    if not template:
-        return False
     if data is None:
         return False
+    if template == '':
+        return data == ''
     if template == '*':
         return True
     if not isinstance(data, str):

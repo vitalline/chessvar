@@ -3559,7 +3559,7 @@ class Board(Window):
         if side not in self.auto_markers:
             return
         while move.chained_move and not (
-            (mtype := move.chained_move.movement_type) and issubclass(mtype, AutoActMovement) and (
+            (mtype := move.chained_move.movement_type) and (
             issubclass(mtype, AutoCaptureMovement) and ((piece := move.chained_move.piece) and (piece.side == side)) or
             issubclass(mtype, ConvertMovement) and ((promo := move.chained_move.promotion) and (promo.side == side))
         )):
@@ -3598,7 +3598,7 @@ class Board(Window):
         first_move = move
         opp = piece.side.opponent()
         while move.chained_move and not (
-            (mtype := move.chained_move.movement_type) and issubclass(mtype, AutoActMovement) and (
+            (mtype := move.chained_move.movement_type) and (
             issubclass(mtype, AutoCaptureMovement) and ((piece := move.chained_move.piece) and (piece.side == opp)) or
             issubclass(mtype, ConvertMovement) and ((promo := move.chained_move.promotion) and (promo.side == opp))
         )):
