@@ -612,6 +612,70 @@ class ConvertMovement(AutoActMovement):
         return move
 
 
+class ReversiRiderMovement(RangedAutoActMovement, ConvertMovement):
+    def reversi_initialize(self, direction: AnyDirection, pos_from: Position, piece: Piece) -> None:
+        self.data['state'] = 0
+
+    def reversi_advance(self, move: Move, direction: AnyDirection, pos_from: Position, piece: Piece) -> None:
+        if self.data['state'] == 0:
+            new_piece = self.board.get_piece(self.transform(move.pos_to))
+            if not new_piece.side:
+                self.data['state'] = -1
+            elif piece.friendly_to(new_piece):
+                if len(direction) > 3 and self.steps < direction[3]:
+                    self.data['state'] = -1
+                else:
+                    self.data['state'] = 1
+            elif not piece.captures(new_piece):
+                self.data['state'] = -1
+
+    def reversi_skip(self, move: Move, direction: AnyDirection, piece: Piece, theoretical: bool = False) -> bool:
+        return not theoretical and self.data['state'] <= 0
+
+    def reversi_stop(self, move: Move, direction: AnyDirection, piece: Piece, theoretical: bool = False) -> bool:
+        if not theoretical and self.data['state'] != 0:
+            return True
+        next_pos_to = self.transform(add(move.pos_from, mul(double(direction), self.steps + 1)))
+        return self.bound_stop_condition(move, direction, next_pos_to)
+
+    def generate(self, move: Move, piece: Piece) -> Move:
+        if not move.is_edit:
+            self.initialize_direction, old_initialize = self.reversi_initialize, self.initialize_direction
+            self.advance_direction, old_advance = self.reversi_advance, self.advance_direction
+            self.skip_condition, old_skip = self.reversi_skip, self.skip_condition
+            self.stop_condition, old_stop = self.reversi_stop, self.stop_condition
+            old_directions = self.directions
+            conversions = {}
+            for direction in old_directions:
+                self.directions = [direction]
+                for convert in super().moves(move.pos_to, piece):
+                    offset = sub(convert.pos_to, move.pos_to)
+                    for distance in range(1, ddiv(offset, direction)):
+                        convert_pos = add(move.pos_to, mul(direction, distance))
+                        converted_piece = self.board.get_piece(convert_pos)
+                        if piece.captures(converted_piece):
+                            new_piece = converted_piece.of(piece.side)
+                            new_piece.set_moves(None)
+                            conversions[convert_pos] = Move(
+                                pos_from=convert_pos, pos_to=convert_pos,
+                                piece=converted_piece, promotion=new_piece,
+                                movement_type=ConvertMovement,
+                            )
+            self.directions = old_directions
+            self.initialize_direction = old_initialize
+            self.advance_direction = old_advance
+            self.skip_condition = old_skip
+            self.stop_condition = old_stop
+            if conversions:
+                last_chain_move = move
+                while last_chain_move.chained_move:
+                    last_chain_move = last_chain_move.chained_move
+                for convert_pos_to in sorted(conversions):
+                    last_chain_move.set(chained_move=conversions[convert_pos_to])
+                    last_chain_move = last_chain_move.chained_move
+        return move
+
+
 class RangedConvertRiderMovement(RangedAutoActMovement, ConvertMovement):
     def __init__(
         self, board: Board,
