@@ -510,6 +510,8 @@ class AutoMarkMovement(BaseMovement):
     # if the moving player is in check, so they won't affect whether a move is legal
     # (though, if a player leaves such a check unanswered, it does count as a loss).
 
+    mark_type = Unset
+
     def mark(self, pos: Position, piece: Piece):
         for move in self.moves(pos, piece, True):
             if move.pos_to not in self.board.auto_markers[piece.side]:
@@ -628,6 +630,8 @@ class RangeConvertRiderMovement(RangedConvertRiderMovement):
 
 
 class AutoRangedConvertRiderMovement(AutoMarkMovement, RangedConvertRiderMovement):
+    mark_type = ConvertMovement
+
     def __init__(
         self, board: Board,
         directions: Unpacked[AnyDirection] | None = None,
@@ -635,7 +639,6 @@ class AutoRangedConvertRiderMovement(AutoMarkMovement, RangedConvertRiderMovemen
         boundless: int = 0, loop: int = 0
     ):
         super().__init__(board, directions, 1, boundless, loop)
-        self.mark_type = ConvertMovement
 
     def __copy_args__(self):
         return self.board, unpack(self.directions), self.boundless, self.loop
@@ -1351,8 +1354,8 @@ class MultiActMovement(AutoActMovement, AutoMarkMovement, BaseMultiMovement):
         move: Unpacked[BaseMovement] | None = None,
         act: Unpacked[AutoActMovement | AutoMarkMovement] | None = None
     ):
-        self.move = repack(moves or [], list)
-        self.act = repack(actions or [], list)
+        self.move = repack(move or [], list)
+        self.act = repack(act or [], list)
         super().__init__(board, [*self.move, *self.act])
 
     def generate(self, move: Move, piece: Piece) -> Move:
@@ -1890,19 +1893,18 @@ class TagActMovement(AutoActMovement, TagMovement):
             movements = {}
         if actions is None:
             actions = {}
-        self.movement_dict = {key: repack(value, list) for key, value in movements.items()}
-        self.action_dict = {key: repack(value, list) for key, value in movements.items()}
-        super(BaseChoiceMovement).__init__(board, [
-            *chain.from_iterable(movements.values()),
-            *chain.from_iterable(actions.values()),
-        ])
+        movement_dict = {key: repack(value, list) for key, value in movements.items()}
+        action_dict = {key: repack(value, list) for key, value in actions.items()}
+        super().__init__(board, {**movement_dict, **action_dict})
+        self.movement_dict = movement_dict
+        self.action_dict = action_dict
 
     def generate(self, move: Move, piece: Piece) -> Move:
         if not move.is_edit:
             for template in self.action_dict:
                 if not self.fits(template or '', move.tag or ''):
                     continue
-                for movement in self.action_dict[tag]:
+                for movement in self.action_dict[template]:
                     if isinstance(movement, AutoActMovement):
                         move = movement.generate(move, piece)
         return move
