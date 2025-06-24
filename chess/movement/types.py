@@ -702,6 +702,7 @@ class CastlingMovement(TargetMovement):
         en_passant_gap: Unpacked[Direction] | None = None,
         other_movement_gap: Unpacked[Direction] | None = None,
         other_en_passant_gap: Unpacked[Direction] | None = None,
+        move_threshold: Unpacked[int] = 0,
     ):
         super().__init__(board)
         self.direction = direction
@@ -711,9 +712,10 @@ class CastlingMovement(TargetMovement):
         self.en_passant_gap = repack(en_passant_gap or [], list)
         self.other_movement_gap = repack(other_movement_gap or [], list)
         self.other_en_passant_gap = repack(other_en_passant_gap or [], list)
+        self.move_threshold = repack(move_threshold or 0, list)
 
     def moves(self, pos_from: Position, piece: Piece, theoretical: bool = False):
-        if piece.total_moves:
+        if piece.total_moves > self.move_threshold[0] >= 0:
             return ()
         pos_to = add(pos_from, piece.side.direction(self.direction))
         if self.board.not_on_board(pos_to):
@@ -727,7 +729,7 @@ class CastlingMovement(TargetMovement):
         other_piece = self.board.get_piece(other_piece_pos)
         if not other_piece.side:
             return ()
-        if other_piece.total_moves:
+        if other_piece.total_moves > self.move_threshold[-1] >= 0:
             return ()
         if not theoretical:
             for gap_offset in self.movement_gap:
@@ -779,6 +781,7 @@ class CastlingMovement(TargetMovement):
             self.board, self.direction, self.other_piece, self.other_direction,
             unpack(self.movement_gap), unpack(self.en_passant_gap),
             unpack(self.other_movement_gap), unpack(self.other_en_passant_gap),
+            (self.move_threshold if self.move_threshold[0] != self.move_threshold[-1] else self.move_threshold[0]),
         )
 
 
