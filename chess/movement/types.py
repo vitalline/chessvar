@@ -648,6 +648,7 @@ class ReversiRiderMovement(RangedAutoActMovement, ConvertMovement):
             conversions = {}
             for direction in old_directions:
                 self.directions = [direction]
+                direction = piece.side.direction(direction)
                 for convert in super().moves(move.pos_to, piece):
                     offset = sub(convert.pos_to, move.pos_to)
                     for distance in range(1, ddiv(offset, direction)):
