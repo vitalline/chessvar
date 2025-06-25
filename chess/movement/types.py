@@ -1282,7 +1282,46 @@ class StageMovement(BaseMultiMovement):
                     yield move
 
 
-class ChainMovement(BaseMultiMovement):
+class BaseChainMovement(BaseMovement):
+    # ABC for movements that need to simulate a chain of moves during their move generation
+
+    @staticmethod
+    def expand(move: Move | None) -> list[Move]:
+        if not move:
+            return []
+        move_chain = [move]
+        while move_chain[-1].chained_move:
+            move_chain.append(move_chain[-1].chained_move)
+        move_chain = [copy(chained_move).set(chained_move=Unset) for chained_move in move_chain]
+        return move_chain
+
+    @staticmethod
+    def contract(move_chain: list[Move]) -> Move | None:
+        if not move_chain:
+            return None
+        move = copy(move_chain[0])
+        last_move = move
+        for chained_move in move_chain[1:]:
+            last_move = last_move.set(chained_move=copy(chained_move)).chained_move
+        return move
+
+    def advance(self, move_chain: list[Move]) -> Position | None:
+        if not move_chain:
+            return None
+        last_pos = move_chain[0].pos_from
+        for chained_move in move_chain:
+            self.board.update_move(chained_move)
+            self.board.move(chained_move, False)
+            if last_pos == chained_move.pos_from:
+                last_pos = chained_move.pos_to
+        return last_pos
+
+    def rollback(self, move_chain: list[Move]):
+        for chained_move in move_chain[::-1]:
+            self.board.undo(chained_move, False)
+
+
+class ChainMovement(BaseMultiMovement, BaseChainMovement):
     def moves(self, pos_from: Position, piece: Piece, theoretical: bool = False, index: int = 0):
         if index >= len(self.movements):
             return
@@ -1299,35 +1338,18 @@ class ChainMovement(BaseMultiMovement):
                     chained_move = chained_move.chained_move
                     yield copy(chained_move).set(pos_from=move.pos_from)
                 last_chain_move = chained_move
-                if last_chain_move.movement_type == RoyalEnPassantMovement:
-                    continue
                 for chained_move in self.moves(last_chain_move.pos_to, piece, theoretical, index + 1):
                     yield copy(chained_move).set(pos_from=move.pos_from).unmark('n').mark('+')
         else:
             for move in self.movements[index].moves(pos_from, piece, theoretical):
-                move_chain = [move]
-                while move_chain[-1].chained_move:
-                    move_chain.append(move_chain[-1].chained_move)
+                move_chain = self.expand(move)
                 if move_chain[-1].movement_type == RoyalEnPassantMovement:
                     yield move
-                    continue
-                move_chain = [copy(chained_move).set(chained_move=Unset) for chained_move in move_chain]
-                last_pos = move_chain[0].pos_from
-                for chained_move in move_chain:
-                    self.board.update_move(chained_move)
-                    self.board.move(chained_move, False)
-                    if last_pos == chained_move.pos_from:
-                        last_pos = chained_move.pos_to
+                last_pos = self.advance(move_chain)
                 chain_options = []
                 for last_chained_move in self.moves(last_pos, piece, theoretical, index + 1):
-                    copy_move = copy(move_chain[0])
-                    chained_copy = copy_move
-                    for chained_move in move_chain[1:]:
-                        chained_copy = chained_copy.set(chained_move=copy(chained_move)).chained_move
-                    chained_copy.set(chained_move=copy(last_chained_move))
-                    chain_options.append(copy_move)
-                for chained_move in move_chain[::-1]:
-                    self.board.undo(chained_move, False)
+                    chain_options.append(self.contract(move_chain + [last_chained_move]))
+                self.rollback(move_chain)
                 yield from chain_options
 
 
@@ -1411,7 +1433,7 @@ class RangedMultiMovement(MultiMovement):
             yield move
 
 
-class MultiActMovement(AutoActMovement, AutoMarkMovement, BaseMultiMovement):
+class MultiActMovement(AutoActMovement, AutoMarkMovement, BaseMultiMovement, BaseChainMovement):
     def __init__(
         self,
         board: Board,
@@ -1423,10 +1445,26 @@ class MultiActMovement(AutoActMovement, AutoMarkMovement, BaseMultiMovement):
         super().__init__(board, [*self.move, *self.act])
 
     def generate(self, move: Move, piece: Piece) -> Move:
-        if not move.is_edit:
-            for movement in self.act:
-                if isinstance(movement, AutoActMovement):
-                    move = movement.generate(move, piece)
+        if move.is_edit:
+            return move
+        actions = [movement for movement in self.act if isinstance(movement, AutoActMovement)]
+        if not actions:
+            return move
+        move_chain = self.expand(move)
+        first_pos = move_chain[0].pos_from
+        last_pos = self.advance(move_chain)
+        full_move = Move(
+            pos_from=first_pos,
+            pos_to=last_pos,
+            piece=piece,
+        )
+        delta_chain = []
+        for movement in actions:
+            self.advance(delta_chain)
+            move_chain += delta_chain
+            delta_chain = self.expand(movement.generate(copy(full_move), piece).chained_move)
+        move = self.contract(move_chain + delta_chain)
+        self.rollback(move_chain)
         return move
 
     def moves(self, pos_from: Position, piece: Piece, theoretical: bool = False):
@@ -1946,7 +1984,7 @@ class TagMovement(BaseChoiceMovement):
                             yield move
 
 
-class TagActMovement(AutoActMovement, TagMovement):
+class TagActMovement(AutoActMovement, TagMovement, BaseChainMovement):
     def __init__(
         self,
         board: Board,
@@ -1964,13 +2002,27 @@ class TagActMovement(AutoActMovement, TagMovement):
         self.action_dict = action_dict
 
     def generate(self, move: Move, piece: Piece) -> Move:
-        if not move.is_edit:
-            for template in self.action_dict:
-                if not self.fits(template or '', move.tag or ''):
-                    continue
-                for movement in self.action_dict[template]:
-                    if isinstance(movement, AutoActMovement):
-                        move = movement.generate(move, piece)
+        if move.is_edit:
+            return move
+        templates = [template for template in self.action_dict if self.fits(template or '', move.tag or '')]
+        actions = [mv for tmpl in templates for mv in self.action_dict[tmpl] if isinstance(mv, AutoActMovement)]
+        if not actions:
+            return move
+        move_chain = self.expand(move)
+        first_pos = move_chain[0].pos_from
+        last_pos = self.advance(move_chain)
+        full_move = Move(
+            pos_from=first_pos,
+            pos_to=last_pos,
+            piece=piece,
+        )
+        delta_chain = []
+        for movement in actions:
+            self.advance(delta_chain)
+            move_chain += delta_chain
+            delta_chain = self.expand(movement.generate(copy(full_move), piece).chained_move)
+        move = self.contract(move_chain + delta_chain)
+        self.rollback(move_chain)
         return move
 
     def moves(self, pos_from: Position, piece: Piece, theoretical: bool = False):
