@@ -499,7 +499,12 @@ class RangedAutoActMovement(AutoActMovement, RiderMovement):
     def moves(self, pos_from: Position, piece: Piece, theoretical: bool = False):
         for move in super().moves(pos_from, piece, theoretical):
             move.movement_type = RiderMovement
-            yield move if theoretical else self.generate(move, piece)
+            if not theoretical:
+                last_move = move
+                while last_move.chained_move:
+                    last_move = last_move.chained_move
+                self.generate(last_move, piece)
+            yield move
 
 
 class AutoMarkMovement(BaseMovement):
@@ -1307,20 +1312,22 @@ class BaseChainMovement(BaseMovement):
         last_move.chained_move = None
         return move
 
-    def advance(self, move_chain: list[Move]) -> Position | None:
+    def advance(self, move_chain: list[Move], in_promotion: bool = False) -> Position | None:
         if not move_chain:
             return None
         last_pos = move_chain[0].pos_from
-        for chained_move in move_chain:
-            self.board.update_move(chained_move)
-            self.board.move(chained_move, False)
+        for i, chained_move in enumerate(move_chain):
+            if i or not in_promotion:
+                self.board.update_move(chained_move)
+                self.board.move(chained_move, False)
             if last_pos == chained_move.pos_from:
                 last_pos = chained_move.pos_to
         return last_pos
 
-    def rollback(self, move_chain: list[Move]):
-        for chained_move in move_chain[::-1]:
-            self.board.undo(chained_move, False)
+    def rollback(self, move_chain: list[Move], in_promotion: bool = False):
+        for i, chained_move in list(enumerate(move_chain))[::-1]:
+            if i or not in_promotion:
+                self.board.undo(chained_move, False)
 
 
 class ChainMovement(BaseMultiMovement, BaseChainMovement):
@@ -1452,9 +1459,10 @@ class MultiActMovement(AutoActMovement, AutoMarkMovement, BaseMultiMovement, Bas
         actions = [movement for movement in self.act if isinstance(movement, AutoActMovement)]
         if not actions:
             return move
+        promotion_piece = self.board.promotion_piece
         move_chain = self.expand(move)
         first_pos = move_chain[0].pos_from
-        last_pos = self.advance(move_chain)
+        last_pos = self.advance(move_chain, bool(promotion_piece))
         full_move = Move(
             pos_from=first_pos,
             pos_to=last_pos,
@@ -1466,7 +1474,8 @@ class MultiActMovement(AutoActMovement, AutoMarkMovement, BaseMultiMovement, Bas
             move_chain += delta_chain
             delta_chain = self.expand(movement.generate(copy(full_move), piece).chained_move)
         move = self.contract(move_chain + delta_chain)
-        self.rollback(move_chain)
+        self.rollback(move_chain, bool(promotion_piece))
+        self.board.promotion_piece = promotion_piece
         return move
 
     def moves(self, pos_from: Position, piece: Piece, theoretical: bool = False):
@@ -2010,9 +2019,10 @@ class TagActMovement(AutoActMovement, TagMovement, BaseChainMovement):
         actions = [mv for tmpl in templates for mv in self.action_dict[tmpl] if isinstance(mv, AutoActMovement)]
         if not actions:
             return move
+        promotion_piece = self.board.promotion_piece
         move_chain = self.expand(move)
         first_pos = move_chain[0].pos_from
-        last_pos = self.advance(move_chain)
+        last_pos = self.advance(move_chain, bool(promotion_piece))
         full_move = Move(
             pos_from=first_pos,
             pos_to=last_pos,
@@ -2024,7 +2034,8 @@ class TagActMovement(AutoActMovement, TagMovement, BaseChainMovement):
             move_chain += delta_chain
             delta_chain = self.expand(movement.generate(copy(full_move), piece).chained_move)
         move = self.contract(move_chain + delta_chain)
-        self.rollback(move_chain)
+        self.rollback(move_chain, bool(promotion_piece))
+        self.board.promotion_piece = promotion_piece
         return move
 
     def moves(self, pos_from: Position, piece: Piece, theoretical: bool = False):
