@@ -1304,6 +1304,7 @@ class BaseChainMovement(BaseMovement):
         last_move = move
         for chained_move in move_chain[1:]:
             last_move = last_move.set(chained_move=copy(chained_move)).chained_move
+        last_move.chained_move = None
         return move
 
     def advance(self, move_chain: list[Move]) -> Position | None:
