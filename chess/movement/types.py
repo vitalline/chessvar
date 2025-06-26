@@ -1782,7 +1782,7 @@ class RelayMovement(BaseChoiceMovement, ChangingLegalMovement):
                 for pos in lookup_result:
                     relay_piece = self.board.get_piece(pos)
                     if (
-                        (bool(piece.friendly_to(relay_piece)) != bool(self.check_enemy))
+                        (self.check_enemy < 0 or bool(self.check_enemy) != bool(piece.friendly_to(relay_piece)))
                         and self.board.fits(value, relay_piece)
                     ):
                         is_relayed = True
