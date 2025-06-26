@@ -3060,6 +3060,7 @@ class Board(Window):
                                         self.promotion_piece = None
                                     else:
                                         self.update_auto_markers(chained_move)
+                                    move_chain[-1].chained_move = chained_move
                                     move_chain.append(chained_move)
                                     if (
                                         any_check_or_mate.intersection(self.end_rules[turn_side.opponent()])
@@ -4009,9 +4010,10 @@ class Board(Window):
                         break
                     else:
                         self.log(f"Drop: {next_move}")
-                        chained_move = next_move.chained_move
-                        while chained_move:
-                            chained_move = self.move(chained_move)
+                        chained_move = next_move
+                        while chained_move.chained_move:
+                            chained_move.chained_move = self.move(chained_move.chained_move)
+                            chained_move = chained_move.chained_move
                             self.update_auto_markers(chained_move)
                             chained_move.set(piece=copy(chained_move.piece))
                             if chained_move.swapped_piece:
@@ -4021,7 +4023,6 @@ class Board(Window):
                             else:
                                 finished = True
                                 break
-                            chained_move = chained_move.chained_move
                         self.shift_ply(+1)
                 else:
                     finished = False
@@ -4067,18 +4068,19 @@ class Board(Window):
                     move.promotion = next_move.promotion  # since the legal move we found may have a different promotion
                 self.update_auto_markers(move, True)
                 move = self.update_auto_actions(move, self.turn_side.opponent())
+                move = self.move(move)
                 chained_move = move
                 while chained_move:
-                    chained_move = self.move(chained_move)
                     self.update_auto_markers(chained_move)
                     chained_move.set(piece=copy(chained_move.piece))
                     if chained_move.swapped_piece:
                         chained_move.set(swapped_piece=copy(chained_move.swapped_piece))
                     if self.promotion_piece is None:
                         self.log(f"Move: {chained_move}")
-                    chained_move = chained_move.chained_move
-                    if chained_move:
+                    if chained_move.chained_move:
+                        chained_move.chained_move = self.move(chained_move.chained_move)
                         next_move = next_move.chained_move
+                    chained_move = chained_move.chained_move
                 if self.chain_start is None:
                     self.chain_start = deepcopy(move)
                     self.move_history.append(self.chain_start)
@@ -4173,9 +4175,9 @@ class Board(Window):
     def auto(self, move: Move, update: bool = True) -> None:
         self.update_auto_markers(move, True)
         move = self.update_auto_actions(move, self.turn_side.opponent())
+        move = self.move(move, update)
         chained_move = move
         while chained_move:
-            chained_move = self.move(chained_move, update)
             self.update_auto_markers(chained_move)
             chained_move.set(piece=copy(chained_move.piece))
             if chained_move.swapped_piece:
@@ -4187,6 +4189,8 @@ class Board(Window):
                     else 'Move'
                 )
                 self.log(f"{move_type}: {chained_move}")
+            if chained_move.chained_move:
+                chained_move.chained_move = self.move(chained_move.chained_move, update)
             chained_move = chained_move.chained_move
         if self.chain_start is None:
             self.chain_start = move
@@ -4607,10 +4611,11 @@ class Board(Window):
                     else 'Move'
                 )
                 self.log(f"Redo: {move_type}: {chained_move}")
+                if chained_move.chained_move:
+                    chained_move.chained_move = self.move(chained_move.chained_move)
                 last_chain_move = chained_move
                 chained_move = chained_move.chained_move
                 if chained_move:
-                    chained_move = self.move(chained_move)
                     self.update_auto_markers(chained_move)
                     chained_move.set(piece=copy(chained_move.piece))
                     if chained_move.swapped_piece:
@@ -4620,9 +4625,9 @@ class Board(Window):
                 self.update_move(last_move)
                 self.update_auto_markers(last_move, True)
                 last_move = self.update_auto_actions(last_move, self.turn_side.opponent())
+            last_move = self.move(last_move)
             chained_move = last_move
             while chained_move:
-                chained_move = self.move(chained_move)
                 self.update_auto_markers(chained_move)
                 chained_move.set(piece=copy(chained_move.piece))
                 if chained_move.swapped_piece:
@@ -4634,10 +4639,11 @@ class Board(Window):
                 )
                 self.log(f"Redo: {move_type}: {chained_move}")
                 self.apply_edit_promotion(chained_move)
+                if chained_move.chained_move:
+                    self.update_move(chained_move.chained_move)
+                    chained_move.chained_move = self.move(chained_move.chained_move)
                 last_chain_move = chained_move
                 chained_move = chained_move.chained_move
-                if chained_move:
-                    self.update_move(chained_move)
             if self.chain_start is None:
                 self.chain_start = deepcopy(last_move)
                 self.move_history.append(self.chain_start)
@@ -6020,6 +6026,7 @@ class Board(Window):
                     else:
                         chained_move.set(promotion=Default)
                     chained_move = self.update_promotion_auto_actions(chained_move)
+                    self.move_history[-1] = chained_move
                     self.end_promotion()
                     current_move = chained_move
                     while chained_move:
@@ -6029,9 +6036,10 @@ class Board(Window):
                             else 'Move'
                         )
                         self.log(f"{move_type}: {chained_move}")
+                        if chained_move.chained_move:
+                            chained_move.chained_move = self.move(chained_move.chained_move)
                         chained_move = chained_move.chained_move
                         if chained_move:
-                            chained_move = self.move(chained_move)
                             self.update_auto_markers(chained_move)
                             chained_move.set(piece=copy(chained_move.piece))
                             if chained_move.swapped_piece:
@@ -6265,9 +6273,10 @@ class Board(Window):
                 elif move.promotion:
                     self.move_history.append(move)
                     self.log(f"Drop: {move}")
+                    if move.chained_move:
+                        move.chained_move = self.move(move.chained_move)
                     chained_move = move.chained_move
                     if chained_move:
-                        chained_move = self.move(chained_move)
                         self.update_auto_markers(chained_move)
                         chained_move.set(piece=copy(chained_move.piece))
                         if chained_move.swapped_piece:
@@ -6279,9 +6288,10 @@ class Board(Window):
                             else 'Move'
                         )
                         self.log(f"{move_type}: {chained_move}")
+                        if chained_move.chained_move:
+                            chained_move.chained_move = self.move(chained_move.chained_move)
                         chained_move = chained_move.chained_move
                         if chained_move:
-                            chained_move = self.move(chained_move)
                             self.update_auto_markers(chained_move)
                             chained_move.set(piece=copy(chained_move.piece))
                             if chained_move.swapped_piece:
@@ -6353,9 +6363,9 @@ class Board(Window):
                     move.promotion = Unset  # we're selecting promotion manually, post-promotion effects must be cleared
                 self.update_auto_markers(move, True)
                 move = self.update_auto_actions(move, self.turn_side.opponent())
+                move = self.move(move)
                 chained_move = move
                 while chained_move:
-                    chained_move = self.move(chained_move)
                     chained_move.set(piece=copy(chained_move.piece))
                     if chained_move.swapped_piece:
                         chained_move.set(swapped_piece=copy(chained_move.swapped_piece))
@@ -6363,6 +6373,7 @@ class Board(Window):
                         if chained_move.promotion is Unset:
                             chained_move.set(promotion=Default)
                         self.log(f"Move: {chained_move}")
+                    last_move = chained_move
                     chained_move = chained_move.chained_move
                     if not chained_move:
                         continue
@@ -6370,6 +6381,8 @@ class Board(Window):
                         chained_move = self.clear_promotion_auto_actions(chained_move)  # clear the old auto-actions and
                         chained_move.promotion = Unset  # do not auto-promote because we're selecting promotion manually
                     self.update_auto_markers(chained_move)
+                    chained_move = self.move(chained_move)
+                    last_move.chained_move = chained_move
                 if self.chain_start is None:
                     self.chain_start = deepcopy(move)
                     self.move_history.append(self.chain_start)
