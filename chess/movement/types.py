@@ -1917,7 +1917,7 @@ class CoordinateMovement(BaseChoiceMovement):
         )
 
 
-class BaseAreaMovement(BaseChoiceMovement):
+class BaseAreaMovement(BaseMovement):
     def lookup(self, key: str, invert: bool, piece: Piece) -> bool | None:
         # Determine if the given condition (or its inversion) covers every square on the board (or none thereof).
         # Returns True if every square is covered, and False if no squares are covered. If neither, returns None.
