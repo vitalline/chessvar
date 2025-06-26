@@ -101,8 +101,8 @@ class AbstractPiece(object, metaclass=PieceMeta):
             return None
         return 0
 
-    def set_moves(self, count: AbstractPiece | int | None, offset: int | None = None, force: bool = False):
-        if self.movement is not None and (force or self.total_moves is None):
+    def set_moves(self, count: AbstractPiece | int | None, offset: int | None = None):
+        if self.movement is not None and (count is None or self.total_moves is None):
             if not (count is None or isinstance(count, int)):
                 count = count.total_moves
             if count is None or count < 0:

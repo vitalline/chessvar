@@ -2914,7 +2914,7 @@ class Board(Window):
                             move = self.move(move, False)
                             if isinstance(move.promotion, AbstractPiece):
                                 self.promotion_piece = True
-                                self.replace(move.piece, move.promotion, False)
+                                self.replace(move.piece, move.promotion, move.movement_type, False)
                                 move = self.update_promotion_auto_actions(move)
                                 self.promotion_piece = None
                             move_chain = [move]
@@ -3052,7 +3052,10 @@ class Board(Window):
                                     chained_move = self.move(chained_move, False)
                                     if isinstance(chained_move.promotion, AbstractPiece):
                                         self.promotion_piece = True
-                                        self.replace(chained_move.piece, chained_move.promotion, False)
+                                        self.replace(
+                                            chained_move.piece, chained_move.promotion,
+                                            chained_move.movement_type, False,
+                                        )
                                         chained_move = self.update_promotion_auto_actions(chained_move)
                                         self.promotion_piece = None
                                     else:
@@ -4544,7 +4547,7 @@ class Board(Window):
                                         if piece == future.placed_piece:
                                             self.captured_pieces[self.turn_side].pop(-(i + 1))
                                             break
-                                self.replace(self.promotion_piece, future.promotion)
+                                self.replace(self.promotion_piece, future.promotion, future.movement_type)
                             self.move_history[-1] = self.update_promotion_auto_actions(self.move_history[-1])
                             self.end_promotion()
                             # The following two lines are a workaround for the fact that PyCharm insisted that
@@ -4977,7 +4980,7 @@ class Board(Window):
                         break
             promotion_piece = self.promotion_piece
             self.promotion_piece = True
-            self.replace(move.piece, move.promotion, update)
+            self.replace(move.piece, move.promotion, move.movement_type, update)
             move = self.update_promotion_auto_actions(move)
             self.promotion_piece = promotion_piece
             return move
@@ -5044,13 +5047,13 @@ class Board(Window):
                 drop = drop.of(drop.side or self.turn_side).on(move.pos_to)
             else:
                 drop = drop(board=self, board_pos=move.piece.board_pos, side=self.turn_side)
-            drop.set_moves(move.piece, 1)
+                drop.set_moves(None)
             move.set(promotion=drop, placed_piece=drop_type_list[0])
             for i, piece in enumerate(self.captured_pieces[self.turn_side][::-1]):
                 if piece == move.placed_piece:
                     self.captured_pieces[self.turn_side].pop(-(i + 1))
                     break
-            self.replace(move.piece, move.promotion, update)
+            self.replace(move.piece, move.promotion, move.movement_type, update)
             move = self.update_promotion_auto_actions(move)
             self.promotion_piece = promotion_piece
             return move
@@ -5066,7 +5069,7 @@ class Board(Window):
                 promoted_from = promoted_from or type(move.piece)
             if type(move.promotion) != promoted_from:
                 move.promotion.promoted_from = promoted_from
-            self.replace(move.piece, move.promotion, update)
+            self.replace(move.piece, move.promotion, move.movement_type, update)
             move = self.update_promotion_auto_actions(move)
             self.promotion_piece = promotion_piece
             return move
@@ -5102,14 +5105,14 @@ class Board(Window):
                 promotion = promotion.of(promotion.side or move.piece.side).on(move.pos_to)
             elif isinstance(promotion, type) and issubclass(promotion, AbstractPiece):
                 promotion = promotion(board=self, board_pos=move.pos_to, side=move.piece.side)
-            promotion.set_moves(move.piece, 1)
+                promotion.set_moves(None)
             promoted_from = promotion.promoted_from or move.piece.promoted_from
             if not isinstance(move.piece, NoPiece):
                 promoted_from = promoted_from or type(move.piece)
             if type(promotion) != promoted_from:
                 promotion.promoted_from = promoted_from
             move.set(promotion=promotion)
-            self.replace(move.piece, move.promotion, update)
+            self.replace(move.piece, move.promotion, move.movement_type, update)
             move = self.update_promotion_auto_actions(move)
             self.promotion_piece = promotion_piece
             return move
@@ -5147,7 +5150,7 @@ class Board(Window):
                 piece = piece.of(piece.side or move.piece.side)
             else:
                 piece = piece(board=self, side=move.piece.side)
-            piece.set_moves(move.piece, 1)
+                piece.set_moves(None)
             promoted_from = piece.promoted_from or move.piece.promoted_from
             if not isinstance(move.piece, NoPiece):
                 promoted_from = promoted_from or type(move.piece)
@@ -5165,7 +5168,7 @@ class Board(Window):
         self,
         piece: AbstractPiece,
         promotions: list[TypeOr[AbstractPiece] | str | None],
-        drops: list[type[AbstractPiece]] | None = None
+        drops: list[type[AbstractPiece]] | None = None,
     ) -> None:
         if drops is None:
             drops = {}
@@ -5217,7 +5220,7 @@ class Board(Window):
                 promotion = type(promotion)
             else:
                 promotion_piece = promotion(board=self, board_pos=pos, side=side)
-            promotion_piece.set_moves(piece, 1)
+                promotion_piece.set_moves(None)
             if not self.edit_mode or (self.move_history and ((m := self.move_history[-1]) and m.is_edit != 1)):
                 promoted_from = promotion_piece.promoted_from or piece.promoted_from
                 if not isinstance(piece, NoPiece):
@@ -5264,7 +5267,7 @@ class Board(Window):
                     self.update_caption()
             else:
                 self.promotion_piece = True
-                self.replace(move.piece, move.promotion)
+                self.replace(move.piece, move.promotion, move.movement_type)
                 self.update_promotion_auto_actions(move)
                 self.promotion_piece = None
 
@@ -5275,9 +5278,21 @@ class Board(Window):
         self.promotion_area_sprite_list.clear()
         self.promotion_piece_sprite_list.clear()
 
-    def replace(self, piece: AbstractPiece, new_piece: AbstractPiece, update: bool = True) -> None:
+    def replace(
+        self,
+        piece: AbstractPiece,
+        new_piece: AbstractPiece,
+        promotion_type: type[BaseMovement] | None = None,
+        update: bool = True,
+    ) -> None:
+        move_offset = 0
+        if issubclass(promotion_type or type, DropMovement):
+            move_offset = 1
+        elif issubclass(promotion_type or type, ConvertMovement):
+            move_offset = -1
         new_piece.board_pos = None
         new_piece = copy(new_piece)
+        new_piece.set_moves(piece, move_offset)
         pos = self.get_absolute(piece.board_pos)
         if update and isinstance(self.pieces[pos[0]][pos[1]], Piece):
             self.piece_sprite_list.remove(self.pieces[pos[0]][pos[1]].sprite)
@@ -6001,7 +6016,7 @@ class Board(Window):
                         self.update_en_passant_markers(chained_move)
                     if pos not in self.promotion_area_drops or self.promotion_area_drops[pos] is not None:
                         chained_move.set(promotion=self.promotion_area[pos])
-                        self.replace(self.promotion_piece, self.promotion_area[pos])
+                        self.replace(self.promotion_piece, self.promotion_area[pos], chained_move.movement_type)
                     else:
                         chained_move.set(promotion=Default)
                     chained_move = self.update_promotion_auto_actions(chained_move)
@@ -6170,7 +6185,7 @@ class Board(Window):
                                 piece = piece.of(piece.side or side).on(pos)
                             else:
                                 piece = piece(board=self, board_pos=move.pos_to, side=side)
-                            piece.set_moves(move.piece, 1)
+                                piece.set_moves(None)
                             promoted_from = piece.promoted_from or move.piece.promoted_from
                             if not isinstance(move.piece, NoPiece):
                                 promoted_from = promoted_from or type(move.piece)

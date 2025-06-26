@@ -233,7 +233,7 @@ def save_piece(
         'from': save_piece_type(piece.promoted_from, last) if piece.promoted_from else None,
         'moves': piece.total_moves,
         'show': None if isinstance(piece, UtilityPiece) or piece.should_hide is None else not piece.should_hide,
-    }.items() if v or (k == 'show' and v is False) or (k == 'moves' and (is_promotion == (v is not None)))}
+    }.items() if v or (k == 'show' and v is False) or (k == 'moves' and v is not (None if is_promotion else 0))}
 
 
 def load_piece(
@@ -257,7 +257,7 @@ def load_piece(
         side=side,
     )
     piece.promoted_from = load_piece_type(data.get('from'), from_dict, last)
-    piece.set_moves(data.get('moves', None if is_promotion else 0), force=True)
+    piece.set_moves(None, data.get('moves', None if is_promotion else 0))
     if isinstance(piece, Piece):
         show_piece = data.get('show')
         if show_piece is not None:
