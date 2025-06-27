@@ -3644,8 +3644,8 @@ class Board(Window):
             if not promotion_found and move.promotion:
                 promotion_found = True
         if promotion_found:
-            move.promotion = Unset
             move.chained_move = None
+        move.promotion = Unset
         return first_move
 
     def load_auto_markers(self, side: Side = Side.ANY) -> None:
