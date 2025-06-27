@@ -516,6 +516,7 @@ class AutoMarkMovement(BaseMovement):
     # (though, if a player leaves such a check unanswered, it does count as a loss).
 
     mark_type = Unset
+    mark_meta = None
 
     def mark(self, pos: Position, piece: Piece, theoretical: bool = True):
         generators = [(self.moves(pos, piece), self.board.auto_markers)]
@@ -526,8 +527,8 @@ class AutoMarkMovement(BaseMovement):
                 if move.pos_to not in markers[piece.side]:
                     markers[piece.side][move.pos_to] = {}
                 if self.mark_type not in markers[piece.side][move.pos_to]:
-                    markers[piece.side][move.pos_to][self.mark_type] = set()
-                markers[piece.side][move.pos_to][self.mark_type].add(pos)
+                    markers[piece.side][move.pos_to][self.mark_type] = {}
+                markers[piece.side][move.pos_to][self.mark_type][pos] = self.mark_meta
 
     def unmark(self, pos: Position, piece: Piece, theoretical: bool = True):
         generators = [(self.moves(pos, piece), self.board.auto_markers)]
@@ -537,7 +538,7 @@ class AutoMarkMovement(BaseMovement):
             for move in moves:
                 if move.pos_to in markers[piece.side]:
                     if self.mark_type in markers[piece.side][move.pos_to]:
-                        markers[piece.side][move.pos_to][self.mark_type].discard(pos)
+                        markers[piece.side][move.pos_to][self.mark_type].pop(pos, None)
                         if not markers[piece.side][move.pos_to][self.mark_type]:
                             del markers[piece.side][move.pos_to][self.mark_type]
                     if not markers[piece.side][move.pos_to]:
@@ -604,6 +605,15 @@ class RangedAutoRiderMovement(RangedAutoCaptureRiderMovement):
 
 class AutoRangedAutoCaptureRiderMovement(AutoMarkMovement, RangedAutoCaptureRiderMovement):
     mark_type = AutoCaptureMovement
+
+    def __init__(
+        self, board: Board,
+        directions: Unpacked[AnyDirection] | None = None,
+        targets: Unpacked[str] | None = None,
+        boundless: int = 0, loop: int = 0
+    ):
+        super().__init__(board, directions, targets, boundless, loop)
+        self.mark_meta = frozenset(self.targets)
 
 
 class AutoRangedRiderMovement(AutoRangedAutoCaptureRiderMovement):
@@ -680,6 +690,7 @@ class AutoRangedConvertRiderMovement(AutoMarkMovement, RangedConvertRiderMovemen
         boundless: int = 0, loop: int = 0
     ):
         super().__init__(board, directions, targets, 1, boundless, loop)
+        self.mark_meta = frozenset(self.targets)
 
     def __copy_args__(self):
         return self.board, unpack(self.directions), unpack(self.targets), self.boundless, self.loop

@@ -3579,29 +3579,37 @@ class Board(Window):
         if move.pos_to in self.auto_markers[side]:
             act_types = self.auto_markers[side][move.pos_to]
             if ConvertMovement in act_types:
-                piece_poss = self.auto_markers[side][move.pos_to][ConvertMovement]
-                piece_pos = sorted(list(piece_poss))[0]
-                piece = self.get_piece(piece_pos)
                 moved = self.get_piece(move.pos_to) if isinstance(move.piece, NoPiece) or move.promotion else move.piece
-                if piece.side == side and piece.captures(moved):
-                    converted = moved.of(side)
-                    converted.set_moves(None)
-                    move.chained_move = Move(
-                        pos_from=move.pos_to, pos_to=move.pos_to,
-                        piece=moved, promotion=converted,
-                        movement_type=ConvertMovement,
-                    )
+                piece_data = self.auto_markers[side][move.pos_to][ConvertMovement]
+                for piece_pos in sorted(list(piece_data)):
+                    if piece_data[piece_pos] and not self.fits_one(piece_data[piece_pos], (), moved):
+                        continue
+                    piece = self.get_piece(piece_pos)
+                    if not piece.side or piece.friendly_of(moved):
+                        continue
+                    if piece.side == side and piece.captures(moved):
+                        converted = moved.of(side)
+                        converted.set_moves(None)
+                        move.chained_move = Move(
+                            pos_from=move.pos_to, pos_to=move.pos_to,
+                            piece=moved, promotion=converted,
+                            movement_type=ConvertMovement,
+                        )
+                        break
             elif AutoCaptureMovement in act_types:
-                piece_poss = self.auto_markers[side][move.pos_to][AutoCaptureMovement]
-                piece_pos = sorted(list(piece_poss))[0]
-                piece = self.get_piece(piece_pos)
                 moved = self.get_piece(move.pos_to) if isinstance(move.piece, NoPiece) or move.promotion else move.piece
-                if piece.side == side and piece.captures(moved):
-                    move.chained_move = Move(
-                        pos_from=piece_pos, pos_to=piece_pos,
-                        piece=piece, captured=moved,
-                        movement_type=AutoCaptureMovement,
-                    )
+                piece_data = self.auto_markers[side][move.pos_to][AutoCaptureMovement]
+                for piece_pos in sorted(list(piece_data)):
+                    if piece_data[piece_pos] and not self.fits_one(piece_data[piece_pos], (), moved):
+                        continue
+                    piece = self.get_piece(piece_pos)
+                    if piece.side == side and piece.captures(moved):
+                        move.chained_move = Move(
+                            pos_from=piece_pos, pos_to=piece_pos,
+                            piece=piece, captured=moved,
+                            movement_type=AutoCaptureMovement,
+                        )
+                        break
         return first_move
 
     def update_promotion_auto_actions(self, move: Move) -> Move:
@@ -3658,7 +3666,7 @@ class Board(Window):
                 if pos not in theoretical:
                     continue
                 for marker_type in theoretical[pos]:
-                    refresh_piece_poss |= theoretical[pos][marker_type]
+                    refresh_piece_poss |= set(theoretical[pos][marker_type])
         for pos in refresh_piece_poss:
             piece = self.get_piece(pos)
             if isinstance(piece.movement, AutoMarkMovement):
