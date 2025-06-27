@@ -493,7 +493,7 @@ class AutoActMovement(BaseMovement):
         return move
 
 
-class RangedAutoActMovement(AutoActMovement, RiderMovement):
+class RangedAutoActRiderMovement(AutoActMovement, RiderMovement):
     # ABC for auto-acting movements that act on all squares they can move to
 
     def moves(self, pos_from: Position, piece: Piece, theoretical: bool = False):
@@ -517,23 +517,31 @@ class AutoMarkMovement(BaseMovement):
 
     mark_type = Unset
 
-    def mark(self, pos: Position, piece: Piece):
-        for move in self.moves(pos, piece, True):
-            if move.pos_to not in self.board.auto_markers[piece.side]:
-                self.board.auto_markers[piece.side][move.pos_to] = {}
-            if self.mark_type not in self.board.auto_markers[piece.side][move.pos_to]:
-                self.board.auto_markers[piece.side][move.pos_to][self.mark_type] = set()
-            self.board.auto_markers[piece.side][move.pos_to][self.mark_type].add(pos)
+    def mark(self, pos: Position, piece: Piece, theoretical: bool = True):
+        generators = [(self.moves(pos, piece), self.board.auto_markers)]
+        if theoretical:
+            generators.append((self.moves(pos, piece, True), self.board.auto_markers_theoretical))
+        for moves, markers in generators:
+            for move in moves:
+                if move.pos_to not in markers[piece.side]:
+                    markers[piece.side][move.pos_to] = {}
+                if self.mark_type not in markers[piece.side][move.pos_to]:
+                    markers[piece.side][move.pos_to][self.mark_type] = set()
+                markers[piece.side][move.pos_to][self.mark_type].add(pos)
 
-    def unmark(self, pos: Position, piece: Piece):
-        for move in self.moves(pos, piece, True):
-            if move.pos_to in self.board.auto_markers[piece.side]:
-                if self.mark_type in self.board.auto_markers[piece.side][move.pos_to]:
-                    self.board.auto_markers[piece.side][move.pos_to][self.mark_type].discard(pos)
-                    if not self.board.auto_markers[piece.side][move.pos_to][self.mark_type]:
-                        del self.board.auto_markers[piece.side][move.pos_to][self.mark_type]
-                if not self.board.auto_markers[piece.side][move.pos_to]:
-                    del self.board.auto_markers[piece.side][move.pos_to]
+    def unmark(self, pos: Position, piece: Piece, theoretical: bool = True):
+        generators = [(self.moves(pos, piece), self.board.auto_markers)]
+        if theoretical:
+            generators.append((self.moves(pos, piece, True), self.board.auto_markers_theoretical))
+        for moves, markers in generators:
+            for move in moves:
+                if move.pos_to in markers[piece.side]:
+                    if self.mark_type in markers[piece.side][move.pos_to]:
+                        markers[piece.side][move.pos_to][self.mark_type].discard(pos)
+                        if not markers[piece.side][move.pos_to][self.mark_type]:
+                            del markers[piece.side][move.pos_to][self.mark_type]
+                    if not markers[piece.side][move.pos_to]:
+                        del markers[piece.side][move.pos_to]
 
     def update(self, move: Move, piece: Piece):
         self.unmark(move.pos_from, piece)
@@ -546,17 +554,28 @@ class AutoMarkMovement(BaseMovement):
         self.mark(move.pos_from, piece)
 
 
-class AutoCaptureMovement(AutoActMovement):
-    # NB: The auto-capture implementation assumes that all pieces that utilize it can never be blocked by another piece.
+class AutoCaptureMovement(RangedAutoActRiderMovement):
+    # NB: The auto-capture implementation assumes that all pieces that utilize it capture up to one piece per direction.
     # This is true for the only army that utilizes this movement type, but it may not work correctly in other scenarios.
 
     default_mark = 't'
+
+    def __init__(
+        self, board: Board,
+        directions: Unpacked[AnyDirection] | None = None,
+        targets: Unpacked[str] | None = None,
+        boundless: int = 0, loop: int = 0
+    ):
+        super().__init__(board, directions, boundless, loop)
+        self.targets = repack(targets or [], list)
 
     def generate(self, move: Move, piece: Piece) -> Move:
         if not move.is_edit:
             captured = []
             for capture in super().moves(move.pos_to, piece):
                 captured_piece = self.board.get_piece(capture.pos_to)
+                if self.targets and not self.board.fits_one(self.targets, (), captured_piece):
+                    continue
                 if piece.captures(captured_piece):
                     captured.append(captured_piece)
             if captured:
@@ -570,16 +589,19 @@ class AutoCaptureMovement(AutoActMovement):
                 ))
         return move
 
+    def __copy_args__(self):
+        return self.board, unpack(self.directions), unpack(self.targets), self.boundless, self.loop
 
-class RangedAutoCaptureRiderMovement(RangedAutoActMovement, AutoCaptureMovement):
-    pass
+
+class RangedAutoCaptureRiderMovement(AutoCaptureMovement):
+    pass  # Alias for AutoCaptureMovement
 
 
 class RangedAutoRiderMovement(RangedAutoCaptureRiderMovement):
     pass  # Alias for RangedAutoCaptureRiderMovement
 
 
-class AutoRangedAutoCaptureRiderMovement(AutoMarkMovement, RangedAutoCaptureRiderMovement):
+class AutoRangedAutoCaptureRiderMovement(AutoMarkMovement, AutoCaptureMovement):
     mark_type = AutoCaptureMovement
 
 
@@ -587,9 +609,19 @@ class AutoRangedRiderMovement(AutoRangedAutoCaptureRiderMovement):
     pass  # Alias for AutoRangedAutoCaptureRiderMovement
 
 
-class ConvertMovement(AutoActMovement):
+class ConvertMovement(RangedAutoActRiderMovement):
     default_mark = 'y'
-    partial_range = False  # whether the conversion is applied if only a part of the range is occupied
+
+    def __init__(
+        self, board: Board,
+        directions: Unpacked[AnyDirection] | None = None,
+        targets: Unpacked[str] | None = None,
+        partial_range: int = 0,
+        boundless: int = 0, loop: int = 0
+    ):
+        super().__init__(board, directions, boundless, loop)
+        self.targets = repack(targets or [], list)
+        self.partial_range = partial_range
 
     def generate(self, move: Move, piece: Piece) -> Move:
         if not move.is_edit:
@@ -597,6 +629,13 @@ class ConvertMovement(AutoActMovement):
             for convert in super().moves(move.pos_to, piece):
                 converted_piece = self.board.get_piece(convert.pos_to)
                 if not converted_piece.side and not self.partial_range:
+                    conversions = {}
+                    break
+                if piece.friendly_of(converted_piece):
+                    continue
+                if self.targets and not self.board.fits_one(self.targets, (), converted_piece):
+                    if self.partial_range:
+                        continue
                     conversions = {}
                     break
                 if piece.captures(converted_piece):
@@ -616,8 +655,48 @@ class ConvertMovement(AutoActMovement):
                     last_chain_move = last_chain_move.chained_move
         return move
 
+    def __copy_args__(self):
+        return self.board, unpack(self.directions), unpack(self.targets), self.partial_range, self.boundless, self.loop
 
-class ReversiRiderMovement(RangedAutoActMovement, ConvertMovement):
+
+class RangedConvertRiderMovement(ConvertMovement):
+    pass  # Alias for ConvertMovement
+
+
+class RangeConvertRiderMovement(RangedConvertRiderMovement):
+    pass  # Alias for RangedConvertRiderMovement
+
+
+class AutoRangedConvertRiderMovement(AutoMarkMovement, ConvertMovement):
+    mark_type = ConvertMovement
+
+    def __init__(
+        self, board: Board,
+        directions: Unpacked[AnyDirection] | None = None,
+        targets: Unpacked[str] | None = None,
+        # NB: non-partial range support for auto-conversion is not implemented
+        boundless: int = 0, loop: int = 0
+    ):
+        super().__init__(board, directions, targets, 1, boundless, loop)
+
+    def __copy_args__(self):
+        return self.board, unpack(self.directions), unpack(self.targets), self.boundless, self.loop
+
+
+class AutoConvertRiderMovement(AutoRangedConvertRiderMovement):
+    pass  # Alias for AutoRangedConvertRiderMovement
+
+
+class ReversiRiderMovement(ConvertMovement):
+    def __init__(
+        self, board: Board,
+        directions: Unpacked[AnyDirection] | None = None,
+        targets: Unpacked[str] | None = None,
+        # NB: partial range support for reversi-style conversion is not implemented
+        boundless: int = 0, loop: int = 0
+    ):
+        super().__init__(board, directions, targets, 0, boundless, loop)
+
     def reversi_initialize(self, direction: AnyDirection, pos_from: Position, piece: Piece) -> None:
         self.data['state'] = 0
 
@@ -631,6 +710,8 @@ class ReversiRiderMovement(RangedAutoActMovement, ConvertMovement):
                     self.data['state'] = -1
                 else:
                     self.data['state'] = 1
+            elif self.targets and not self.board.fits_one(self.targets, (), new_piece):
+                self.data['state'] = -1
             elif not piece.captures(new_piece):
                 self.data['state'] = -1
 
@@ -659,6 +740,8 @@ class ReversiRiderMovement(RangedAutoActMovement, ConvertMovement):
                     for distance in range(1, ddiv(offset, direction)):
                         convert_pos = add(move.pos_to, mul(direction, distance))
                         converted_piece = self.board.get_piece(convert_pos)
+                        if piece.friendly_of(converted_piece):
+                            continue
                         if piece.captures(converted_piece):
                             new_piece = converted_piece.of(piece.side)
                             new_piece.set_moves(None)
@@ -681,41 +764,8 @@ class ReversiRiderMovement(RangedAutoActMovement, ConvertMovement):
                     last_chain_move = last_chain_move.chained_move
         return move
 
-
-class RangedConvertRiderMovement(RangedAutoActMovement, ConvertMovement):
-    def __init__(
-        self, board: Board,
-        directions: Unpacked[AnyDirection] | None = None,
-        partial_range: int = 0, boundless: int = 0, loop: int = 0
-    ):
-        super().__init__(board, directions, boundless, loop)
-        self.partial_range = bool(partial_range)
-
     def __copy_args__(self):
-        return self.board, unpack(self.directions), int(self.partial_range), self.boundless, self.loop
-
-
-class RangeConvertRiderMovement(RangedConvertRiderMovement):
-    pass  # Alias for RangedConvertRiderMovement
-
-
-class AutoRangedConvertRiderMovement(AutoMarkMovement, RangedConvertRiderMovement):
-    mark_type = ConvertMovement
-
-    def __init__(
-        self, board: Board,
-        directions: Unpacked[AnyDirection] | None = None,
-        # NB: non-partial range support for auto-conversion is not implemented yet
-        boundless: int = 0, loop: int = 0
-    ):
-        super().__init__(board, directions, 1, boundless, loop)
-
-    def __copy_args__(self):
-        return self.board, unpack(self.directions), self.boundless, self.loop
-
-
-class AutoConvertRiderMovement(AutoRangedConvertRiderMovement):
-    pass  # Alias for AutoRangedConvertRiderMovement
+        return self.board, unpack(self.directions), unpack(self.targets), self.boundless, self.loop
 
 
 class SwapRiderMovement(RiderMovement):
@@ -1482,16 +1532,22 @@ class MultiActMovement(AutoActMovement, AutoMarkMovement, BaseMultiMovement, Bas
         for movement in self.move:
             for move in movement.moves(pos_from, piece, theoretical):
                 yield move if theoretical else self.generate(move, piece)
-
-    def mark(self, pos: Position, piece: Piece):
+        if not theoretical:
+            return
         for movement in self.act:
             if isinstance(movement, AutoMarkMovement):
-                movement.mark(pos, piece)
+                for move in movement.moves(pos_from, piece, theoretical):
+                    yield move
 
-    def unmark(self, pos: Position, piece: Piece):
+    def mark(self, pos: Position, piece: Piece, theoretical: bool = True):
         for movement in self.act:
             if isinstance(movement, AutoMarkMovement):
-                movement.unmark(pos, piece)
+                movement.mark(pos, piece, theoretical)
+
+    def unmark(self, pos: Position, piece: Piece, theoretical: bool = True):
+        for movement in self.act:
+            if isinstance(movement, AutoMarkMovement):
+                movement.unmark(pos, piece, theoretical)
 
     def __copy_args__(self):
         return self.board, unpack(self.move), unpack(self.act)
@@ -1726,7 +1782,7 @@ class ChoiceMovement(BaseChoiceMovement):
                         mark = 'i!' if invert else 'i'
                         captures = move.captured[:]
                         to_piece = self.board.get_piece(move.pos_to)
-                        if to_piece.side and piece.captures(to_piece):
+                        if to_piece.side and piece.captures(to_piece) and not move.swapped_piece:
                             captures.append(to_piece)
                         if not value:
                             if not captures != invert:
@@ -1736,6 +1792,68 @@ class ChoiceMovement(BaseChoiceMovement):
                         if not theoretical and not legal:
                             continue
                         yield copy(move).set(is_legal=legal).unmark('n').mark(mark)
+
+
+class ChoiceActMovement(AutoActMovement, ChoiceMovement, BaseChainMovement):
+    def __init__(
+        self,
+        board: Board,
+        movements: dict[str, Unpacked[BaseMovement]] | None = None,
+        actions: dict[str, Unpacked[AutoActMovement]] | None = None
+    ):
+        if movements is None:
+            movements = {}
+        if actions is None:
+            actions = {}
+        movement_dict = {key: repack(value, list) for key, value in movements.items()}
+        action_dict = {key: repack(value, list) for key, value in actions.items()}
+        super().__init__(board, {**movement_dict, **action_dict})
+        self.movement_dict = movement_dict
+        self.action_dict = action_dict
+
+    def generate(self, move: Move, piece: Piece) -> Move:
+        if move.is_edit:
+            return move
+        caps = move.captured[:]
+        to_piece = self.board.get_piece(move.pos_to)
+        if to_piece.side and piece.captures(to_piece) and not move.swapped_piece:
+            caps.append(to_piece)
+        splits = [(k, k[1:], True) if k.startswith('!') else (k, k, False) for k in self.action_dict]
+        matches = [k for k, v, i in splits if (
+            (any(piece.captures(x) and self.board.fits(v, x) for x in caps) if v else not caps) != i
+        )]
+        actions = [mv for k in matches for mv in self.action_dict[k] if isinstance(mv, AutoActMovement)]
+        if not actions:
+            return move
+        promotion_piece = self.board.promotion_piece
+        move_chain = self.expand(move)
+        first_pos = move_chain[0].pos_from
+        last_pos = self.advance(move_chain, bool(promotion_piece))
+        full_move = Move(
+            pos_from=first_pos,
+            pos_to=last_pos,
+            piece=piece,
+        )
+        delta_chain = []
+        for movement in actions:
+            self.advance(delta_chain)
+            move_chain += delta_chain
+            delta_chain = self.expand(movement.generate(copy(full_move), piece).chained_move)
+        move = self.contract(move_chain + delta_chain)
+        self.rollback(move_chain, bool(promotion_piece))
+        self.board.promotion_piece = promotion_piece
+        return move
+
+    def moves(self, pos_from: Position, piece: Piece, theoretical: bool = False):
+        for move in super().moves(pos_from, piece, theoretical):
+            yield move if theoretical else self.generate(move, piece)
+
+    def __copy_args__(self):
+        return (
+            self.board,
+            {key: unpack(value) for key, value in self.movement_dict.items()},
+            {key: unpack(value) for key, value in self.action_dict.items()},
+        )
 
 
 class RelayMovement(BaseChoiceMovement, ChangingLegalMovement):

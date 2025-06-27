@@ -259,6 +259,7 @@ def debug_info(board: Board) -> list[str]:
                 debug_log[-1] += " None"
     for section_type, section_data in (
         ('auto-action squares', board.auto_markers),
+        ('theoretical auto-action squares', board.auto_markers_theoretical),
     ):
         for side in board.piece_set_ids:
             side_section_data = section_data.get(side) or {}
