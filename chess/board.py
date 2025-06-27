@@ -3202,6 +3202,8 @@ class Board(Window):
                                 self.load_pieces()
                                 pieces_loaded = True
                             self.load_theoretical_moves(turn_side, False)
+                            self.auto_markers = deepcopy(auto_markers)
+                            self.auto_markers_theoretical = deepcopy(auto_markers_theoretical)
                             self.en_passant_targets = deepcopy(en_passant_targets)
                             self.en_passant_markers = deepcopy(en_passant_markers)
                             self.royal_ep_targets = deepcopy(royal_ep_targets)
@@ -3642,6 +3644,7 @@ class Board(Window):
             if not promotion_found and move.promotion:
                 promotion_found = True
         if promotion_found:
+            move.promotion = Unset
             move.chained_move = None
         return first_move
 
@@ -6398,7 +6401,6 @@ class Board(Window):
                     is_final = True
                 if not issubclass(move.movement_type or type, (CloneMovement, ConvertMovement)):
                     move = self.clear_promotion_auto_actions(move)  # clear the old auto-actions and do not auto-promote
-                    move.promotion = Unset  # we're selecting promotion manually, post-promotion effects must be cleared
                 move = self.move(move)
                 self.update_auto_markers(move, True)
                 move = self.update_auto_actions(move, self.turn_side.opponent())
@@ -6411,16 +6413,10 @@ class Board(Window):
                         if chained_move.promotion is Unset:
                             chained_move.set(promotion=Default)
                         self.log(f"Move: {chained_move}")
-                    last_move = chained_move
+                    if chained_move.chained_move:
+                        chained_move.chained_move = self.move(chained_move.chained_move)
+                        self.update_auto_markers(chained_move.chained_move)
                     chained_move = chained_move.chained_move
-                    if not chained_move:
-                        continue
-                    if not issubclass(chained_move.movement_type or type, (CloneMovement, ConvertMovement)):
-                        chained_move = self.clear_promotion_auto_actions(chained_move)  # clear the old auto-actions and
-                        chained_move.promotion = Unset  # do not auto-promote because we're selecting promotion manually
-                    chained_move = self.move(chained_move)
-                    self.update_auto_markers(chained_move)
-                    last_move.chained_move = chained_move
                 if self.chain_start is None:
                     self.chain_start = deepcopy(move)
                     self.move_history.append(self.chain_start)

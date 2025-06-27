@@ -488,22 +488,31 @@ class RangedCaptureRiderMovement(RangedMovement, RiderMovement):
 class AutoActMovement(BaseMovement):
     # ABC for movements that can automatically act on the board after the move is made
 
-    def generate(self, move: Move, piece: Piece) -> Move:
+    should_generate = True  # Whether the movement should generate actions for its moves
+
+    def apply(self, move: Move, piece: Piece) -> Move:
         # This method should be overridden in subclasses to implement the specific action
+        return move
+
+    def generate(self, move: Move, piece: Piece) -> Move:
+        should_generate = self.should_generate
+        self.should_generate = False
+        move = self.apply(move, piece)
+        self.should_generate = should_generate
         return move
 
 
 class RangedAutoActRiderMovement(AutoActMovement, RiderMovement):
     # ABC for auto-acting movements that act on all squares they can move to
 
-    def moves(self, pos_from: Position, piece: Piece, theoretical: bool = False, generate: bool = True):
+    def moves(self, pos_from: Position, piece: Piece, theoretical: bool = False):
         for move in super().moves(pos_from, piece, theoretical):
             move.movement_type = RiderMovement
-            if not theoretical and generate:
+            if not theoretical and self.should_generate:
                 last_move = move
                 while last_move.chained_move:
                     last_move = last_move.chained_move
-                self.generate(last_move, piece)
+                last_move = self.generate(last_move, piece)
             yield move
 
 
@@ -519,6 +528,8 @@ class AutoMarkMovement(BaseMovement):
     mark_meta = None
 
     def mark(self, pos: Position, piece: Piece, theoretical: bool = True):
+        should_generate = self.should_generate
+        self.should_generate = False
         generators = [(self.moves(pos, piece), self.board.auto_markers)]
         if theoretical:
             generators.append((self.moves(pos, piece, True), self.board.auto_markers_theoretical))
@@ -529,8 +540,11 @@ class AutoMarkMovement(BaseMovement):
                 if self.mark_type not in markers[piece.side][move.pos_to]:
                     markers[piece.side][move.pos_to][self.mark_type] = {}
                 markers[piece.side][move.pos_to][self.mark_type][pos] = self.mark_meta
+        self.should_generate = should_generate
 
     def unmark(self, pos: Position, piece: Piece, theoretical: bool = True):
+        should_generate = self.should_generate
+        self.should_generate = False
         generators = [(self.moves(pos, piece), self.board.auto_markers)]
         if theoretical:
             generators.append((self.moves(pos, piece, True), self.board.auto_markers_theoretical))
@@ -543,6 +557,7 @@ class AutoMarkMovement(BaseMovement):
                             del markers[piece.side][move.pos_to][self.mark_type]
                     if not markers[piece.side][move.pos_to]:
                         del markers[piece.side][move.pos_to]
+        self.should_generate = should_generate
 
     def update(self, move: Move, piece: Piece):
         self.unmark(move.pos_from, piece)
@@ -575,10 +590,10 @@ class RangedAutoCaptureRiderMovement(RangedAutoActRiderMovement, AutoCaptureMove
         super().__init__(board, directions, boundless, loop)
         self.targets = repack(targets or [], list)
 
-    def generate(self, move: Move, piece: Piece) -> Move:
+    def apply(self, move: Move, piece: Piece) -> Move:
         if not move.is_edit:
             captured = []
-            for capture in super().moves(move.pos_to, piece, generate=False):
+            for capture in super().moves(move.pos_to, piece):
                 captured_piece = self.board.get_piece(capture.pos_to)
                 if self.targets and not self.board.fits_one(self.targets, (), captured_piece):
                     continue
@@ -639,10 +654,10 @@ class RangedConvertRiderMovement(RangedAutoActRiderMovement, ConvertMovement):
         self.targets = repack(targets or [], list)
         self.partial_range = partial_range
 
-    def generate(self, move: Move, piece: Piece) -> Move:
+    def apply(self, move: Move, piece: Piece) -> Move:
         if not move.is_edit:
             conversions = {}
-            for convert in super().moves(move.pos_to, piece, generate=False):
+            for convert in super().moves(move.pos_to, piece):
                 converted_piece = self.board.get_piece(convert.pos_to)
                 if not converted_piece.side and not self.partial_range:
                     conversions = {}
@@ -737,7 +752,7 @@ class ReversiRiderMovement(RangedAutoActRiderMovement, ConvertMovement):
         next_pos_to = self.transform(add(move.pos_from, mul(double(direction), self.steps + 1)))
         return self.bound_stop_condition(move, direction, next_pos_to)
 
-    def generate(self, move: Move, piece: Piece) -> Move:
+    def apply(self, move: Move, piece: Piece) -> Move:
         if not move.is_edit:
             self.initialize_direction, old_initialize = self.reversi_initialize, self.initialize_direction
             self.advance_direction, old_advance = self.reversi_advance, self.advance_direction
@@ -748,7 +763,7 @@ class ReversiRiderMovement(RangedAutoActRiderMovement, ConvertMovement):
             for direction in old_directions:
                 self.directions = [direction]
                 direction = piece.side.direction(direction)
-                for convert in super().moves(move.pos_to, piece, generate=False):
+                for convert in super().moves(move.pos_to, piece):
                     offset = sub(convert.pos_to, move.pos_to)
                     for distance in range(1, ddiv(offset, direction)):
                         convert_pos = add(move.pos_to, mul(direction, distance))
@@ -1518,7 +1533,7 @@ class MultiActMovement(AutoActMovement, AutoMarkMovement, BaseMultiMovement, Bas
         self.passive = repack(passive or [], list)
         super().__init__(board, [*self.move, *self.active, *self.passive])
 
-    def generate(self, move: Move, piece: Piece) -> Move:
+    def apply(self, move: Move, piece: Piece) -> Move:
         if move.is_edit:
             return move
         actions = [movement for movement in self.active if isinstance(movement, AutoActMovement)]
@@ -1546,7 +1561,7 @@ class MultiActMovement(AutoActMovement, AutoMarkMovement, BaseMultiMovement, Bas
     def moves(self, pos_from: Position, piece: Piece, theoretical: bool = False):
         for movement in self.move:
             for move in movement.moves(pos_from, piece, theoretical):
-                yield move if theoretical else self.generate(move, piece)
+                yield move if theoretical or not self.should_generate else self.generate(move, piece)
         if not theoretical:
             return
         for movement in [*self.active, *self.passive]:
@@ -1826,7 +1841,7 @@ class ChoiceActMovement(AutoActMovement, ChoiceMovement, BaseChainMovement):
         self.movement_dict = movement_dict
         self.action_dict = action_dict
 
-    def generate(self, move: Move, piece: Piece) -> Move:
+    def apply(self, move: Move, piece: Piece) -> Move:
         if move.is_edit:
             return move
         caps = move.captured[:]
@@ -1861,7 +1876,7 @@ class ChoiceActMovement(AutoActMovement, ChoiceMovement, BaseChainMovement):
 
     def moves(self, pos_from: Position, piece: Piece, theoretical: bool = False):
         for move in super().moves(pos_from, piece, theoretical):
-            yield move if theoretical else self.generate(move, piece)
+            yield move if theoretical or not self.should_generate else self.generate(move, piece)
 
     def __copy_args__(self):
         return (
@@ -2145,7 +2160,7 @@ class TagActMovement(AutoActMovement, TagMovement, BaseChainMovement):
         self.movement_dict = movement_dict
         self.action_dict = action_dict
 
-    def generate(self, move: Move, piece: Piece) -> Move:
+    def apply(self, move: Move, piece: Piece) -> Move:
         if move.is_edit:
             return move
         templates = [template for template in self.action_dict if self.fits(template or '', move.tag or '')]
@@ -2173,7 +2188,7 @@ class TagActMovement(AutoActMovement, TagMovement, BaseChainMovement):
 
     def moves(self, pos_from: Position, piece: Piece, theoretical: bool = False):
         for move in super().moves(pos_from, piece, theoretical):
-            yield move if theoretical else self.generate(move, piece)
+            yield move if theoretical or not self.should_generate else self.generate(move, piece)
 
     def __copy_args__(self):
         return (
