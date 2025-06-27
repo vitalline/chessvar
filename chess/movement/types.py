@@ -554,7 +554,12 @@ class AutoMarkMovement(BaseMovement):
         self.mark(move.pos_from, piece)
 
 
-class AutoCaptureMovement(RangedAutoActRiderMovement):
+class AutoCaptureMovement(BaseMovement):
+    # Used to mark auto-capture moves and as a base class for auto-capturing movement types
+    pass
+
+
+class RangedAutoCaptureRiderMovement(RangedAutoActRiderMovement, AutoCaptureMovement):
     # NB: The auto-capture implementation assumes that all pieces that utilize it capture up to one piece per direction.
     # This is true for the only army that utilizes this movement type, but it may not work correctly in other scenarios.
 
@@ -593,15 +598,11 @@ class AutoCaptureMovement(RangedAutoActRiderMovement):
         return self.board, unpack(self.directions), unpack(self.targets), self.boundless, self.loop
 
 
-class RangedAutoCaptureRiderMovement(AutoCaptureMovement):
-    pass  # Alias for AutoCaptureMovement
-
-
 class RangedAutoRiderMovement(RangedAutoCaptureRiderMovement):
     pass  # Alias for RangedAutoCaptureRiderMovement
 
 
-class AutoRangedAutoCaptureRiderMovement(AutoMarkMovement, AutoCaptureMovement):
+class AutoRangedAutoCaptureRiderMovement(AutoMarkMovement, RangedAutoCaptureRiderMovement):
     mark_type = AutoCaptureMovement
 
 
@@ -609,7 +610,12 @@ class AutoRangedRiderMovement(AutoRangedAutoCaptureRiderMovement):
     pass  # Alias for AutoRangedAutoCaptureRiderMovement
 
 
-class ConvertMovement(RangedAutoActRiderMovement):
+class ConvertMovement(BaseMovement):
+    # Used to mark side-converting moves and as a base class for side-converting movement types
+    pass
+
+
+class RangedConvertRiderMovement(RangedAutoActRiderMovement, ConvertMovement):
     default_mark = 'y'
 
     def __init__(
@@ -659,15 +665,11 @@ class ConvertMovement(RangedAutoActRiderMovement):
         return self.board, unpack(self.directions), unpack(self.targets), self.partial_range, self.boundless, self.loop
 
 
-class RangedConvertRiderMovement(ConvertMovement):
-    pass  # Alias for ConvertMovement
-
-
 class RangeConvertRiderMovement(RangedConvertRiderMovement):
     pass  # Alias for RangedConvertRiderMovement
 
 
-class AutoRangedConvertRiderMovement(AutoMarkMovement, ConvertMovement):
+class AutoRangedConvertRiderMovement(AutoMarkMovement, RangedConvertRiderMovement):
     mark_type = ConvertMovement
 
     def __init__(
@@ -687,15 +689,15 @@ class AutoConvertRiderMovement(AutoRangedConvertRiderMovement):
     pass  # Alias for AutoRangedConvertRiderMovement
 
 
-class ReversiRiderMovement(ConvertMovement):
+class ReversiRiderMovement(RangedAutoActRiderMovement, ConvertMovement):
     def __init__(
         self, board: Board,
         directions: Unpacked[AnyDirection] | None = None,
         targets: Unpacked[str] | None = None,
-        # NB: partial range support for reversi-style conversion is not implemented
         boundless: int = 0, loop: int = 0
     ):
-        super().__init__(board, directions, targets, 0, boundless, loop)
+        super().__init__(board, directions, boundless, loop)
+        self.targets = repack(targets or [], list)
 
     def reversi_initialize(self, direction: AnyDirection, pos_from: Position, piece: Piece) -> None:
         self.data['state'] = 0
