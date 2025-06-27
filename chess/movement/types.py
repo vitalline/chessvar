@@ -1497,16 +1497,18 @@ class MultiActMovement(AutoActMovement, AutoMarkMovement, BaseMultiMovement, Bas
         self,
         board: Board,
         move: Unpacked[BaseMovement] | None = None,
-        act: Unpacked[AutoActMovement | AutoMarkMovement] | None = None
+        active: Unpacked[AutoActMovement | AutoMarkMovement] | None = None,
+        passive: Unpacked[AutoMarkMovement] | None = None,
     ):
         self.move = repack(move or [], list)
-        self.act = repack(act or [], list)
-        super().__init__(board, [*self.move, *self.act])
+        self.active = repack(active or [], list)
+        self.passive = repack(passive or [], list)
+        super().__init__(board, [*self.move, *self.active, *self.passive])
 
     def generate(self, move: Move, piece: Piece) -> Move:
         if move.is_edit:
             return move
-        actions = [movement for movement in self.act if isinstance(movement, AutoActMovement)]
+        actions = [movement for movement in self.active if isinstance(movement, AutoActMovement)]
         if not actions:
             return move
         promotion_piece = self.board.promotion_piece
@@ -1534,23 +1536,23 @@ class MultiActMovement(AutoActMovement, AutoMarkMovement, BaseMultiMovement, Bas
                 yield move if theoretical else self.generate(move, piece)
         if not theoretical:
             return
-        for movement in self.act:
+        for movement in [*self.active, *self.passive]:
             if isinstance(movement, AutoMarkMovement):
                 for move in movement.moves(pos_from, piece, theoretical):
                     yield move
 
     def mark(self, pos: Position, piece: Piece, theoretical: bool = True):
-        for movement in self.act:
+        for movement in [*self.active, *self.passive]:
             if isinstance(movement, AutoMarkMovement):
                 movement.mark(pos, piece, theoretical)
 
     def unmark(self, pos: Position, piece: Piece, theoretical: bool = True):
-        for movement in self.act:
+        for movement in [*self.active, *self.passive]:
             if isinstance(movement, AutoMarkMovement):
                 movement.unmark(pos, piece, theoretical)
 
     def __copy_args__(self):
-        return self.board, unpack(self.move), unpack(self.act)
+        return self.board, unpack(self.move), unpack(self.active), unpack(self.passive)
 
 
 class MultiEnPassantTargetMovement(BaseMultiMovement, TargetMovement):
