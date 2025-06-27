@@ -496,10 +496,10 @@ class AutoActMovement(BaseMovement):
 class RangedAutoActRiderMovement(AutoActMovement, RiderMovement):
     # ABC for auto-acting movements that act on all squares they can move to
 
-    def moves(self, pos_from: Position, piece: Piece, theoretical: bool = False):
+    def moves(self, pos_from: Position, piece: Piece, theoretical: bool = False, generate: bool = True):
         for move in super().moves(pos_from, piece, theoretical):
             move.movement_type = RiderMovement
-            if not theoretical:
+            if not theoretical and generate:
                 last_move = move
                 while last_move.chained_move:
                     last_move = last_move.chained_move
@@ -577,7 +577,7 @@ class RangedAutoCaptureRiderMovement(RangedAutoActRiderMovement, AutoCaptureMove
     def generate(self, move: Move, piece: Piece) -> Move:
         if not move.is_edit:
             captured = []
-            for capture in super().moves(move.pos_to, piece):
+            for capture in super().moves(move.pos_to, piece, generate=False):
                 captured_piece = self.board.get_piece(capture.pos_to)
                 if self.targets and not self.board.fits_one(self.targets, (), captured_piece):
                     continue
@@ -632,7 +632,7 @@ class RangedConvertRiderMovement(RangedAutoActRiderMovement, ConvertMovement):
     def generate(self, move: Move, piece: Piece) -> Move:
         if not move.is_edit:
             conversions = {}
-            for convert in super().moves(move.pos_to, piece):
+            for convert in super().moves(move.pos_to, piece, generate=False):
                 converted_piece = self.board.get_piece(convert.pos_to)
                 if not converted_piece.side and not self.partial_range:
                     conversions = {}
@@ -737,7 +737,7 @@ class ReversiRiderMovement(RangedAutoActRiderMovement, ConvertMovement):
             for direction in old_directions:
                 self.directions = [direction]
                 direction = piece.side.direction(direction)
-                for convert in super().moves(move.pos_to, piece):
+                for convert in super().moves(move.pos_to, piece, generate=False):
                     offset = sub(convert.pos_to, move.pos_to)
                     for distance in range(1, ddiv(offset, direction)):
                         convert_pos = add(move.pos_to, mul(direction, distance))
