@@ -126,6 +126,7 @@ class Board(Window):
         self.promotion_piece = None  # piece that is currently being promoted
         self.promotion_area = {}  # squares to draw possible promotions on
         self.promotion_area_drops = {}  # dropped pieces matching the squares above
+        self.drop_area = {}  # squares to draw captured pieces on in the drop UI
         self.action_count = 0  # current number of actions taken
         self.ply_count = 0  # current overall move number
         self.ply_simulation = 0  # current number of look-ahead moves
@@ -239,6 +240,7 @@ class Board(Window):
         self.is_started = False  # whether a game has been initialized and started
         self.extra_labels = False  # whether to show additional labels on border rows/columns
         self.show_history = False  # whether to show all moves made during the opponent's turn
+        self.show_drops = False  # whether to show a list of all droppable pieces (the drop UI)
         self.row_label_list = []  # labels for the rows
         self.col_label_list = []  # labels for the columns
         self.board_sprite_list = SpriteList()  # sprites for the board squares
@@ -247,6 +249,9 @@ class Board(Window):
         self.piece_sprite_list = SpriteList()  # sprites for the pieces
         self.promotion_area_sprite_list = SpriteList()  # sprites for the promotion area background tiles
         self.promotion_piece_sprite_list = SpriteList()  # sprites for the possible promotion pieces
+        self.drop_area_sprite_list = SpriteList()  # sprites for the drop UI background tiles
+        self.drop_piece_sprite_list = SpriteList()  # sprites for the drop UI captured pieces
+        self.drop_piece_label_list = []  # labels for the drop UI captured piece counts
         self.save_interval = 0  # time since the last autosave
 
         # normalize file paths
@@ -684,6 +689,7 @@ class Board(Window):
         self.clear_en_passant_markers()
         self.clear_auto_markers()
         self.reset_captures()
+        self.update_drops(False)
 
         old_turn_side = self.turn_side
 
@@ -955,6 +961,7 @@ class Board(Window):
         self.clear_relay_markers()
         self.clear_en_passant_markers()
         self.clear_auto_markers()
+        self.update_drops(False)
         self.end_value = 0
         self.end_group = None
         self.end_condition = None
@@ -1378,6 +1385,7 @@ class Board(Window):
         self.clear_en_passant_markers()
         self.clear_auto_markers()
         self.reset_captures()
+        self.update_drops(False)
 
         old_turn_side = self.turn_side
 
@@ -3336,7 +3344,7 @@ class Board(Window):
         pos = self.selected_square or self.hovered_square
         if not pos and self.is_active:
             pos = self.highlight_square
-        if self.on_board(pos) and with_markers:
+        if self.on_board(pos) and pos not in self.drop_area and with_markers:
             piece = self.get_piece(pos)
             if self.hide_move_markers is False or not piece.is_hidden:
                 move_dict = {}
@@ -4268,6 +4276,7 @@ class Board(Window):
     def move(self, move: Move, update: bool = True) -> Move:
         self.skip_caption_update = True
         self.deselect_piece()
+        self.update_drops(False)
         abs_from, abs_to = self.get_absolute(move.pos_from), self.get_absolute(move.pos_to)
         if move.piece is not None and move.pos_to is not None:
             # piece was moved to a different square, set its position to the new square
@@ -4449,6 +4458,7 @@ class Board(Window):
 
     def undo_last_move(self) -> None:
         self.deselect_piece()
+        self.update_drops(False)
         if not self.move_history:
             return
         old_turn_side = self.turn_side
@@ -4562,6 +4572,7 @@ class Board(Window):
 
     def redo_last_move(self) -> None:
         self.deselect_piece()
+        self.update_drops(False)
         piece_was_moved = False
         if self.promotion_piece is not None:
             if self.move_history and self.future_move_history:
@@ -4780,6 +4791,7 @@ class Board(Window):
 
     def advance_turn(self) -> None:
         self.deselect_piece()
+        self.update_drops(False)
         # if we're promoting, we can't advance the turn yet
         if self.promotion_piece:
             self.update_caption()
@@ -4997,6 +5009,12 @@ class Board(Window):
         if piece or hovered_square:
             if not piece:
                 piece = self.get_piece(hovered_square)
+            if self.show_drops and hovered_square in self.drop_area:
+                drop_side, drop_piece, drop_count = self.drop_area[hovered_square]
+                if drop_side and drop_piece:
+                    self.set_caption(f"{prefix} {drop_side} has {drop_count} × {drop_piece.name} in the piece bank")
+                    return
+                piece = self.no_piece
             if not isinstance(piece, NoPiece) and (self.edit_mode or not isinstance(piece, Border)):
                 self.set_caption(f"{prefix} {piece} on {toa(piece.board_pos)}")
                 return
@@ -5220,8 +5238,8 @@ class Board(Window):
         direction = (
             Side.WHITE if piece_pos[0] - self.notation_offset[1] < self.board_height / 2 else Side.BLACK
         ).direction
-        area = len(promotions)
-        area_height = min(len(promotions), max(self.board_height // 2, 1 + isqrt(area - 1)))
+        area = min(len(promotions), self.board_height * self.board_width)
+        area_height = min(area, max(self.board_height // 2, 1 + isqrt(area - 1)))
         area_width = ceil(area / area_height)
         area_origin = piece_pos
         while self.not_on_board((area_origin[0] + direction(area_height - 1), area_origin[1])):
@@ -5243,6 +5261,8 @@ class Board(Window):
         total = 0
         for promotion, drop, pos in zip_longest(promotions, drops, area_squares):
             total += 1
+            if total > len(area_squares):
+                break
             background_sprite = Sprite("assets/util/square.png")
             background_sprite.color = self.color_scheme['promotion_area_color']
             background_sprite.position = self.get_screen_position(pos)
@@ -5253,46 +5273,46 @@ class Board(Window):
             no_promotion = False
             if promotion is None:
                 no_promotion = True
-                promotion_piece = piece.on(pos)
+                new_piece = piece.on(pos)
                 promotion = type(promotion)
             elif not promotion:
                 continue
             elif isinstance(promotion, AbstractPiece):
-                promotion_piece = promotion.of(promotion.side or side).on(pos)
+                new_piece = promotion.of(promotion.side or side).on(pos)
                 promotion = type(promotion)
             else:
-                promotion_piece = promotion(board=self, board_pos=pos, side=side)
-                promotion_piece.set_moves(None)
+                new_piece = promotion(board=self, board_pos=pos, side=side)
+                new_piece.set_moves(None)
             if not self.edit_mode or (self.move_history and ((m := self.move_history[-1]) and m.is_edit != 1)):
-                promoted_from = promotion_piece.promoted_from or piece.promoted_from
+                promoted_from = new_piece.promoted_from or piece.promoted_from
                 if not isinstance(piece, NoPiece):
                     promoted_from = promoted_from or type(piece)
-                if type(promotion_piece) != promoted_from:
-                    promotion_piece.promoted_from = promoted_from
+                if type(new_piece) != promoted_from:
+                    new_piece.promoted_from = promoted_from
             alternate_sprites = True if self.alternate_pieces == 0 else None
-            if isinstance(promotion_piece, Piece):
+            if isinstance(new_piece, Piece):
                 if issubclass(promotion, (King, CBKing)) and promotion not in self.piece_sets[side]:
-                    self.update_piece(promotion_piece, asset_folder='other')
-                elif self.edit_mode and self.edit_piece_set_id is not None and not isinstance(piece, Obstacle):
-                    promotion_piece.should_hide = self.hide_edit_pieces
-                    self.update_piece(promotion_piece, penultima_hide=False, alternate_sprite=alternate_sprites)
+                    self.update_piece(new_piece, asset_folder='other')
+                elif self.edit_mode and self.edit_piece_set_id is not None and not isinstance(new_piece, Obstacle):
+                    new_piece.should_hide = self.hide_edit_pieces
+                    self.update_piece(new_piece, penultima_hide=False, alternate_sprite=alternate_sprites)
                 else:
-                    self.update_piece(promotion_piece, penultima_flip=True, alternate_sprite=alternate_sprites)
-                promotion_piece_size = self.square_size
-                if isinstance(promotion_piece, (Border, Wall, Void)):
-                    promotion_piece_size *= 0.8
-                if isinstance(promotion_piece, Shield):
-                    promotion_piece_size *= 0.9
-                promotion_piece.set_size(promotion_piece_size)
-                promotion_piece.set_color(
+                    self.update_piece(new_piece, penultima_flip=True, alternate_sprite=alternate_sprites)
+                new_piece_size = self.square_size
+                if isinstance(new_piece, (Border, Wall, Void)):
+                    new_piece_size *= 0.8
+                if isinstance(new_piece, Shield):
+                    new_piece_size *= 0.9
+                new_piece.set_size(new_piece_size)
+                new_piece.set_color(
                     self.color_scheme.get(
-                        f"{promotion_piece.side.key()}piece_color",
+                        f"{new_piece.side.key()}piece_color",
                         self.color_scheme['piece_color']
                     ),
                     self.color_scheme['colored_pieces']
                 )
-                self.promotion_piece_sprite_list.append(promotion_piece.sprite)
-            self.promotion_area[pos] = promotion_piece
+                self.promotion_piece_sprite_list.append(new_piece.sprite)
+            self.promotion_area[pos] = new_piece
             if no_promotion:
                 self.promotion_area_drops[pos] = None
             elif drop is not None:
@@ -5453,9 +5473,10 @@ class Board(Window):
         for sprite in self.board_sprite_list:
             position = self.get_board_position(sprite.position)
             sprite.color = self.color_scheme[f"{'light' if self.is_light_square(position) else 'dark'}_square_color"]
-        for sprite in self.promotion_area_sprite_list:
-            sprite.color = self.color_scheme['promotion_area_color']
-        for piece_list in (self.obstacles, self.promotion_area.values()):
+        for sprite_list in (self.promotion_area_sprite_list, self.drop_area_sprite_list):
+            for sprite in sprite_list:
+                sprite.color = self.color_scheme['promotion_area_color']
+        for piece_list in (self.obstacles, self.promotion_area.values(), [x[1] for x in self.drop_area.values()]):
             for piece in piece_list:
                 piece.set_color(
                     self.color_scheme.get(
@@ -5535,6 +5556,7 @@ class Board(Window):
                     self.update_piece(piece, penultima_hide=False, alternate_sprite=alternate_sprites)
                 else:
                     self.update_piece(piece, penultima_flip=True, alternate_sprite=alternate_sprites)
+        self.update_drops()
 
     def update_sprite(
         self,
@@ -5588,6 +5610,7 @@ class Board(Window):
         ):
             for sprite in sprite_list:
                 self.update_sprite(sprite, *args)
+        self.update_drops()
         for label in self.row_label_list:
             position = label.position
             label.font_size = self.square_size / max(2, len(label.text))
@@ -5618,6 +5641,115 @@ class Board(Window):
             if self.alternate_pieces != new_side.value:
                 self.alternate_pieces = new_side.value
                 self.update_pieces()
+
+    def update_drops(self, show: bool | None = None) -> None:
+        if show is not None:
+            if self.show_drops == show:
+                return
+            self.show_drops = show
+        self.drop_area = {}
+        self.drop_area_sprite_list.clear()
+        self.drop_piece_sprite_list.clear()
+        self.drop_piece_label_list.clear()
+        no_drops = True
+        if self.show_drops:
+            origins = {
+                Side.WHITE: (0, 0),
+                Side.BLACK: (self.board_height - 1, self.board_width - 1),
+            }
+            label_kwargs = {
+                'anchor_x': 'center',
+                'anchor_y': 'center',
+                'font_name': 'Courier New',
+                'bold': True,
+                'color': self.color_scheme['text_color'],
+            }
+            piece_scale_ratio = 0.66
+            label_scale_ratio = 0.33
+            for side, pieces in self.captured_pieces.items():
+                if side not in origins:
+                    continue
+                if not pieces:
+                    continue
+                piece_counts = {}
+                for piece_type in pieces:
+                    piece_counts[piece_type] = piece_counts.get(piece_type, 0) + 1
+                if not piece_counts:
+                    continue
+                direction = side.direction
+                area = min(len(piece_counts), (self.board_height // 2) * self.board_width)
+                area_width = min(ceil(len(piece_counts) / self.board_width), 1) * self.board_width
+                area_height = ceil(area / area_width)
+                area_origin = origins[side]
+                area_squares = []
+                for row, col in product(range(area_height), range(area_width)):
+                    current_row = area_origin[0] + direction(row)
+                    current_col = area_origin[1] + direction(col)
+                    area_squares.append((current_row, current_col))
+                total = 0
+                for piece_type, pos in zip_longest(piece_counts, area_squares):
+                    total += 1
+                    if total > len(area_squares):
+                        break
+                    background_sprite = Sprite("assets/util/square.png")
+                    background_sprite.color = self.color_scheme['promotion_area_color']
+                    background_sprite.position = self.get_screen_position(pos)
+                    background_sprite.scale = self.square_size / background_sprite.texture.width
+                    self.drop_area_sprite_list.append(background_sprite)
+                    new_piece = None
+                    if not piece_type:
+                        self.drop_area[pos] = (Side.NONE, None, 0)
+                        continue
+                    elif issubclass(piece_type, AbstractPiece):
+                        new_piece = piece_type(board=self, board_pos=pos, side=side)
+                        new_piece.set_moves(None)
+                    alternate_sprites = True if self.alternate_pieces == 0 else None
+                    if isinstance(new_piece, Piece):
+                        if isinstance(new_piece, (King, CBKing)) and piece_type not in self.piece_sets[side]:
+                            self.update_piece(new_piece, asset_folder='other')
+                        elif (
+                            self.edit_mode and self.edit_piece_set_id is not None
+                            and not isinstance(new_piece, Obstacle)
+                        ):
+                            new_piece.should_hide = self.hide_edit_pieces
+                            self.update_piece(new_piece, penultima_hide=False, alternate_sprite=alternate_sprites)
+                        else:
+                            self.update_piece(new_piece, penultima_flip=True, alternate_sprite=alternate_sprites)
+                        new_piece_size = self.square_size
+                        if isinstance(new_piece, (Border, Wall, Void)):
+                            new_piece_size *= 0.8
+                        if isinstance(new_piece, Shield):
+                            new_piece_size *= 0.9
+                        new_piece.set_size(new_piece_size * piece_scale_ratio)
+                        new_piece.set_color(
+                            self.color_scheme.get(
+                                f"{new_piece.side.key()}piece_color",
+                                self.color_scheme['piece_color']
+                            ),
+                            self.color_scheme['colored_pieces']
+                        )
+                        new_piece.sprite.position = (
+                            new_piece.sprite.position[0] - self.square_size * (1 - piece_scale_ratio) / 2,
+                            new_piece.sprite.position[1] + self.square_size * (1 - piece_scale_ratio) / 2,
+                        )
+                        self.drop_piece_sprite_list.append(new_piece.sprite)
+                    text = str(piece_counts[piece_type])
+                    text_pos = (
+                        background_sprite.position[0] + self.square_size * label_scale_ratio / 2,
+                        background_sprite.position[1] - self.square_size * label_scale_ratio / 2,
+                    )
+                    font_size = self.square_size / len(text) * label_scale_ratio
+                    self.drop_piece_label_list.append(Text(text, *text_pos, font_size=font_size, **label_kwargs))
+                    self.drop_area[pos] = (side, new_piece, piece_counts[piece_type])
+                    no_drops = False
+        if show is not None:
+            if no_drops:
+                self.show_drops = False
+            else:
+                self.deselect_piece()
+                self.skip_caption_update = False
+                self.update_caption()
+
 
     def flip_board(self) -> None:
         self.flip_mode = not self.flip_mode
@@ -5957,7 +6089,7 @@ class Board(Window):
             for label in label_list:
                 label.draw()
         self.board_sprite_list.draw()
-        if not self.promotion_area:
+        if not self.promotion_area and not self.show_drops:
             draw_sprite(self.highlight)
             draw_sprite(self.selection)
         self.move_sprite_list.draw()
@@ -5966,9 +6098,13 @@ class Board(Window):
         if self.active_piece:
             draw_sprite(self.active_piece.sprite)
         self.promotion_area_sprite_list.draw()
-        if self.promotion_area:
+        self.drop_area_sprite_list.draw()
+        if self.promotion_area or self.show_drops:
             draw_sprite(self.highlight)
         self.promotion_piece_sprite_list.draw()
+        self.drop_piece_sprite_list.draw()
+        for label in self.drop_piece_label_list:
+            label.draw()
 
     def on_update(self, delta_time: float) -> None:
         if self.is_trickster_mode():
@@ -6041,6 +6177,8 @@ class Board(Window):
         self.piece_was_selected = False
         if buttons & MOUSE_BUTTON_LEFT:
             self.held_buttons = MOUSE_BUTTON_LEFT
+            if self.show_drops:
+                return
             if self.game_over and not self.edit_mode:
                 return
             pos = self.get_board_position((x, y))
@@ -6131,6 +6269,8 @@ class Board(Window):
             self.clicked_square = pos
         if buttons & MOUSE_BUTTON_RIGHT:
             self.held_buttons = MOUSE_BUTTON_RIGHT
+            if self.show_drops:
+                return
             pos = self.get_board_position((x, y))
             if self.not_on_board(pos):
                 self.deselect_piece()
@@ -6170,6 +6310,9 @@ class Board(Window):
             return
         held_buttons = buttons & self.held_buttons
         self.held_buttons = 0
+        if self.show_drops:
+            self.update_drops(False)
+            return
         if self.edit_mode:
             pos = self.get_board_position((x, y))
             if self.not_on_board(pos):
@@ -6716,6 +6859,7 @@ class Board(Window):
                 self.edit_mode = not self.edit_mode
                 self.log(f"Mode: {'EDIT' if self.edit_mode else 'PLAY'}", False)
                 self.deselect_piece()
+                self.update_drops(False)
                 self.unload_end_data()
                 self.load_pieces()
                 self.load_check()
@@ -6852,19 +6996,22 @@ class Board(Window):
                     )
                 self.reset_custom_data()
                 self.reset_board()
-        if symbol == key.O and modifiers & key.MOD_ACCEL and not partial_move:  # Toggle drops (Crazyhouse mode)
-            self.use_drops = not self.use_drops
-            if self.use_drops:
-                self.log("Info: Drops enabled")
-            else:
-                self.log("Info: Drops disabled")
-            self.future_move_history = []  # we don't know if we can redo all the future moves anymore, so we clear them
-            self.unload_end_data()
-            self.load_pieces()
-            self.load_check()
-            self.load_moves()
-            self.reload_end_data()
-            self.advance_turn()
+        if symbol == key.O:
+            if modifiers & key.MOD_ALT and not self.promotion_piece:  # Toggle drop banks
+                self.update_drops(not self.show_drops)
+            elif modifiers & key.MOD_ACCEL and not partial_move:  # Toggle drops (Crazyhouse mode)
+                self.use_drops = not self.use_drops
+                if self.use_drops:
+                    self.log("Info: Drops enabled")
+                else:
+                    self.log("Info: Drops disabled")
+                self.future_move_history = []  # we don't know if we can redo all the future moves anymore so clear them
+                self.unload_end_data()
+                self.load_pieces()
+                self.load_check()
+                self.load_moves()
+                self.reload_end_data()
+                self.advance_turn()
         if symbol == key.P:  # Promotion
             if self.edit_mode:
                 old_id = self.edit_piece_set_id
@@ -7150,6 +7297,7 @@ class Board(Window):
             moves = self.unique_moves()[self.turn_side]
             if modifiers & key.MOD_SHIFT:  # Random piece
                 self.deselect_piece()
+                self.update_drops(False)
                 if moves:
                     self.log("Info: Selecting a random piece", False)
                     self.select_piece(base_rng.choice(list(moves.keys())))

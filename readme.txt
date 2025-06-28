@@ -58,6 +58,7 @@ Ctrl + Shift + K: show valid moves for current player, theoretical moves for oth
 Alt + K: toggle type-based move markers
 Alt + Shift + K: toggle theoretical move markers
 Ctrl + O: toggle drops (crazyhouse mode)
+Alt + O: toggle drop banks
 
 UI hotkeys:
 Ctrl + [-]: make window smaller (-5px/square)
