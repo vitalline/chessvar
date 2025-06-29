@@ -5010,9 +5010,12 @@ class Board(Window):
             if not piece:
                 piece = self.get_piece(hovered_square)
             if self.show_drops and hovered_square in self.drop_area:
-                drop_side, drop_piece, drop_count = self.drop_area[hovered_square]
-                if drop_side and drop_piece:
-                    self.set_caption(f"{prefix} {drop_side} has {drop_count} × {drop_piece.name} in the piece bank")
+                drop_piece, drop_count = self.drop_area[hovered_square]
+                if drop_piece:
+                    if drop_count == 1:
+                        self.set_caption(f"{prefix} {drop_piece} in the piece bank")
+                    else:
+                        self.set_caption(f"{prefix} {drop_piece} (×{drop_count}) in the piece bank")
                     return
                 piece = self.no_piece
             if not isinstance(piece, NoPiece) and (self.edit_mode or not isinstance(piece, Border)):
@@ -5476,7 +5479,7 @@ class Board(Window):
         for sprite_list in (self.promotion_area_sprite_list, self.drop_area_sprite_list):
             for sprite in sprite_list:
                 sprite.color = self.color_scheme['promotion_area_color']
-        for piece_list in (self.obstacles, self.promotion_area.values(), [x[1] for x in self.drop_area.values()]):
+        for piece_list in (self.obstacles, self.promotion_area.values(), [x[0] for x in self.drop_area.values()]):
             for piece in piece_list:
                 piece.set_color(
                     self.color_scheme.get(
@@ -5698,7 +5701,7 @@ class Board(Window):
                     self.drop_area_sprite_list.append(background_sprite)
                     new_piece = None
                     if not piece_type:
-                        self.drop_area[pos] = (Side.NONE, None, 0)
+                        self.drop_area[pos] = (None, 0)
                         continue
                     elif issubclass(piece_type, AbstractPiece):
                         new_piece = piece_type(board=self, board_pos=pos, side=side)
@@ -5740,17 +5743,16 @@ class Board(Window):
                     )
                     font_size = self.square_size / len(text) * label_scale_ratio
                     self.drop_piece_label_list.append(Text(text, *text_pos, font_size=font_size, **label_kwargs))
-                    self.drop_area[pos] = (side, new_piece, piece_counts[piece_type])
+                    self.drop_area[pos] = (new_piece, piece_counts[piece_type])
                     no_drops = False
         if show is not None:
             if no_drops:
                 self.show_drops = False
             else:
                 self.deselect_piece()
-                self.skip_caption_update = False
-                self.update_caption()
             if self.is_started and show != no_drops:
                 self.log(f"Info: Piece banks {'shown' if show else 'hidden'}", False)
+                self.update_caption()
 
     def flip_board(self) -> None:
         self.flip_mode = not self.flip_mode
