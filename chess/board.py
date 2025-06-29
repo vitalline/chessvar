@@ -5749,7 +5749,8 @@ class Board(Window):
                 self.deselect_piece()
                 self.skip_caption_update = False
                 self.update_caption()
-
+            if self.is_started and show != no_drops:
+                self.log(f"Info: Piece banks {'shown' if show else 'hidden'}", False)
 
     def flip_board(self) -> None:
         self.flip_mode = not self.flip_mode
