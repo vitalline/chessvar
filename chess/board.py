@@ -7423,40 +7423,48 @@ class Board(Window):
     def auto_save(self) -> None:
         self.save(get_file_path('auto', 'json', self.board_config['autosave_path']), auto=True)
 
-    def sync(self, post: bool = False) -> bool | None:
+    def sync(self, get: bool = True, post: bool = False) -> bool | None:
         if not self.board_config['sync_data']:
             return None
-        self.update_caption(string="Getting data...", force=True)
         url = f"{self.board_config['sync_host']}:{self.board_config['sync_port']}"
         ts = datetime.now(UTC).isoformat()
-        r = request('get', url, data={'time': ts})
-        if r.status_code == 200:
-            data = r.json()
-            if data.get('data'):
-                save_data = self.dump_board(data=data['data'], trim=sync_trim_fields)
-                if self.load_board(save_data):
-                    self.log(f"Info: Game data loaded from {url}")
-                    return True
-                else:
-                    self.log(f"Info: Failed to load game data from {url}")
-                    return False
-            elif not post:
-                return None
-        else:
-            self.log(f"Error: Failed to get game data from {url} (status code {r.status_code})")
-            return None
-        self.update_caption(string="Sending data...", force=True)
-        r = request('post', url, data={'time': ts, 'data': self.dump_board(string=False)})
-        if r.status_code == 200:
-            data = r.json()
-            if data.get('saved'):
-                self.log(f"Info: Game data sent to {url}", False)
+        was_active = self.is_active
+        finished = False
+        value = None
+        if was_active:
+            self.deactivate()
+        if get and not finished:
+            self.update_caption(string="Getting data...", force=True)
+            r = request('get', url, data={'time': ts})
+            if r.status_code == 200:
+                data = r.json()
+                if data.get('data') is not None:
+                    save_data = self.dump_board(data=data['data'], trim=sync_trim_fields)
+                    if self.load_board(save_data):
+                        self.log(f"Info: Game data loaded from {url}")
+                        value = True
+                    else:
+                        self.log(f"Info: Failed to load game data from {url}")
+                        value = False
+                    finished = True
             else:
-                self.log(f"Info: Game data needs update from {url}", False)
-                return self.sync()
-        else:
-            self.log(f"Error: Failed to send game data to {url} (status code {r.status_code})")
-        return None
+                self.log(f"Error: Failed to get game data from {url} (status code {r.status_code})")
+                finished = True
+        if post and not finished:
+            self.update_caption(string="Sending data...", force=True)
+            r = request('post', url, data={'time': ts, 'data': self.dump_board(string=False)})
+            if r.status_code == 200:
+                data = r.json()
+                if data.get('saved'):
+                    self.log(f"Info: Game data sent to {url}", False)
+                else:
+                    self.log(f"Info: Game data needs update from {url}", False)
+                    value = self.sync()
+            else:
+                self.log(f"Error: Failed to send game data to {url} (status code {r.status_code})")
+        if was_active:
+            self.activate()
+        return value
 
 
     def log(self, string: str, important: bool = True, *, prefix: str | None = None) -> None:
