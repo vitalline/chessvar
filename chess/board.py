@@ -7043,14 +7043,15 @@ class Board(Window):
                 self.reset_custom_data()
                 self.reset_board()
         if symbol == key.O:
-            if modifiers & key.MOD_ALT and not self.promotion_piece:  # Toggle drop banks
+            if modifiers & key.MOD_ALT:  # Toggle online play
+                self.board_config['sync_data'] = not self.board_config['sync_data']
+                self.log(f"Info: Online mode {'enabled' if self.board_config['sync_data'] else 'disabled'}")
+                self.sync()
+            elif modifiers & key.MOD_SHIFT and not self.promotion_piece:  # Toggle drop banks
                 self.update_drops(not self.show_drops)
             elif modifiers & key.MOD_ACCEL and not partial_move:  # Toggle drops (Crazyhouse mode)
                 self.use_drops = not self.use_drops
-                if self.use_drops:
-                    self.log("Info: Drops enabled")
-                else:
-                    self.log("Info: Drops disabled")
+                self.log(f"Info: Drops {'enabled' if self.use_drops else 'disabled'}")
                 self.future_move_history = []  # we don't know if we can redo all the future moves anymore so clear them
                 self.unload_end_data()
                 self.load_pieces()
@@ -7441,6 +7442,7 @@ class Board(Window):
         url = f"http://{self.board_config['sync_host']}:{self.board_config['sync_port']}/"
         was_active = self.is_active
         finished = False
+        offline = False
         value = None
         if was_active:
             self.deactivate()
@@ -7458,15 +7460,24 @@ class Board(Window):
                             self.log(f"Info: Game data loaded from {url}")
                             value = True
                         else:
-                            self.log(f"Info: Failed to load game data from {url}")
+                            self.log(f"Error: Failed to load game data from {url}")
                             value = False
                         finished = True
                 else:
-                    self.log(f"Error: Failed to get game data from {url} (status code {r.status_code})")
+                    error_message = ''
+                    try:
+                        data = r.json()
+                        if data.get('error'):
+                            error_message = f": {data['error']}"
+                    except JsonDecodeError:
+                        pass
+                    self.log(f"Error: Failed to get game data from {url} (status code {r.status_code}){error_message}")
                     finished = True
+                    offline = True
             except RequestException as e:
                 self.log(f"Error: Failed to get game data from {url} ({e})")
                 finished = True
+                offline = True
         self.sync_timestamp = datetime.now().astimezone(UTC)
         if post and not finished:
             self.update_caption(string="Sending data...", force=True)
@@ -7483,10 +7494,21 @@ class Board(Window):
                         self.log(f"Info: Game data needs update from {url}", False)
                         value = self.sync()
                 else:
-                    self.log(f"Error: Failed to send game data to {url} (status code {r.status_code})")
+                    error_message = ''
+                    try:
+                        data = r.json()
+                        if data.get('error'):
+                            error_message = f": {data['error']}"
+                    except JsonDecodeError:
+                        pass
+                    self.log(f"Error: Failed to send game data to {url} (status code {r.status_code}){error_message}")
+                    offline = True
             except RequestException as e:
-                self.log(f"Error: Failed to get game data from {url} ({e})")
-                finished = True
+                self.log(f"Error: Failed to send game data to {url} ({e})")
+                offline = True
+        if offline:
+            self.board_config['sync_data'] = False
+            self.log("Info: Online mode disabled")
         if was_active:
             self.activate()
         return value

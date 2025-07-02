@@ -58,7 +58,7 @@ Ctrl + Shift + K: show valid moves for current player, theoretical moves for oth
 Alt + K: toggle type-based move markers
 Alt + Shift + K: toggle theoretical move markers
 Ctrl + O: toggle drops (crazyhouse mode)
-Alt + O: toggle drop banks
+Alt + O: toggle server synchronization
 
 UI hotkeys:
 Ctrl + [-]: make window smaller (-5px/square)
@@ -75,6 +75,7 @@ Shift + G: cycle graphics mode forward (+1)
 Ctrl + I: print game information (if applicable)
 Shift + I: toggle intermediate move markers
 Alt + I: toggle labels between board sections
+Shift + O: toggle drop bank visibility
 Alt + V: toggle verbose console output
 ... + Shift: toggle all console output
 
