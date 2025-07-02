@@ -19,6 +19,7 @@ from arcade import key, MOUSE_BUTTON_LEFT, MOUSE_BUTTON_RIGHT, Text
 from arcade import Sprite, SpriteList, View, Window
 from arcade import draw_sprite, get_screens
 from requests import request
+from requests.exceptions import RequestException
 
 from chess.color import colors, default_colors, trickster_colors
 from chess.color import average, darken, desaturate, lighten, saturate
@@ -7426,7 +7427,7 @@ class Board(Window):
     def sync(self, get: bool = True, post: bool = False) -> bool | None:
         if not self.board_config['sync_data']:
             return None
-        url = f"{self.board_config['sync_host']}:{self.board_config['sync_port']}"
+        url = f"http://{self.board_config['sync_host']}:{self.board_config['sync_port']}/"
         ts = datetime.now(UTC).isoformat()
         was_active = self.is_active
         finished = False
@@ -7435,33 +7436,41 @@ class Board(Window):
             self.deactivate()
         if get and not finished:
             self.update_caption(string="Getting data...", force=True)
-            r = request('get', url, data={'time': ts})
-            if r.status_code == 200:
-                data = r.json()
-                if data.get('data') is not None:
-                    save_data = self.dump_board(data=data['data'], trim=sync_trim_fields)
-                    if self.load_board(save_data):
-                        self.log(f"Info: Game data loaded from {url}")
-                        value = True
-                    else:
-                        self.log(f"Info: Failed to load game data from {url}")
-                        value = False
+            try:
+                r = request('get', url, json={'time': ts})
+                if r.status_code == 200:
+                    data = r.json()
+                    if data.get('data') is not None:
+                        save_data = self.dump_board(data=data['data'], trim=sync_trim_fields)
+                        if self.load_board(save_data):
+                            self.log(f"Info: Game data loaded from {url}")
+                            value = True
+                        else:
+                            self.log(f"Info: Failed to load game data from {url}")
+                            value = False
+                        finished = True
+                else:
+                    self.log(f"Error: Failed to get game data from {url} (status code {r.status_code})")
                     finished = True
-            else:
-                self.log(f"Error: Failed to get game data from {url} (status code {r.status_code})")
+            except RequestException as e:
+                self.log(f"Error: Failed to get game data from {url} ({e})")
                 finished = True
         if post and not finished:
             self.update_caption(string="Sending data...", force=True)
-            r = request('post', url, data={'time': ts, 'data': self.dump_board(string=False)})
-            if r.status_code == 200:
-                data = r.json()
-                if data.get('saved'):
-                    self.log(f"Info: Game data sent to {url}", False)
+            try:
+                r = request('post', url, json={'time': ts, 'data': self.dump_board(string=False)})
+                if r.status_code == 200:
+                    data = r.json()
+                    if data.get('saved'):
+                        self.log(f"Info: Game data sent to {url}", False)
+                    else:
+                        self.log(f"Info: Game data needs update from {url}", False)
+                        value = self.sync()
                 else:
-                    self.log(f"Info: Game data needs update from {url}", False)
-                    value = self.sync()
-            else:
-                self.log(f"Error: Failed to send game data to {url} (status code {r.status_code})")
+                    self.log(f"Error: Failed to send game data to {url} (status code {r.status_code})")
+            except RequestException as e:
+                self.log(f"Error: Failed to get game data from {url} ({e})")
+                finished = True
         if was_active:
             self.activate()
         return value
