@@ -6207,6 +6207,8 @@ class Board(Window):
     def on_mouse_press(self, x: int, y: int, buttons: int, modifiers: int) -> None:
         if not self.is_active:
             return
+        if self.sync() is not None:
+            return
         self.piece_was_selected = False
         if buttons & MOUSE_BUTTON_LEFT:
             self.held_buttons = MOUSE_BUTTON_LEFT
@@ -6343,7 +6345,7 @@ class Board(Window):
             return
         held_buttons = buttons & self.held_buttons
         self.held_buttons = 0
-        if self.sync() is not None:
+        if not held_buttons:
             return
         if self.show_drops:
             self.update_drops(False)
