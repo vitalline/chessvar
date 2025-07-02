@@ -106,3 +106,9 @@ AUTO:  Auto-save settings
   - autosave_ply (0):  how many plies should pass between auto-saves
   - autosave_time (0):  how many seconds should pass between auto-saves
   - trim_autosave (False):  whether to remove fields absent from the original save file in auto-saves
+
+SYNC: Server synchronization settings
+  - sync_data (False):  whether to synchronize game data with the server
+  - sync_host (localhost):  synchronization server address
+  - sync_port (58084):  synchronization server port
+  - sync_time (0):  how many seconds should pass between idle sync attempts
