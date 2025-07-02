@@ -943,7 +943,7 @@ class Board(Window):
                     data[f"{k}_state"] = save_rng(rng)
         if not isinstance(trim, bool):
             data = {k: v for k, v in data.items() if k not in trim}
-        elif self.load_dict is not None:
+        elif trim and self.load_dict is not None:
             data = {k: v for k, v in data.items() if k in self.load_dict}
         alias_dict = alias if isinstance(alias, dict) else self.alias_dict
         if recursive is None:
