@@ -1,5 +1,6 @@
 /**/__pycache__/
 /.idea/
+/.venv/
 /assets.*/
 /auto/
 /build/
@@ -7,7 +8,6 @@
 /dist.*/
 /main.build/
 /main.dist/
-/venv/
 /*.bak/
 /**/auto_*.json
 /**/debug_*.log
