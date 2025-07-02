@@ -255,6 +255,7 @@ class Board(Window):
         self.drop_area_sprite_list = SpriteList()  # sprites for the drop UI background tiles
         self.drop_piece_sprite_list = SpriteList()  # sprites for the drop UI captured pieces
         self.drop_piece_label_list = []  # labels for the drop UI captured piece counts
+        self.sync_timestamp = None  # timestamp of the last server sync
         self.save_interval = 0  # time since the last autosave
 
         # normalize file paths
@@ -7428,7 +7429,6 @@ class Board(Window):
         if not self.board_config['sync_data']:
             return None
         url = f"http://{self.board_config['sync_host']}:{self.board_config['sync_port']}/"
-        ts = datetime.now().astimezone(UTC).isoformat()
         was_active = self.is_active
         finished = False
         value = None
@@ -7437,7 +7437,9 @@ class Board(Window):
         if get and not finished:
             self.update_caption(string="Getting data...", force=True)
             try:
-                r = request('get', url, json={'time': ts})
+                r = request('get', url, json={
+                    'time': self.sync_timestamp.isoformat() if self.sync_timestamp else None,
+                })
                 if r.status_code == 200:
                     data = r.json()
                     if data.get('data') is not None:
@@ -7455,10 +7457,14 @@ class Board(Window):
             except RequestException as e:
                 self.log(f"Error: Failed to get game data from {url} ({e})")
                 finished = True
+        self.sync_timestamp = datetime.now().astimezone(UTC)
         if post and not finished:
             self.update_caption(string="Sending data...", force=True)
             try:
-                r = request('post', url, json={'time': ts, 'data': self.dump_board(string=False)})
+                r = request('post', url, json={
+                    'data': self.dump_board(string=False),
+                    'time': self.sync_timestamp.isoformat() if self.sync_timestamp else None,
+                })
                 if r.status_code == 200:
                     data = r.json()
                     if data.get('saved'):
