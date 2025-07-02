@@ -938,10 +938,10 @@ class Board(Window):
                 new_rng = Random(seed)
                 if rng.getstate() != new_rng.getstate():
                     data[f"{k}_state"] = save_rng(rng)
-        if isinstance(trim, bool) and self.load_dict is not None:
-            data = {k: v for k, v in data.items() if k in self.load_dict}
-        else:
+        if not isinstance(trim, bool):
             data = {k: v for k, v in data.items() if k not in trim}
+        elif self.load_dict is not None:
+            data = {k: v for k, v in data.items() if k in self.load_dict}
         alias_dict = alias if isinstance(alias, dict) else self.alias_dict
         if recursive is None:
             recursive = self.board_config['recursive_aliases']
