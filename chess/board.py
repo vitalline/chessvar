@@ -7046,7 +7046,7 @@ class Board(Window):
             if modifiers & key.MOD_ALT:  # Toggle online play
                 self.board_config['sync_data'] = not self.board_config['sync_data']
                 self.log(f"Info: Online mode {'enabled' if self.board_config['sync_data'] else 'disabled'}")
-                self.sync()
+                self.sync(post=True)
             elif modifiers & key.MOD_SHIFT and not self.promotion_piece:  # Toggle drop banks
                 self.update_drops(not self.show_drops)
             elif modifiers & key.MOD_ACCEL and not partial_move:  # Toggle drops (Crazyhouse mode)
