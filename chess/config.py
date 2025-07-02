@@ -65,7 +65,12 @@ DEFAULT_CONFIG = {
         'autosave_ply': 0,
         'autosave_time': 0,
         'trim_autosave': False,
-    }
+    },
+    "SYNC": {
+        'sync_data': False,
+        'sync_host': 'localhost',
+        'sync_port': 58084,
+    },
 }
 
 

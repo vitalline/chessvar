@@ -123,6 +123,17 @@ end_types = {
     }.items() for v in vs
 }
 
+sync_trim_fields = {
+    'window_size',
+    'square_size',
+    'flip_mode',
+    'color_index',
+    'color_scheme',
+    'selection',
+    'alter_pieces',
+    'alter_swap',
+}
+
 
 def expand_types(lst: Collection[str]) -> Collection[str]:
     return chain.from_iterable((p + s for p in ('', prefix_chars['not'])) for s in lst)

@@ -3,7 +3,7 @@ from __future__ import annotations
 from collections import defaultdict
 from collections.abc import Collection, Sequence
 from copy import copy, deepcopy
-from datetime import datetime
+from datetime import datetime, UTC
 from itertools import chain, product, zip_longest
 from json import loads, JSONDecodeError
 from math import ceil, floor, isqrt
@@ -18,16 +18,18 @@ from PIL.ImageColor import getrgb
 from arcade import key, MOUSE_BUTTON_LEFT, MOUSE_BUTTON_RIGHT, Text
 from arcade import Sprite, SpriteList, View, Window
 from arcade import draw_sprite, get_screens
+from requests import request
 
 from chess.color import colors, default_colors, trickster_colors
 from chess.color import average, darken, desaturate, lighten, saturate
 from chess.config import Config
-from chess.data import base_rng, get_set_data, get_set_name
+from chess.data import base_rng, get_set_data, get_set_name, piece_groups
 from chess.data import default_board_width, default_board_height, default_size
 from chess.data import min_width, min_height, min_size, max_size, size_step
-from chess.data import action_types, end_types, piece_groups, penultima_textures
+from chess.data import action_types, end_types, expand_types as ext
+from chess.data import prefix_chars as pch, prefix_types, type_prefixes
 from chess.data import default_rules, default_sub_rules, default_end_rules
-from chess.data import expand_types as ext, prefix_chars as pch, prefix_types, type_prefixes
+from chess.data import penultima_textures, sync_trim_fields
 from chess.debug import debug_info, save_piece_data, save_piece_sets, save_piece_types
 from chess.movement.base import BaseMovement
 from chess.movement.move import Move
@@ -776,12 +778,27 @@ class Board(Window):
         self.update_status()
 
         self.is_started = True
+        self.sync(post=True)
 
-    def dump_board(self, trim: bool = False) -> str:
+    def dump_board(
+        self,
+        data: dict | None = None,
+        trim: bool | Collection[str] = False,
+        alias: bool | dict[str, Any] = True,
+        string: bool = True,
+        unicode: bool = True,
+        compress: int | None = None,
+        recursive: bool | None = None,
+        indent: type(Default) | int | None = Default,
+    ) -> str | dict:
+        no_data = data is None
         wh = self.board_width, self.board_height, *self.notation_offset
         whn = *wh, {}
-        whc = *wh, {k: v for k, v in self.custom_areas.items() if isinstance(v, set)}
-        wha = defaultdict(lambda: whn, {side: (*wh, self.areas.get(side) or {}) for side in (Side.WHITE, Side.BLACK)})
+        whc = *wh, {}
+        wha = defaultdict(lambda: whn)
+        if no_data:
+            whc = *wh, {k: v for k, v in self.custom_areas.items() if isinstance(v, set)}
+            wha = defaultdict(lambda: whn, {s: (*wh, self.areas.get(s) or {}) for s in (Side.WHITE, Side.BLACK)})
         data = {
             'variant': self.custom_variant,
             'info': '\n'.join(self.save_info),
@@ -909,26 +926,34 @@ class Board(Window):
             'set_seed': self.set_seed,
             'roll_seed': self.roll_seed,
             'roll_update': self.board_config['update_roll_seed'],
-        }
-        for k, v in {
-            'chaos': (self.chaos_seed, self.chaos_rng),
-            'set': (self.set_seed, self.set_rng),
-            'roll':  (self.roll_seed, self.roll_rng),
-        }.items():
-            seed, rng = v
-            new_rng = Random(seed)
-            if rng.getstate() != new_rng.getstate():
-                data[f"{k}_state"] = save_rng(rng)
-        if trim and self.load_dict is not None:
+        } if no_data else data
+        if no_data:
+            for k, v in {
+                'chaos': (self.chaos_seed, self.chaos_rng),
+                'set': (self.set_seed, self.set_rng),
+                'roll':  (self.roll_seed, self.roll_rng),
+            }.items():
+                seed, rng = v
+                new_rng = Random(seed)
+                if rng.getstate() != new_rng.getstate():
+                    data[f"{k}_state"] = save_rng(rng)
+        if isinstance(trim, bool) and self.load_dict is not None:
             data = {k: v for k, v in data.items() if k in self.load_dict}
-        if self.alias_dict and self.board_config['recursive_aliases'] is not None:
-            data = {'alias': self.alias_dict, **condense(data, self.alias_dict, self.board_config['recursive_aliases'])}
-        indent = self.board_config['indent']
-        compression = self.board_config['compression']
-        if indent is None:
-            return dumps(data, separators=(',', ':'), indent=indent, ensure_ascii=False)
         else:
-            return dumps(data, compression=compression, indent=indent, ensure_ascii=False)
+            data = {k: v for k, v in data.items() if k not in trim}
+        alias_dict = alias if isinstance(alias, dict) else self.alias_dict
+        if recursive is None:
+            recursive = self.board_config['recursive_aliases']
+        if alias and alias_dict and recursive is not None:
+            data = {'alias': alias_dict, **condense(data, alias_dict, recursive)}
+        if not string:
+            return data
+        indent = self.board_config['indent'] if indent is Default else indent
+        compress = self.board_config['compression'] if compress is None else compress
+        if indent is None:
+            return dumps(data, separators=(',', ':'), indent=indent, ensure_ascii=not unicode)
+        else:
+            return dumps(data, compression=compress, indent=indent, ensure_ascii=not unicode)
 
     def load_board(self, dump: str, with_history: bool = False) -> bool:
         try:
@@ -1449,6 +1474,7 @@ class Board(Window):
         self.update_status()
 
         self.is_started = True
+        self.sync(post=True)
 
     def reset_custom_data(self, rollback: bool = False) -> None:
         if rollback:
@@ -4806,6 +4832,8 @@ class Board(Window):
             self.ply_count % self.board_config['autosave_ply'] == 0
         ):
             self.auto_save()
+        if self.is_started:
+            self.sync(post=True)
         if self.edit_mode:
             self.load_end_conditions()
             self.color_pieces()  # reverting the piece colors to normal in case they were changed
@@ -6313,6 +6341,8 @@ class Board(Window):
             return
         held_buttons = buttons & self.held_buttons
         self.held_buttons = 0
+        if self.sync() is not None:
+            return
         if self.show_drops:
             self.update_drops(False)
             return
@@ -6706,7 +6736,8 @@ class Board(Window):
                     if data is not None:
                         state = '' if isfile(path) else '(deleted) '
                         self.log(f"Info: Reloading last {which} state in {state}\"{path}\"")
-                        self.load_board(data)
+                        if self.load_board(data):
+                            self.sync(post=True)
                 elif isfile(path):  # Reload save file
                     self.log(f"Info: Reloading last {which} file")
                     self.load(path)
@@ -7065,7 +7096,8 @@ class Board(Window):
                     if data is not None:
                         state = '' if isfile(path) else '(deleted) '
                         self.log(f"Info: Reloading last {which} state in {state}\"{path}\"")
-                        self.load_board(data, True)
+                        if self.load_board(data, with_history=True):
+                            self.sync(post=True)
                 elif isfile(path):  # Reload save file
                     self.log(f"Info: Reloading last {which} file")
                     self.load(path, True)
@@ -7357,6 +7389,7 @@ class Board(Window):
                 save_data = file.read()
             load_attempted = True
             if self.load_board(save_data, with_history=update_mode & 1 if should_update else with_history):
+                self.sync(post=True)
                 self.load_path, self.load_name = split(path)
                 if should_update:
                     self.save(path)
@@ -7369,7 +7402,7 @@ class Board(Window):
         if not path:
             return
         path = normalize(path)
-        data = self.dump_board(self.board_config[f"trim_{'auto' * auto}save"])
+        data = self.dump_board(trim=self.board_config[f"trim_{'auto' * auto}save"])
         if auto and data == self.auto_data:
             return
         makedirs(dirname(path), exist_ok=True)
@@ -7389,6 +7422,42 @@ class Board(Window):
 
     def auto_save(self) -> None:
         self.save(get_file_path('auto', 'json', self.board_config['autosave_path']), auto=True)
+
+    def sync(self, post: bool = False) -> bool | None:
+        if not self.board_config['sync_data']:
+            return None
+        self.update_caption(string="Getting data...", force=True)
+        url = f"{self.board_config['sync_host']}:{self.board_config['sync_port']}"
+        ts = datetime.now(UTC).isoformat()
+        r = request('get', url, data={'time': ts})
+        if r.status_code == 200:
+            data = r.json()
+            if data.get('data'):
+                save_data = self.dump_board(data=data['data'], trim=sync_trim_fields)
+                if self.load_board(save_data):
+                    self.log(f"Info: Game data loaded from {url}")
+                    return True
+                else:
+                    self.log(f"Info: Failed to load game data from {url}")
+                    return False
+            elif not post:
+                return None
+        else:
+            self.log(f"Error: Failed to get game data from {url} (status code {r.status_code})")
+            return None
+        self.update_caption(string="Sending data...", force=True)
+        r = request('post', url, data={'time': ts, 'data': self.dump_board(string=False)})
+        if r.status_code == 200:
+            data = r.json()
+            if data.get('saved'):
+                self.log(f"Info: Game data sent to {url}", False)
+            else:
+                self.log(f"Info: Game data needs update from {url}", False)
+                return self.sync()
+        else:
+            self.log(f"Error: Failed to send game data to {url} (status code {r.status_code})")
+        return None
+
 
     def log(self, string: str, important: bool = True, *, prefix: str | None = None) -> None:
         if prefix is None:
