@@ -7428,7 +7428,7 @@ class Board(Window):
         if not self.board_config['sync_data']:
             return None
         url = f"http://{self.board_config['sync_host']}:{self.board_config['sync_port']}/"
-        ts = datetime.now(UTC).isoformat()
+        ts = datetime.now().astimezone(UTC).isoformat()
         was_active = self.is_active
         finished = False
         value = None
