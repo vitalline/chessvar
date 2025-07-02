@@ -256,6 +256,7 @@ class Board(Window):
         self.drop_piece_sprite_list = SpriteList()  # sprites for the drop UI captured pieces
         self.drop_piece_label_list = []  # labels for the drop UI captured piece counts
         self.sync_timestamp = None  # timestamp of the last server sync
+        self.sync_interval = 0  # time since the last server sync
         self.save_interval = 0  # time since the last autosave
 
         # normalize file paths
@@ -685,6 +686,7 @@ class Board(Window):
 
     def reset_board(self, update: bool | None = True, log: bool = True) -> None:
         self.save_interval = 0
+        self.sync_interval = 0
         self.is_started = False
 
         self.hovered_square = None
@@ -979,6 +981,7 @@ class Board(Window):
         }
 
         self.save_interval = 0
+        self.sync_interval = 0
         self.save_loaded = False
         self.is_started = False
         success = True
@@ -1404,6 +1407,7 @@ class Board(Window):
 
     def empty_board(self) -> None:
         self.save_interval = 0
+        self.sync_interval = 0
         self.is_started = False
 
         self.hovered_square = None
@@ -6144,9 +6148,13 @@ class Board(Window):
             self.trickster_color_delta += delta_time
             self.trickster_angle_delta += delta_time
         self.save_interval += delta_time
+        self.sync_interval += delta_time
         if self.board_config['autosave_time'] and self.save_interval >= self.board_config['autosave_time']:
             self.save_interval %= self.board_config['autosave_time']
             self.auto_save()
+        if self.board_config['sync_time'] and self.sync_interval >= self.board_config['sync_time']:
+            self.sync_interval %= self.board_config['sync_time']
+            self.sync()
 
     def on_resize(self, width: int, height: int) -> None:
         self.skip_mouse_move = 2

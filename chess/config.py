@@ -70,6 +70,7 @@ DEFAULT_CONFIG = {
         'sync_data': False,
         'sync_host': 'localhost',
         'sync_port': 58084,
+        'sync_time': 0,
     },
 }
 
