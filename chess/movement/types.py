@@ -595,10 +595,11 @@ class RangedAutoCaptureRiderMovement(RangedAutoActRiderMovement, AutoCaptureMove
             captured = []
             for capture in super().moves(move.pos_to, piece):
                 captured_piece = self.board.get_piece(capture.pos_to)
-                if self.targets and not self.board.fits_one(self.targets, (), captured_piece):
+                if not piece.captures(captured_piece):
                     continue
-                if piece.captures(captured_piece):
-                    captured.append(captured_piece)
+                if self.targets and not self.board.fits_one(self.targets, (), captured_piece, piece):
+                    continue
+                captured.append(captured_piece)
             if captured:
                 last_chain_move = move
                 while last_chain_move.chained_move:
@@ -664,19 +665,23 @@ class RangedConvertRiderMovement(RangedAutoActRiderMovement, ConvertMovement):
                     break
                 if piece.friendly_of(converted_piece):
                     continue
-                if self.targets and not self.board.fits_one(self.targets, (), converted_piece):
+                if not piece.captures(converted_piece):
                     if self.partial_range:
                         continue
                     conversions = {}
                     break
-                if piece.captures(converted_piece):
-                    new_piece = converted_piece.of(piece.side)
-                    new_piece.set_moves(None)
-                    conversions[convert.pos_to] = Move(
-                        pos_from=convert.pos_to, pos_to=convert.pos_to,
-                        piece=converted_piece, promotion=new_piece,
-                        movement_type=ConvertMovement,
-                    )
+                if self.targets and not self.board.fits_one(self.targets, (), converted_piece, piece):
+                    if self.partial_range:
+                        continue
+                    conversions = {}
+                    break
+                new_piece = converted_piece.of(piece.side)
+                new_piece.set_moves(None)
+                conversions[convert.pos_to] = Move(
+                    pos_from=convert.pos_to, pos_to=convert.pos_to,
+                    piece=converted_piece, promotion=new_piece,
+                    movement_type=ConvertMovement,
+                )
             if conversions:
                 last_chain_move = move
                 while last_chain_move.chained_move:
@@ -738,9 +743,9 @@ class ReversiRiderMovement(RangedAutoActRiderMovement, ConvertMovement):
                     self.data['state'] = -1
                 else:
                     self.data['state'] = 1
-            elif self.targets and not self.board.fits_one(self.targets, (), new_piece):
-                self.data['state'] = -1
             elif not piece.captures(new_piece):
+                self.data['state'] = -1
+            elif self.targets and not self.board.fits_one(self.targets, (), new_piece, piece):
                 self.data['state'] = -1
 
     def reversi_skip(self, move: Move, direction: AnyDirection, piece: Piece, theoretical: bool = False) -> bool:
@@ -968,17 +973,37 @@ class EnPassantTargetRiderMovement(RiderMovement, TargetMovement):
 
 
 class EnPassantRiderMovement(RiderMovement):
+    def __init__(
+        self, board: Board,
+        directions: Unpacked[AnyDirection] | None = None,
+        targets: Unpacked[str] | None = None,
+        boundless: int = 0, loop: int = 0
+    ):
+        super().__init__(board, directions, boundless, loop)
+        self.targets = repack(targets or [], list)
+
     def moves(self, pos_from: Position, piece: Piece, theoretical: bool = False):
         for move in super().moves(pos_from, piece, theoretical):
             move.movement_type = RiderMovement
             if not theoretical:
                 if ep_targets := self.board.en_passant_markers.get(piece.side.opponent(), {}).get(move.pos_to, set()):
+                    captured = []
+                    for pos in ep_targets:
+                        captured_piece = self.board.get_piece(pos)
+                        if not piece.captures(captured_piece):
+                            continue
+                        if self.targets and not self.board.fits_one(self.targets, (), captured_piece, piece):
+                            continue
+                        captured.append(captured_piece)
                     move.set(
-                        captured=move.captured + [self.board.get_piece(pos) for pos in ep_targets],
+                        captured=move.captured + captured,
                         movement_type=type(self),
                     )
                     move.mark('f')
             yield move
+
+    def __copy_args__(self):
+        return self.board, unpack(self.directions), unpack(self.targets), self.boundless, self.loop
 
 
 class AbsoluteMovement(RiderMovement):
