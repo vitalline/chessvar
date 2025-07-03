@@ -48,7 +48,7 @@ SEED:  Randomization settings
 SKIP:  Granular options for automatically making forced moves
   - fast_moves (False):  if there is one legal move, make it
   - fast_chain (True):  same as fast_moves, but only for move chain continuations
-  - fast_drops (False):  if only one drop to the selected square is available, make it
+  - fast_drops (True):  if only one drop to the selected square is available, make it
   - fast_promotion (True):  if only one promotion of the moving piece is available, make it
   - fast_sequences (True):  same as fast_moves, but only for subsequent moves by the same player
   - fast_turn_pass (True):  if the only legal option is to pass the turn, do so
