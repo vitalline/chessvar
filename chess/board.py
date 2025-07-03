@@ -7463,6 +7463,8 @@ class Board(Window):
                             self.log(f"Error: Failed to load game data from {url}")
                             value = False
                         finished = True
+                    if data.get('time') is not None:
+                        self.sync_timestamp = datetime.fromisoformat(data['time']).astimezone(UTC)
                 else:
                     error_message = ''
                     try:
@@ -7478,8 +7480,8 @@ class Board(Window):
                 self.log(f"Error: Failed to get game data from {url} ({e})")
                 finished = True
                 offline = True
-        self.sync_timestamp = datetime.now().astimezone(UTC)
         if post and not finished:
+            self.sync_timestamp = datetime.now().astimezone(UTC)
             self.update_caption(string="Sending data...", force=True)
             try:
                 r = request('post', url, json={
