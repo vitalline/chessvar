@@ -32,7 +32,7 @@ DEFAULT_CONFIG = {
     "SKIP": {
         'fast_moves': False,
         'fast_chain': True,
-        'fast_drops': False,
+        'fast_drops': True,
         'fast_promotion': True,
         'fast_sequences': True,
         'fast_turn_pass': True,
