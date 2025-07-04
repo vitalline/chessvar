@@ -7440,12 +7440,9 @@ class Board(Window):
         if not self.board_config['sync_data']:
             return None
         url = f"http://{self.board_config['sync_host']}:{self.board_config['sync_port']}/"
-        was_active = self.is_active
         finished = False
         offline = False
         value = None
-        if was_active:
-            self.deactivate()
         if get and not finished:
             self.update_caption(string="Getting data...", force=True)
             try:
@@ -7456,12 +7453,17 @@ class Board(Window):
                     data = r.json()
                     if data.get('data') is not None:
                         save_data = self.dump_board(data=data['data'], trim=sync_trim_fields)
+                        was_active = self.is_active
+                        if was_active:
+                            self.deactivate()
                         if self.load_board(save_data):
                             self.log(f"Info: Game data loaded from {url}")
                             value = True
                         else:
                             self.log(f"Error: Failed to load game data from {url}")
                             value = False
+                        if was_active:
+                            self.activate()
                         finished = True
                     if data.get('time') is not None:
                         self.sync_timestamp = datetime.fromisoformat(data['time']).astimezone(UTC)
@@ -7511,8 +7513,6 @@ class Board(Window):
         if offline:
             self.board_config['sync_data'] = False
             self.log("Info: Online mode disabled")
-        if was_active:
-            self.activate()
         return value
 
 
