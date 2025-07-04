@@ -7513,6 +7513,7 @@ class Board(Window):
         if offline:
             self.board_config['sync_data'] = False
             self.log("Info: Online mode disabled")
+        self.update_caption()
         return value
 
 
