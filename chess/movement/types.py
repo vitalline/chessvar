@@ -1020,7 +1020,7 @@ class AbsoluteMovement(RiderMovement):
             pos_to = self.transform(pos_to)
             if self.stay or pos_to != pos_from:
                 to_piece = self.board.get_piece(pos_to)
-                if piece.blocked_by(to_piece):
+                if not theoretical and piece.blocked_by(to_piece):
                     continue
                 move = Move(pos_from=pos_from, pos_to=pos_to, movement_type=type(self)).mark(self.default_mark)
                 yield from self.chain(move, piece, theoretical)
