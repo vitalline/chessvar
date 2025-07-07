@@ -847,7 +847,7 @@ class TargetMovement(BaseMovement):
             marker_dict.setdefault(pos, set()).add(target_pos)
 
 
-class CastlingMovement(TargetMovement):
+class CastlingMovement(TargetMovement, ChangingMovement):
     def __init__(
         self,
         board: Board,
@@ -995,11 +995,12 @@ class EnPassantRiderMovement(RiderMovement):
                         if self.targets and not self.board.fits_one(self.targets, (), captured_piece, piece):
                             continue
                         captured.append(captured_piece)
-                    move.set(
-                        captured=move.captured + captured,
-                        movement_type=type(self),
-                    )
-                    move.mark('f')
+                    if captured:
+                        move.set(
+                            captured=move.captured + captured,
+                            movement_type=type(self),
+                        )
+                        move.mark('f')
             yield move
 
     def __copy_args__(self):
@@ -1824,7 +1825,7 @@ class BaseChoiceMovement(BaseMultiMovement):
         return self.board, {key: unpack(value) for key, value in self.movement_dict.items()}
 
 
-class ChoiceMovement(BaseChoiceMovement):
+class ChoiceMovement(BaseChoiceMovement, ChangingLegalMovement):
     def moves(self, pos_from: Position, piece: Piece, theoretical: bool = False):
         for key in self.movement_dict:
             value, invert = (key[1:], True) if key.startswith('!') else (key, False)
