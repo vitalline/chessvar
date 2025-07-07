@@ -209,6 +209,20 @@ class AbstractPiece(object, metaclass=PieceMeta):
         return cls.__name__.startswith(CUSTOM_PREFIX)
 
     @classmethod
+    def groups(cls) -> list[str]:
+        return sorted(cls.group_data or ())
+
+    @classmethod
+    def add_group(cls, group: str) -> None:
+        if cls.group_data is None:
+            cls.group_data = set()
+        cls.group_data.add(group)
+
+    @classmethod
+    def clear_groups(cls) -> None:
+        cls.group_data = None
+
+    @classmethod
     def type_str(cls) -> str | None:
         if cls.type_data is None:
             if cls.is_custom():
@@ -216,10 +230,6 @@ class AbstractPiece(object, metaclass=PieceMeta):
             else:
                 cls.type_data = f"{cls.__module__.rsplit('.', 1)[-1]}.{cls.__name__}"
         return cls.type_data
-
-    @classmethod
-    def group_str(cls) -> str | None:
-        return cls.group_data
 
 
 class Piece(AbstractPiece):

@@ -479,8 +479,8 @@ class Board(Window):
             yield from (pch['side'] + data.name.lower(), pch['side'] + str(data.value))
         elif isinstance(data, type):
             if issubclass(data, AbstractPiece):
-                if data.group_str():
-                    yield pch['group'] + data.group_str()
+                for group in data.groups():
+                    yield pch['group'] + group
                 if data.name:
                     yield pch['name'] + data.name
                 if data.type_str():
@@ -1132,7 +1132,7 @@ class Board(Window):
         }
         for group, piece_list in self.piece_groups.items():
             for piece_type in piece_list:
-                piece_type.group_data = group
+                piece_type.add_group(group)
         self.piece_limits = {
             Side(int(k)) if k.isdigit() else k: {g: v for g, v in d.items()} if k.isdigit() else d
             for k, d in data.get('limits', {}).items()
@@ -1501,7 +1501,7 @@ class Board(Window):
         self.custom_end_rules = {}
         for group, piece_list in self.piece_groups.items():
             for piece_type in piece_list:
-                piece_type.group_data = None
+                piece_type.clear_groups()
         self.piece_groups = {}
         self.piece_limits = {}
         if self.color_index is None:
