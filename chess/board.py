@@ -3298,6 +3298,7 @@ class Board(Window):
         self.check_side = check_side
         self.check_groups = copy(check_groups)
         self.end_data = end_data
+        self.update_caption()
 
     def unique_moves(self, side: Side | None = None) -> dict[Side, dict[Position, list[Move]]]:
         if side is None:
