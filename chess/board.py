@@ -115,6 +115,7 @@ class Board(Window):
         self.save_name = ''  # name of the last saved data file
         self.save_path = str(join(base_dir, self.board_config['save_path']))  # directory of the last saved file
         self.save_info = []  # list of comment strings in save data
+        self.save_imported = False  # whether a save was successfully imported
         self.save_loaded = False  # whether a save was successfully loaded
         self.game_loaded = False  # whether the game had successfully loaded
         self.skip_mouse_move = 0  # setting this to >=1 skips mouse movement events
@@ -304,8 +305,8 @@ class Board(Window):
             save_path = argv[1]
         elif save_name := self.board_config['load_save'].strip():
             save_path = join(self.load_path, save_name + ('.json' if '.' not in save_name else ''))
-        self.load(save_path)
-        if not self.save_loaded:
+        load_attempted = self.load(save_path)
+        if not load_attempted or not self.save_imported:
             self.reset_custom_data()
             self.reset_board()
             self.log_special_modes()
@@ -960,6 +961,9 @@ class Board(Window):
             return dumps(data, compression=compress, indent=indent, ensure_ascii=not unicode)
 
     def load_board(self, dump: str, with_history: bool = False) -> bool:
+        self.save_imported = False
+        self.save_loaded = False
+
         try:
             data = loads(dump)
         except JSONDecodeError:
@@ -982,7 +986,6 @@ class Board(Window):
 
         self.save_interval = 0
         self.sync_interval = 0
-        self.save_loaded = False
         self.is_started = False
         success = True
 
@@ -1401,7 +1404,8 @@ class Board(Window):
         self.load_data = dump
         self.load_dict = data
         self.is_started = True
-        self.save_loaded = True
+        self.save_imported = True
+        self.save_loaded = success
 
         return success
 
@@ -6108,7 +6112,7 @@ class Board(Window):
         self.log(f"Info: Resized to {self.width}x{self.height}", False)
 
     def set_visible(self, visible: bool = True) -> None:
-        if self.board_config['update_mode'] < 0 and self.load_data is None:
+        if self.board_config['update_mode'] < 0 and not self.is_started:
             visible = False
         super().set_visible(visible)
 
@@ -6748,12 +6752,16 @@ class Board(Window):
                     data = self.save_data if modifiers & key.MOD_SHIFT else self.load_data
                     if data is not None:
                         state = '' if isfile(path) else '(deleted) '
-                        self.log(f"Info: Reloading last {which} state in {state}\"{path}\"")
+                        self.log(f"Info: Loading from last {which} state in {state}\"{path}\"")
                         if self.load_board(data):
                             self.sync(post=True)
                 elif isfile(path):  # Reload save file
-                    self.log(f"Info: Reloading last {which} file")
-                    self.load(path)
+                    self.log(f"Info: Loading from last {which} file")
+                    if self.load(path):
+                        if not self.save_imported:
+                            self.reset_custom_data(True)
+                            self.reset_board()
+                            self.log_special_modes()
                 else:
                     self.log(f"Error: Last {which} file not found at \"{path}\"")
             elif modifiers & key.MOD_SHIFT:  # Randomize piece sets
@@ -7105,16 +7113,20 @@ class Board(Window):
                 path = normalize(path) if path else None
                 if not path:
                     self.log(f"Error: No file {which} yet")
-                elif modifiers & key.MOD_ACCEL:  # Reload save data
+                elif modifiers & key.MOD_ACCEL:  # Reload save data (with history)
                     data = self.save_data if modifiers & key.MOD_SHIFT else self.load_data
                     if data is not None:
                         state = '' if isfile(path) else '(deleted) '
                         self.log(f"Info: Reloading last {which} state in {state}\"{path}\"")
                         if self.load_board(data, with_history=True):
                             self.sync(post=True)
-                elif isfile(path):  # Reload save file
+                elif isfile(path):  # Reload save file (with history)
                     self.log(f"Info: Reloading last {which} file")
-                    self.load(path, True)
+                    if self.load(path, True):
+                        if not self.save_imported:
+                            self.reset_custom_data(True)
+                            self.reset_board()
+                            self.log_special_modes()
                 else:
                     self.log(f"Error: Last {which} file not found at \"{path}\"")
             elif modifiers & key.MOD_ACCEL and not modifiers & key.MOD_SHIFT:  # Flip board
@@ -7313,11 +7325,11 @@ class Board(Window):
                 else:
                     load_path = load_menu(self.load_path, self.load_name or None)
                 if load_path:
-                    self.load(load_path, with_history=bool(modifiers & key.MOD_SHIFT))
-                    if not self.save_loaded:
-                        self.reset_custom_data(True)
-                        self.reset_board()
-                        self.log_special_modes()
+                    if self.load(load_path, with_history=bool(modifiers & key.MOD_SHIFT)):
+                        if not self.save_imported:
+                            self.reset_custom_data(True)
+                            self.reset_board()
+                            self.log_special_modes()
                 else:
                     self.log("Info: Loading cancelled", False)
                 self.activate()
@@ -7663,7 +7675,7 @@ class Board(Window):
         self.log(f"Info: Configuration saved to \"{save_path}\"", False)
 
     def run(self, view: View | None = None) -> None:
-        if self.board_config['update_mode'] < 0 and self.load_data is not None:
+        if self.board_config['update_mode'] < 0 and self.save_loaded:
             self.close()
         else:
             self.set_visible()
