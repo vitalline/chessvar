@@ -3374,6 +3374,7 @@ class Board(Window):
 
     def show_moves(self, with_markers: bool | None = None, with_move: bool | None = None) -> None:
         self.hide_moves()
+        self.skip_caption_update = False
         self.update_caption()
         move_sprites = dict()
         if with_markers is None:

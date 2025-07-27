@@ -123,11 +123,12 @@ class RiderMovement(BaseMovement):
     def chain(self, move: Move, piece: Piece, theoretical: bool = False):
         if not theoretical:
             if royal_ep_targets := self.board.royal_ep_markers.get(piece.side.opponent(), {}).get(move.pos_to, set()):
+                royal_ep_captured = [self.board.get_piece(pos) for pos in royal_ep_targets]
                 for chained_move in (
                     Move(
                         pos_from=move.pos_to, pos_to=move.pos_to,
                         movement_type=RoyalEnPassantMovement, piece=piece,
-                        captured=[self.board.get_piece(pos) for pos in royal_ep_targets],
+                        captured=[captured for captured in royal_ep_captured if piece.captures(captured)],
                     ).mark(self.default_mark),
                     Move(
                         pos_from=move.pos_to, pos_to=move.pos_to,
@@ -338,11 +339,14 @@ class ProximityRiderMovement(RiderMovement):
 
     def initialize_direction(self, direction: AnyDirection, pos_from: Position, piece: Piece) -> None:
         self.data['captured'] = None
+        self.data['royal_ep'] = None
         if self.distance < 0:
             capture_pos = self.transform(add(pos_from, mul(double(direction), self.distance)))
             capture = self.board.get_piece(capture_pos)
             if piece.captures(capture):
                 self.data['captured'] = capture
+            if royal_ep_targets := self.board.royal_ep_markers.get(piece.side.opponent(), {}).get(capture_pos, set()):
+                self.data['royal_ep'] = list(royal_ep_targets)
 
     def advance_direction(self, move: Move, direction: AnyDirection, pos_from: Position, piece: Piece) -> None:
         if self.distance > 0:
@@ -350,6 +354,8 @@ class ProximityRiderMovement(RiderMovement):
             capture = self.board.get_piece(capture_pos)
             if piece.captures(capture):
                 self.data['captured'] = capture
+            if royal_ep_targets := self.board.royal_ep_markers.get(piece.side.opponent(), {}).get(capture_pos, set()):
+                self.data['royal_ep'] = list(royal_ep_targets)
 
     def stop_condition(self, move: Move, direction: AnyDirection, piece: Piece, theoretical: bool = False) -> bool:
         if not theoretical:
@@ -362,6 +368,27 @@ class ProximityRiderMovement(RiderMovement):
         for move in super().moves(pos_from, piece, theoretical):
             if not theoretical and self.data['captured']:
                 move.set(captured=self.data['captured'])
+            yield move
+
+    def chain(self, move: Move, piece: Piece, theoretical: bool = False):
+        if not theoretical:
+            if royal_ep_targets := self.data['royal_ep']:
+                royal_ep_captured = [self.board.get_piece(pos) for pos in royal_ep_targets]
+                for chained_move in (
+                    Move(
+                        pos_from=move.pos_to, pos_to=move.pos_to,
+                        movement_type=RoyalEnPassantMovement, piece=piece,
+                        captured=[captured for captured in royal_ep_captured if piece.captures(captured)],
+                    ).mark(self.default_mark),
+                    Move(
+                        pos_from=move.pos_to, pos_to=move.pos_to,
+                        movement_type=move.movement_type, piece=piece,
+                    ).mark(self.default_mark),
+                ):
+                    yield copy(move).set(chained_move=chained_move)
+            else:
+                yield move
+        else:
             yield move
 
     def __copy_args__(self):
