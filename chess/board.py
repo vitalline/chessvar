@@ -4844,7 +4844,7 @@ class Board(Window):
         ):
             self.auto_save()
         if self.is_started:
-            self.sync(post=True)
+            self.sync(get=True, post=True)
         if self.edit_mode:
             self.load_end_conditions()
             self.color_pieces()  # reverting the piece colors to normal in case they were changed
@@ -6159,7 +6159,7 @@ class Board(Window):
             self.auto_save()
         if self.board_config['sync_time'] and self.sync_interval >= self.board_config['sync_time']:
             self.sync_interval %= self.board_config['sync_time']
-            self.sync()
+            self.sync(get=True)
 
     def on_resize(self, width: int, height: int) -> None:
         self.skip_mouse_move = 2
@@ -6220,7 +6220,7 @@ class Board(Window):
     def on_mouse_press(self, x: int, y: int, buttons: int, modifiers: int) -> None:
         if not self.is_active:
             return
-        if self.sync() is not None:
+        if self.sync(get=True) is not None:
             return
         self.piece_was_selected = False
         if buttons & MOUSE_BUTTON_LEFT:
@@ -7055,7 +7055,7 @@ class Board(Window):
             if modifiers & key.MOD_ALT:  # Toggle online play
                 self.board_config['sync_data'] = not self.board_config['sync_data']
                 self.log(f"Info: Online mode {'enabled' if self.board_config['sync_data'] else 'disabled'}")
-                self.sync(post=True)
+                self.sync(get=True, post=True)
             elif modifiers & key.MOD_SHIFT and not self.promotion_piece:  # Toggle drop banks
                 self.update_drops(not self.show_drops)
             elif modifiers & key.MOD_ACCEL and not partial_move:  # Toggle drops (Crazyhouse mode)
@@ -7449,7 +7449,7 @@ class Board(Window):
     def auto_save(self) -> None:
         self.save(get_file_path('auto', 'json', self.board_config['autosave_path']), auto=True)
 
-    def sync(self, get: bool = True, post: bool = False) -> bool | None:
+    def sync(self, get: bool = False, post: bool = False) -> bool | None:
         if not self.board_config['sync_data']:
             return None
         url = f"http://{self.board_config['sync_host']}:{self.board_config['sync_port']}/"
@@ -7509,7 +7509,7 @@ class Board(Window):
                         self.log(f"Info: Game data sent to {url}", False)
                     else:
                         self.log(f"Info: Game data needs update from {url}", False)
-                        value = self.sync()
+                        value = self.sync(get=True)
                 else:
                     error_message = ''
                     try:
