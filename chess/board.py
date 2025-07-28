@@ -783,7 +783,7 @@ class Board(Window):
         self.update_status()
 
         self.is_started = True
-        self.sync(post=True)
+        self.sync(get=not self.game_loaded, post=True)
 
     def dump_board(
         self,
