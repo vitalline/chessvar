@@ -3474,8 +3474,8 @@ class Board(Window):
                             mark.alpha = type_marker_alpha
                             self.type_sprite_list.append(mark)
                             move_sprites[pos_to].append(mark)
-                        if with_move is None:
-                            with_move = False
+                    if with_move is None:
+                        with_move = False
         if with_move is None:
             with_move = True
         if with_move and self.move_history and not self.edit_mode:
