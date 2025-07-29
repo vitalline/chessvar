@@ -390,7 +390,7 @@ class ProximityRiderMovement(RiderMovement):
             yield move
 
     def expand(self, move: Move, piece: Piece, theoretical: bool = False):
-        if not theoretical:
+        if not theoretical and self.data['royal_ep']:
             yield from RoyalEnPassantMovement.apply(move, piece, self.data['royal_ep'])
         else:
             yield move
@@ -2108,10 +2108,7 @@ class CoordinateMovement(BaseChoiceMovement):
                     if not coords:
                         yield move
                         continue
-                    move.set(
-                        captured=[x for x in [self.board.get_piece(pos) for pos in coords] if piece.captures(x)],
-                        movement_type=CoordinateMovement,
-                    )
+                    move.set(captured=[x for x in [self.board.get_piece(pos) for pos in coords] if piece.captures(x)])
                     targets = set.union(
                         *(self.board.royal_ep_markers.get(piece.side.opponent(), {}).get(pos, set()) for pos in coords)
                     )
