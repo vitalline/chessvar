@@ -2104,11 +2104,20 @@ class CoordinateMovement(BaseChoiceMovement):
             for move in movement.moves(pos_from, piece, theoretical):
                 move = copy(move).unmark('n').mark('q')
                 if not theoretical:
-                    move.set(captured=[
-                        capture for x in self.coordinate(move.pos_to, piece, theoretical)
-                        if piece.captures((capture := self.board.get_piece(x)))
-                    ])
-                yield move
+                    coords = self.coordinate(move.pos_to, piece, theoretical)
+                    if not coords:
+                        yield move
+                        continue
+                    move.set(
+                        captured=[x for x in [self.board.get_piece(pos) for pos in coords] if piece.captures(x)],
+                        movement_type=CoordinateMovement,
+                    )
+                    targets = set.union(
+                        *(self.board.royal_ep_markers.get(piece.side.opponent(), {}).get(pos, set()) for pos in coords)
+                    )
+                    yield from RoyalEnPassantMovement.apply(move, piece, targets)
+                else:
+                    yield move
 
     def __copy_args__(self):
         return (
