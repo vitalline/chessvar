@@ -3,7 +3,7 @@ from __future__ import annotations
 from copy import copy
 from itertools import chain
 from math import ceil, floor
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, Collection
 
 from chess.movement.base import BaseMovement
 from chess.movement.move import Move
@@ -28,6 +28,40 @@ class ChangingMovement(ChangingLegalMovement):
     # ABC for movements that change their behavior based on certain conditions, and do not return all theoretical moves.
     # NB: Movement classes that return all theoretical moves, regardless of conditions, mustn't inherit from this class.
     pass
+
+
+class DropMovement(BaseMovement):
+    # Used to mark piece drops
+    pass
+
+
+class RoyalEnPassantMovement(BaseMovement):
+    # Used to mark en passant captures of royals that moved through check
+
+    @classmethod
+    def apply(cls, move: Move, piece: Piece, targets: Collection[Position] | None = None):
+        if targets is None:
+            targets = piece.board.royal_ep_markers.get(piece.side.opponent(), {}).get(move.pos_to, set())
+        if not targets:
+            yield move
+            return
+        captured = [x for x in [piece.board.get_piece(pos) for pos in targets] if piece.captures(x)]
+        if not captured:
+            yield move
+            return
+        for chained_move in (
+            Move(
+                piece=piece, marks=move.marks,
+                pos_from=move.pos_to, pos_to=move.pos_to,
+                movement_type=cls, captured=captured,
+            ).mark('f+'),
+            Move(
+                piece=piece, marks=move.marks,
+                pos_from=move.pos_to, pos_to=move.pos_to,
+                movement_type=move.movement_type,
+            ),
+        ):
+            yield copy(move).set(chained_move=chained_move)
 
 
 class RiderMovement(BaseMovement):
@@ -112,7 +146,7 @@ class RiderMovement(BaseMovement):
                 data = self.data.copy()
                 if self.skip_condition(move, direction, piece, theoretical):
                     continue
-                yield from self.chain(move, piece, theoretical)
+                yield from self.expand(move, piece, theoretical)
                 self.steps = steps  # this is a hacky way to make sure the step count stays correct after the yield
                 # this is because the step count will be reset to 0 if self.moves() is called before the next yield
                 self.data = data  # same thing for self.data, because it's also updated by successive moves() calls
@@ -120,24 +154,9 @@ class RiderMovement(BaseMovement):
             else:
                 direction_id += 1
 
-    def chain(self, move: Move, piece: Piece, theoretical: bool = False):
+    def expand(self, move: Move, piece: Piece, theoretical: bool = False):
         if not theoretical:
-            if royal_ep_targets := self.board.royal_ep_markers.get(piece.side.opponent(), {}).get(move.pos_to, set()):
-                royal_ep_captured = [self.board.get_piece(pos) for pos in royal_ep_targets]
-                for chained_move in (
-                    Move(
-                        pos_from=move.pos_to, pos_to=move.pos_to,
-                        movement_type=RoyalEnPassantMovement, piece=piece,
-                        captured=[captured for captured in royal_ep_captured if piece.captures(captured)],
-                    ).mark(self.default_mark),
-                    Move(
-                        pos_from=move.pos_to, pos_to=move.pos_to,
-                        movement_type=move.movement_type, piece=piece,
-                    ).mark(self.default_mark),
-                ):
-                    yield copy(move).set(chained_move=chained_move)
-            else:
-                yield move
+            yield from RoyalEnPassantMovement.apply(move, piece)
         else:
             yield move
 
@@ -370,24 +389,9 @@ class ProximityRiderMovement(RiderMovement):
                 move.set(captured=self.data['captured'])
             yield move
 
-    def chain(self, move: Move, piece: Piece, theoretical: bool = False):
+    def expand(self, move: Move, piece: Piece, theoretical: bool = False):
         if not theoretical:
-            if royal_ep_targets := self.data['royal_ep']:
-                royal_ep_captured = [self.board.get_piece(pos) for pos in royal_ep_targets]
-                for chained_move in (
-                    Move(
-                        pos_from=move.pos_to, pos_to=move.pos_to,
-                        movement_type=RoyalEnPassantMovement, piece=piece,
-                        captured=[captured for captured in royal_ep_captured if piece.captures(captured)],
-                    ).mark(self.default_mark),
-                    Move(
-                        pos_from=move.pos_to, pos_to=move.pos_to,
-                        movement_type=move.movement_type, piece=piece,
-                    ).mark(self.default_mark),
-                ):
-                    yield copy(move).set(chained_move=chained_move)
-            else:
-                yield move
+            yield from RoyalEnPassantMovement.apply(move, piece, self.data['royal_ep'])
         else:
             yield move
 
@@ -846,11 +850,6 @@ class SwapRiderMovement(RiderMovement):
         return super().stop_condition(move, direction, piece, theoretical)
 
 
-class DropMovement(BaseMovement):
-    # Used to mark piece drops
-    pass
-
-
 class TargetMovement(BaseMovement):
     # ABC used to simplify marking squares where en passant captures are possible
 
@@ -973,11 +972,6 @@ class CastlingPartnerMovement(BaseMovement):
     pass
 
 
-class RoyalEnPassantMovement(BaseMovement):
-    # Used to mark en passant captures of royals that moved through check
-    pass
-
-
 class EnPassantTargetRiderMovement(RiderMovement, TargetMovement):
     def moves(self, pos_from: Position, piece: Piece, theoretical: bool = False):
         for move in super().moves(pos_from, piece, theoretical):
@@ -1051,7 +1045,7 @@ class AbsoluteMovement(RiderMovement):
                 if not theoretical and piece.blocked_by(to_piece):
                     continue
                 move = Move(pos_from=pos_from, pos_to=pos_to, movement_type=type(self)).mark(self.default_mark)
-                yield from self.chain(move, piece, theoretical)
+                yield from self.expand(move, piece, theoretical)
 
     def __copy_args__(self):
         return self.board, unpack(self.areas), self.stay
@@ -1522,6 +1516,7 @@ class MultiMovement(BaseMultiMovement):
                 for move in movement.moves(pos_from, piece, theoretical):
                     yield copy(move)
             for movement in self.move:
+                skip_royal_ep = None
                 for move in movement.moves(pos_from, piece, theoretical):
                     chained_move = move
                     while chained_move:
@@ -1533,9 +1528,15 @@ class MultiMovement(BaseMultiMovement):
                                 break
                         if not is_legal:
                             break
+                        if skip_royal_ep is not None and (next_move := chained_move.chained_move):
+                            if next_move.pos_from == next_move.pos_to == skip_royal_ep:
+                                chained_move.chained_move = next_move.chained_move
+                                skip_royal_ep = None
                         chained_move = chained_move.chained_move
                     else:
                         yield copy(move).unmark('n').mark('m')
+                    if not is_legal and chained_move.movement_type == RoyalEnPassantMovement:
+                        skip_royal_ep = chained_move.pos_to
             for movement in self.capture:
                 for move in movement.moves(pos_from, piece, theoretical):
                     chained_move = move
