@@ -322,8 +322,10 @@ def load_movement(board: Board, data: list | str | None, from_dict: dict | None)
         return arg  # if it's not a list or dict, it's probably a simple value. no need to do anything. just return it
     if data is None:  # if the data is None, return None. this is, of course, still the only case where we return None
         return None  # if the data is UNSET_STRING, return Unset. similarly, it is the only case where we return Unset
-    if data == UNSET_STRING:  # otherwise, we need to load the movement type and the rest of the arguments, so that we
-        return Unset  # can create a new instance of the movement type with the arguments we just loaded. very simple.
+    if data == UNSET_STRING:  # if the data is any other string, we try to load the piece type corresponding to it and
+        return Unset  # create a new instance of that piece type to simply return its movement. otherwise, we load the
+    if isinstance(data, str):  # movement type and the rest of its arguments in order to create a new instance of that
+        return load_piece_type(data, from_dict)(board).movement  # movement type with the arguments we've just loaded.
     bases, data_copy = {}, data.copy()  # oh boy, here comes the hard part. we need to load the movement classes first
     for base_string in data:  # for every base class string or list that is located at the beginning of the data list,
         if base := load_movement_type(base_string):  # we need to load a movement class corresponding to the string or
