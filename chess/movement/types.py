@@ -1703,11 +1703,16 @@ class CloneMovement(BaseMultiMovement):
 
     def add_clone(self, spawns: dict[Position, Piece], move: Move, piece: Piece, last_pos: Position) -> None:
         if move.pos_from and move.pos_from != move.pos_to:
-            is_capture = move.captured or not self.board.not_a_piece(move.pos_to)
-            if not (self.move or self.capture) or (self.capture if is_capture else self.move):
-                move_piece = piece if move.pos_from == last_pos else (
-                    move.promotion or move.piece
-                    or self.board.get_piece(move.pos_from)
+            marks = set(move.marks)
+            capture_only, move_only = 'c' in marks, 'm' in marks
+            has_capture = move.captured or not self.board.not_a_piece(move.pos_to)
+            is_capture = (has_capture or capture_only) and not move_only
+            is_move = (not has_capture or move_only) and not capture_only
+            if not (self.move or self.capture) or (self.capture and is_capture) or (self.move and is_move):
+                move_piece = (
+                    piece if move.pos_from == last_pos else
+                    move.promotion if move.movement_type == DropMovement else
+                    (move.piece or self.board.get_piece(move.pos_from))
                 )
                 spawns[move.pos_from] = move_piece
 
@@ -2308,6 +2313,7 @@ passive_movements = (
     DropMovement,
     CloneMovement,
     RangedMovement,
+    ConvertMovement,
     AutoActMovement,
 )
 

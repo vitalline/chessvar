@@ -3683,15 +3683,16 @@ class Board(Window):
     def clear_promotion_auto_actions(move: Move) -> Move:
         promotion_found = bool(move.promotion)
         first_move = move
-        while move.chained_move and not (
-            (mtype := move.chained_move.movement_type) and issubclass(mtype, AutoActMovement)
-        ):
+        while move.chained_move and not (issubclass(move.chained_move.movement_type or type, AutoActMovement)):
+            if not issubclass(move.movement_type or type, (CloneMovement, ConvertMovement)):
+                move.promotion = Unset
             move = move.chained_move
             if not promotion_found and move.promotion:
                 promotion_found = True
         if promotion_found:
             move.chained_move = None
-        move.promotion = Unset
+        if not issubclass(move.movement_type or type, (CloneMovement, ConvertMovement)):
+            move.promotion = Unset
         return first_move
 
     def load_auto_markers(self, side: Side = Side.ANY) -> None:
@@ -6236,6 +6237,8 @@ class Board(Window):
                     last_chain_move = None
                     chained_move = self.move_history[-1]
                     while chained_move.chained_move:
+                        if chained_move.promotion is Unset:
+                            break
                         last_chain_move = chained_move
                         chained_move = chained_move.chained_move
                     if pos in self.promotion_area_drops and (drop := self.promotion_area_drops[pos]) is not None:
@@ -6593,8 +6596,7 @@ class Board(Window):
                     is_final = False
                 else:
                     is_final = True
-                if not issubclass(move.movement_type or type, (CloneMovement, ConvertMovement)):
-                    move = self.clear_promotion_auto_actions(move)  # clear the old auto-actions and do not auto-promote
+                move = self.clear_promotion_auto_actions(move)  # clear the old auto-actions and unset promotion choices
                 move = self.move(move)
                 self.update_auto_markers(move, True)
                 move = self.update_auto_actions(move, self.turn_side.opponent())
