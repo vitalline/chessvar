@@ -7075,6 +7075,7 @@ class Board(Window):
                             self.log(f"Info: Request interval set to {new_interval} seconds", False)
                         else:
                             self.log(f"Info: Request interval disabled", False)
+                        self.update_config('sync_time')
                     else:
                         self.log("Info: Request interval change cancelled", False)
                 elif modifiers & key.MOD_ALT:  # Server address
@@ -7101,6 +7102,8 @@ class Board(Window):
                             self.board_config['sync_data'] = True
                             self.log("Info: Online mode enabled")
                         self.sync(get=True, post=True)
+                        if self.board_config['sync_data']:
+                            self.update_config(('sync_host', 'sync_port'))
                     else:
                         self.log("Info: Server connection cancelled", False)
                 self.activate()
@@ -7693,6 +7696,13 @@ class Board(Window):
             self.log_data.clear()
         if verbose:
             self.verbose_data.clear()
+
+    def update_config(self, fields: Unpacked[str] = ()) -> None:
+        config = Config(config_path)
+        for field in repack(fields):
+            if field in self.board_config:
+                config[field] = self.board_config[field]
+        config.save(config_path)
 
     def save_config(self) -> None:
         config = copy(self.board_config)
