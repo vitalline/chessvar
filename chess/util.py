@@ -7,7 +7,7 @@ from copy import copy
 from datetime import datetime
 from itertools import chain
 from json import dumps as json_dumps
-from tkinter import Tk, filedialog
+from tkinter import Tk, filedialog, simpledialog
 from typing import Any, TypeAlias, TypeVar, Union
 
 # Lambda function to return the sign of a number. Returns +1 for positive numbers, -1 for negative numbers, and 0 for 0.
@@ -205,7 +205,7 @@ def make_hashable(thing: tuple | AnyJson) -> tuple | AnyJsonType:
 
 
 # Function to traverse any data object using sequences of keys or indices. Returns the values at the specified location.
-def find(data: Index[T], *fields: Key) -> Collection[T] | None:
+def find(data: Index[T] | AnyJsonType, *fields: Key) -> Collection[T] | None:
     if not fields:
         return data if isinstance(data, Collection) else (data,)
     if isinstance(data, Sequence) and isinstance(fields[0], str):
@@ -260,6 +260,36 @@ def find_string(string: Any, part: Any, side: int = 0, case: bool = False) -> bo
     if not case:
         string, part = string.lower(), part.lower()
     return part in string if not side else (string.startswith(part) if side < 0 else string.endswith(part))
+
+
+# Function to prompt the user for a string input using a simple dialog box.
+def prompt_string(prompt: str, title: str = " ", default: str | None = None) -> str | None:
+    with topmost() as root:
+        return simpledialog.askstring(
+            parent=root,
+            title=title,
+            prompt=prompt,
+            initialvalue=default,
+        )
+
+
+# Same as above, but for integer input.
+def prompt_integer(
+    prompt: str,
+    title: str = " ",
+    default: int | None = None,
+    minimum: int | None = None,
+    maximum: int | None = None,
+) -> int | None:
+    with topmost() as root:
+        return simpledialog.askinteger(
+            parent=root,
+            title=title,
+            prompt=prompt,
+            initialvalue=default,
+            minvalue=minimum,
+            maxvalue=maximum,
+        )
 
 
 # Function to generate a file name based on a name, extension and timestamp (if not provided, the current time is used).

@@ -51,7 +51,8 @@ from chess.pieces.util import NoPiece, Obstacle, Block, Border, Shield, Void, Wa
 from chess.save import condense, expand, condense_algebraic as cnd_alg, expand_algebraic as exp_alg, substitute
 from chess.save import load_rng, load_move, load_piece, load_piece_type, load_custom_type, load_movement_type
 from chess.save import save_rng, save_move, save_piece, save_piece_type, save_custom_type
-from chess.util import base_dir, config_path, get_file_name, get_file_path, load_menu, save_menu
+from chess.util import base_dir, config_path, get_file_name, get_file_path
+from chess.util import prompt_string, prompt_integer, load_menu, save_menu
 from chess.util import Default, Unset, Key, Index, TypeOr, Unpacked, unpack, repack, sign, spell
 from chess.util import deduplicate, dumps, find, find_string, fits, normalize, pluralize
 
@@ -257,8 +258,8 @@ class Board(Window):
         self.drop_piece_sprite_list = SpriteList()  # sprites for the drop UI captured pieces
         self.drop_piece_label_list = []  # labels for the drop UI captured piece counts
         self.sync_timestamp = None  # timestamp of the last server sync
-        self.sync_interval = 0  # time since the last server sync
-        self.save_interval = 0  # time since the last autosave
+        self.sync_interval = 0.0  # time since the last server sync
+        self.save_interval = 0.0  # time since the last autosave
 
         # normalize file paths
         paths = self.auto_path, self.load_path, self.save_path
@@ -686,8 +687,8 @@ class Board(Window):
                 self.piece_sprite_list.append(self.pieces[row][col].sprite)
 
     def reset_board(self, update: bool | None = True, log: bool = True) -> None:
-        self.save_interval = 0
-        self.sync_interval = 0
+        self.save_interval = 0.0
+        self.sync_interval = 0.0
         self.is_started = False
 
         self.hovered_square = None
@@ -984,8 +985,8 @@ class Board(Window):
             for pieces in [*self.movable_pieces.values(), self.obstacles] for p in pieces
         }
 
-        self.save_interval = 0
-        self.sync_interval = 0
+        self.save_interval = 0.0
+        self.sync_interval = 0.0
         self.is_started = False
         success = True
 
@@ -1410,8 +1411,8 @@ class Board(Window):
         return success
 
     def empty_board(self) -> None:
-        self.save_interval = 0
-        self.sync_interval = 0
+        self.save_interval = 0.0
+        self.sync_interval = 0.0
         self.is_started = False
 
         self.hovered_square = None
@@ -7055,10 +7056,54 @@ class Board(Window):
                 self.reset_custom_data()
                 self.reset_board()
         if symbol == key.O:
-            if modifiers & key.MOD_ALT:  # Toggle online play
-                self.board_config['sync_data'] = not self.board_config['sync_data']
-                self.log(f"Info: Online mode {'enabled' if self.board_config['sync_data'] else 'disabled'}")
-                self.sync(get=True, post=True)
+            if modifiers & key.MOD_ALT:  # Online play
+                if self.fullscreen:
+                    self.to_windowed()
+                self.deactivate()
+                self.draw(0)
+                if modifiers & key.MOD_SHIFT:  # Request interval
+                    self.log(f"Info: Setting request interval", False)
+                    new_interval = prompt_integer(
+                        prompt="Request Interval (seconds)",
+                        default=self.board_config['sync_time'],
+                        minimum=0,
+                    )
+                    if new_interval is not None:
+                        self.sync_interval = 0.0
+                        self.board_config['sync_time'] = new_interval
+                        if new_interval:
+                            self.log(f"Info: Request interval set to {new_interval} seconds", False)
+                        else:
+                            self.log(f"Info: Request interval disabled", False)
+                    else:
+                        self.log("Info: Request interval change cancelled", False)
+                elif modifiers & key.MOD_ALT:  # Server address
+                    self.log(f"Info: Setting server address", False)
+                    current_address = f"{self.board_config['sync_host']}:{self.board_config['sync_port']}"
+                    new_address = prompt_string(prompt="Multiplayer Server Address", default=current_address)
+                    if new_address is not None:
+                        parts = new_address.split('://')
+                        if parts:
+                            parts = parts[-1].split(':')
+                            if parts[0]:
+                                self.board_config['sync_host'] = parts[0]
+                            if len(parts) > 1 and parts[1]:
+                                try:
+                                    port = int(parts[1])
+                                    if not (0 < port < 65536):
+                                        raise ValueError
+                                    self.board_config['sync_port'] = port
+                                except ValueError:
+                                    self.log("Error: Invalid port number", False)
+                            new_address = f"http://{self.board_config['sync_host']}:{self.board_config['sync_port']}"
+                            self.log(f"Info: Server address set to {new_address}", False)
+                        if not self.board_config['sync_data']:
+                            self.board_config['sync_data'] = True
+                            self.log("Info: Online mode enabled")
+                        self.sync(get=True, post=True)
+                    else:
+                        self.log("Info: Server connection cancelled", False)
+                self.activate()
             elif modifiers & key.MOD_SHIFT and not self.promotion_piece:  # Toggle drop banks
                 self.update_drops(not self.show_drops)
             elif modifiers & key.MOD_ACCEL and not partial_move:  # Toggle drops (Crazyhouse mode)
