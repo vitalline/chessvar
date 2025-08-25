@@ -7096,7 +7096,7 @@ class Board(Window):
                                     self.board_config['sync_port'] = port
                                 except ValueError:
                                     self.log("Error: Invalid port number", False)
-                            new_address = f"http://{self.board_config['sync_host']}:{self.board_config['sync_port']}"
+                            new_address = f"http://{self.board_config['sync_host']}:{self.board_config['sync_port']}/"
                             self.log(f"Info: Server address set to {new_address}", False)
                         if not self.board_config['sync_data']:
                             self.board_config['sync_data'] = True
