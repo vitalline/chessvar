@@ -7102,8 +7102,7 @@ class Board(Window):
                             self.board_config['sync_data'] = True
                             self.log("Info: Online mode enabled")
                         self.sync(get=True, post=True)
-                        if self.board_config['sync_data']:
-                            self.update_config(('sync_host', 'sync_port'))
+                        self.update_config(('sync_host', 'sync_port'))
                     else:
                         self.log("Info: Server connection cancelled", False)
                 self.activate()
