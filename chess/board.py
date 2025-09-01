@@ -158,6 +158,7 @@ class Board(Window):
         self.win_side = Side.NONE  # side that has won the game, if any
         self.check_side = Side.NONE  # side that is currently in check, if any
         self.check_groups = set()  # groups that are currently in check
+        self.has_drops = None  # whether drop toggling is allowed
         self.use_drops = self.board_config['use_drops']  # whether pieces can be dropped
         self.hide_pieces = self.board_config['hide_pieces'] % 3  # 0: don't hide, 1: hide all, 2: penultima mode
         self.hide_move_markers = self.board_config['hide_moves']  # whether to hide the move markers; None uses above
@@ -926,6 +927,7 @@ class Board(Window):
             'alter_swap': self.alternate_swap,
             'hide_pieces': self.hide_pieces,
             'hide_moves': self.hide_move_markers,
+            'has_drops': self.has_drops,
             'use_drops': self.use_drops,
             'chaos_mode': self.chaos_mode,
             'chaos_seed': self.chaos_seed,
@@ -1108,7 +1110,11 @@ class Board(Window):
         self.alternate_swap = data.get('alter_swap', self.alternate_swap)
         self.hide_pieces = data.get('hide_pieces', self.hide_pieces)
         self.hide_move_markers = data.get('hide_moves', self.hide_move_markers)
+        self.has_drops = data.get('has_drops', self.has_drops)
         self.use_drops = data.get('use_drops', self.use_drops)
+        if self.has_drops is not None:
+            self.use_drops = self.has_drops
+
         self.chaos_mode = data.get('chaos_mode', self.chaos_mode)
         self.edit_mode = data.get('edit', self.edit_mode)
         self.edit_piece_set_id = data.get('edit_promotion', self.edit_piece_set_id)
@@ -1504,6 +1510,7 @@ class Board(Window):
         self.custom_extra_drops = {}
         self.custom_turn_order = []
         self.custom_end_rules = {}
+        self.has_drops = None
         for group, piece_list in self.piece_groups.items():
             for piece_type in piece_list:
                 piece_type.clear_groups()
@@ -7112,7 +7119,7 @@ class Board(Window):
                 self.activate()
             elif modifiers & key.MOD_SHIFT and not self.promotion_piece:  # Toggle drop banks
                 self.update_drops(not self.show_drops)
-            elif modifiers & key.MOD_ACCEL and not partial_move:  # Toggle drops (Crazyhouse mode)
+            elif modifiers & key.MOD_ACCEL and self.has_drops is None and not partial_move:  # Toggle drops
                 self.use_drops = not self.use_drops
                 self.log(f"Info: Drops {'enabled' if self.use_drops else 'disabled'}")
                 self.future_move_history = []  # we don't know if we can redo all the future moves anymore so clear them
