@@ -7097,14 +7097,18 @@ class Board(Window):
                                 except ValueError:
                                     self.log("Error: Invalid port number", False)
                             new_address = f"http://{self.board_config['sync_host']}:{self.board_config['sync_port']}/"
-                            self.log(f"Info: Server address set to {new_address}", False)
+                            self.log(f"Info: Server address set to {new_address}")
                         if not self.board_config['sync_data']:
                             self.board_config['sync_data'] = True
                             self.log("Info: Online mode enabled")
                         self.sync(get=True, post=True)
                         self.update_config(('sync_host', 'sync_port'))
                     else:
-                        self.log("Info: Server connection cancelled", False)
+                        if self.board_config['sync_data']:
+                            self.board_config['sync_data'] = False
+                            self.log("Info: Online mode disabled")
+                        else:
+                            self.log("Info: Server connection cancelled", False)
                 self.activate()
             elif modifiers & key.MOD_SHIFT and not self.promotion_piece:  # Toggle drop banks
                 self.update_drops(not self.show_drops)
@@ -7251,6 +7255,7 @@ class Board(Window):
                 else:
                     self.hide_pieces = old_hide_pieces
                 self.update_pieces()
+                self.sync(post=True)
                 self.show_moves()
         if symbol == key.J:  # Alternate piece sprites (J was chosen due to closeness with other "hiding" hotkeys)
             old_alternate_pieces, old_alternate_swap = self.alternate_pieces, self.alternate_swap
@@ -7312,6 +7317,7 @@ class Board(Window):
                     else:
                         self.hide_move_markers = old_hide_move_markers
                     self.update_pieces()
+                    self.sync(post=True)
                     self.show_moves()
         if symbol == key.K and not self.hide_move_markers:  # Move marker mode
             selected_square = self.selected_square

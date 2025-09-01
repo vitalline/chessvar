@@ -59,8 +59,8 @@ Alt + K: toggle type-based move markers
 Alt + Shift + K: toggle theoretical move markers
 Ctrl + O: toggle drops (crazyhouse mode)
 Shift + O: toggle drop bank visibility
-Alt + O: enter server address for online play
-Alt + Shift + O: enter server update interval
+Alt + O: set server address for online play
+Alt + Shift + O: set server update interval
 
 UI hotkeys:
 Ctrl + [-]: make window smaller (-5px/square)
