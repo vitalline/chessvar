@@ -311,11 +311,16 @@ class Piece(AbstractPiece):
         if flipped_vertically is not None:
             self.flipped_vertically = flipped_vertically
         if self.sprite.texture.file_path.resolve() != texture_path:
+            size = self.size
             color = self.sprite.color
             new_texture = load_texture(texture_path)
             self.sprite.texture = new_texture
             self.sprite.color = color
-            self.set_size(new_texture.width)
+            self.set_size(size)
+
+    @property
+    def size(self):
+        return abs(self.sprite.scale_x) * self.sprite.texture.width
 
     def set_size(self, size: float):
         if size <= 0:
