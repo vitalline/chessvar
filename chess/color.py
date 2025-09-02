@@ -147,6 +147,10 @@ colors = [
         (getrgb('#696969'), getrgb('#252525'), 'cherub1'),
         (getrgb('#696969'), getrgb('#252525'), 'cherub2'),
         # the rest of the cherub colors are generated below
+
+        # crypt: *knight to c-sharp intensifies*
+        (getrgb('#80f0ff'), getrgb('#ff8010'), 'crypt'),
+        # other colors are similarly generated below
     ]
 ]
 
@@ -200,6 +204,18 @@ for i in range(len(colors)):
         colors[i]['black_check_color'] = (192, 0, 0) if scheme_id == 2 else (0, 192, 0)
         colors[i]['white_draw_color'] = (192, 64, 64) if scheme_id == 1 else (64, 192, 64)
         colors[i]['black_draw_color'] = (192, 64, 64) if scheme_id == 2 else (64, 192, 64)
+        colors[i]['win_color'] = None
+    if colors[i]['scheme_type'] == 'crypt':
+        # define the crypt piece colors (white pieces are blue, black pieces are red)
+        colors[i]['colored_pieces'] = True
+        colors[i]['white_piece_color'] = (64, 192, 255)
+        colors[i]['black_piece_color'] = (255, 32, 0)
+        colors[i]['white_check_color'] = (48, 144, 192)
+        colors[i]['black_check_color'] = (192, 24, 0)
+        colors[i]['white_draw_color'] = (96, 160, 192)
+        colors[i]['black_draw_color'] = (192, 80, 64)
+        colors[i]['background_color'] = (96, 96, 96)
+        colors[i]['text_color'] = (224, 224, 224)
         colors[i]['win_color'] = None
     # add defaults for required colors that were not previously defined
     for key in default_colors:
