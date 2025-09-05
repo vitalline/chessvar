@@ -516,7 +516,10 @@ def debug_info(board: Board) -> list[str]:
     drop_mode = {
         k: f"Pieces {v} be dropped on the board" for k, v in {False: "cannot", True: "can"}.items()
     }.get(board.use_drops, "Unknown")
-    debug_log.append(f"Use drops: {board.use_drops} - {drop_mode}")
+    drop_toggle_mode = {
+        None: "Toggle", board.use_drops: "Fixed", not board.use_drops: "Illegal"
+    }.get(board.has_drops, "Uncertain")
+    debug_log.append(f"Use drops: {board.use_drops} - {drop_mode} ({drop_toggle_mode})")
     chaos_mode = {
         0: "Off",
         1: "Chaos (Matching Pieces)",
