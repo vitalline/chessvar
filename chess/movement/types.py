@@ -601,7 +601,7 @@ class AutoMarkMovement(BaseMovement):
         self.mark(move.pos_from, piece)
 
 
-class AutoCaptureMovement(BaseMovement):
+class AutoCaptureMovement(AutoActMovement):
     # Used to mark auto-capture moves and as a base class for auto-capturing movement types
     pass
 
@@ -667,7 +667,7 @@ class AutoRangedRiderMovement(AutoRangedAutoCaptureRiderMovement):
     pass  # Alias for AutoRangedAutoCaptureRiderMovement
 
 
-class ConvertMovement(BaseMovement):
+class ConvertMovement(AutoActMovement):
     # Used to mark side-converting moves and as a base class for side-converting movement types
     pass
 

@@ -3675,7 +3675,8 @@ class Board(Window):
             (mtype := move.chained_move.movement_type) and issubclass(mtype, AutoActMovement)
         ):
             move = move.chained_move
-        move.chained_move = None
+        if not issubclass(move.movement_type or type, (CloneMovement, ConvertMovement)):
+            move.chained_move = None
         if (
             not issubclass(first_move.movement_type or type, ConvertMovement)
             and isinstance(piece.movement, AutoActMovement)
@@ -4152,8 +4153,8 @@ class Board(Window):
                     )
                 ) or self.chain_moves.get(self.turn_side, {}).get(tuple(poss)):
                     chained_move.chained_move = Unset  # do not chain moves because we're updating every move separately
-                if next_move.promotion is not None:
-                    move = self.clear_promotion_auto_actions(move)  # clear the old auto-actions in order to reload them
+                move = self.clear_promotion_auto_actions(move)  # clear the old auto-actions and unset promotion choices
+                if next_move.promotion is not None:  # we need to transfer over the promotion choice from the saved move
                     move.promotion = next_move.promotion  # since the legal move we found may have a different promotion
                 move = self.move(move)
                 self.update_auto_markers(move, True)
@@ -4164,6 +4165,8 @@ class Board(Window):
                     if chained_move.swapped_piece:
                         chained_move.set(swapped_piece=copy(chained_move.swapped_piece))
                     if self.promotion_piece is None:
+                        if chained_move.promotion is Unset:
+                            chained_move.set(promotion=Default)
                         self.log(f"Move: {chained_move}")
                     if chained_move.chained_move:
                         chained_move.chained_move = self.move(chained_move.chained_move)
@@ -4704,6 +4707,7 @@ class Board(Window):
                 )
                 self.log(f"Redo: {move_type}: {chained_move}")
                 if chained_move.chained_move:
+                    self.update_move(chained_move.chained_move)
                     chained_move.chained_move = self.move(chained_move.chained_move)
                 last_chain_move = chained_move
                 chained_move = chained_move.chained_move
