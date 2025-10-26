@@ -334,12 +334,17 @@ class Piece(AbstractPiece):
     def set_color(self, color: Color, force_color: bool = False):
         if not self.name:
             return
-        side = Side.WHITE if force_color else Side.NONE  # if forcing color, make piece white so that it can be colored
-        if not side:  # if not forcing color, determine side based on color
+        # NB: color changes are applied to sprites as a multiplicative filter, so black texture parts will remain black
+        # because of this, colored pieces need to have the white piece textures in order to be displayed as their color
+        if self.side is Side.NEUTRAL:  # neutral pieces only have one texture, simply change color directly and move on
+            self.sprite.color = color
+            return
+        side = Side.WHITE if force_color else Side.NONE  # if forcing color, use the white piece texture
+        if not side:  # if not forcing color, determine texture based on color
             if max(color) != min(color):  # if color is not grayscale
-                side = Side.WHITE  # make piece white so that it can be colored
+                side = Side.WHITE  # use the white piece texture
             if max(color) == min(color):  # if color is grayscale
-                side = self.side  # make piece match the side
+                side = self.side  # use the texture matching the piece's side
         self.sprite.color = color
-        if side != self.texture_side:  # if side was defined and does not match the current texture
+        if side != self.texture_side:  # if the texture to use does not match the current texture
             self.reload(side=side)
