@@ -6002,13 +6002,16 @@ class Board(Window):
 
         if (
             self.game_loaded or self.board_width != default_board_width or self.board_height != default_board_height
-            or self.border_cols or self.border_rows or self.notation_offset != (0, 0)
+            or self.border_cols or self.border_rows or self.notation_offset != old_offset
         ):
             if self.board_width != old_width or self.board_height != old_height:
                 self.log(f"Info: Changed board size to {self.board_width}x{self.board_height}")
             if self.notation_offset != old_offset:
-                offset_string = ', '.join(f"{x:+}" if x else "0" for x in self.notation_offset)
-                self.log(f"Info: Changed notation offset to ({offset_string})")
+                if any(self.notation_offset):
+                    offset_string = ', '.join(f"{x:+}" if x else "0" for x in self.notation_offset)
+                    self.log(f"Info: Changed notation offset to ({offset_string})")
+                else:
+                    self.log(f"Info: Removed notation offset")
             if self.border_cols != old_cols:
                 if self.border_cols:
                     s26 = lambda x: b26(x + (0 if x < 0 else 1))
