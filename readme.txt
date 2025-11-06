@@ -57,6 +57,8 @@ Shift + K: show theoretical moves for both sides
 Ctrl + Shift + K: show valid moves for current player, theoretical moves for other player
 Alt + K: toggle type-based move markers
 Alt + Shift + K: toggle theoretical move markers
+Ctrl + A: highlight movable pieces
+Shift + A: highlight drop squares
 Ctrl + O: toggle drops (crazyhouse mode)
 Shift + O: toggle drop bank visibility
 Alt + O: set server address for online play

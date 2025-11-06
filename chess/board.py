@@ -254,6 +254,7 @@ class Board(Window):
         self.move_sprite_list = SpriteList()  # sprites for the move markers
         self.type_sprite_list = SpriteList()  # sprites for the type-based move markers
         self.piece_sprite_list = SpriteList()  # sprites for the pieces
+        self.movable_sprite_list = SpriteList()  # sprites for the movable piece and legal drop markers
         self.promotion_area_sprite_list = SpriteList()  # sprites for the promotion area background tiles
         self.promotion_piece_sprite_list = SpriteList()  # sprites for the possible promotion pieces
         self.drop_area_sprite_list = SpriteList()  # sprites for the drop UI background tiles
@@ -599,6 +600,7 @@ class Board(Window):
             self.piece_sprite_list.remove(piece.sprite)
             self.active_piece = piece
 
+        self.hide_movable()
         self.show_moves()
 
     def deselect_piece(self) -> None:
@@ -617,6 +619,7 @@ class Board(Window):
             self.piece_sprite_list.append(piece.sprite)
 
         self.selected_square = None
+        self.hide_movable()
         self.show_moves()
 
     def reset_pieces(self, pieces: dict | None = None) -> None:
@@ -3479,7 +3482,7 @@ class Board(Window):
                     if with_move is None:
                         with_move = False
         if with_move is None:
-            with_move = True
+            with_move = not self.movable_sprite_list
         if with_move and self.move_history and not self.edit_mode:
             history_moves = []
             draw_for = self.get_turn_side(-1)
@@ -3553,6 +3556,39 @@ class Board(Window):
     def hide_moves(self) -> None:
         self.move_sprite_list.clear()
         self.type_sprite_list.clear()
+
+    def show_movable(self, pieces: bool = False, drops: bool = False):
+        self.hide_movable()
+        moves = self.moves.get(self.turn_side, {})
+        can_pass = self.can_pass()
+        for pos in moves:
+            if not isinstance(pos, str):
+                if not pieces:
+                    continue
+                mark_types = ['selection']
+                if can_pass:
+                    mark_types += ['capture']
+                if pos in moves[pos]:
+                    mark_types += ['capture']
+                for mark_type in mark_types:
+                    mark = Sprite(f"assets/util/{mark_type}.png")
+                    mark.color = self.color_scheme['selection_color']
+                    mark.position = self.get_screen_position(pos)
+                    mark.scale = self.square_size / mark.texture.width
+                    self.movable_sprite_list.append(mark)
+            elif pos == 'drop':
+                if not drops:
+                    continue
+                for drop_pos in moves[pos]:
+                    mark = Sprite(f"assets/util/move.png")
+                    mark.color = self.color_scheme['highlight_color']
+                    mark.position = self.get_screen_position(drop_pos)
+                    mark.scale = self.square_size / mark.texture.width
+                    self.movable_sprite_list.append(mark)
+        self.show_moves()
+
+    def hide_movable(self) -> None:
+        self.movable_sprite_list.clear()
 
     def can_pass(self, side: Side | None = None) -> bool:
         return not self.game_over and self.moves.get(side if isinstance(side, Side) else self.turn_side, {}).get('pass')
@@ -4403,6 +4439,7 @@ class Board(Window):
         if update:
             old_color = self.highlight.color
             self.highlight.color = (0, 0, 0, 0)
+            self.hide_movable()
             self.hide_moves()
             self.draw_once()
             self.highlight.color = old_color
@@ -4496,6 +4533,7 @@ class Board(Window):
         if update:
             old_color = self.highlight.color
             self.highlight.color = (0, 0, 0, 0)
+            self.hide_movable()
             self.hide_moves()
             self.draw_once()
             self.highlight.color = old_color
@@ -5283,6 +5321,7 @@ class Board(Window):
         if drops is None:
             drops = {}
         self.hide_moves()
+        self.hide_movable()
         self.promotion_piece = piece
         piece_pos = piece.board_pos
         direction = (
@@ -5428,6 +5467,7 @@ class Board(Window):
         if update:
             old_color = self.highlight.color
             self.highlight.color = (0, 0, 0, 0)
+            self.hide_movable()
             self.hide_moves()
             self.draw_once()
             self.highlight.color = old_color
@@ -6148,6 +6188,7 @@ class Board(Window):
         if not self.promotion_area and not self.show_drops:
             draw_sprite(self.highlight)
             draw_sprite(self.selection)
+        self.movable_sprite_list.draw()
         self.move_sprite_list.draw()
         self.piece_sprite_list.draw()
         self.type_sprite_list.draw()
@@ -6241,6 +6282,9 @@ class Board(Window):
             return
         if self.sync(get=True) is not None:
             return
+        if self.movable_sprite_list:
+            self.hide_movable()
+            self.show_moves()
         self.piece_was_selected = False
         if buttons & MOUSE_BUTTON_LEFT:
             self.held_buttons = MOUSE_BUTTON_LEFT
@@ -6940,6 +6984,7 @@ class Board(Window):
                 self.load_check()
                 self.load_moves()
                 self.hide_moves()
+                self.hide_movable()
                 self.reload_end_data()
                 self.advance_turn()
         if symbol == key.W:  # White
@@ -7368,6 +7413,8 @@ class Board(Window):
                 ):
                     self.do_auto_save = not self.do_auto_save
                     self.log(f"Info: Auto-saving {'enabled' if self.do_auto_save else 'disabled'}", False)
+            elif (modifiers & key.MOD_ACCEL or modifiers & key.MOD_SHIFT) and not self.promotion_piece:
+                self.show_movable(pieces=bool(modifiers & key.MOD_ACCEL), drops=bool(modifiers & key.MOD_SHIFT))
         if symbol == key.T and modifiers & key.MOD_ACCEL:  # Trickster mode
             if self.color_scheme['scheme_type'] == 'cherub':
                 self.trickster_color_index = (
