@@ -6087,12 +6087,6 @@ class Board(Window):
         else:
             self.log(f"Info: Resized to {self.width}x{self.height} (Size: {round(square_size, 5)}px)")
         self.set_location(x - (self.width - old_width) // 2, y - (self.height - old_height) // 2)
-        if not self.fullscreen:
-            self.windowed_size = self.width, self.height
-            self.windowed_square_size = min(
-                self.width / (self.visual_board_width + 2),
-                self.height / (self.visual_board_height + 2)
-            )
         self.set_visible(True)
 
     def to_windowed(self) -> None:
@@ -6177,6 +6171,12 @@ class Board(Window):
 
     def on_resize(self, width: int, height: int) -> None:
         self.skip_mouse_move = 2
+        if not self.fullscreen:
+            self.windowed_size = self.width, self.height
+            self.windowed_square_size = min(
+                self.width / (self.visual_board_width + 2),
+                self.height / (self.visual_board_height + 2)
+            )
         square_size, origin = self.square_size, self.origin
         self.square_size = min(
             self.width / (self.visual_board_width + 2),
