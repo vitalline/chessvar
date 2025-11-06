@@ -119,6 +119,7 @@ class Board(Window):
         self.save_imported = False  # whether a save was successfully imported
         self.save_loaded = False  # whether a save was successfully loaded
         self.game_loaded = False  # whether the game had successfully loaded
+        self.do_auto_save = True  # whether to apply auto-saving rules (as defined in the config)
         self.skip_mouse_move = 0  # setting this to >=1 skips mouse movement events
         self.skip_caption_update = False  # setting this to True skips window caption updates
         self.highlight_square = None  # square that is being highlighted with the keyboard
@@ -7358,6 +7359,15 @@ class Board(Window):
             if selected_square:
                 self.select_piece(selected_square)
             self.show_moves()
+        if symbol == key.A:
+            if modifiers & key.MOD_ALT:  # Auto-save
+                if (
+                    self.board_config['autosave_act'] or
+                    self.board_config['autosave_ply'] or
+                    self.board_config['autosave_time']
+                ):
+                    self.do_auto_save = not self.do_auto_save
+                    self.log(f"Info: Auto-saving {'enabled' if self.do_auto_save else 'disabled'}", False)
         if symbol == key.T and modifiers & key.MOD_ACCEL:  # Trickster mode
             if self.color_scheme['scheme_type'] == 'cherub':
                 self.trickster_color_index = (
@@ -7518,7 +7528,8 @@ class Board(Window):
         self.save(get_file_path('save', 'json', self.board_config['save_path']))
 
     def auto_save(self) -> None:
-        self.save(get_file_path('auto', 'json', self.board_config['autosave_path']), auto=True)
+        if self.do_auto_save:
+            self.save(get_file_path('auto', 'json', self.board_config['autosave_path']), auto=True)
 
     def sync(self, get: bool = False, post: bool = False) -> bool | None:
         if not self.board_config['sync_data']:

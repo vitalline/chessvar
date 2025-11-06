@@ -99,6 +99,7 @@ Alt + R: reload last loaded game file
 ... + Shift: use last saved game file instead
 ... + F (instead of R): and reload move history
 Alt + S: save current position as starting position
+Alt + A: toggle auto-saving (if enabled in config)
 
 Edit hotkeys:
 Ctrl + E: toggle board edit mode
