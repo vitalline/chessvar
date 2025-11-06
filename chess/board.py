@@ -768,11 +768,8 @@ class Board(Window):
             self.roll_rng = Random(self.roll_seed)
 
         self.move_history = []
-
         self.reset_pieces()
-
-        self.draw(0)
-
+        self.draw_once(force=True)
         self.clear_theoretical_moves()
         self.unload_end_data()
         self.load_pieces()
@@ -1311,8 +1308,7 @@ class Board(Window):
             sprite_list.clear()
 
         self.reset_pieces(pieces)
-
-        self.draw(0)
+        self.draw_once(force=True)
 
         self.promotion_piece = load_piece(self, data.get('promotion'), c)
 
@@ -1474,11 +1470,8 @@ class Board(Window):
         self.roll_rng = Random(self.roll_seed)
 
         self.move_history = []
-
         self.reset_pieces({})
-
-        self.draw(0)
-
+        self.draw_once(force=True)
         self.clear_theoretical_moves()
         self.unload_end_data()
         self.load_pieces()
@@ -4298,7 +4291,7 @@ class Board(Window):
             self.load_moves()
             if update:
                 self.show_moves(with_markers=False)
-                self.draw(0)
+                self.draw_once()
                 self.select_piece(move.pos_to)
             else:
                 self.selected_square = move.pos_to
@@ -4410,7 +4403,7 @@ class Board(Window):
             old_color = self.highlight.color
             self.highlight.color = (0, 0, 0, 0)
             self.hide_moves()
-            self.draw(0)
+            self.draw_once()
             self.highlight.color = old_color
         return move
 
@@ -4503,7 +4496,7 @@ class Board(Window):
             old_color = self.highlight.color
             self.highlight.color = (0, 0, 0, 0)
             self.hide_moves()
-            self.draw(0)
+            self.draw_once()
             self.highlight.color = old_color
 
     def undo_last_move(self) -> None:
@@ -5435,7 +5428,7 @@ class Board(Window):
             old_color = self.highlight.color
             self.highlight.color = (0, 0, 0, 0)
             self.hide_moves()
-            self.draw(0)
+            self.draw_once()
             self.highlight.color = old_color
 
     def color_pieces(self, side: Side = Side.ANY, color: tuple[int, int, int] | None = None) -> None:
@@ -6132,9 +6125,18 @@ class Board(Window):
         self.is_active = False
         self.on_deactivate()
 
+    def draw_once(self, force: bool | None = None):
+        is_started = self.is_started
+        if force is not None:
+            self.is_started = force
+        self.draw(0)
+        self.is_started = is_started
+
     def on_draw(self) -> None:
         self.update_trickster_mode()
         self.clear()
+        if not self.is_started:
+            return
         for label_list in (self.row_label_list, self.col_label_list):
             for label in label_list:
                 label.draw()
@@ -6192,8 +6194,7 @@ class Board(Window):
             self.notation_offset,
             self.flip_mode,
         )
-        if self.is_started:
-            self.draw(0)
+        self.draw_once()
 
     def on_activate(self) -> None:
         if not self.is_active:
@@ -6638,7 +6639,7 @@ class Board(Window):
                     self.load_pieces()
                     self.load_moves()
                     self.show_moves(with_markers=False)
-                    self.draw(0)
+                    self.draw_once()
                     self.select_piece(move.pos_to)
                     if self.auto_moves and (
                         self.board_config['fast_moves'] or self.board_config['fast_chain']
@@ -6742,7 +6743,7 @@ class Board(Window):
                 if self.fullscreen:
                     self.to_windowed()
                 self.deactivate()
-                self.draw(0)
+                self.draw_once()
                 self.log("Info: Selecting a file to save to", False)
                 if not self.save_name and self.load_name:
                     save_path = save_menu(self.load_path, self.load_name)
@@ -7071,7 +7072,7 @@ class Board(Window):
                 if self.fullscreen:
                     self.to_windowed()
                 self.deactivate()
-                self.draw(0)
+                self.draw_once()
                 if modifiers & key.MOD_SHIFT:  # Request interval
                     self.log(f"Info: Setting request interval", False)
                     new_interval = prompt_integer(
@@ -7385,7 +7386,7 @@ class Board(Window):
                 if self.fullscreen:
                     self.to_windowed()
                 self.deactivate()
-                self.draw(0)
+                self.draw_once()
                 self.log(f"Info: Selecting a file to {'reload' if modifiers & key.MOD_SHIFT else 'load from'}", False)
                 if not self.load_name and self.save_name:
                     load_path = load_menu(self.save_path, self.save_name)
