@@ -6252,6 +6252,7 @@ class Board(Window):
             self.highlight.color = self.color_scheme['highlight_color']
             if not self.highlight_square:
                 self.hovered_square = hovered_square
+        self.hide_movable()
         self.show_moves()
 
     def on_deactivate(self) -> None:
@@ -6259,6 +6260,7 @@ class Board(Window):
         self.clicked_square = None
         self.held_buttons = 0
         self.highlight.color = (0, 0, 0, 0)
+        self.hide_movable()
         self.show_moves()
 
     def on_mouse_enter(self, x: int, y: int):
